@@ -15,6 +15,9 @@ public extension PureXML.Parsing {
         case invalidReference(String, Mark)
         case unexpectedEndTag(name: String, Mark)
         case junkAfterDocumentElement(Mark)
+        case nestingTooDeep(limit: Int, Mark)
+        case nameTooLong(limit: Int, Mark)
+        case contentTooLong(limit: Int, Mark)
         /// A `<!DOCTYPE ...>` declaration was found. DTD processing is disabled by
         /// default as a security posture (XXE, entity-expansion DoS); enabling it
         /// is a deliberate future opt-in, not silent behavior.
@@ -52,6 +55,12 @@ public extension PureXML.Parsing {
                 "unexpected end tag </\(name)> at \(mark)"
             case let .junkAfterDocumentElement(mark):
                 "content after the root element at \(mark)"
+            case let .nestingTooDeep(limit, mark):
+                "element nesting exceeds the limit of \(limit) at \(mark)"
+            case let .nameTooLong(limit, mark):
+                "name exceeds the length limit of \(limit) at \(mark)"
+            case let .contentTooLong(limit, mark):
+                "content exceeds the length limit of \(limit) at \(mark)"
             case let .unsupportedDoctype(mark):
                 "DTD processing is disabled (DOCTYPE at \(mark))"
             case let .notImplemented(detail):

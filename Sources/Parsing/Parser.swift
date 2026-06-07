@@ -16,15 +16,18 @@ public extension PureXML.Parsing {
         public init() {}
 
         /// Parses a single XML document from a string into a document node.
-        public func parse(_ xml: String) throws -> PureXML.Model.Node {
-            try build(EventReader(xml))
+        public func parse(_ xml: String, limits: Limits = .default) throws -> PureXML.Model.Node {
+            try build(EventReader(xml, limits: limits))
         }
 
         /// Parses a single XML document from an incremental character source. The
         /// closure returns the next character or nil at end of input, so the
         /// document can arrive in chunks and is never held whole.
-        public func parse(pulling pull: @escaping () -> Character?) throws -> PureXML.Model.Node {
-            try build(EventReader(pulling: pull))
+        public func parse(
+            pulling pull: @escaping () -> Character?,
+            limits: Limits = .default,
+        ) throws -> PureXML.Model.Node {
+            try build(EventReader(pulling: pull, limits: limits))
         }
 
         private func build(_ source: EventReader) throws -> PureXML.Model.Node {

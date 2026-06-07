@@ -85,6 +85,37 @@ struct ParsingTests {
         }
     }
 
+    @Test("Nesting beyond the depth limit is rejected")
+    func test_depthLimitRejected() {
+        let limits = PureXML.Parsing.Limits(maxDepth: 3)
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<a><b><c><d>x</d></c></b></a>", limits: limits)
+        }
+    }
+
+    @Test("Nesting within the depth limit parses")
+    func test_depthWithinLimit() throws {
+        let limits = PureXML.Parsing.Limits(maxDepth: 5)
+        let node = try PureXML.parse("<a><b><c>x</c></b></a>", limits: limits)
+        #expect(node.firstElement?.name.localName == "a")
+    }
+
+    @Test("Names over the length limit are rejected")
+    func test_nameLimitRejected() {
+        let limits = PureXML.Parsing.Limits(maxNameLength: 4)
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<abcdefgh/>", limits: limits)
+        }
+    }
+
+    @Test("Content over the length limit is rejected")
+    func test_contentLimitRejected() {
+        let limits = PureXML.Parsing.Limits(maxContentLength: 5)
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<a>abcdefghij</a>", limits: limits)
+        }
+    }
+
     @Test("Streams events one at a time without building a tree")
     func test_streamsEvents() throws {
         var reader = PureXML.events("<r a=\"1\">hi<b/></r>")

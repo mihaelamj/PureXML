@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Configurable, bounded-by-default parser limits (`PureXML.Parsing.Limits`):
+  maximum nesting depth (default 256), name length, and content length, enforced
+  during scanning. Protects against pathological input and keeps the recursive
+  node model safe to build and tear down. Threaded through `parse`/`events`.
 - Initial package scaffold: root Swift package, namespacing under `PureXML`, and
   the portability and verification gates carried over from PureYAML.
 - XML node model (`PureXML.Model`): `Node`, `Element`, `Attribute`, and
@@ -27,3 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   processing instructions. Safe by default: `<!DOCTYPE>` is rejected (no DTD/XXE).
 - Top-level API: `PureXML.parse(_:)`, `PureXML.parse(pulling:)`, and
   `PureXML.events(_:)` / `PureXML.events(pulling:)` for streaming.
+
+### Changed
+
+- The emitter is now iterative (explicit work stack, not recursion), mirroring
+  libxml2's approach, so deep trees do not overflow the call stack.
+- The emitter escapes tab/newline/CR (and `>`) in attribute values so attributes
+  round-trip through spec-compliant parsers; mixed content is no longer
+  reformatted (formatting is suppressed for elements with text/CDATA children).

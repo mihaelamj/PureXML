@@ -10,9 +10,10 @@ public extension PureXML.Parsing {
     ///
     /// Safe by default: a `<!DOCTYPE ...>` declaration is rejected rather than
     /// processed, removing the DTD-based threat classes (XXE, entity-expansion
-    /// DoS) at the door.
+    /// DoS) at the door. Bounded ``Limits`` cap depth, name, and content size.
     struct EventReader {
         private var reader: Reader
+        private let limits: Limits
         private var open: [PureXML.Model.QualifiedName] = []
         private var pending: [Event] = []
         private var sawRoot = false
@@ -20,13 +21,15 @@ public extension PureXML.Parsing {
 
         /// Creates a reader over a character-pulling source. The closure returns
         /// the next character or nil at end of input.
-        init(pulling pull: @escaping () -> Character?) {
+        init(pulling pull: @escaping () -> Character?, limits: Limits = .default) {
             reader = Reader(pulling: pull)
+            self.limits = limits
         }
 
         /// Creates a reader over a string (a convenience over the streaming init).
-        init(_ string: String) {
+        init(_ string: String, limits: Limits = .default) {
             reader = Reader(string)
+            self.limits = limits
         }
 
         /// Returns the next event, or nil at the end of the document.
@@ -52,26 +55,19 @@ public extension PureXML.Parsing {
                 if reader.matches("<!--") {
                     return try scanComment()
                 }
-                if reader.matches("<![CDATA[") {
-                    throw ParseError.unexpectedCharacter("[", reader.mark)
-                }
                 if reader.matches("<?") {
                     let instruction = try scanProcessingInstruction()
-                    if instruction.target.lowercased() == "xml" {
-                        continue
-                    }
+                    if instruction.target.lowercased() == "xml" { continue }
                     return .processingInstruction(target: instruction.target, data: instruction.data)
                 }
                 if reader.matches("<!DOCTYPE") {
                     throw ParseError.unsupportedDoctype(reader.mark)
                 }
-                if reader.matches("</") {
-                    throw ParseError.unexpectedEndTag(name: "", reader.mark)
+                if reader.matches("</") || reader.matches("<![CDATA[") {
+                    throw ParseError.junkAfterDocumentElement(reader.mark)
                 }
                 if lead == "<" {
-                    if sawRoot {
-                        throw ParseError.junkAfterDocumentElement(reader.mark)
-                    }
+                    guard !sawRoot else { throw ParseError.junkAfterDocumentElement(reader.mark) }
                     return try scanStartTag()
                 }
                 throw ParseError.junkAfterDocumentElement(reader.mark)
@@ -82,15 +78,9 @@ public extension PureXML.Parsing {
             guard let lead = reader.peek() else {
                 throw ParseError.unexpectedEndOfInput(reader.mark)
             }
-            if reader.matches("</") {
-                return try scanEndTag()
-            }
-            if reader.matches("<!--") {
-                return try scanComment()
-            }
-            if reader.matches("<![CDATA[") {
-                return try scanCDATA()
-            }
+            if reader.matches("</") { return try scanEndTag() }
+            if reader.matches("<!--") { return try scanComment() }
+            if reader.matches("<![CDATA[") { return try scanCDATA() }
             if reader.matches("<?") {
                 let instruction = try scanProcessingInstruction()
                 return .processingInstruction(target: instruction.target, data: instruction.data)
@@ -98,13 +88,14 @@ public extension PureXML.Parsing {
             if reader.matches("<!DOCTYPE") {
                 throw ParseError.unsupportedDoctype(reader.mark)
             }
-            if lead == "<" {
-                return try scanStartTag()
-            }
+            if lead == "<" { return try scanStartTag() }
             return try scanText()
         }
 
         private mutating func scanStartTag() throws -> Event {
+            guard open.count < limits.maxDepth else {
+                throw ParseError.nestingTooDeep(limit: limits.maxDepth, reader.mark)
+            }
             reader.consume("<")
             let name = try scanName()
             let attributes = try scanAttributes()
@@ -142,7 +133,10 @@ public extension PureXML.Parsing {
         private mutating func scanText() throws -> Event {
             let mark = reader.mark
             var raw = ""
+            var length = 0
             while let character = reader.peek(), character != "<" {
+                length += 1
+                try checkContent(length, mark)
                 raw.append(character)
                 reader.advance()
             }
@@ -153,10 +147,13 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             reader.consume("<!--")
             var content = ""
+            var length = 0
             while !reader.matches("-->") {
                 guard let character = reader.advance() else {
                     throw ParseError.unterminatedComment(mark)
                 }
+                length += 1
+                try checkContent(length, mark)
                 content.append(character)
             }
             reader.consume("-->")
@@ -167,10 +164,13 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             reader.consume("<![CDATA[")
             var content = ""
+            var length = 0
             while !reader.matches("]]>") {
                 guard let character = reader.advance() else {
                     throw ParseError.unterminatedCDATA(mark)
                 }
+                length += 1
+                try checkContent(length, mark)
                 content.append(character)
             }
             reader.consume("]]>")
@@ -183,10 +183,13 @@ public extension PureXML.Parsing {
             let target = try scanName()
             reader.skipSpace()
             var data = ""
+            var length = 0
             while !reader.matches("?>") {
                 guard let character = reader.advance() else {
                     throw ParseError.unterminatedTag(mark)
                 }
+                length += 1
+                try checkContent(length, mark)
                 data.append(character)
             }
             reader.consume("?>")
@@ -223,7 +226,10 @@ public extension PureXML.Parsing {
             }
             reader.advance()
             var raw = ""
+            var length = 0
             while let character = reader.peek(), character != quote {
+                length += 1
+                try checkContent(length, mark)
                 raw.append(character)
                 reader.advance()
             }
@@ -234,15 +240,27 @@ public extension PureXML.Parsing {
         }
 
         private mutating func scanName() throws -> PureXML.Model.QualifiedName {
+            let mark = reader.mark
             guard let first = reader.peek(), first.isXMLNameStart else {
                 throw ParseError.expectedName(reader.mark)
             }
             var raw = ""
+            var length = 0
             while let character = reader.peek(), character.isXMLNameContinuation {
+                length += 1
+                guard length <= limits.maxNameLength else {
+                    throw ParseError.nameTooLong(limit: limits.maxNameLength, mark)
+                }
                 raw.append(character)
                 reader.advance()
             }
             return PureXML.Model.QualifiedName(raw)
+        }
+
+        private func checkContent(_ length: Int, _ mark: Mark) throws {
+            guard length <= limits.maxContentLength else {
+                throw ParseError.contentTooLong(limit: limits.maxContentLength, mark)
+            }
         }
     }
 }
