@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   macos:
@@ -22,6 +23,8 @@ jobs:
       - name: Install format and lint tools
         run: brew install swiftformat swiftlint
       - name: Repository gates
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           bash scripts/check-style.sh
           bash scripts/check-namespacing.sh
