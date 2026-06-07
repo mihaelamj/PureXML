@@ -10,20 +10,131 @@ struct ParsingTests {
         }
     }
 
-    /// The tokenizing parser is not implemented yet. This test pins the current
-    /// contract so the gap is explicit rather than a silent partial parse.
-    @Test("Non-empty input reports the parser is not implemented yet")
-    func test_nonEmptyInputNotImplemented() {
-        do {
-            _ = try PureXML.parse("<root/>")
-            Issue.record("expected parse to throw notImplemented")
-        } catch let error as PureXML.Parsing.ParseError {
-            guard case .notImplemented = error else {
-                Issue.record("expected notImplemented, got \(error)")
-                return
-            }
-        } catch {
-            Issue.record("unexpected error: \(error)")
+    @Test("Parses an empty element")
+    func test_parsesEmptyElement() throws {
+        let node = try PureXML.parse("<root/>")
+        guard case let .document(children) = node else {
+            Issue.record("expected a document node")
+            return
         }
+        #expect(children == [.element(.init("root"))])
+    }
+
+    @Test("Parses attributes, decoding entities")
+    func test_parsesAttributes() throws {
+        let node = try PureXML.parse("<a href=\"x?b=1&amp;c=2\" id='bk1'/>")
+        let element = node.firstElement
+        #expect(element?.attributes == [.init("href", "x?b=1&c=2"), .init("id", "bk1")])
+    }
+
+    @Test("Parses nested elements and text with entities")
+    func test_parsesNestedAndText() throws {
+        let node = try PureXML.parse("<p>1 &lt; 2 &amp; ok<b>x</b></p>")
+        let paragraph = node.firstElement
+        #expect(paragraph?.name.localName == "p")
+        #expect(paragraph?.children.first == .text("1 < 2 & ok"))
+        #expect(paragraph?.children.last == .element(.init("b", children: [.text("x")])))
+    }
+
+    @Test("Parses comments, CDATA, and processing instructions")
+    func test_parsesMiscNodes() throws {
+        let node = try PureXML.parse("<r><!--c--><![CDATA[a<b]]><?pi go?></r>")
+        let root = node.firstElement
+        #expect(root?.children == [
+            .comment("c"),
+            .cdata("a<b"),
+            .processingInstruction(target: "pi", data: "go"),
+        ])
+    }
+
+    @Test("Skips an XML declaration in the prolog")
+    func test_skipsXMLDeclaration() throws {
+        let node = try PureXML.parse("<?xml version=\"1.0\"?>\n<root>hi</root>")
+        #expect(node.firstElement?.text == "hi")
+    }
+
+    @Test("Round-trips through the serializer")
+    func test_roundTripsSerializerOutput() throws {
+        let original = PureXML.Model.Element(
+            "catalog",
+            children: [.element(.init("book", attributes: [.init("id", "bk101")], children: [.text("A & B")]))],
+        )
+        let xml = PureXML.serialize(.element(original), options: .compact)
+        let reparsed = try PureXML.parse(xml)
+        #expect(reparsed.firstElement == original)
+    }
+
+    @Test("Mismatched end tag is an error")
+    func test_mismatchedEndTagThrows() {
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<a></b>")
+        }
+    }
+
+    @Test("DOCTYPE is rejected by default (security posture)")
+    func test_doctypeRejected() {
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<!DOCTYPE a><a/>")
+        }
+    }
+
+    @Test("Unterminated tag is an error")
+    func test_unterminatedTagThrows() {
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            try PureXML.parse("<a><b></a>")
+        }
+    }
+
+    @Test("Streams events one at a time without building a tree")
+    func test_streamsEvents() throws {
+        var reader = PureXML.events("<r a=\"1\">hi<b/></r>")
+        var events: [PureXML.Parsing.Event] = []
+        while let event = try reader.next() {
+            events.append(event)
+        }
+        #expect(events == [
+            .startElement(name: .init("r"), attributes: [.init("a", "1")]),
+            .characters("hi"),
+            .startElement(name: .init("b"), attributes: []),
+            .endElement(name: .init("b")),
+            .endElement(name: .init("r")),
+        ])
+    }
+
+    /// Proves the parser does not require the whole string at once: the source is
+    /// a closure pulling characters across separate chunks, never joined.
+    @Test("Parses from an incremental, chunked character source")
+    func test_parsesFromChunkedSource() throws {
+        let chunks = ["<ro", "ot a", "=", "'1'>", "te", "xt<c/>", "</roo", "t>"]
+        var chunkIterator = chunks.makeIterator()
+        var charIterator = (chunkIterator.next() ?? "").makeIterator()
+        let pull: () -> Character? = {
+            while true {
+                if let character = charIterator.next() {
+                    return character
+                }
+                guard let nextChunk = chunkIterator.next() else {
+                    return nil
+                }
+                charIterator = nextChunk.makeIterator()
+            }
+        }
+
+        let node = try PureXML.parse(pulling: pull)
+        let root = node.firstElement
+        #expect(root?.name.localName == "root")
+        #expect(root?.attributes == [.init("a", "1")])
+        #expect(root?.children.first == .text("text"))
+        #expect(root?.children.last == .element(.init("c")))
+    }
+}
+
+private extension PureXML.Model.Node {
+    var firstElement: PureXML.Model.Element? {
+        guard case let .document(children) = self else { return element }
+        for child in children {
+            if case let .element(element) = child { return element }
+        }
+        return nil
     }
 }

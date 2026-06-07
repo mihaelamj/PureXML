@@ -21,8 +21,8 @@ follows the same structure, rules, and verification gates.
 
 ## Status
 
-This is an early scaffold. The node model and the emitter are implemented and
-usable today; the tokenizing parser is still being built.
+The node model, the emitter, and a streaming parser are implemented and usable
+today.
 
 - **Model** (`PureXML.Model`): `Node`, `Element`, `Attribute`, `QualifiedName`.
   Preserves document order and the distinction between text, CDATA, comments,
@@ -33,10 +33,15 @@ usable today; the tokenizing parser is still being built.
 - **Validation** (`PureXML.Validation`): structural checks such as duplicate
   attribute names. Schema validation (DTD/XSD/RELAX NG) is out of scope for the
   library target.
-- **Parsing** (`PureXML.Parsing`): the public surface (`Parser`, `ParseError`,
-  `Mark`) is stable. `PureXML.parse(_:)` currently raises
-  `ParseError.notImplemented` so callers can wire against the final API before
-  the scanner lands. The gap is pinned by a test rather than left silent.
+- **Parsing** (`PureXML.Parsing`): a streaming, iterative parser. `EventReader`
+  is a pull-based event core that consumes input through a character-source
+  closure and emits one `Event` at a time, never holding the whole document in
+  memory (it drives chunked input). `Parser` builds a `Model.Node` tree
+  iteratively over the event core. Handles elements, attributes, text, the five
+  predefined entities and numeric character references, comments, CDATA, and
+  processing instructions. Safe by default: `<!DOCTYPE>` is rejected, which
+  removes the DTD-based threat classes (XXE, entity-expansion DoS). DTD support,
+  namespaces-as-resolved-URIs, and validation are deliberate future layers.
 
 ## Usage
 
@@ -53,8 +58,14 @@ let element = PureXML.Model.Element(
 let xml = PureXML.serialize(.element(element))
 try PureXML.validate(.element(element))
 
-// Parsing is not implemented yet:
-// let node = try PureXML.parse(xml)
+// Parse it back into a tree.
+let node = try PureXML.parse(xml)
+
+// Or stream events without building a tree (drives chunked input too).
+var reader = PureXML.events(xml)
+while let event = try reader.next() {
+    // handle .startElement / .characters / .endElement / ...
+}
 ```
 
 ## Attribution

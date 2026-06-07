@@ -9,6 +9,16 @@ public extension PureXML.Parsing {
         case unterminatedCDATA(Mark)
         case mismatchedEndTag(expected: String, found: String, Mark)
         case duplicateAttribute(name: String, Mark)
+        case expectedName(Mark)
+        case expectedEquals(Mark)
+        case unquotedAttributeValue(Mark)
+        case invalidReference(String, Mark)
+        case unexpectedEndTag(name: String, Mark)
+        case junkAfterDocumentElement(Mark)
+        /// A `<!DOCTYPE ...>` declaration was found. DTD processing is disabled by
+        /// default as a security posture (XXE, entity-expansion DoS); enabling it
+        /// is a deliberate future opt-in, not silent behavior.
+        case unsupportedDoctype(Mark)
         /// Raised by entry points whose parsing path is not implemented yet.
         case notImplemented(String)
 
@@ -30,6 +40,20 @@ public extension PureXML.Parsing {
                 "expected </\(expected)> but found </\(found)> at \(mark)"
             case let .duplicateAttribute(name, mark):
                 "duplicate attribute '\(name)' at \(mark)"
+            case let .expectedName(mark):
+                "expected a name at \(mark)"
+            case let .expectedEquals(mark):
+                "expected '=' after attribute name at \(mark)"
+            case let .unquotedAttributeValue(mark):
+                "attribute value must be quoted at \(mark)"
+            case let .invalidReference(reference, mark):
+                "invalid reference '\(reference)' at \(mark)"
+            case let .unexpectedEndTag(name, mark):
+                "unexpected end tag </\(name)> at \(mark)"
+            case let .junkAfterDocumentElement(mark):
+                "content after the root element at \(mark)"
+            case let .unsupportedDoctype(mark):
+                "DTD processing is disabled (DOCTYPE at \(mark))"
             case let .notImplemented(detail):
                 "not implemented: \(detail)"
             }

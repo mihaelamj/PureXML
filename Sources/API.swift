@@ -8,6 +8,25 @@ public extension PureXML {
         try Parsing.Parser().parse(xml)
     }
 
+    /// Parses an XML document from an incremental character source into a
+    /// ``Model/Node`` tree. The closure returns the next character or nil at end
+    /// of input, so the document can arrive in chunks and is never held whole.
+    static func parse(pulling pull: @escaping () -> Character?) throws -> Model.Node {
+        try Parsing.Parser().parse(pulling: pull)
+    }
+
+    /// Returns a streaming ``Parsing/EventReader`` over an XML string. Pull events
+    /// one at a time with `next()` to process documents without building a tree.
+    static func events(_ xml: String) -> Parsing.EventReader {
+        Parsing.EventReader(xml)
+    }
+
+    /// Returns a streaming ``Parsing/EventReader`` over an incremental character
+    /// source, for processing arbitrarily large or chunked input.
+    static func events(pulling pull: @escaping () -> Character?) -> Parsing.EventReader {
+        Parsing.EventReader(pulling: pull)
+    }
+
     /// Serializes a ``Model/Node`` tree into XML with the selected options.
     static func serialize(
         _ node: Model.Node,
