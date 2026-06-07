@@ -14,6 +14,7 @@ public extension PureXML.Parsing {
         case unquotedAttributeValue(Mark)
         case invalidReference(String, Mark)
         case unexpectedEndTag(name: String, Mark)
+        case undefinedNamespacePrefix(prefix: String, Mark)
         case junkAfterDocumentElement(Mark)
         case nestingTooDeep(limit: Int, Mark)
         case nameTooLong(limit: Int, Mark)
@@ -56,6 +57,8 @@ public extension PureXML.Parsing {
                 "invalid reference '\(reference)' at \(mark)"
             case let .unexpectedEndTag(name, mark):
                 "unexpected end tag </\(name)> at \(mark)"
+            case let .undefinedNamespacePrefix(prefix, mark):
+                "namespace prefix '\(prefix)' is not bound at \(mark)"
             case let .junkAfterDocumentElement(mark):
                 "content after the root element at \(mark)"
             case let .nestingTooDeep(limit, mark):

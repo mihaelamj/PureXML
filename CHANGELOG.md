@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Namespace resolution. Qualified names now carry an optional resolved
+  `namespaceURI`, populated by the parser from in-scope `xmlns` declarations at
+  the start-element boundary (the libxml2 SAX2 model). A default namespace applies
+  to unprefixed element names but not attributes, the `xml` prefix is built in,
+  `xmlns` declarations are preserved as attributes for round-trip, and an unbound
+  prefix raises `ParseError.undefinedNamespacePrefix`. Namespace-free documents
+  are unchanged (URIs stay nil).
 - Byte input with encoding detection. `PureXML.parse(bytes:)` and
   `PureXML.events(bytes:)` accept raw `[UInt8]` and detect the encoding (UTF-8 or
   UTF-16, with or without a byte-order mark) following the XML sniff order, then

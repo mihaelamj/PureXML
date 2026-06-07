@@ -53,7 +53,7 @@ flowchart TB
   Escape["Iterative emitter + escaping"]:::done
   Limits["Bounded-by-default limits"]:::done
   Bytes["Byte input + encoding detection"]:::done
-  Namespaces["Namespace resolution"]:::todo
+  Namespaces["Namespace resolution"]:::done
   ByteStream["Streaming byte decode"]:::todo
   DTD["Optional DTD + entities"]:::todo
   Validation["Schema validation"]:::todo

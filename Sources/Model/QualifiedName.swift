@@ -7,13 +7,25 @@ public extension PureXML.Model {
         /// The local part of the name (`element` in `xs:element`).
         public var localName: String
 
-        public init(prefix: String? = nil, localName: String) {
+        /// The resolved namespace URI, or nil when the name is in no namespace or
+        /// has not been namespace-resolved. Populated by the parser from in-scope
+        /// `xmlns` declarations; nil for names built directly.
+        public var namespaceURI: String?
+
+        public init(prefix: String? = nil, localName: String, namespaceURI: String? = nil) {
             self.prefix = prefix
             self.localName = localName
+            self.namespaceURI = namespaceURI
+        }
+
+        /// Returns a copy of this name carrying the given resolved namespace URI.
+        public func resolved(namespaceURI: String?) -> QualifiedName {
+            QualifiedName(prefix: prefix, localName: localName, namespaceURI: namespaceURI)
         }
 
         /// Parses a raw `prefix:local` or bare `local` name.
         public init(_ raw: String) {
+            namespaceURI = nil
             if let colon = raw.firstIndex(of: ":") {
                 let head = String(raw[raw.startIndex ..< colon])
                 let tail = String(raw[raw.index(after: colon)...])

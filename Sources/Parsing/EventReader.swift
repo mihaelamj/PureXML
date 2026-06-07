@@ -15,6 +15,7 @@ public extension PureXML.Parsing {
         private var reader: Reader
         private let limits: Limits
         private var open: [PureXML.Model.QualifiedName] = []
+        private var namespaces = NamespaceContext()
         private var pending: [Event] = []
         private var sawRoot = false
         private var primed = false
@@ -96,20 +97,23 @@ public extension PureXML.Parsing {
             guard open.count < limits.maxDepth else {
                 throw ParseError.nestingTooDeep(limit: limits.maxDepth, reader.mark)
             }
+            let mark = reader.mark
             reader.consume("<")
-            let name = try scanName()
-            let attributes = try scanAttributes()
+            let rawName = try scanName()
+            let rawAttributes = try scanAttributes()
+            let resolved = try namespaces.enterElement(name: rawName, attributes: rawAttributes, at: mark)
             if reader.consume("/>") {
-                pending.append(.endElement(name: name))
+                namespaces.leaveElement()
+                pending.append(.endElement(name: resolved.name))
                 sawRoot = true
-                return .startElement(name: name, attributes: attributes)
+                return .startElement(name: resolved.name, attributes: resolved.attributes)
             }
             guard reader.consume(">") else {
                 throw ParseError.unterminatedTag(reader.mark)
             }
-            open.append(name)
+            open.append(resolved.name)
             sawRoot = true
-            return .startElement(name: name, attributes: attributes)
+            return .startElement(name: resolved.name, attributes: resolved.attributes)
         }
 
         private mutating func scanEndTag() throws -> Event {
@@ -123,11 +127,14 @@ public extension PureXML.Parsing {
             guard let top = open.last else {
                 throw ParseError.unexpectedEndTag(name: name.description, mark)
             }
-            guard top == name else {
+            // Tag matching is lexical (the qualified-name text must match); the
+            // open name additionally carries its resolved namespace URI.
+            guard top.description == name.description else {
                 throw ParseError.mismatchedEndTag(expected: top.description, found: name.description, mark)
             }
             open.removeLast()
-            return .endElement(name: name)
+            namespaces.leaveElement()
+            return .endElement(name: top)
         }
 
         private mutating func scanText() throws -> Event {
