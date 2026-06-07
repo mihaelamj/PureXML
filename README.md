@@ -19,6 +19,56 @@ intentionally strict about portability:
 It is a sibling project to [PureYAML](https://github.com/mihaelamj/PureYAML) and
 follows the same structure, rules, and verification gates.
 
+## Roadmap
+
+The roadmap uses the TileDown Mermaid palette: green for shipped work, yellow for
+review, purple for epic grouping, and gray for open work.
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  LDone["In main now"]:::done
+  LReview["PR in review"]:::review
+  LEpic["Epic grouping"]:::epic
+  LTodo["Open issue, no PR"]:::todo
+  LDone --> LReview
+  LReview --> LEpic
+  LEpic --> LTodo
+```
+
+Capability is being grown toward libxml2 parity in pure Swift, guided by the
+private PureXML-research analysis. Shipped vs open work:
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Model["Node model + emitter"]:::done
+  Stream["Streaming pull parser"]:::done
+  Escape["Iterative emitter + escaping"]:::done
+  Limits["Bounded-by-default limits"]:::done
+  Bytes["Byte input + encoding detection"]:::done
+  Namespaces["Namespace resolution"]:::todo
+  ByteStream["Streaming byte decode"]:::todo
+  DTD["Optional DTD + entities"]:::todo
+  Validation["Schema validation"]:::todo
+  XPath["XPath 1.0"]:::todo
+  Model --> Stream
+  Stream --> Escape
+  Escape --> Limits
+  Limits --> Bytes
+  Bytes --> Namespaces
+  Namespaces --> ByteStream
+  ByteStream --> DTD
+  DTD --> Validation
+  Validation --> XPath
+```
+
 ## Status
 
 The node model, the emitter, and a streaming parser are implemented and usable
