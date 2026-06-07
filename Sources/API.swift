@@ -64,6 +64,20 @@ public extension PureXML {
         return Parsing.EventReader(pulling: { decoder.next() }, limits: limits)
     }
 
+    /// Parses an XML document and validates its tree against the DTD content
+    /// models declared in its internal subset, returning the validation issues.
+    /// DTD processing must be enabled (`Limits(allowDoctype: true)`); without a
+    /// DTD the result is empty.
+    static func validateAgainstInternalDTD(
+        _ xml: String,
+        limits: Parsing.Limits = .init(allowDoctype: true),
+        strict: Bool = false,
+    ) throws -> [Validation.Issue] {
+        let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits)
+        let schema = Validation.DTDSchema(elementModels: parsed.documentType.elementModels)
+        return schema.validate(parsed.node, strict: strict)
+    }
+
     /// Compiles and evaluates an XPath query over a node, returning the selected
     /// node-set. Compile once with ``XPath/Query`` to reuse a query.
     static func xpath(_ path: String, over node: Model.Node) throws -> [XPath.Selection] {

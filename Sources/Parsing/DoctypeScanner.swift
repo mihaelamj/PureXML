@@ -9,7 +9,7 @@ extension PureXML.Parsing {
     /// and notation declarations are skipped as well. Parameter entities are not
     /// supported and their declarations and references are skipped.
     enum DoctypeScanner {
-        static func scan(_ reader: inout Reader, limits: Limits) throws -> [String: String] {
+        static func scan(_ reader: inout Reader, limits: Limits) throws -> DocumentType {
             let mark = reader.mark
             guard limits.allowDoctype else {
                 throw ParseError.unsupportedDoctype(mark)
@@ -20,20 +20,20 @@ extension PureXML.Parsing {
             while let character = reader.peek(), character != "[", character != ">" {
                 reader.advance()
             }
-            var entities: [String: String] = [:]
+            var doctype = DocumentType()
             if reader.consume("[") {
-                try scanInternalSubset(&reader, into: &entities, at: mark)
+                try scanInternalSubset(&reader, into: &doctype, at: mark)
             }
             reader.skipSpace()
             guard reader.consume(">") else {
                 throw ParseError.unterminatedTag(mark)
             }
-            return entities
+            return doctype
         }
 
         private static func scanInternalSubset(
             _ reader: inout Reader,
-            into entities: inout [String: String],
+            into doctype: inout DocumentType,
             at mark: Mark,
         ) throws {
             while true {
@@ -45,7 +45,9 @@ extension PureXML.Parsing {
                     return
                 }
                 if reader.matches("<!ENTITY") {
-                    try scanEntityDeclaration(&reader, into: &entities)
+                    try scanEntityDeclaration(&reader, into: &doctype.entities)
+                } else if reader.matches("<!ELEMENT") {
+                    scanElementDeclaration(&reader, into: &doctype.elementModels)
                 } else if reader.matches("<!--") {
                     skip(&reader, until: "-->")
                 } else if reader.matches("<?") {
@@ -57,6 +59,25 @@ extension PureXML.Parsing {
                 } else {
                     reader.advance()
                 }
+            }
+        }
+
+        private static func scanElementDeclaration(
+            _ reader: inout Reader,
+            into elementModels: inout [String: String],
+        ) {
+            reader.consume("<!ELEMENT")
+            reader.skipSpace()
+            let name = scanName(&reader)
+            reader.skipSpace()
+            var model = ""
+            while let character = reader.peek(), character != ">" {
+                model.append(character)
+                reader.advance()
+            }
+            reader.consume(">")
+            if !name.isEmpty {
+                elementModels[name] = model.trimmingXMLWhitespace()
             }
         }
 

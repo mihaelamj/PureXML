@@ -39,8 +39,11 @@ flowchart TB
   LEpic --> LTodo
 ```
 
-Capability is being grown toward libxml2 parity in pure Swift, guided by the
-private PureXML-research analysis. Shipped vs open work:
+Capability is grown toward libxml2 parity in pure Swift, guided by the private
+PureXML-research analysis. The streaming parser/emitter core is complete
+(parsing, emitting, namespaces, byte input and streaming decode, optional DTD
+with entities, DTD content-model validation, and an XPath 1.0 subset). The
+collapsed core plus the next open work:
 
 ```mermaid
 flowchart TB
@@ -48,25 +51,15 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Model["Node model + emitter"]:::done
-  Stream["Streaming pull parser"]:::done
-  Escape["Iterative emitter + escaping"]:::done
-  Limits["Bounded-by-default limits"]:::done
-  Bytes["Byte input + encoding detection"]:::done
-  Namespaces["Namespace resolution"]:::done
-  ByteStream["Streaming byte decode"]:::done
-  DTD["Optional DTD + entities"]:::done
-  Validation["Schema validation"]:::todo
-  XPath["XPath 1.0 subset"]:::done
-  Model --> Stream
-  Stream --> Escape
-  Escape --> Limits
-  Limits --> Bytes
-  Bytes --> Namespaces
-  Namespaces --> ByteStream
-  ByteStream --> DTD
-  DTD --> Validation
-  Validation --> XPath
+  Core["Streaming core: parse, emit, namespaces, bytes, DTD, validation, XPath"]:::done
+  Attlist["ATTLIST validation"]:::todo
+  Schema["XSD / RELAX NG"]:::todo
+  Push["Push / feed streaming API"]:::todo
+  Xslt["XSLT 1.0"]:::todo
+  Core --> Attlist
+  Attlist --> Schema
+  Schema --> Push
+  Push --> Xslt
 ```
 
 ## Status

@@ -86,6 +86,20 @@ extension PureXML.Parsing {
     }
 }
 
+extension StringProtocol {
+    /// Trims leading and trailing XML whitespace without Foundation.
+    func trimmingXMLWhitespace() -> String {
+        var slice = self[...]
+        while let first = slice.first, first.isXMLWhitespace {
+            slice = slice.dropFirst()
+        }
+        while let last = slice.last, last.isXMLWhitespace {
+            slice = slice.dropLast()
+        }
+        return String(slice)
+    }
+}
+
 extension Character {
     /// XML S production: space, tab, carriage return, line feed.
     var isXMLWhitespace: Bool {

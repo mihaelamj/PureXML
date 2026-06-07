@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DTD content-model validation. The parser now surfaces the `<!DOCTYPE>` internal
+  subset's `<!ELEMENT>` declarations (`PureXML.Parsing.DocumentType`, via
+  `Parser.parseWithDocumentType`), and `PureXML.Validation.DTDSchema` validates a
+  tree against them: `EMPTY`, `ANY`, `(#PCDATA)`, mixed content, and element
+  content models (sequence/choice with `?`/`*`/`+`, matched as a regular language
+  over child element names). `PureXML.validateAgainstInternalDTD(_:)` parses and
+  validates in one call. `<!ATTLIST>` validation is not yet covered.
 - XPath query support (a practical subset). `PureXML.XPath.Query` compiles a
   location path and evaluates it over a node; `PureXML.xpath(_:over:)` is the
   one-shot convenience. Supports the forward axes (child, descendant `//`, self

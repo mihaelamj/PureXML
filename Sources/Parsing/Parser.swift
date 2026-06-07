@@ -17,6 +17,15 @@ public extension PureXML.Parsing {
 
         /// Parses a single XML document from a string into a document node.
         public func parse(_ xml: String, limits: Limits = .default) throws -> PureXML.Model.Node {
+            try build(EventReader(xml, limits: limits)).node
+        }
+
+        /// Parses a string and surfaces the parsed DTD (entities and element
+        /// content models) alongside the tree, for schema validation.
+        public func parseWithDocumentType(
+            _ xml: String,
+            limits: Limits = .default,
+        ) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
             try build(EventReader(xml, limits: limits))
         }
 
@@ -33,7 +42,7 @@ public extension PureXML.Parsing {
             pulling pull: @escaping () -> Character?,
             limits: Limits = .default,
         ) throws -> PureXML.Model.Node {
-            try build(EventReader(pulling: pull, limits: limits))
+            try build(EventReader(pulling: pull, limits: limits)).node
         }
 
         /// Parses a single XML document from an incremental BYTE source, decoding
@@ -44,10 +53,10 @@ public extension PureXML.Parsing {
             limits: Limits = .default,
         ) throws -> PureXML.Model.Node {
             var decoder = StreamingDecoder(pullingBytes: pull)
-            return try build(EventReader(pulling: { decoder.next() }, limits: limits))
+            return try build(EventReader(pulling: { decoder.next() }, limits: limits)).node
         }
 
-        private func build(_ source: EventReader) throws -> PureXML.Model.Node {
+        private func build(_ source: EventReader) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
             var reader = source
             var roots: [PureXML.Model.Node] = []
             var stack: [ElementFrame] = []
@@ -82,7 +91,7 @@ public extension PureXML.Parsing {
             guard produced else {
                 throw ParseError.emptyDocument
             }
-            return .document(roots)
+            return (.document(roots), reader.documentType)
         }
 
         private func attach(
