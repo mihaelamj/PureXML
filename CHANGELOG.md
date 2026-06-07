@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Byte input with encoding detection. `PureXML.parse(bytes:)` and
+  `PureXML.events(bytes:)` accept raw `[UInt8]` and detect the encoding (UTF-8 or
+  UTF-16, with or without a byte-order mark) following the XML sniff order, then
+  decode with the Swift standard library (no Foundation). `PureXML.Parsing.
+  InputEncoding.detect(_:)` exposes the detector. Malformed input (such as an
+  odd-length UTF-16 stream) raises `ParseError.malformedEncoding`.
 - Configurable, bounded-by-default parser limits (`PureXML.Parsing.Limits`):
   maximum nesting depth (default 256), name length, and content length, enforced
   during scanning. Protects against pathological input and keeps the recursive

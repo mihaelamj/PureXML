@@ -20,6 +20,12 @@ public extension PureXML.Parsing {
             try build(EventReader(xml, limits: limits))
         }
 
+        /// Parses a single XML document from raw bytes, detecting the encoding
+        /// (UTF-8 or UTF-16, with or without a byte-order mark) before parsing.
+        public func parse(bytes: [UInt8], limits: Limits = .default) throws -> PureXML.Model.Node {
+            try parse(ByteDecoder.decode(bytes), limits: limits)
+        }
+
         /// Parses a single XML document from an incremental character source. The
         /// closure returns the next character or nil at end of input, so the
         /// document can arrive in chunks and is never held whole.

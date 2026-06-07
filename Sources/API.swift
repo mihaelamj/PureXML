@@ -18,10 +18,22 @@ public extension PureXML {
         try Parsing.Parser().parse(pulling: pull, limits: limits)
     }
 
+    /// Parses an XML document from raw bytes, detecting the encoding (UTF-8 or
+    /// UTF-16, with or without a byte-order mark) before parsing.
+    static func parse(bytes: [UInt8], limits: Parsing.Limits = .default) throws -> Model.Node {
+        try Parsing.Parser().parse(bytes: bytes, limits: limits)
+    }
+
     /// Returns a streaming ``Parsing/EventReader`` over an XML string. Pull events
     /// one at a time with `next()` to process documents without building a tree.
     static func events(_ xml: String, limits: Parsing.Limits = .default) -> Parsing.EventReader {
         Parsing.EventReader(xml, limits: limits)
+    }
+
+    /// Returns a streaming ``Parsing/EventReader`` over raw bytes, detecting the
+    /// encoding before streaming events.
+    static func events(bytes: [UInt8], limits: Parsing.Limits = .default) throws -> Parsing.EventReader {
+        try Parsing.EventReader(Parsing.ByteDecoder.decode(bytes), limits: limits)
     }
 
     /// Returns a streaming ``Parsing/EventReader`` over an incremental character

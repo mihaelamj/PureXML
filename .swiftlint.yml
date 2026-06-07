@@ -5,6 +5,10 @@
 # build plus test ships with the engine package.
 opt_in_rules:
   - force_unwrapping
+disabled_rules:
+  # Suggests Foundation's String(bytes:encoding:); PureXML is Foundation-free, so
+  # String(decoding:as:) from the standard library is the correct conversion.
+  - optional_data_string_conversion
 excluded:
   - .build
   - DerivedData

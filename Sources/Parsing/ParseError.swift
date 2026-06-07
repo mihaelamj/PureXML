@@ -22,6 +22,9 @@ public extension PureXML.Parsing {
         /// default as a security posture (XXE, entity-expansion DoS); enabling it
         /// is a deliberate future opt-in, not silent behavior.
         case unsupportedDoctype(Mark)
+        /// Raised when raw bytes cannot be decoded in the detected encoding (for
+        /// example an odd-length UTF-16 stream).
+        case malformedEncoding
         /// Raised by entry points whose parsing path is not implemented yet.
         case notImplemented(String)
 
@@ -63,6 +66,8 @@ public extension PureXML.Parsing {
                 "content exceeds the length limit of \(limit) at \(mark)"
             case let .unsupportedDoctype(mark):
                 "DTD processing is disabled (DOCTYPE at \(mark))"
+            case .malformedEncoding:
+                "input bytes are malformed for the detected encoding"
             case let .notImplemented(detail):
                 "not implemented: \(detail)"
             }
