@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional DTD with internal general entities, off by default. With
+  `Limits(allowDoctype: true)` the parser reads a `<!DOCTYPE>` internal subset,
+  honors internal `<!ENTITY name "value">` declarations, and expands them in text
+  and attribute values. Defenses are mandatory: expansion is bounded by
+  `Limits.maxEntityExpansion` (billion-laughs amplification raises
+  `ParseError.amplificationLimitExceeded`), recursive entities raise
+  `ParseError.recursiveEntity`, undeclared entities raise
+  `ParseError.undefinedEntity`, and external entities are never loaded (XXE stays
+  closed). The default still rejects `<!DOCTYPE>` outright.
 - Streaming byte decode. `PureXML.parse(pullingBytes:)` and
   `events(pullingBytes:)` accept an incremental byte source (`() -> UInt8?`) and
   decode UTF-8 or UTF-16 on the fly, so the bytes are never fully buffered.

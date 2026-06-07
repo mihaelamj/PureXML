@@ -55,7 +55,7 @@ flowchart TB
   Bytes["Byte input + encoding detection"]:::done
   Namespaces["Namespace resolution"]:::done
   ByteStream["Streaming byte decode"]:::done
-  DTD["Optional DTD + entities"]:::todo
+  DTD["Optional DTD + entities"]:::done
   Validation["Schema validation"]:::todo
   XPath["XPath 1.0"]:::todo
   Model --> Stream

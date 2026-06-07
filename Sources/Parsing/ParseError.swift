@@ -13,6 +13,9 @@ public extension PureXML.Parsing {
         case expectedEquals(Mark)
         case unquotedAttributeValue(Mark)
         case invalidReference(String, Mark)
+        case undefinedEntity(name: String, Mark)
+        case recursiveEntity(name: String, Mark)
+        case amplificationLimitExceeded(Mark)
         case unexpectedEndTag(name: String, Mark)
         case undefinedNamespacePrefix(prefix: String, Mark)
         case junkAfterDocumentElement(Mark)
@@ -55,6 +58,12 @@ public extension PureXML.Parsing {
                 "attribute value must be quoted at \(mark)"
             case let .invalidReference(reference, mark):
                 "invalid reference '\(reference)' at \(mark)"
+            case let .undefinedEntity(name, mark):
+                "entity '&\(name);' is not declared at \(mark)"
+            case let .recursiveEntity(name, mark):
+                "entity '&\(name);' refers to itself at \(mark)"
+            case let .amplificationLimitExceeded(mark):
+                "entity expansion exceeds the amplification limit at \(mark)"
             case let .unexpectedEndTag(name, mark):
                 "unexpected end tag </\(name)> at \(mark)"
             case let .undefinedNamespacePrefix(prefix, mark):

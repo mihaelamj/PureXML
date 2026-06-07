@@ -16,6 +16,8 @@ public extension PureXML.Parsing {
         private let limits: Limits
         private var open: [PureXML.Model.QualifiedName] = []
         private var namespaces = NamespaceContext()
+        private var entities: [String: String] = [:]
+        private var entityBudget: Int
         private var pending: [Event] = []
         private var sawRoot = false
         private var primed = false
@@ -25,12 +27,14 @@ public extension PureXML.Parsing {
         init(pulling pull: @escaping () -> Character?, limits: Limits = .default) {
             reader = Reader(pulling: pull)
             self.limits = limits
+            entityBudget = limits.maxEntityExpansion
         }
 
         /// Creates a reader over a string (a convenience over the streaming init).
         init(_ string: String, limits: Limits = .default) {
             reader = Reader(string)
             self.limits = limits
+            entityBudget = limits.maxEntityExpansion
         }
 
         /// Returns the next event, or nil at the end of the document.
@@ -62,7 +66,8 @@ public extension PureXML.Parsing {
                     return .processingInstruction(target: instruction.target, data: instruction.data)
                 }
                 if reader.matches("<!DOCTYPE") {
-                    throw ParseError.unsupportedDoctype(reader.mark)
+                    entities = try DoctypeScanner.scan(&reader, limits: limits)
+                    continue
                 }
                 if reader.matches("</") || reader.matches("<![CDATA[") {
                     throw ParseError.junkAfterDocumentElement(reader.mark)
@@ -147,7 +152,7 @@ public extension PureXML.Parsing {
                 raw.append(character)
                 reader.advance()
             }
-            return try .characters(EntityDecoder.decode(raw, at: mark))
+            return try .characters(EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark))
         }
 
         private mutating func scanComment() throws -> Event {
@@ -243,7 +248,7 @@ public extension PureXML.Parsing {
             guard reader.consume(String(quote)) else {
                 throw ParseError.unexpectedEndOfInput(reader.mark)
             }
-            return try EntityDecoder.decode(raw, at: mark)
+            return try EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark)
         }
 
         private mutating func scanName() throws -> PureXML.Model.QualifiedName {
