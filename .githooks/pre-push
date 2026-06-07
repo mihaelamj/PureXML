@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# pre-push hook: run the mechanical gates locally before a push reaches GitHub.
+# These mirror the CI workflow (.github/workflows/ci.yml) so red is caught here
+# first. PureXML is a root Swift package, so Swift gates run at repo root.
+#
+# Install (per repo): git config core.hooksPath .githooks
+
+set -u
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+cd "$ROOT" || exit 1
+
+bash scripts/check-all.sh
