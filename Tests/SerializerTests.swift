@@ -20,6 +20,15 @@ struct SerializerTests {
         #expect(xml == "<a href=\"x?b=1&amp;c=2\">1 &lt; 2</a>")
     }
 
+    @Test("Attribute whitespace is escaped as numeric character references")
+    func test_escapesAttributeWhitespace() {
+        // libxml2 escapes tab/newline/CR in attribute values so they survive a
+        // spec-compliant parser's attribute-value normalization.
+        let element = PureXML.Model.Element("a", attributes: [.init("x", "1\t2\n3\r4>5")])
+        let xml = PureXML.serialize(.element(element), options: .compact)
+        #expect(xml == "<a x=\"1&#9;2&#10;3&#13;4&gt;5\"/>")
+    }
+
     @Test("Pretty printing indents nested elements")
     func test_prettyPrintsNested() {
         let inner = PureXML.Model.Element("title", children: [.text("Guide")])

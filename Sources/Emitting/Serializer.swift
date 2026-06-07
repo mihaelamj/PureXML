@@ -83,12 +83,20 @@ public extension PureXML.Emitting {
         }
 
         private static func escapeAttribute(_ value: String) -> String {
+            // Match the libxml2 attribute escape table: the markup characters plus
+            // tab/newline/carriage-return as numeric references. Escaping the
+            // whitespace is what preserves it through a spec-compliant parser's
+            // attribute-value normalization, so an attribute round-trips intact.
             var result = ""
             for character in value {
                 switch character {
                 case "&": result += "&amp;"
                 case "<": result += "&lt;"
+                case ">": result += "&gt;"
                 case "\"": result += "&quot;"
+                case "\t": result += "&#9;"
+                case "\n": result += "&#10;"
+                case "\r": result += "&#13;"
                 default: result.append(character)
                 }
             }
