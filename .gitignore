@@ -81,3 +81,21 @@
 # directory next to the executable. The file is per-developer state.
 Packages/db.sqlite
 Packages/db.sqlite-*
+# Editor swap files
+*~
+*.swp
+*.swo
+
+# Python virtualenvs
+venv/
+.env/
+
+# Node
+node_modules/
+
+# Local symlink targets and machine-local settings
+*.symlink
+.claude/settings.local.json
+settings/settings.local.json
+**/.DS_Store
+*.moved-aside
