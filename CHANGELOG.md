@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XPath query support (a practical subset). `PureXML.XPath.Query` compiles a
+  location path and evaluates it over a node; `PureXML.xpath(_:over:)` is the
+  one-shot convenience. Supports the forward axes (child, descendant `//`, self
+  `.`, attribute `@`), the node tests (name, `*`, `text()`, `node()`,
+  `comment()`), and the predicates `[n]`, `[@a]`, `[@a='v']`, `[child]`,
+  `[child='v']`. Returns a `Selection` node-set with `element` and `stringValue`
+  accessors. Upward/sibling axes and the full expression language are out of
+  scope (the model has no parent pointers).
 - Optional DTD with internal general entities, off by default. With
   `Limits(allowDoctype: true)` the parser reads a `<!DOCTYPE>` internal subset,
   honors internal `<!ENTITY name "value">` declarations, and expands them in text

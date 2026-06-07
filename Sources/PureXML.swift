@@ -20,4 +20,7 @@ public enum PureXML {
 
     /// XML stream types.
     public enum Stream {}
+
+    /// XPath query types.
+    public enum XPath {}
 }

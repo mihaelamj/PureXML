@@ -57,7 +57,7 @@ flowchart TB
   ByteStream["Streaming byte decode"]:::done
   DTD["Optional DTD + entities"]:::done
   Validation["Schema validation"]:::todo
-  XPath["XPath 1.0"]:::todo
+  XPath["XPath 1.0 subset"]:::done
   Model --> Stream
   Stream --> Escape
   Escape --> Limits

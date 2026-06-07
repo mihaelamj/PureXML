@@ -64,6 +64,12 @@ public extension PureXML {
         return Parsing.EventReader(pulling: { decoder.next() }, limits: limits)
     }
 
+    /// Compiles and evaluates an XPath query over a node, returning the selected
+    /// node-set. Compile once with ``XPath/Query`` to reuse a query.
+    static func xpath(_ path: String, over node: Model.Node) throws -> [XPath.Selection] {
+        try XPath.Query(path).evaluate(over: node)
+    }
+
     /// Serializes a ``Model/Node`` tree into XML with the selected options.
     static func serialize(
         _ node: Model.Node,
