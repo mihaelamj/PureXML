@@ -30,10 +30,33 @@ struct EncodingTests {
         #expect(rootText(littleEndianNode) == "hi")
     }
 
+    @Test("Decodes a UTF-8 byte stream incrementally (multi-byte scalars)")
+    func test_streamingUTF8() throws {
+        let node = try PureXML.parse(pullingBytes: byteSource(Array("<r>café \u{1F600}</r>".utf8)))
+        #expect(rootText(node) == "café \u{1F600}")
+    }
+
+    @Test("Decodes a UTF-16 byte stream incrementally, both byte orders")
+    func test_streamingUTF16() throws {
+        let bigEndianNode = try PureXML.parse(pullingBytes: byteSource(utf16("<r>héllo</r>", bigEndian: true)))
+        #expect(rootText(bigEndianNode) == "héllo")
+        let littleEndianNode = try PureXML.parse(pullingBytes: byteSource(utf16("<r>héllo</r>", bigEndian: false)))
+        #expect(rootText(littleEndianNode) == "héllo")
+    }
+
     @Test("Odd-length UTF-16 input is rejected as malformed")
     func test_malformedUTF16() {
         #expect(throws: PureXML.Parsing.ParseError.malformedEncoding) {
             _ = try PureXML.parse(bytes: [0xFE, 0xFF, 0x00])
+        }
+    }
+
+    private func byteSource(_ bytes: [UInt8]) -> () -> UInt8? {
+        var index = 0
+        return {
+            guard index < bytes.count else { return nil }
+            defer { index += 1 }
+            return bytes[index]
         }
     }
 

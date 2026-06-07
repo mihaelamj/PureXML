@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Streaming byte decode. `PureXML.parse(pullingBytes:)` and
+  `events(pullingBytes:)` accept an incremental byte source (`() -> UInt8?`) and
+  decode UTF-8 or UTF-16 on the fly, so the bytes are never fully buffered.
+  Encoding is detected from the leading bytes; invalid sequences become the
+  Unicode replacement character rather than failing the stream.
 - Namespace resolution. Qualified names now carry an optional resolved
   `namespaceURI`, populated by the parser from in-scope `xmlns` declarations at
   the start-element boundary (the libxml2 SAX2 model). A default namespace applies

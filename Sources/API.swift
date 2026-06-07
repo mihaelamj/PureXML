@@ -45,6 +45,25 @@ public extension PureXML {
         Parsing.EventReader(pulling: pull, limits: limits)
     }
 
+    /// Parses an XML document from an incremental byte source, decoding the
+    /// encoding on the fly so the bytes are never fully buffered.
+    static func parse(
+        pullingBytes pull: @escaping () -> UInt8?,
+        limits: Parsing.Limits = .default,
+    ) throws -> Model.Node {
+        try Parsing.Parser().parse(pullingBytes: pull, limits: limits)
+    }
+
+    /// Returns a streaming ``Parsing/EventReader`` over an incremental byte
+    /// source, decoding the encoding on the fly.
+    static func events(
+        pullingBytes pull: @escaping () -> UInt8?,
+        limits: Parsing.Limits = .default,
+    ) -> Parsing.EventReader {
+        var decoder = Parsing.StreamingDecoder(pullingBytes: pull)
+        return Parsing.EventReader(pulling: { decoder.next() }, limits: limits)
+    }
+
     /// Serializes a ``Model/Node`` tree into XML with the selected options.
     static func serialize(
         _ node: Model.Node,

@@ -36,6 +36,17 @@ public extension PureXML.Parsing {
             try build(EventReader(pulling: pull, limits: limits))
         }
 
+        /// Parses a single XML document from an incremental BYTE source, decoding
+        /// the encoding (UTF-8 or UTF-16) on the fly so the bytes are never fully
+        /// buffered. The closure returns the next byte or nil at end of input.
+        public func parse(
+            pullingBytes pull: @escaping () -> UInt8?,
+            limits: Limits = .default,
+        ) throws -> PureXML.Model.Node {
+            var decoder = StreamingDecoder(pullingBytes: pull)
+            return try build(EventReader(pulling: { decoder.next() }, limits: limits))
+        }
+
         private func build(_ source: EventReader) throws -> PureXML.Model.Node {
             var reader = source
             var roots: [PureXML.Model.Node] = []

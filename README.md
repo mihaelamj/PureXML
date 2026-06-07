@@ -54,7 +54,7 @@ flowchart TB
   Limits["Bounded-by-default limits"]:::done
   Bytes["Byte input + encoding detection"]:::done
   Namespaces["Namespace resolution"]:::done
-  ByteStream["Streaming byte decode"]:::todo
+  ByteStream["Streaming byte decode"]:::done
   DTD["Optional DTD + entities"]:::todo
   Validation["Schema validation"]:::todo
   XPath["XPath 1.0"]:::todo
