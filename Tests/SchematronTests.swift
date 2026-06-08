@@ -15,7 +15,7 @@ struct SchematronTests {
     </schema>
     """
 
-    private func validate(_ xml: String) throws -> [PureXML.Validation.Issue] {
+    private func validate(_ xml: String) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.Validation.Schematron(schema: schema).validate(xml)
     }
 
@@ -25,19 +25,20 @@ struct SchematronTests {
         #expect(try validate(xml).isEmpty)
     }
 
-    @Test("A failed assert is reported as an error")
+    @Test("A failed assert is reported as an error located at its context node")
     func test_failedAssert() throws {
         let xml = "<library><book isbn=\"1\"><author>A</author></book></library>"
         let issues = try validate(xml)
         #expect(issues.count == 1)
         #expect(issues.first?.severity == .error)
-        #expect(issues.first?.message == "a book must have a title")
+        #expect(issues.first?.reason == "a book must have a title")
+        #expect(String(describing: issues[0]) == "a book must have a title at path: library/book")
     }
 
     @Test("Multiple failed asserts each report")
     func test_multipleAsserts() throws {
         let xml = "<library><book><author>A</author></book></library>"
-        let messages = try validate(xml).map(\.message)
+        let messages = try validate(xml).map(\.reason)
         #expect(messages.contains("a book must have a title"))
         #expect(messages.contains("a book must have an isbn"))
     }
@@ -49,7 +50,7 @@ struct SchematronTests {
         let issues = try validate(xml)
         #expect(issues.count == 1)
         #expect(issues.first?.severity == .warning)
-        #expect(issues.first?.message == "more than two authors")
+        #expect(issues.first?.reason == "more than two authors")
     }
 
     @Test("Rules fire once per matching node across the document")
