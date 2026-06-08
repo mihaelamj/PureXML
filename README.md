@@ -39,11 +39,15 @@ flowchart TB
   LEpic --> LTodo
 ```
 
-Capability is grown toward libxml2 parity in pure Swift, guided by the private
-PureXML-research analysis. The streaming parser/emitter core is complete
-(parsing, emitting, namespaces, byte input and streaming decode, optional DTD
-with entities, DTD content-model validation, and an XPath 1.0 subset). The
-collapsed core plus the next open work:
+The goal is full libxml2 feature parity in pure Swift with zero dependencies, by
+clean-room reimplementation (behavior reproduced from the private PureXML-research
+analysis, no upstream source copied). The streaming core plus DTD validation
+(content models, attributes, ID/IDREF) and an XPath 1.0 subset is shipped; the
+remaining libxml2 surface is tracked as epics. Deliberate non-goals: network
+fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out,
+and external resolution is opt-in through an injected resolver so XXE stays closed.
+
+Parsing and I/O:
 
 ```mermaid
 flowchart TB
@@ -51,15 +55,73 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Core["Streaming core: parse, emit, namespaces, bytes, DTD, validation, XPath"]:::done
-  Attlist["ATTLIST validation"]:::done
-  Schema["XSD / RELAX NG"]:::todo
-  Push["Push / feed streaming API"]:::todo
-  Xslt["XSLT 1.0"]:::todo
-  Core --> Attlist
-  Attlist --> Schema
-  Schema --> Push
-  Push --> Xslt
+  Core["Streaming core + DTD validation (shipped)"]:::done
+  Push["#1 Push / feed streaming API"]:::epic
+  Sax["#19 SAX2 push callbacks"]:::epic
+  Html["#20 HTML parser and serializer"]:::epic
+  Enc["#28 Full encoding support"]:::epic
+  Ent["#29 External and parameter entities"]:::epic
+  TreeApi["#31 Tree manipulation API"]:::epic
+  Writer["#32 xmlTextWriter"]:::epic
+  Reader["#33 xmlTextReader with validation"]:::epic
+  Save["#34 Serialization option parity"]:::epic
+  Chars["#35 Character and name validity"]:::epic
+  Core --> Push
+  Core --> Sax
+  Core --> Html
+  Core --> Enc
+  Core --> Ent
+  Core --> TreeApi
+  Core --> Writer
+  Core --> Reader
+  Core --> Save
+  Core --> Chars
+```
+
+Querying:
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  XPathFull["#21 Full XPath 1.0"]:::epic
+  Pattern["#22 xmlPattern streaming match"]:::epic
+  XPointer["#23 XPointer"]:::epic
+  XPathFull --> Pattern
+  XPathFull --> XPointer
+```
+
+Validation:
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Regexp["#30 Regular expression engine"]:::epic
+  Xsd["#2 XSD / RELAX NG validation"]:::epic
+  Schematron["#25 Schematron validation"]:::epic
+  Regexp --> Xsd
+  Xsd --> Schematron
+```
+
+Transformation and integrity:
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Xslt["#3 XSLT 1.0"]:::epic
+  XInclude["#24 XInclude, URI, xml:base"]:::epic
+  C14n["#26 Canonical XML"]:::epic
+  Catalog["#27 XML Catalog"]:::epic
+  Xslt --> C14n
+  XInclude --> Catalog
 ```
 
 ## Status
