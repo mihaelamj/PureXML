@@ -3,7 +3,7 @@ import Testing
 
 @Suite("DTD attribute validation")
 struct DTDAttributeTests {
-    private func issues(_ xml: String, strict: Bool = false) throws -> [PureXML.Validation.Issue] {
+    private func issues(_ xml: String, strict: Bool = false) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.validateAgainstInternalDTD(xml, strict: strict)
     }
 
