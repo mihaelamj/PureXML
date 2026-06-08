@@ -28,7 +28,7 @@ public extension PureXML.Validation {
         /// `#ALL` runs every pattern.
         public func validate(_ xml: String, phase: String? = nil) throws -> [ValidationError] {
             let node = try PureXML.parse(xml)
-            let validation = Self.rule(activePatterns(phase: phase), diagnostics: schema.diagnostics)
+            let validation = Self.rule(activePatterns(phase: phase), schemaLets: schema.lets, diagnostics: schema.diagnostics)
             return Validator<Void>.blank.validating(validation).errors(for: node, in: ())
         }
 
@@ -45,10 +45,18 @@ public extension PureXML.Validation {
 
         /// The schema as a single ``Validation`` over the document root, so it
         /// composes with the rest of the framework.
-        static func rule(_ patterns: [SchematronPattern], diagnostics: [String: [SchematronMessagePart]]) -> Validation<PureXML.Model.Node, Void> {
+        static func rule(
+            _ patterns: [SchematronPattern],
+            schemaLets: [SchematronLet],
+            diagnostics: [String: [SchematronMessagePart]],
+        ) -> Validation<PureXML.Model.Node, Void> {
             .init(
                 description: "Document satisfies the Schematron schema",
-                check: { context in evaluate(patterns, over: PureXML.Model.TreeNode(context.subject), diagnostics: diagnostics) },
+                check: { context in
+                    let root = PureXML.Model.TreeNode(context.subject)
+                    let base = bindings(schemaLets, at: root, base: [:])
+                    return evaluate(patterns, over: root, base: base, diagnostics: diagnostics)
+                },
                 when: { $0.codingPath.isEmpty },
             )
         }
@@ -56,30 +64,36 @@ public extension PureXML.Validation {
         private static func evaluate(
             _ patterns: [SchematronPattern],
             over root: PureXML.Model.TreeNode,
+            base: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
         ) -> [ValidationError] {
-            patterns.flatMap { evaluate($0, over: root, diagnostics: diagnostics) }
+            patterns.flatMap { evaluate($0, over: root, base: base, diagnostics: diagnostics) }
         }
 
         private static func evaluate(
             _ pattern: SchematronPattern,
             over root: PureXML.Model.TreeNode,
+            base: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
         ) -> [ValidationError] {
+            // Pattern-level lets extend the schema-level base, evaluated at the root.
+            let patternBase = bindings(pattern.lets, at: root, base: base)
             var errors: [ValidationError] = []
             var claimed: Set<ObjectIdentifier> = []
             for rule in pattern.rules {
                 for node in rule.context.nodes(over: root) where claimed.insert(ObjectIdentifier(node)).inserted {
-                    errors += apply(rule.assertions, at: node, variables: bindings(rule.lets, at: node), diagnostics: diagnostics)
+                    let variables = bindings(rule.lets, at: node, base: patternBase)
+                    errors += apply(rule.assertions, at: node, variables: variables, diagnostics: diagnostics)
                 }
             }
             return errors
         }
 
-        /// Evaluates a rule's `<let>` bindings at the context node, in order, so a
-        /// later binding can reference an earlier one through `$name`.
-        private static func bindings(_ lets: [SchematronLet], at node: PureXML.Model.TreeNode) -> [String: PureXML.XPath.Value] {
-            var variables: [String: PureXML.XPath.Value] = [:]
+        /// Evaluates `<let>` bindings over `base` at `node`, in order, so a later
+        /// binding can reference an earlier one (or a wider-scope one) through
+        /// `$name`.
+        private static func bindings(_ lets: [SchematronLet], at node: PureXML.Model.TreeNode, base: [String: PureXML.XPath.Value]) -> [String: PureXML.XPath.Value] {
+            var variables = base
             for binding in lets {
                 if let value = try? binding.value.value(at: node, variables: variables) {
                     variables[binding.name] = value
