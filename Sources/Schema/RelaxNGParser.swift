@@ -122,37 +122,10 @@ private final class RNGCompiler {
         var facets = PureXML.Schema.Facets()
         for param in RNGNode.children(node, named: "param") {
             if let name = RNGNode.attribute(param, "name") {
-                Self.applyParam(name, RNGNode.text(param), into: &facets)
+                PureXML.Schema.RelaxNGFacets.apply(name, RNGNode.text(param), into: &facets)
             }
         }
         return PureXML.Schema.SimpleType(base: base, facets: facets)
-    }
-
-    private static func applyParam(_ name: String, _ value: String, into facets: inout PureXML.Schema.Facets) {
-        applyValueParam(name, value, into: &facets)
-        applyNumericParam(name, Int(value), into: &facets)
-    }
-
-    private static func applyValueParam(_ name: String, _ value: String, into facets: inout PureXML.Schema.Facets) {
-        switch name {
-        case "pattern": facets.patterns.append(value)
-        case "minInclusive": facets.minInclusive = value
-        case "maxInclusive": facets.maxInclusive = value
-        case "minExclusive": facets.minExclusive = value
-        case "maxExclusive": facets.maxExclusive = value
-        default: break
-        }
-    }
-
-    private static func applyNumericParam(_ name: String, _ number: Int?, into facets: inout PureXML.Schema.Facets) {
-        switch name {
-        case "length": facets.length = number
-        case "minLength": facets.minLength = number
-        case "maxLength": facets.maxLength = number
-        case "totalDigits": facets.totalDigits = number
-        case "fractionDigits": facets.fractionDigits = number
-        default: break
-        }
     }
 
     /// Resolves an `externalRef` to the referenced schema's pattern, merging any
