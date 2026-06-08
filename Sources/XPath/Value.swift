@@ -53,13 +53,52 @@ public extension PureXML.XPath {
 
         /// Formats a number in the XPath canonical form: `NaN`, `Infinity`, an
         /// integer without a decimal point, or the shortest round-tripping decimal.
+        /// XPath 1.0 forbids exponential notation, so any exponent in the shortest
+        /// representation is expanded to a plain decimal.
         static func format(_ value: Double) -> String {
             if value.isNaN { return "NaN" }
             if value.isInfinite { return value < 0 ? "-Infinity" : "Infinity" }
             if value == value.rounded(), abs(value) < 1e15 {
                 return String(Int64(value))
             }
-            return String(value)
+            return expandExponent(String(value))
+        }
+
+        /// Rewrites a Swift double rendering into a plain decimal without an
+        /// exponent: `1.5e-05` becomes `0.000015`, `1.23e+21` becomes
+        /// `1230000000000000000000`.
+        private static func expandExponent(_ text: String) -> String {
+            let lowered = text.lowercased()
+            guard let exponentIndex = lowered.firstIndex(of: "e") else { return text }
+            let mantissa = String(lowered[lowered.startIndex ..< exponentIndex])
+            guard let exponent = Int(lowered[lowered.index(after: exponentIndex)...]) else { return text }
+            let negative = mantissa.hasPrefix("-")
+            let unsigned = negative ? String(mantissa.dropFirst()) : mantissa
+            let parts = unsigned.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+            let integerDigits = String(parts.first ?? "")
+            let fractionDigits = parts.count > 1 ? String(parts[1]) : ""
+            var digits = Array(integerDigits + fractionDigits)
+            // The decimal point currently sits after `integerDigits`; the exponent
+            // shifts it right (positive) or left (negative).
+            var point = integerDigits.count + exponent
+            if point <= 0 {
+                digits = Array(repeating: "0", count: 1 - point) + digits
+                point = 1
+            } else if point > digits.count {
+                digits += Array(repeating: "0", count: point - digits.count)
+            }
+            let integerPart = String(digits[0 ..< point])
+            let fractionPart = String(digits[point...])
+            let body = fractionPart.isEmpty ? integerPart : "\(integerPart).\(trimTrailingZeros(fractionPart))"
+            return (negative ? "-" : "") + body
+        }
+
+        private static func trimTrailingZeros(_ fraction: String) -> String {
+            var trimmed = fraction
+            while trimmed.count > 1, trimmed.hasSuffix("0") {
+                trimmed.removeLast()
+            }
+            return trimmed
         }
 
         /// Parses a string to a number per the XPath `Number` grammar: optional

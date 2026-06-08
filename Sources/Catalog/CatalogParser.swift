@@ -2,12 +2,17 @@
 /// internal detail of ``PureXML/Catalog/CatalogParser``.
 private struct CatalogBuilder {
     typealias RewriteRule = PureXML.Catalog.RewriteRule
+    typealias DelegateRule = PureXML.Catalog.DelegateRule
 
     var systemMap: [String: String] = [:]
     var publicMap: [String: String] = [:]
     var uriMap: [String: String] = [:]
     var rewriteSystem: [RewriteRule] = []
     var rewriteURI: [RewriteRule] = []
+    var delegateSystem: [DelegateRule] = []
+    var delegatePublic: [DelegateRule] = []
+    var delegateURI: [DelegateRule] = []
+    var nextCatalogs: [String] = []
 
     mutating func add(_ node: PureXML.Model.TreeNode) {
         switch node.name?.localName {
@@ -22,8 +27,32 @@ private struct CatalogBuilder {
         case "rewriteURI":
             appendRewrite(node, start: "uriStartString", into: &rewriteURI)
         default:
+            addDelegation(node)
+        }
+    }
+
+    private mutating func addDelegation(_ node: PureXML.Model.TreeNode) {
+        switch node.name?.localName {
+        case "delegateSystem":
+            appendDelegate(node, start: "systemIdStartString", into: &delegateSystem)
+        case "delegatePublic":
+            appendDelegate(node, start: "publicIdStartString", into: &delegatePublic)
+        case "delegateURI":
+            appendDelegate(node, start: "uriStartString", into: &delegateURI)
+        case "nextCatalog":
+            if let catalog = attribute(node, "catalog") { nextCatalogs.append(catalog) }
+        default:
             break
         }
+    }
+
+    private func appendDelegate(
+        _ node: PureXML.Model.TreeNode,
+        start: String,
+        into rules: inout [DelegateRule],
+    ) {
+        guard let startString = attribute(node, start), let catalog = attribute(node, "catalog") else { return }
+        rules.append(DelegateRule(startString: startString, catalog: catalog))
     }
 
     private func insert(
@@ -56,6 +85,10 @@ private struct CatalogBuilder {
             uriMap: uriMap,
             rewriteSystem: rewriteSystem,
             rewriteURI: rewriteURI,
+            delegateSystem: delegateSystem,
+            delegatePublic: delegatePublic,
+            delegateURI: delegateURI,
+            nextCatalogs: nextCatalogs,
         )
     }
 }

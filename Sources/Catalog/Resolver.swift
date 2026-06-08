@@ -4,6 +4,14 @@ extension PureXML.Catalog {
         let startString: String
         let rewritePrefix: String
     }
+
+    /// A longest-prefix delegation rule (`delegateSystem`, `delegatePublic`,
+    /// `delegateURI`): a matching identifier is resolved by the catalog at
+    /// `catalog` instead.
+    struct DelegateRule: Sendable {
+        let startString: String
+        let catalog: String
+    }
 }
 
 public extension PureXML.Catalog {
@@ -24,6 +32,10 @@ public extension PureXML.Catalog {
         private let uriMap: [String: String]
         private let rewriteSystem: [RewriteRule]
         private let rewriteURI: [RewriteRule]
+        private let delegateSystem: [DelegateRule]
+        private let delegatePublic: [DelegateRule]
+        private let delegateURI: [DelegateRule]
+        private let nextCatalogs: [String]
 
         /// Parses an OASIS XML catalog document.
         public init(_ xml: String) throws {
@@ -36,12 +48,20 @@ public extension PureXML.Catalog {
             uriMap: [String: String],
             rewriteSystem: [RewriteRule],
             rewriteURI: [RewriteRule],
+            delegateSystem: [DelegateRule] = [],
+            delegatePublic: [DelegateRule] = [],
+            delegateURI: [DelegateRule] = [],
+            nextCatalogs: [String] = [],
         ) {
             self.systemMap = systemMap
             self.publicMap = publicMap
             self.uriMap = uriMap
             self.rewriteSystem = rewriteSystem
             self.rewriteURI = rewriteURI
+            self.delegateSystem = delegateSystem
+            self.delegatePublic = delegatePublic
+            self.delegateURI = delegateURI
+            self.nextCatalogs = nextCatalogs
         }
 
         /// Resolves a system identifier: an exact `system` entry, else the longest
@@ -69,6 +89,57 @@ public extension PureXML.Catalog {
             }
             if let publicID { return resolvePublic(publicID) }
             return nil
+        }
+
+        /// Resolves a system identifier, following `delegateSystem` and
+        /// `nextCatalog` chains: the local entries are tried first, then the
+        /// catalog named by the longest matching delegate prefix, then each
+        /// `nextCatalog` in turn. `loadingCatalog` fetches a catalog document by
+        /// URI; nil refuses it, and already-visited catalogs are skipped.
+        public func resolveSystem(_ systemID: String, loadingCatalog: (String) -> String?) -> String? {
+            var visited: Set<String> = []
+            return chained(systemID, delegates: delegateSystem, pick: { $0.resolveSystem(systemID) }, loadingCatalog, &visited)
+        }
+
+        /// Resolves a public identifier, following `delegatePublic` and
+        /// `nextCatalog` chains. See ``resolveSystem(_:loadingCatalog:)``.
+        public func resolvePublic(_ publicID: String, loadingCatalog: (String) -> String?) -> String? {
+            var visited: Set<String> = []
+            return chained(publicID, delegates: delegatePublic, pick: { $0.resolvePublic(publicID) }, loadingCatalog, &visited)
+        }
+
+        /// Resolves a URI name, following `delegateURI` and `nextCatalog` chains.
+        /// See ``resolveSystem(_:loadingCatalog:)``.
+        public func resolveURI(_ name: String, loadingCatalog: (String) -> String?) -> String? {
+            var visited: Set<String> = []
+            return chained(name, delegates: delegateURI, pick: { $0.resolveURI(name) }, loadingCatalog, &visited)
+        }
+
+        private func chained(
+            _ identifier: String,
+            delegates: [DelegateRule],
+            pick: (Resolver) -> String?,
+            _ loadingCatalog: (String) -> String?,
+            _ visited: inout Set<String>,
+        ) -> String? {
+            if let local = pick(self) { return local }
+            let matching = delegates
+                .filter { identifier.hasPrefix($0.startString) }
+                .sorted { $0.startString.count > $1.startString.count }
+            for rule in matching {
+                if let sub = load(rule.catalog, loadingCatalog, &visited), let resolved = pick(sub) { return resolved }
+            }
+            for next in nextCatalogs {
+                guard let sub = load(next, loadingCatalog, &visited) else { continue }
+                if let resolved = sub.chained(identifier, delegates: [], pick: pick, loadingCatalog, &visited) { return resolved }
+            }
+            return nil
+        }
+
+        private func load(_ uri: String, _ loadingCatalog: (String) -> String?, _ visited: inout Set<String>) -> Resolver? {
+            guard !visited.contains(uri), let text = loadingCatalog(uri) else { return nil }
+            visited.insert(uri)
+            return try? Resolver(text)
         }
 
         /// Builds a ``PureXML/Parsing/EntityResolver`` that resolves an external
