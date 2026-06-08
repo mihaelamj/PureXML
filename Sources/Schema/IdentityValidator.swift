@@ -9,9 +9,9 @@ extension PureXML.Schema {
         /// The constraints declared for each element local name.
         let constraints: [String: [IdentityConstraint]]
 
-        func validate(_ root: PureXML.Model.TreeNode) -> [PureXML.Validation.Issue] {
+        func validate(_ root: PureXML.Model.TreeNode) -> [PureXML.Validation.ValidationError] {
             guard !constraints.isEmpty else { return [] }
-            var issues: [PureXML.Validation.Issue] = []
+            var issues: [PureXML.Validation.ValidationError] = []
             walk(root, scopes: [], into: &issues)
             return issues
         }
@@ -19,7 +19,7 @@ extension PureXML.Schema {
         private func walk(
             _ node: PureXML.Model.TreeNode,
             scopes: [[String: [[String?]]]],
-            into issues: inout [PureXML.Validation.Issue],
+            into issues: inout [PureXML.Validation.ValidationError],
         ) {
             var frame: [String: [[String?]]] = [:]
             let declared = node.name.flatMap { constraints[$0.localName] } ?? []
@@ -48,7 +48,7 @@ extension PureXML.Schema {
             _ constraint: IdentityConstraint,
             at node: PureXML.Model.TreeNode,
             frame: inout [String: [[String?]]],
-            into issues: inout [PureXML.Validation.Issue],
+            into issues: inout [PureXML.Validation.ValidationError],
         ) {
             guard isNonRef(constraint) else { return }
             var tuples: [[String?]] = []
@@ -56,12 +56,12 @@ extension PureXML.Schema {
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
-                    issues.append(.init(severity: .error, message: "key '\(constraint.name)': a field is missing"))
+                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: []))
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if seen.contains(where: { $0 == tuple }) {
-                    issues.append(.init(severity: .error, message: "\(label(constraint)) '\(constraint.name)': duplicate value"))
+                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: []))
                 } else {
                     seen.append(tuple)
                 }
@@ -75,14 +75,14 @@ extension PureXML.Schema {
             refer: String,
             at node: PureXML.Model.TreeNode,
             scopes: [[String: [[String?]]]],
-            into issues: inout [PureXML.Validation.Issue],
+            into issues: inout [PureXML.Validation.ValidationError],
         ) {
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    issues.append(.init(severity: .error, message: "keyref '\(constraint.name)': no matching key '\(refer)'"))
+                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: []))
                 }
             }
         }

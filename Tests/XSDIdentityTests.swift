@@ -3,7 +3,7 @@ import Testing
 
 @Suite("XSD identity constraints")
 struct XSDIdentityTests {
-    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.Issue] {
+    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.Schema.Document(xsd).validate(xml)
     }
 

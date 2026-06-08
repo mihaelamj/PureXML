@@ -18,7 +18,7 @@ struct XSDComplexTypeTests {
 
     private enum TestFailure: Error { case noRoot }
 
-    private func validate(_ xml: String, _ type: Schema.ComplexType) throws -> [PureXML.Validation.Issue] {
+    private func validate(_ xml: String, _ type: Schema.ComplexType) throws -> [PureXML.Validation.ValidationError] {
         try Schema.ComplexValidator().validate(parse(xml), against: type)
     }
 

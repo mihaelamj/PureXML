@@ -3,8 +3,24 @@ import Testing
 
 @Suite("XSD schema documents")
 struct XSDSchemaTests {
-    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.Issue] {
+    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.Schema.Document(xsd).validate(xml)
+    }
+
+    @Test("A nested type violation is located by coding path")
+    func test_violationCarriesPath() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="order">
+            <xs:complexType>
+              <xs:sequence><xs:element name="qty" type="xs:integer"/></xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """
+        let found = try validate(xsd, "<order><qty>lots</qty></order>")
+        #expect(found.count == 1)
+        #expect(String(describing: found[0]).hasSuffix("at path: order/qty"))
     }
 
     @Test("A simple element with a built-in type")

@@ -3,7 +3,7 @@ import Testing
 
 @Suite("XSD list, union, groups, and references")
 struct XSDCompositionTests {
-    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.Issue] {
+    private func validate(_ xsd: String, _ xml: String) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.Schema.Document(xsd).validate(xml)
     }
 
