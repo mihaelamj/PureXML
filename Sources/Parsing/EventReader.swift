@@ -297,6 +297,11 @@ extension PureXML.Parsing.EventReader {
         reader.mark.offset
     }
 
+    /// The current source position, for attaching spans to ranged tree nodes.
+    var mark: PureXML.Parsing.Mark {
+        reader.mark
+    }
+
     /// Resynchronizes after a failed ``next()`` that started at `offset`, so
     /// reading can resume past a recorded diagnostic. Returns false at end of
     /// input. If the failed scan already advanced (it consumed the malformed

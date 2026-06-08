@@ -66,8 +66,10 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Validation["#92 OpenAPIKit-idiom validation framework + recovering reader: read invalid documents without crashing, return rich located results"]:::epic
+  Editor["#94 Editor integration: source spans on the tree, unified lint, expected-here, so findings map to screen positions"]:::epic
   Gaps["#71 Beyond-parity libxml2 gaps: DTD entities/defaulting (#72 #73), parser breadth (#74), XSD instance/derivation/wildcards/namespaces (#75 #76 #77 #78), RELAX NG + Schematron (#79 #80), XSLT elements/functions (#81 #82), HTML5 full tree (#83 #84), C14N/catalog/XInclude (#85 #86 #87), XPath/XPointer (#88), regex (#89), DOM/serialization (#90 #91)"]:::epic
-  Validation --> Gaps
+  Validation --> Editor
+  Editor --> Gaps
 ```
 
 ## Status

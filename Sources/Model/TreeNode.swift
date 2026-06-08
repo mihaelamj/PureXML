@@ -38,6 +38,10 @@ public extension PureXML.Model {
         /// The child nodes in document order. Mutated only through the editing
         /// methods so the parent links stay consistent.
         public internal(set) var children: [TreeNode]
+        /// The node's span in the source text, when it was produced by the ranged
+        /// reader (``PureXML/read(asTree:)``); nil for synthesized or edited nodes.
+        /// Lets a located finding be mapped back to characters in the document.
+        public internal(set) var sourceRange: PureXML.Parsing.SourceRange?
 
         init(
             kind: PureXML.Model.TreeNodeKind,

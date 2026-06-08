@@ -49,6 +49,18 @@ public extension PureXML.Parsing {
             readRecovering(EventReader(xml, limits: limits, resolver: resolver, recovering: true))
         }
 
+        /// Reads a possibly-invalid document into a mutable, parent-aware tree whose
+        /// nodes carry source spans, plus located diagnostics. The editor entry
+        /// point: never throws, recovers in place, and lets a located finding be
+        /// mapped to a source range through ``Model/TreeNode/node(at:)``.
+        public func readTree(
+            _ xml: String,
+            limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
+        ) -> (tree: PureXML.Model.TreeNode, diagnostics: [Diagnostic]) {
+            readTreeRecovering(EventReader(xml, limits: limits, resolver: resolver, recovering: true))
+        }
+
         /// Parses a single XML document from raw bytes, detecting the encoding
         /// (UTF-8 or UTF-16, with or without a byte-order mark) before parsing.
         public func parse(bytes: [UInt8], limits: Limits = .default) throws -> PureXML.Model.Node {
@@ -170,6 +182,52 @@ public extension PureXML.Parsing {
                 attach(.element(element), to: &stack, roots: &roots)
             }
             return ReadResult(node: .document(roots), diagnostics: reader.diagnostics)
+        }
+
+        /// Like ``readRecovering(_:)`` but builds a mutable, parent-aware
+        /// ``PureXML/Model/TreeNode`` whose every node carries its source span, for
+        /// editor use. Never throws; returns the best-effort tree and the
+        /// diagnostics. Each element spans from the `<` of its start tag to just
+        /// past its end tag (or `/>`); leaf nodes span the text they consumed.
+        func readTreeRecovering(_ source: EventReader) -> (tree: PureXML.Model.TreeNode, diagnostics: [Diagnostic]) {
+            var reader = source
+            let document = PureXML.Model.TreeNode.document()
+            var stack: [(node: PureXML.Model.TreeNode, start: PureXML.Parsing.Mark)] = []
+
+            func attach(_ node: PureXML.Model.TreeNode) {
+                (stack.last?.node ?? document).append(node)
+            }
+
+            while true {
+                let start = reader.mark
+                guard let event = try? reader.next() else { break }
+                switch event {
+                case let .startElement(name, attributes):
+                    stack.append((PureXML.Model.TreeNode.element(name, attributes: attributes), start))
+                case .endElement:
+                    guard let (element, openMark) = stack.popLast() else { continue }
+                    element.sourceRange = PureXML.Parsing.SourceRange(start: openMark, end: reader.mark)
+                    attach(element)
+                case let .characters(text):
+                    attach(ranged(.text(text), from: start, to: reader.mark))
+                case let .cdata(text):
+                    attach(ranged(.cdata(text), from: start, to: reader.mark))
+                case let .comment(text):
+                    attach(ranged(.comment(text), from: start, to: reader.mark))
+                case let .processingInstruction(target, data):
+                    attach(ranged(.processingInstruction(target: target, data: data), from: start, to: reader.mark))
+                }
+            }
+            while let (element, openMark) = stack.popLast() {
+                element.sourceRange = PureXML.Parsing.SourceRange(start: openMark, end: reader.mark)
+                attach(element)
+            }
+            return (document, reader.diagnostics)
+        }
+
+        private func ranged(_ node: PureXML.Model.TreeNode, from start: PureXML.Parsing.Mark, to end: PureXML.Parsing.Mark) -> PureXML.Model.TreeNode {
+            node.sourceRange = PureXML.Parsing.SourceRange(start: start, end: end)
+            return node
         }
 
         private func consume(_ event: Event, into stack: inout [ElementFrame], roots: inout [PureXML.Model.Node]) {

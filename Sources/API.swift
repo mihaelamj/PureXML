@@ -138,6 +138,19 @@ public extension PureXML {
         Parsing.Parser().read(xml, limits: limits, resolver: resolver)
     }
 
+    /// Reads a possibly-invalid document into a mutable, parent-aware
+    /// ``Model/TreeNode`` whose nodes carry source spans, plus located
+    /// ``Parsing/Diagnostic``s. The editor entry point: never throws, recovers in
+    /// place, and lets a located validation finding be mapped to a source range
+    /// via ``Model/TreeNode/node(at:)`` and the node's `sourceRange`.
+    static func readTree(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) -> (tree: Model.TreeNode, diagnostics: [Parsing.Diagnostic]) {
+        Parsing.Parser().readTree(xml, limits: limits, resolver: resolver)
+    }
+
     /// Validates a parsed XML node with the default structural rules, throwing a
     /// ``PureXML/Validation/ValidationErrorCollection`` that locates every failure
     /// by coding path. Pass a custom ``PureXML/Validation/Validator`` to add or
