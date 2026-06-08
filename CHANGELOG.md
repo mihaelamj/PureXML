@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Full encoding support. Byte input now decodes UTF-32 (both byte orders, BOM or
+  sniffed) and the single-byte encodings ISO-8859-1 and Windows-1252 selected by
+  the XML declaration's `encoding` name, in addition to UTF-8 and UTF-16. The
+  streaming byte path also decodes UTF-32. Standard library only, no Foundation.
 - Incremental XML writer (`PureXML.Emitting.Writer`, the libxml2 `xmlTextWriter`
   model): emit a document with start/end and write calls without building a tree.
   Escaping matches the tree serializer (extracted into a shared `Escaping` helper),

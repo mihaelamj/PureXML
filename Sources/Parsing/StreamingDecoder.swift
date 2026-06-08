@@ -35,7 +35,37 @@ extension PureXML.Parsing {
                 return nextUTF16(bigEndian: true)
             case .utf16LittleEndian:
                 return nextUTF16(bigEndian: false)
+            case .utf32BigEndian:
+                return nextUTF32(bigEndian: true)
+            case .utf32LittleEndian:
+                return nextUTF32(bigEndian: false)
+            case .latin1:
+                return nextSingleByte { Unicode.Scalar($0) }
+            case .windows1252:
+                return nextSingleByte(PureXML.Parsing.ByteDecoder.windows1252Scalar)
             }
+        }
+
+        private mutating func nextUTF32(bigEndian: Bool) -> Character? {
+            var ordered: [UInt32] = []
+            for _ in 0 ..< 4 {
+                guard let byte = nextByte() else {
+                    finished = true
+                    return nil
+                }
+                ordered.append(UInt32(byte))
+            }
+            if !bigEndian { ordered.reverse() }
+            let value = ordered.reduce(UInt32(0)) { ($0 << 8) | $1 }
+            return Character(Unicode.Scalar(value) ?? "\u{FFFD}")
+        }
+
+        private mutating func nextSingleByte(_ map: (UInt8) -> Unicode.Scalar) -> Character? {
+            guard let byte = nextByte() else {
+                finished = true
+                return nil
+            }
+            return Character(map(byte))
         }
 
         private mutating func detect() {

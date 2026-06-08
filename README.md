@@ -59,7 +59,7 @@ flowchart TB
   Push["#1 Push / feed streaming API"]:::epic
   Sax["#19 SAX2 push callbacks"]:::done
   Html["#20 HTML parser and serializer"]:::epic
-  Enc["#28 Full encoding support"]:::epic
+  Enc["#28 Full encoding support"]:::done
   Ent["#29 External and parameter entities"]:::epic
   TreeApi["#31 Tree manipulation API"]:::epic
   Writer["#32 xmlTextWriter"]:::done

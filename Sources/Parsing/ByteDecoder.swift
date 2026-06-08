@@ -1,11 +1,17 @@
 extension PureXML.Parsing {
     /// Decodes raw bytes into a string using the detected encoding, stripping any
-    /// byte-order mark. UTF-8 and UTF-16 (both byte orders) are supported, which
-    /// is the encoding set the XML specification requires of every processor.
-    /// Uses only the Swift standard library (no Foundation), so it stays portable.
+    /// byte-order mark. Covers UTF-8, UTF-16, and UTF-32 (both byte orders), plus
+    /// ISO-8859-1 and Windows-1252 selected by the XML declaration's encoding
+    /// name. Uses only the Swift standard library (no Foundation).
     enum ByteDecoder {
         static func decode(_ bytes: [UInt8]) throws -> String {
-            let (encoding, bomLength) = InputEncoding.detectWithBOM(bytes)
+            let (sniffed, bomLength) = InputEncoding.detectWithBOM(bytes)
+            // With no BOM the byte sniff defaults to UTF-8; honor a declared
+            // single-byte encoding if the XML declaration names one.
+            var encoding = sniffed
+            if sniffed == .utf8, bomLength == 0, let declared = declaredEncoding(in: bytes) {
+                encoding = declared
+            }
             let body = bytes.dropFirst(bomLength)
             switch encoding {
             case .utf8:
@@ -14,6 +20,14 @@ extension PureXML.Parsing {
                 return try decodeUTF16(body, bigEndian: true)
             case .utf16LittleEndian:
                 return try decodeUTF16(body, bigEndian: false)
+            case .utf32BigEndian:
+                return try decodeUTF32(body, bigEndian: true)
+            case .utf32LittleEndian:
+                return try decodeUTF32(body, bigEndian: false)
+            case .latin1:
+                return String(String.UnicodeScalarView(body.map { Unicode.Scalar($0) }))
+            case .windows1252:
+                return String(String.UnicodeScalarView(body.map { Self.windows1252Scalar($0) }))
             }
         }
 
@@ -24,12 +38,78 @@ extension PureXML.Parsing {
             var units: [UInt16] = []
             units.reserveCapacity(bytes.count / 2)
             var iterator = bytes.makeIterator()
-            while let first = iterator.next(), let second = iterator.next() {
-                let high = UInt16(first)
-                let low = UInt16(second)
-                units.append(bigEndian ? (high << 8 | low) : (low << 8 | high))
+            while let high = iterator.next(), let low = iterator.next() {
+                let first = UInt16(high)
+                let second = UInt16(low)
+                units.append(bigEndian ? (first << 8 | second) : (second << 8 | first))
             }
             return String(decoding: units, as: UTF16.self)
+        }
+
+        private static func decodeUTF32(_ bytes: ArraySlice<UInt8>, bigEndian: Bool) throws -> String {
+            guard bytes.count.isMultiple(of: 4) else {
+                throw PureXML.Parsing.ParseError.malformedEncoding
+            }
+            let array = Array(bytes)
+            var scalars = String.UnicodeScalarView()
+            var index = 0
+            while index + 4 <= array.count {
+                let quad = array[index ..< index + 4]
+                let value = (bigEndian ? AnySequence(quad) : AnySequence(quad.reversed()))
+                    .reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+                scalars.append(Unicode.Scalar(value) ?? "\u{FFFD}")
+                index += 4
+            }
+            return String(scalars)
+        }
+
+        /// Reads the `encoding` pseudo-attribute from an XML declaration that is
+        /// ASCII-compatible at the front (UTF-8 or a single-byte encoding).
+        static func declaredEncoding(in bytes: [UInt8]) -> InputEncoding? {
+            let header = Array(bytes.prefix(256))
+            guard header.starts(with: Array("<?xml".utf8)) else { return nil }
+            let limit = header.firstIndex(of: 0x3E) ?? header.count // ">"
+            let scan = Array(header[..<limit])
+            guard let position = indexOfSubsequence(Array("encoding".utf8), in: scan) else { return nil }
+            var index = position + 8
+            while index < scan.count, scan[index] != 0x22, scan[index] != 0x27 {
+                index += 1
+            }
+            guard index < scan.count else { return nil }
+            let quote = scan[index]
+            index += 1
+            var name: [UInt8] = []
+            while index < scan.count, scan[index] != quote {
+                name.append(scan[index])
+                index += 1
+            }
+            switch String(decoding: name, as: UTF8.self).lowercased() {
+            case "utf-8", "utf8", "us-ascii", "ascii": return .utf8
+            case "iso-8859-1", "latin1", "latin-1", "l1": return .latin1
+            case "windows-1252", "cp1252", "cp-1252": return .windows1252
+            default: return nil
+            }
+        }
+
+        private static func indexOfSubsequence(_ needle: [UInt8], in haystack: [UInt8]) -> Int? {
+            guard !needle.isEmpty, haystack.count >= needle.count else { return nil }
+            for start in 0 ... (haystack.count - needle.count) where Array(haystack[start ..< start + needle.count]) == needle {
+                return start
+            }
+            return nil
+        }
+
+        /// Maps a Windows-1252 byte to its Unicode scalar. The 0x80...0x9F range
+        /// is the published CP1252 table; everything else is ISO-8859-1.
+        static func windows1252Scalar(_ byte: UInt8) -> Unicode.Scalar {
+            guard (0x80 ... 0x9F).contains(byte) else { return Unicode.Scalar(byte) }
+            let high: [UInt32] = [
+                0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
+                0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x008D, 0x017D, 0x008F,
+                0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
+                0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
+            ]
+            return Unicode.Scalar(high[Int(byte - 0x80)]) ?? "\u{FFFD}"
         }
     }
 }
