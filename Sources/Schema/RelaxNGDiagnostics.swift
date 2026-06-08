@@ -73,7 +73,7 @@ extension PureXML.Schema.RelaxNGEngine {
             case let .text(value), let .cdata(value):
                 let next = textDeriv(residual, value)
                 if isNotAllowed(next) {
-                    errors.append(.init(reason: "text content is not valid in <\(name)>", at: path))
+                    errors.append(.init(reason: "\(textDetail(residual, value)) in <\(name)>", at: path))
                     sequenceBroken = true
                 } else {
                     residual = next
@@ -113,6 +113,31 @@ extension PureXML.Schema.RelaxNGEngine {
         }
         validateElement(opened, child, path, &errors)
         return (forceClose(opened), false)
+    }
+
+    /// Explains why `value` does not satisfy the text/datatype `pattern`, quoting
+    /// the offending value and naming the datatype it failed (`'abc' is not a
+    /// valid integer`) or the literal it should have matched, falling back to a
+    /// generic message when the content admits no text at all.
+    private func textDetail(_ pattern: Pattern, _ value: String) -> String {
+        switch pattern {
+        case let .data(type):
+            type.validate(value) ?? "text content '\(value)' is not valid"
+        case let .value(type, literal):
+            type.valueMatches(value, literal: literal)
+                ? "text content '\(value)' is not valid"
+                : "text content '\(value)' must be '\(literal)'"
+        case let .list(inner):
+            textDetail(inner, value)
+        case let .choice(lhs, rhs):
+            textDetail(isNotAllowed(textDeriv(lhs, value)) ? rhs : lhs, value)
+        case let .group(lhs, _), let .after(lhs, _):
+            textDetail(lhs, value)
+        case let .ref(name):
+            textDetail(resolve(name), value)
+        default:
+            "text content is not allowed"
+        }
     }
 
     /// The content (the `after` left side) an opened element's children must match.
