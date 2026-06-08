@@ -81,11 +81,22 @@ extension PureXML.HTML {
 }
 
 public extension PureXML.HTML {
-    /// Parses HTML into a ``PureXML/Model/Node`` document, leniently handling
-    /// tag-soup input, void elements, optional end tags, and raw-text elements.
+    /// Parses an HTML fragment into a ``PureXML/Model/Node`` document, leniently
+    /// handling tag-soup input, void elements, optional end tags, and raw-text
+    /// elements. Markup is taken as-is, with no implied `html`/`head`/`body`.
     static func parse(_ html: String) -> PureXML.Model.Node {
         var tokenizer = Tokenizer(html)
         return TreeBuilder.build(tokenizer.tokenize())
+    }
+
+    /// Parses a full HTML document by the HTML5 tree-construction insertion
+    /// modes: the result always has an `html` root containing a `head` and a
+    /// `body`, with head-only elements (`title`, `meta`, `link`, `style`,
+    /// `script`, and the rest) routed into the head and flow content into the
+    /// body, whether or not the source spelled those elements out.
+    static func parseDocument(_ html: String) -> PureXML.Model.Node {
+        var tokenizer = Tokenizer(html)
+        return DocumentBuilder.build(tokenizer.tokenize())
     }
 
     /// Serializes a node tree as HTML.
