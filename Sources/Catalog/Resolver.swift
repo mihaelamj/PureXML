@@ -59,6 +59,12 @@ public extension PureXML.Catalog {
             self = try CatalogParser.parse(xml, baseURI: baseURI)
         }
 
+        /// Parses a legacy SGML Open (OASIS TR 9401) catalog. Replacement URIs are
+        /// resolved against `baseURI` and any `BASE` entry.
+        public init(sgml text: String, baseURI: String = "") {
+            self = SGMLCatalogParser.parse(text, baseURI: baseURI)
+        }
+
         init(
             systemMap: [String: String],
             publicMap: [String: String],
