@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unexpected elements, invalid or missing attributes, invalid text/datatype
   content, and missing required content. A datatype mismatch quotes the offending
   value and names the expected type (`'abc' is not a valid integer`), and a value
-  mismatch quotes both the actual text and the required literal. `RelaxNG.validation()` exposes the schema
+  mismatch quotes both the actual text and the required literal. An attribute
+  failure distinguishes an undeclared attribute from a declared one with a bad
+  value, quoting the value and naming its type. `RelaxNG.validation()` exposes the schema
   as a `Validation<Node, Void>`, so RELAX NG composes with the same validation
   framework as the XSD, DTD, and Schematron rules. The boolean engine remains the
   authority on validity; the walk only places and explains the failures.
