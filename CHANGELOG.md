@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Pull-cursor reader (the libxml2 `xmlTextReader` model).
+  `PureXML.Parsing.TextReader` (via `PureXML.reader(_:)`) walks a document one
+  node at a time with `read()`, exposing `nodeKind`, `name`, `value`, `depth`,
+  `attributes`/`attributeCount`/`attribute(_:)`, and `isEmptyElement` at each
+  step. It layers on the streaming core, so it never holds the whole document.
+  A childless element is reported once as an empty element (no separate end
+  node), normalizing `<a/>` and `<a></a>`. `documentType` surfaces the DTD read
+  so far as the validation hook.
 - Mutable, parent-aware document tree (the libxml2 `tree.h` model).
   `PureXML.Model.TreeNode` is a reference type that knows its parent and
   siblings, so a document can be navigated upward and sideways (`parent`,
