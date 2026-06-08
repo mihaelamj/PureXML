@@ -3,6 +3,7 @@
 private struct CatalogBuilder {
     typealias RewriteRule = PureXML.Catalog.RewriteRule
     typealias DelegateRule = PureXML.Catalog.DelegateRule
+    typealias SuffixRule = PureXML.Catalog.SuffixRule
 
     var systemMap: [String: String] = [:]
     var publicMap: [String: String] = [:]
@@ -12,7 +13,10 @@ private struct CatalogBuilder {
     var delegateSystem: [DelegateRule] = []
     var delegatePublic: [DelegateRule] = []
     var delegateURI: [DelegateRule] = []
+    var systemSuffix: [SuffixRule] = []
+    var uriSuffix: [SuffixRule] = []
     var nextCatalogs: [String] = []
+    var preferPublic = true
 
     mutating func add(_ node: PureXML.Model.TreeNode) {
         switch node.name?.localName {
@@ -26,9 +30,22 @@ private struct CatalogBuilder {
             appendRewrite(node, start: "systemIdStartString", into: &rewriteSystem)
         case "rewriteURI":
             appendRewrite(node, start: "uriStartString", into: &rewriteURI)
+        case "systemSuffix":
+            appendSuffix(node, suffix: "systemIdSuffix", into: &systemSuffix)
+        case "uriSuffix":
+            appendSuffix(node, suffix: "uriSuffix", into: &uriSuffix)
         default:
             addDelegation(node)
         }
+    }
+
+    private func appendSuffix(
+        _ node: PureXML.Model.TreeNode,
+        suffix: String,
+        into rules: inout [SuffixRule],
+    ) {
+        guard let suffixString = attribute(node, suffix), let uri = attribute(node, "uri") else { return }
+        rules.append(SuffixRule(suffixString: suffixString, uri: uri))
     }
 
     private mutating func addDelegation(_ node: PureXML.Model.TreeNode) {
@@ -88,7 +105,10 @@ private struct CatalogBuilder {
             delegateSystem: delegateSystem,
             delegatePublic: delegatePublic,
             delegateURI: delegateURI,
+            systemSuffix: systemSuffix,
+            uriSuffix: uriSuffix,
             nextCatalogs: nextCatalogs,
+            preferPublic: preferPublic,
         )
     }
 }
@@ -101,8 +121,19 @@ extension PureXML.Catalog {
         static func parse(_ xml: String) throws -> Resolver {
             let root = try PureXML.parseTree(xml)
             var builder = CatalogBuilder()
+            if let catalog = catalogElement(root), prefer(of: catalog) == "system" {
+                builder.preferPublic = false
+            }
             collect(root, into: &builder)
             return builder.resolver()
+        }
+
+        private static func catalogElement(_ node: PureXML.Model.TreeNode) -> PureXML.Model.TreeNode? {
+            node.kind == .element ? node : node.children.first { $0.kind == .element }
+        }
+
+        private static func prefer(of node: PureXML.Model.TreeNode) -> String? {
+            node.attributes.first { $0.name.localName == "prefer" }?.value
         }
 
         private static func collect(_ node: PureXML.Model.TreeNode, into builder: inout CatalogBuilder) {
