@@ -25,6 +25,12 @@ public extension PureXML.Parsing {
         private var pending: [Event] = []
         private var sawRoot = false
         private var primed = false
+        /// When true, ``next()`` repairs malformed input in place instead of
+        /// throwing: it records a ``Diagnostic`` and emits best-effort events.
+        private let recovering: Bool
+        private var reachedEnd = false
+        /// The problems found so far, when reading in recovering mode.
+        private(set) var diagnostics: [Diagnostic] = []
 
         /// Creates a reader over a character-pulling source. The closure returns
         /// the next character or nil at end of input.
@@ -32,22 +38,29 @@ public extension PureXML.Parsing {
             pulling pull: @escaping () -> Character?,
             limits: Limits = .default,
             resolver: EntityResolver = .refusing,
+            recovering: Bool = false,
         ) {
             reader = Reader(pulling: pull)
             self.limits = limits
             self.resolver = resolver
+            self.recovering = recovering
             entityBudget = limits.maxEntityExpansion
         }
 
         /// Creates a reader over a string (a convenience over the streaming init).
-        init(_ string: String, limits: Limits = .default, resolver: EntityResolver = .refusing) {
+        init(_ string: String, limits: Limits = .default, resolver: EntityResolver = .refusing, recovering: Bool = false) {
             reader = Reader(string)
             self.limits = limits
             self.resolver = resolver
+            self.recovering = recovering
             entityBudget = limits.maxEntityExpansion
         }
 
-        /// Returns the next event, or nil at the end of the document.
+        /// Returns the next event, or nil at the end of the document. In recovering
+        /// mode it never throws: each malformed construct is recorded as a
+        /// diagnostic and reading continues, popping to a matching open element on
+        /// a mismatched end tag and stopping (so the caller closes what is open) on
+        /// truncation.
         mutating func next() throws -> Event? {
             if !primed {
                 primed = true
@@ -55,10 +68,21 @@ public extension PureXML.Parsing {
                     reader.advance()
                 }
             }
-            if !pending.isEmpty {
-                return pending.removeFirst()
+            while true {
+                if !pending.isEmpty {
+                    return pending.removeFirst()
+                }
+                guard recovering else {
+                    return open.isEmpty ? try nextAtTopLevel() : try nextInContent()
+                }
+                if reachedEnd { return nil }
+                let start = offset
+                do {
+                    return open.isEmpty ? try nextAtTopLevel() : try nextInContent()
+                } catch let error as ParseError {
+                    if let event = recoveredEvent(from: error, startingAt: start) { return event }
+                }
             }
-            return open.isEmpty ? try nextAtTopLevel() : try nextInContent()
         }
 
         private mutating func nextAtTopLevel() throws -> Event? {
@@ -86,7 +110,11 @@ public extension PureXML.Parsing {
                     guard !sawRoot else { throw ParseError.junkAfterDocumentElement(reader.mark) }
                     return try scanStartTag()
                 }
-                throw ParseError.junkAfterDocumentElement(reader.mark)
+                // Junk after the root is "content after the root element"; the same
+                // shape before any root is simply an unexpected character.
+                throw sawRoot
+                    ? ParseError.junkAfterDocumentElement(reader.mark)
+                    : ParseError.unexpectedCharacter(lead, reader.mark)
             }
         }
 
@@ -168,40 +196,6 @@ public extension PureXML.Parsing {
             return try .characters(EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark))
         }
 
-        private mutating func scanComment() throws -> Event {
-            let mark = reader.mark
-            reader.consume("<!--")
-            var content = ""
-            var length = 0
-            while !reader.matches("-->") {
-                guard let character = reader.advance() else {
-                    throw ParseError.unterminatedComment(mark)
-                }
-                length += 1
-                try checkContent(length, mark)
-                content.append(character)
-            }
-            reader.consume("-->")
-            return .comment(content)
-        }
-
-        private mutating func scanCDATA() throws -> Event {
-            let mark = reader.mark
-            reader.consume("<![CDATA[")
-            var content = ""
-            var length = 0
-            while !reader.matches("]]>") {
-                guard let character = reader.advance() else {
-                    throw ParseError.unterminatedCDATA(mark)
-                }
-                length += 1
-                try checkContent(length, mark)
-                content.append(character)
-            }
-            reader.consume("]]>")
-            return .cdata(content)
-        }
-
         private mutating func scanProcessingInstruction() throws -> (target: String, data: String) {
             let mark = reader.mark
             reader.consume("<?")
@@ -238,6 +232,12 @@ public extension PureXML.Parsing {
                 reader.skipSpace()
                 let value = try scanAttributeValue()
                 guard seen.insert(name.description).inserted else {
+                    if recovering {
+                        // Keep the element: record the duplicate and drop the later
+                        // occurrence rather than failing the whole start tag.
+                        diagnostics.append(Diagnostic(.duplicateAttribute(name: name.description, mark)))
+                        continue
+                    }
                     throw ParseError.duplicateAttribute(name: name.description, mark)
                 }
                 attributes.append(PureXML.Model.Attribute(name: name, value: value))
@@ -313,5 +313,75 @@ extension PureXML.Parsing.EventReader {
             reader.advance()
         }
         return true
+    }
+
+    /// Pops the open-element stack down to (and including) the most recent element
+    /// named `found`, synthesizing an end-tag event for each closed element,
+    /// innermost first. Returns the first such event with the rest queued, so a
+    /// mismatched end tag implicitly closes the elements nested inside the match.
+    /// Returns nil when no open element matches, dropping the stray end tag.
+    mutating func scanComment() throws -> PureXML.Parsing.Event {
+        let mark = reader.mark
+        reader.consume("<!--")
+        var content = ""
+        var length = 0
+        while !reader.matches("-->") {
+            guard let character = reader.advance() else {
+                throw PureXML.Parsing.ParseError.unterminatedComment(mark)
+            }
+            length += 1
+            try checkContent(length, mark)
+            content.append(character)
+        }
+        reader.consume("-->")
+        return .comment(content)
+    }
+
+    mutating func scanCDATA() throws -> PureXML.Parsing.Event {
+        let mark = reader.mark
+        reader.consume("<![CDATA[")
+        var content = ""
+        var length = 0
+        while !reader.matches("]]>") {
+            guard let character = reader.advance() else {
+                throw PureXML.Parsing.ParseError.unterminatedCDATA(mark)
+            }
+            length += 1
+            try checkContent(length, mark)
+            content.append(character)
+        }
+        reader.consume("]]>")
+        return .cdata(content)
+    }
+
+    /// Handles a thrown error in recovering mode: records the diagnostic and
+    /// returns an event to emit (an end tag synthesized by popping to a match) or
+    /// nil to continue after resynchronizing. Marks the end of input on truncation
+    /// or an exhausted source.
+    mutating func recoveredEvent(from error: PureXML.Parsing.ParseError, startingAt start: Int) -> PureXML.Parsing.Event? {
+        diagnostics.append(PureXML.Parsing.Diagnostic(error))
+        switch error {
+        case .unexpectedEndOfInput:
+            reachedEnd = true
+            return nil
+        case let .mismatchedEndTag(_, found, _), let .unexpectedEndTag(found, _):
+            return closeTo(found)
+        default:
+            if !recover(from: start) { reachedEnd = true }
+            return nil
+        }
+    }
+
+    mutating func closeTo(_ found: String) -> PureXML.Parsing.Event? {
+        guard let index = open.lastIndex(where: { $0.description == found }) else { return nil }
+        var events: [PureXML.Parsing.Event] = []
+        while open.count > index {
+            let closed = open.removeLast()
+            namespaces.leaveElement()
+            events.append(.endElement(name: closed))
+        }
+        guard let first = events.first else { return nil }
+        pending.append(contentsOf: events.dropFirst())
+        return first
     }
 }
