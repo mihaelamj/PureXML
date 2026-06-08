@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:decimal-format` (#81). `format-number` now honors named and default
+  decimal formats: the decimal separator, grouping separator, percent, minus
+  sign, zero-digit (so non-Latin digit sets render), NaN, and infinity symbols
+  are taken from the chosen `xsl:decimal-format`, both in the picture and the
+  output. Folded across `xsl:include`/`xsl:import`.
 - XSLT `xsl:fallback` (#81). An unrecognized XSLT element instantiates its
   `xsl:fallback` children in its place (forwards-compatible processing), or is
   dropped when it has none; a fallback under a supported instruction is ignored.

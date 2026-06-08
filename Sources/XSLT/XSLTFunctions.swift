@@ -1,32 +1,39 @@
+private typealias DecimalFormat = PureXML.XSLT.DecimalFormat
+
+/// The digit-place counts and grouping derived from a format-number picture.
+/// File scope and private.
+private struct NumberLayout {
+    let minInteger: Int
+    let minFraction: Int
+    let maxFraction: Int
+    let grouping: Bool
+}
+
 extension PureXML.XSLT {
-    /// The XSLT `format-number` function over the default decimal format. Supports
-    /// `0`/`#` digit places, `.` for the decimal point, `,` grouping, and a `%`
-    /// percent suffix. Pure Swift, no Foundation.
+    /// The XSLT `format-number` function. Supports `0`/`#` digit places, the
+    /// decimal point, grouping, and a percent suffix, honoring the symbols of the
+    /// chosen `xsl:decimal-format`. Pure Swift, no Foundation.
     enum FormatNumber {
-        static func format(_ value: Double, _ picture: String) -> String {
-            guard !value.isNaN else { return "NaN" }
+        static func format(_ value: Double, _ picture: String, _ symbols: DecimalFormat = DecimalFormat()) -> String {
+            guard !value.isNaN else { return symbols.notANumber }
+            if value.isInfinite { return (value < 0 ? String(symbols.minusSign) : "") + symbols.infinity }
             guard !picture.isEmpty else { return PureXML.XPath.Value.format(value) }
-            let percent = picture.contains("%")
-            let pattern = picture.filter { $0 != "%" }
-            let parts = pattern.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+            let percent = picture.contains(symbols.percent)
+            let pattern = picture.filter { $0 != symbols.percent }
+            let parts = pattern.split(separator: symbols.decimalSeparator, maxSplits: 1, omittingEmptySubsequences: false)
             let integerPattern = String(parts.first ?? "")
             let fractionPattern = parts.count > 1 ? String(parts[1]) : ""
 
-            let minInteger = integerPattern.count(where: { $0 == "0" })
-            let minFraction = fractionPattern.count(where: { $0 == "0" })
-            let maxFraction = fractionPattern.count(where: { $0 == "0" || $0 == "#" })
-            let grouping = integerPattern.contains(",")
+            let minInteger = integerPattern.count(where: { $0 == symbols.zeroDigit })
+            let minFraction = fractionPattern.count(where: { $0 == symbols.zeroDigit })
+            let maxFraction = fractionPattern.count(where: { $0 == symbols.zeroDigit || $0 == symbols.digit })
+            let grouping = integerPattern.contains(symbols.groupingSeparator)
 
             var magnitude = Swift.abs(percent ? value * 100 : value)
             magnitude = round(magnitude, places: maxFraction)
-            let rendered = render(
-                magnitude,
-                minInteger: minInteger,
-                minFraction: minFraction,
-                maxFraction: maxFraction,
-                grouping: grouping,
-            )
-            return (value < 0 ? "-" : "") + rendered + (percent ? "%" : "")
+            let layout = NumberLayout(minInteger: minInteger, minFraction: minFraction, maxFraction: maxFraction, grouping: grouping)
+            let rendered = render(magnitude, layout, symbols)
+            return (value < 0 ? String(symbols.minusSign) : "") + rendered + (percent ? String(symbols.percent) : "")
         }
 
         private static func round(_ value: Double, places: Int) -> Double {
@@ -37,38 +44,43 @@ extension PureXML.XSLT {
             return (value * scale).rounded() / scale
         }
 
-        private static func render(
-            _ value: Double,
-            minInteger: Int,
-            minFraction: Int,
-            maxFraction: Int,
-            grouping: Bool,
-        ) -> String {
+        private static func render(_ value: Double, _ layout: NumberLayout, _ symbols: DecimalFormat) -> String {
             let integerValue = Int(value)
-            var integerText = String(integerValue)
-            while integerText.count < Swift.max(1, minInteger) {
-                integerText = "0" + integerText
+            var integerDigits = String(integerValue)
+            while integerDigits.count < Swift.max(1, layout.minInteger) {
+                integerDigits = "0" + integerDigits
             }
-            if grouping { integerText = group(integerText) }
+            var integerText = digitsToSymbols(integerDigits, symbols)
+            if layout.grouping { integerText = group(integerText, symbols.groupingSeparator) }
 
             var fractionValue = value - Double(integerValue)
-            var fractionText = ""
-            for _ in 0 ..< maxFraction {
+            var fractionDigits = ""
+            for _ in 0 ..< layout.maxFraction {
                 fractionValue *= 10
                 let digit = Int(fractionValue)
-                fractionText += String(digit)
+                fractionDigits += String(digit)
                 fractionValue -= Double(digit)
             }
-            while fractionText.count > minFraction, fractionText.hasSuffix("0") {
-                fractionText.removeLast()
+            while fractionDigits.count > layout.minFraction, fractionDigits.hasSuffix("0") {
+                fractionDigits.removeLast()
             }
-            return fractionText.isEmpty ? integerText : integerText + "." + fractionText
+            let fractionText = digitsToSymbols(fractionDigits, symbols)
+            return fractionText.isEmpty ? integerText : integerText + String(symbols.decimalSeparator) + fractionText
         }
 
-        private static func group(_ digits: String) -> String {
+        /// Maps ASCII digits to the format's digit set, offset from its zero-digit.
+        private static func digitsToSymbols(_ digits: String, _ symbols: DecimalFormat) -> String {
+            guard symbols.zeroDigit != "0", let zero = symbols.zeroDigit.unicodeScalars.first else { return digits }
+            return String(digits.map { character in
+                guard let value = character.wholeNumberValue, let scalar = Unicode.Scalar(zero.value + UInt32(value)) else { return character }
+                return Character(scalar)
+            })
+        }
+
+        private static func group(_ digits: String, _ separator: Character) -> String {
             var result = ""
             for (offset, character) in digits.reversed().enumerated() {
-                if offset > 0, offset.isMultiple(of: 3) { result.append(",") }
+                if offset > 0, offset.isMultiple(of: 3) { result.append(separator) }
                 result.append(character)
             }
             return String(result.reversed())
@@ -88,13 +100,16 @@ extension PureXML.XSLT {
             current: PureXML.Model.TreeNode,
             keys: KeyIndex,
             loader: @escaping (String) -> String?,
+            decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([.tree(current)]) }
                 .adding("format-number") { arguments, _ in
-                    .string(FormatNumber.format(
+                    let name = arguments.count > 2 ? arguments[2].string : ""
+                    return .string(FormatNumber.format(
                         arguments.first?.number ?? .nan,
                         arguments.count > 1 ? arguments[1].string : "",
+                        decimalFormats[name] ?? PureXML.XSLT.DecimalFormat(),
                     ))
                 }
                 .adding("key") { arguments, _ in

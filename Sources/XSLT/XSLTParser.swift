@@ -11,6 +11,7 @@ private struct Parts {
     var stripSpace: Set<String> = []
     var preserveSpace: Set<String> = []
     var attributeSets: [String: PureXML.XSLT.AttributeSet] = [:]
+    var decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:]
 
     var stylesheet: PureXML.XSLT.Stylesheet {
         PureXML.XSLT.Stylesheet(
@@ -21,6 +22,7 @@ private struct Parts {
             stripSpace: stripSpace,
             preserveSpace: preserveSpace,
             attributeSets: attributeSets,
+            decimalFormats: decimalFormats,
         )
     }
 
@@ -33,6 +35,7 @@ private struct Parts {
         stripSpace.formUnion(sub.stripSpace)
         preserveSpace.formUnion(sub.preserveSpace)
         attributeSets.merge(sub.attributeSets) { mine, _ in mine }
+        decimalFormats.merge(sub.decimalFormats) { mine, _ in mine }
         globals = isImport ? sub.globals + globals : globals + sub.globals
         output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
     }
@@ -112,6 +115,17 @@ extension PureXML.XSLT {
         }
 
         private static func absorb(_ child: Tree, into parts: inout Parts, loader: (String) -> String?, precedence: Int) {
+            if absorbDeclaration(child, into: &parts, precedence: precedence) { return }
+            switch XSLTNode.localName(child) {
+            case "include": parts.fold(load(child, loader: loader, precedence: precedence), isImport: false)
+            case "import": parts.fold(load(child, loader: loader, precedence: precedence - 1), isImport: true)
+            default: break
+            }
+        }
+
+        /// Absorbs a non-composition top-level declaration, returning whether it
+        /// was one (so the caller can then try `include`/`import`).
+        private static func absorbDeclaration(_ child: Tree, into parts: inout Parts, precedence: Int) -> Bool {
             switch XSLTNode.localName(child) {
             case "template": parts.templates.append(template(child, precedence: precedence))
             case "variable", "param": parts.globals.append(variable(child))
@@ -120,15 +134,10 @@ extension PureXML.XSLT {
             case "strip-space": parts.stripSpace.formUnion(elementNames(child))
             case "preserve-space": parts.preserveSpace.formUnion(elementNames(child))
             case "attribute-set": addAttributeSet(child, into: &parts)
-            case "include": parts.fold(load(child, loader: loader, precedence: precedence), isImport: false)
-            case "import": parts.fold(load(child, loader: loader, precedence: precedence - 1), isImport: true)
-            default: break
+            case "decimal-format": parts.decimalFormats[XSLTNode.attribute(child, "name") ?? ""] = decimalFormat(child)
+            default: return false
             }
-        }
-
-        private static func addAttributeSet(_ child: Tree, into parts: inout Parts) {
-            guard let name = XSLTNode.attribute(child, "name") else { return }
-            parts.attributeSets[name] = AttributeSet(attributes: body(child), use: useAttributeSets(child))
+            return true
         }
 
         /// The whitespace-separated element name tests of an `xsl:strip-space` or
@@ -358,5 +367,33 @@ extension PureXML.XSLT {
             if !literal.isEmpty { parts.append(.literal(literal)) }
             return parts
         }
+    }
+}
+
+/// Top-level declaration helpers for ``XSLTParser``, kept in an extension so the
+/// parser enum stays within the type-body length budget.
+private extension PureXML.XSLT.XSLTParser {
+    static func addAttributeSet(_ child: Tree, into parts: inout Parts) {
+        guard let name = XSLTNode.attribute(child, "name") else { return }
+        parts.attributeSets[name] = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
+    }
+
+    /// Reads an `xsl:decimal-format`'s symbol overrides; each unset attribute
+    /// keeps the XSLT standard default.
+    static func decimalFormat(_ node: Tree) -> PureXML.XSLT.DecimalFormat {
+        var format = PureXML.XSLT.DecimalFormat()
+        func char(_ name: String, _ keyPath: WritableKeyPath<PureXML.XSLT.DecimalFormat, Character>) {
+            if let value = XSLTNode.attribute(node, name)?.first { format[keyPath: keyPath] = value }
+        }
+        char("decimal-separator", \.decimalSeparator)
+        char("grouping-separator", \.groupingSeparator)
+        char("percent", \.percent)
+        char("zero-digit", \.zeroDigit)
+        char("digit", \.digit)
+        char("pattern-separator", \.patternSeparator)
+        char("minus-sign", \.minusSign)
+        if let infinity = XSLTNode.attribute(node, "infinity") { format.infinity = infinity }
+        if let notANumber = XSLTNode.attribute(node, "NaN") { format.notANumber = notANumber }
+        return format
     }
 }

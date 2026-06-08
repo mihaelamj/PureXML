@@ -112,6 +112,23 @@ public extension PureXML.XSLT {
         }
     }
 
+    /// The symbols an `xsl:decimal-format` sets for `format-number`: those used in
+    /// the picture (digit places, separators, percent) and in the output. The
+    /// defaults are the XSLT standard format.
+    struct DecimalFormat: Sendable {
+        public var decimalSeparator: Character = "."
+        public var groupingSeparator: Character = ","
+        public var percent: Character = "%"
+        public var zeroDigit: Character = "0"
+        public var digit: Character = "#"
+        public var patternSeparator: Character = ";"
+        public var minusSign: Character = "-"
+        public var infinity: String = "Infinity"
+        public var notANumber: String = "NaN"
+
+        public init() {}
+    }
+
     /// An `xsl:attribute-set`: the `xsl:attribute` instructions it contributes and
     /// the other attribute sets it includes (`use-attribute-sets`).
     struct AttributeSet: Sendable {
@@ -174,6 +191,9 @@ public extension PureXML.XSLT {
         public var preserveSpace: Set<String>
         /// Named `xsl:attribute-set` declarations, keyed by name.
         public var attributeSets: [String: AttributeSet]
+        /// `xsl:decimal-format` declarations for `format-number`, keyed by name; the
+        /// empty key is the default (unnamed) format.
+        public var decimalFormats: [String: DecimalFormat]
 
         public init(
             templates: [Template],
@@ -183,6 +203,7 @@ public extension PureXML.XSLT {
             stripSpace: Set<String> = [],
             preserveSpace: Set<String> = [],
             attributeSets: [String: AttributeSet] = [:],
+            decimalFormats: [String: DecimalFormat] = [:],
         ) {
             self.templates = templates
             self.globals = globals
@@ -191,6 +212,7 @@ public extension PureXML.XSLT {
             self.stripSpace = stripSpace
             self.preserveSpace = preserveSpace
             self.attributeSets = attributeSets
+            self.decimalFormats = decimalFormats
         }
     }
 }

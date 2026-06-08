@@ -147,7 +147,7 @@ extension PureXML.XSLT {
                 position: context.position,
                 size: context.size,
                 variables: context.variables,
-                functions: PureXML.XSLT.Library.table(current: context.node, keys: keyIndex, loader: documentLoader),
+                functions: PureXML.XSLT.Library.table(current: context.node, keys: keyIndex, loader: documentLoader, decimalFormats: stylesheet.decimalFormats),
             )
         }
 
