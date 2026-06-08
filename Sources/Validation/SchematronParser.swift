@@ -30,10 +30,16 @@ extension PureXML.Validation {
 
         private static func rule(_ node: PureXML.Model.TreeNode) throws -> SchematronRule? {
             guard let context = attribute(node, "context") else { return nil }
+            let lets = try children(node, localName: "let").compactMap(letBinding)
             let assertions = try node.children
                 .filter { $0.kind == .element && isAssertion($0) }
                 .compactMap(assertion)
-            return try SchematronRule(context: PureXML.XPath.Query(contextExpression(context)), assertions: assertions)
+            return try SchematronRule(context: PureXML.XPath.Query(contextExpression(context)), lets: lets, assertions: assertions)
+        }
+
+        private static func letBinding(_ node: PureXML.Model.TreeNode) throws -> SchematronLet? {
+            guard let name = attribute(node, "name"), let value = attribute(node, "value") else { return nil }
+            return try SchematronLet(name: name, value: PureXML.XPath.Query(value))
         }
 
         private static func assertion(_ node: PureXML.Model.TreeNode) throws -> SchematronAssertion? {
