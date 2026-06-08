@@ -165,4 +165,37 @@ extension PureXML.Schema.XSDParser {
         case .substitution: "substitution"
         }
     }
+
+    /// Throws when any `xs:all` group violates its XSD 1.0 constraints: its members
+    /// must all be elements, each occurring at most once, and the group itself may
+    /// occur at most once. Nested model groups inside an `all` are not allowed.
+    static func checkAllGroups(_ containers: [XSDTree]) throws {
+        for container in containers {
+            for all in descendants(container, named: "all") {
+                try checkAllGroup(all)
+            }
+        }
+    }
+
+    private static func checkAllGroup(_ all: XSDTree) throws {
+        if !atMostOnce(XSDDerivNode.attribute(all, "maxOccurs")) {
+            throw SchemaFault.invalidAllGroup(reason: "the group's maxOccurs must be 0 or 1")
+        }
+        for member in XSDDerivNode.elementChildren(all) {
+            let kind = XSDDerivNode.localName(member) ?? ""
+            if kind == "annotation" { continue }
+            guard kind == "element" else {
+                throw SchemaFault.invalidAllGroup(reason: "a member may only be an element, not '\(kind)'")
+            }
+            if !atMostOnce(XSDDerivNode.attribute(member, "maxOccurs")) {
+                let label = XSDDerivNode.attribute(member, "name") ?? XSDDerivNode.attribute(member, "ref") ?? ""
+                throw SchemaFault.invalidAllGroup(reason: "element '\(label)' must have maxOccurs 0 or 1")
+            }
+        }
+    }
+
+    private static func atMostOnce(_ maxOccurs: String?) -> Bool {
+        guard let maxOccurs else { return true }
+        return maxOccurs == "0" || maxOccurs == "1"
+    }
 }

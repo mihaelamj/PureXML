@@ -17,6 +17,7 @@ extension PureXML.Schema {
             let derivation = derivationTables(containers)
             try checkFinal(derivation)
             try checkRedefine(containers)
+            try checkAllGroups(containers)
             var context = XSDContext(
                 simpleTypes: [:],
                 attributeGroups: indexByName(allChildren(containers, named: "attributeGroup")),
@@ -25,6 +26,8 @@ extension PureXML.Schema {
                 substitutions: filterSubstitutions(XSDNode.substitutionMembers(containers), derivation),
                 abstractElements: derivation.abstractElements,
             )
+            context.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"
+            context.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
             context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
             resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
             var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
@@ -55,6 +58,7 @@ extension PureXML.Schema {
                 abstractElements: derivation.abstractElements,
                 typeBlock: derivation.typeBlock,
                 typeDerivation: derivation.typeDerivation,
+                targetNamespace: context.targetNamespace,
             )
         }
 
@@ -186,8 +190,10 @@ extension PureXML.Schema {
             } else {
                 SimpleType(base: .string)
             }
+            let qualified = XSDNode.attribute(node, "form") == "qualified"
+                || (XSDNode.attribute(node, "form") == nil && context.attributeFormQualified)
             return AttributeUse(
-                name: PureXML.Model.QualifiedName(name),
+                name: PureXML.Model.QualifiedName(localName: name, namespaceURI: qualified ? context.targetNamespace : nil),
                 type: type,
                 required: required,
                 valueConstraint: valueConstraint(of: node),
@@ -261,24 +267,20 @@ extension PureXML.Schema {
                 let head = context.abstractElements.contains(name) ? [] : [name]
                 let alternatives = head + (context.substitutions[name] ?? [])
                 if alternatives.count == 1 {
-                    return Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0]))
+                    return Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0], context))
                 }
                 // The reference admits its substitution-group members, so expand it
                 // to a choice over the head and every member, each carrying its own
                 // declared type.
-                let members = alternatives.map { Particle(term: elementReferenceTerm($0)) }
+                let members = alternatives.map { Particle(term: elementReferenceTerm($0, context)) }
                 return Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(Group(compositor: .choice, particles: members)))
             }
             let name = XSDNode.attribute(node, "name") ?? ""
             return Particle(
                 minOccurs: minimum,
                 maxOccurs: maximum,
-                term: .element(name: PureXML.Model.QualifiedName(name), type: elementType(node, context)),
+                term: .element(name: localElementName(name, XSDNode.attribute(node, "form"), context), type: elementType(node, context)),
             )
-        }
-
-        private static func elementReferenceTerm(_ name: String) -> Term {
-            .element(name: PureXML.Model.QualifiedName(name), type: .typeReference(elementKey(name)))
         }
 
         private static func groupReferenceParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle? {
@@ -291,6 +293,25 @@ extension PureXML.Schema {
             }
             return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
         }
+    }
+}
+
+extension PureXML.Schema.XSDParser {
+    /// The qualified name of a reference to a global element: globals are always in
+    /// the schema's target namespace.
+    static func elementReferenceTerm(_ name: String, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Term {
+        .element(
+            name: PureXML.Model.QualifiedName(localName: name, namespaceURI: context.targetNamespace),
+            type: .typeReference(elementKey(name)),
+        )
+    }
+
+    /// The qualified name of a local element declaration: in the target namespace
+    /// when `elementFormDefault` (or the element's own `form`) is qualified,
+    /// otherwise in no namespace.
+    static func localElementName(_ name: String, _ form: String?, _ context: PureXML.Schema.XSDContext) -> PureXML.Model.QualifiedName {
+        let qualified = form == "qualified" || (form == nil && context.elementFormQualified)
+        return PureXML.Model.QualifiedName(localName: name, namespaceURI: qualified ? context.targetNamespace : nil)
     }
 }
 

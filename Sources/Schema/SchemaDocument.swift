@@ -7,6 +7,10 @@ public extension PureXML.Schema {
         /// A type inside `xs:redefine` does not redefine itself: its restriction or
         /// extension base must name the type it redefines.
         case redefineIncompatible(type: String)
+        /// An `xs:all` group violates its XSD 1.0 constraints: every member must be
+        /// an element with `maxOccurs` at most 1, and the group itself may occur at
+        /// most once.
+        case invalidAllGroup(reason: String)
 
         public var description: String {
             switch self {
@@ -16,6 +20,8 @@ public extension PureXML.Schema {
                 "type '\(type)' derives from '\(base)' by \(method), which '\(base)' declares final"
             case let .redefineIncompatible(type):
                 "redefined type '\(type)' must derive from itself"
+            case let .invalidAllGroup(reason):
+                "invalid xs:all group: \(reason)"
             }
         }
     }
@@ -32,6 +38,7 @@ public extension PureXML.Schema {
         private let abstractElements: Set<String>
         private let typeBlock: [String: Set<DerivationMethod>]
         private let typeDerivation: [String: TypeDerivation]
+        private let targetNamespace: String?
 
         /// Compiles a schema document. `schemaLoader` resolves the
         /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
@@ -49,6 +56,7 @@ public extension PureXML.Schema {
             abstractElements = compiled.abstractElements
             typeBlock = compiled.typeBlock
             typeDerivation = compiled.typeDerivation
+            targetNamespace = compiled.targetNamespace
         }
 
         /// Validates an instance document against the schema, returning one located
@@ -66,6 +74,11 @@ public extension PureXML.Schema {
             }
             guard let declaration = elements[root.name.localName] else {
                 return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [])]
+            }
+            // A schema with a target namespace declares its global elements in that
+            // namespace; the root must be in it.
+            if let target = targetNamespace, !target.isEmpty, root.name.namespaceURI != target {
+                return [.init(reason: "root element '\(root.name.localName)' is not in the schema target namespace '\(target)'", at: [.element(root.name.description)])]
             }
             // An abstract element may not appear in an instance directly; only a
             // concrete substitution-group member may stand in its place.

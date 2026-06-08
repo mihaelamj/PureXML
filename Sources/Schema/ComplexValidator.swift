@@ -107,7 +107,7 @@ public extension PureXML.Schema {
         ) {
             let present = element.attributes.filter { !Self.isNamespaceDeclaration($0) && !Self.isSchemaInstanceAttribute($0) }
             for use in type.attributes {
-                let match = present.first { $0.name.localName == use.name.localName }
+                let match = present.first { Self.sameName($0.name, use.name) }
                 if let match {
                     if let error = use.type.validate(match.value) {
                         errors.append(XSDFailure(reason: "attribute '\(use.name.localName)': \(error)", at: path))
@@ -121,7 +121,7 @@ public extension PureXML.Schema {
             }
             // An undeclared attribute is allowed only if an xs:anyAttribute wildcard
             // admits its namespace.
-            for attribute in present where !type.attributes.contains(where: { $0.name.localName == attribute.name.localName }) {
+            for attribute in present where !type.attributes.contains(where: { Self.sameName($0.name, attribute.name) }) {
                 if type.attributeWildcard?.admits(attribute.name) == true { continue }
                 errors.append(XSDFailure(reason: "undeclared attribute '\(attribute.name.localName)'", at: path))
             }
