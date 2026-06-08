@@ -250,7 +250,7 @@ extension RNCParser {
         switch peek() {
         case let .string(value): advance()
             // A bare string literal is shorthand for a `token`-typed value.
-            return .value(PureXML.Schema.SimpleType(base: .token), value)
+            return .value(PureXML.Schema.SimpleType(base: .token), concatenated(value))
         case .symbol("("): advance()
             let pattern = parsePattern()
             expectSymbol(")")
@@ -269,7 +269,7 @@ extension RNCParser {
         var facets = PureXML.Schema.Facets()
         if peek() == .symbol("{") { parseParams(into: &facets) }
         if case let .string(value) = peek() { advance()
-            return .value(PureXML.Schema.SimpleType(base: type), value)
+            return .value(PureXML.Schema.SimpleType(base: type), concatenated(value))
         }
         return .data(PureXML.Schema.SimpleType(base: type, facets: facets))
     }
