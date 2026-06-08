@@ -15,10 +15,11 @@ extension PureXML.Validation {
             let root = try PureXML.parseTree(xml)
             let schema = descendants(root, localName: "schema").first ?? root
             let patterns = try descendants(root, localName: "pattern").map(pattern)
-            return SchematronSchema(
+            return try SchematronSchema(
                 patterns: patterns,
                 phases: phases(root),
                 defaultPhase: attribute(schema, "defaultPhase"),
+                diagnostics: diagnostics(root),
             )
         }
 
@@ -76,11 +77,24 @@ extension PureXML.Validation {
 
         private static func assertion(_ node: PureXML.Model.TreeNode) throws -> SchematronAssertion? {
             guard let test = attribute(node, "test") else { return nil }
+            let referenced = attribute(node, "diagnostics")?.split(whereSeparator: \.isWhitespace).map(String.init) ?? []
             return try SchematronAssertion(
                 isReport: node.name?.localName == "report",
                 test: PureXML.XPath.Query(test),
                 message: messageParts(node),
+                diagnostics: referenced,
             )
+        }
+
+        /// The `<diagnostic id=>` message templates, keyed by id.
+        private static func diagnostics(_ root: PureXML.Model.TreeNode) throws -> [String: [SchematronMessagePart]] {
+            var table: [String: [SchematronMessagePart]] = [:]
+            for diagnostic in descendants(root, localName: "diagnostic") {
+                if let id = attribute(diagnostic, "id") {
+                    table[id] = try messageParts(diagnostic)
+                }
+            }
+            return table
         }
 
         /// Builds an assertion message template from a node's children: text nodes

@@ -28,7 +28,8 @@ public extension PureXML.Validation {
         /// `#ALL` runs every pattern.
         public func validate(_ xml: String, phase: String? = nil) throws -> [ValidationError] {
             let node = try PureXML.parse(xml)
-            return Validator<Void>.blank.validating(Self.rule(activePatterns(phase: phase))).errors(for: node, in: ())
+            let validation = Self.rule(activePatterns(phase: phase), diagnostics: schema.diagnostics)
+            return Validator<Void>.blank.validating(validation).errors(for: node, in: ())
         }
 
         /// The patterns active in the requested phase, falling back to the schema's
@@ -44,24 +45,32 @@ public extension PureXML.Validation {
 
         /// The schema as a single ``Validation`` over the document root, so it
         /// composes with the rest of the framework.
-        static func rule(_ patterns: [SchematronPattern]) -> Validation<PureXML.Model.Node, Void> {
+        static func rule(_ patterns: [SchematronPattern], diagnostics: [String: [SchematronMessagePart]]) -> Validation<PureXML.Model.Node, Void> {
             .init(
                 description: "Document satisfies the Schematron schema",
-                check: { context in evaluate(patterns, over: PureXML.Model.TreeNode(context.subject)) },
+                check: { context in evaluate(patterns, over: PureXML.Model.TreeNode(context.subject), diagnostics: diagnostics) },
                 when: { $0.codingPath.isEmpty },
             )
         }
 
-        private static func evaluate(_ patterns: [SchematronPattern], over root: PureXML.Model.TreeNode) -> [ValidationError] {
-            patterns.flatMap { evaluate($0, over: root) }
+        private static func evaluate(
+            _ patterns: [SchematronPattern],
+            over root: PureXML.Model.TreeNode,
+            diagnostics: [String: [SchematronMessagePart]],
+        ) -> [ValidationError] {
+            patterns.flatMap { evaluate($0, over: root, diagnostics: diagnostics) }
         }
 
-        private static func evaluate(_ pattern: SchematronPattern, over root: PureXML.Model.TreeNode) -> [ValidationError] {
+        private static func evaluate(
+            _ pattern: SchematronPattern,
+            over root: PureXML.Model.TreeNode,
+            diagnostics: [String: [SchematronMessagePart]],
+        ) -> [ValidationError] {
             var errors: [ValidationError] = []
             var claimed: Set<ObjectIdentifier> = []
             for rule in pattern.rules {
                 for node in rule.context.nodes(over: root) where claimed.insert(ObjectIdentifier(node)).inserted {
-                    errors += apply(rule.assertions, at: node, variables: bindings(rule.lets, at: node))
+                    errors += apply(rule.assertions, at: node, variables: bindings(rule.lets, at: node), diagnostics: diagnostics)
                 }
             }
             return errors
@@ -83,18 +92,35 @@ public extension PureXML.Validation {
             _ assertions: [SchematronAssertion],
             at node: PureXML.Model.TreeNode,
             variables: [String: PureXML.XPath.Value],
+            diagnostics: [String: [SchematronMessagePart]],
         ) -> [ValidationError] {
             let path = codingPath(of: node)
             var errors: [ValidationError] = []
             for assertion in assertions {
                 let holds = (try? assertion.test.value(at: node, variables: variables).boolean) ?? false
-                if assertion.isReport {
-                    if holds { errors.append(ValidationError(reason: render(assertion.message, at: node, variables: variables), at: path, severity: .warning)) }
-                } else if !holds {
-                    errors.append(ValidationError(reason: render(assertion.message, at: node, variables: variables), at: path, severity: .error))
-                }
+                let flagged = assertion.isReport ? holds : !holds
+                guard flagged else { continue }
+                let reason = reason(assertion, at: node, variables: variables, diagnostics: diagnostics)
+                errors.append(ValidationError(reason: reason, at: path, severity: assertion.isReport ? .warning : .error))
             }
             return errors
+        }
+
+        /// The finding text: the assertion's rendered message, followed by the
+        /// rendered text of each `<diagnostic>` it references, for extra detail.
+        private static func reason(
+            _ assertion: SchematronAssertion,
+            at node: PureXML.Model.TreeNode,
+            variables: [String: PureXML.XPath.Value],
+            diagnostics: [String: [SchematronMessagePart]],
+        ) -> String {
+            var text = render(assertion.message, at: node, variables: variables)
+            for id in assertion.diagnostics {
+                guard let parts = diagnostics[id] else { continue }
+                let rendered = render(parts, at: node, variables: variables)
+                if !rendered.isEmpty { text += " " + rendered }
+            }
+            return text
         }
 
         /// Renders a message template against the context node: literal text as is,
