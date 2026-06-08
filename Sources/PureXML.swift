@@ -36,4 +36,7 @@ public enum PureXML {
 
     /// XInclude processing, URI reference resolution, and `xml:base`.
     public enum XInclude {}
+
+    /// Canonical XML (C14N) serialization types.
+    public enum Canonical {}
 }

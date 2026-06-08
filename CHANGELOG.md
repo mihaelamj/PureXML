@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Canonical XML (#26, the libxml2 `c14n.h` model). The new `PureXML.Canonical`
+  namespace renders the C14N form of a node: namespace declarations sorted by
+  prefix (default first) and attributes by namespace URI then local name, empty
+  elements expanded to start/end pairs, CDATA folded into escaped text, and the
+  C14N text/attribute escaping rules. Inclusive mode renders every in-scope
+  namespace; exclusive mode renders only the namespaces an element and its
+  attributes visibly use (with an `InclusiveNamespaces` prefix list). Comments
+  are omitted unless requested. For whole-tree canonicalization C14N 1.0 and 1.1
+  coincide, so the single inclusive mode covers both.
 - XInclude, URI resolution, and `xml:base` (#24, the libxml2 `xinclude.h`/`uri.h`
   model). The new `PureXML.XInclude` namespace adds RFC 3986 reference
   resolution (`URIReference.resolve(_:against:)`, with dot-segment removal) and
