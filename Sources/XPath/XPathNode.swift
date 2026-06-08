@@ -1,4 +1,4 @@
-extension PureXML.XPath {
+public extension PureXML.XPath {
     /// An XPath node. Most nodes wrap a parent-aware ``PureXML/Model/TreeNode``
     /// (element, text, CDATA, comment, processing instruction, or the document
     /// root). Attributes and namespaces are not tree nodes, so XPath surfaces them
@@ -12,7 +12,7 @@ extension PureXML.XPath {
         case attribute(owner: PureXML.Model.TreeNode, PureXML.Model.Attribute)
         case namespace(owner: PureXML.Model.TreeNode, prefix: String, uri: String)
 
-        static func == (lhs: Node, rhs: Node) -> Bool {
+        public static func == (lhs: Node, rhs: Node) -> Bool {
             switch (lhs, rhs) {
             case let (.tree(left), .tree(right)):
                 left === right
@@ -25,7 +25,7 @@ extension PureXML.XPath {
             }
         }
 
-        func hash(into hasher: inout Hasher) {
+        public func hash(into hasher: inout Hasher) {
             switch self {
             case let .tree(node):
                 hasher.combine(0)
