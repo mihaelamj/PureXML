@@ -16,9 +16,13 @@ public extension PureXML.Schema {
         private let elements: [String: ElementType]
         private let types: [String: ElementType]
 
-        /// Compiles a schema document.
-        public init(_ xsd: String) throws {
-            (elements, types) = try XSDParser.parse(xsd)
+        /// Compiles a schema document. `schemaLoader` resolves the
+        /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
+        /// schema source; it returns nil (the default) when external schemas are
+        /// not available, which keeps compilation from reaching the filesystem or
+        /// network by default.
+        public init(_ xsd: String, schemaLoader: @escaping (String) -> String? = { _ in nil }) throws {
+            (elements, types) = try XSDParser.parse(xsd, loader: schemaLoader)
         }
 
         /// Validates an instance document against the schema, returning one issue

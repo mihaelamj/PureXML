@@ -1,56 +1,3 @@
-private typealias Tree = PureXML.Model.TreeNode
-
-/// Tree-access helpers shared by the schema parser. File-scope and private.
-private enum XSDNode {
-    static func localName(_ node: Tree) -> String? {
-        node.name?.localName
-    }
-
-    static func attribute(_ node: Tree, _ name: String) -> String? {
-        node.attributes.first { $0.name.localName == name }?.value
-    }
-
-    static func elementChildren(_ node: Tree) -> [Tree] {
-        node.children.filter { $0.kind == .element }
-    }
-
-    static func children(_ node: Tree, named name: String) -> [Tree] {
-        elementChildren(node).filter { localName($0) == name }
-    }
-
-    static func firstChild(_ node: Tree, named name: String) -> Tree? {
-        children(node, named: name).first
-    }
-
-    static func stripPrefix(_ qualified: String) -> String {
-        qualified.split(separator: ":").last.map(String.init) ?? qualified
-    }
-
-    static func occurrence(_ node: Tree) -> (min: Int, max: Int?) {
-        let minimum = attribute(node, "minOccurs").flatMap(Int.init) ?? 1
-        let maximumText = attribute(node, "maxOccurs")
-        let maximum: Int? = maximumText == "unbounded" ? nil : (maximumText.flatMap(Int.init) ?? 1)
-        return (minimum, maximum)
-    }
-}
-
-/// The parsing context: the named simple types resolved so far, plus the
-/// definition nodes for named attribute groups and model groups (so their refs
-/// can be expanded), and a guard against cyclic group references. File-scope and
-/// private.
-private struct Context {
-    var simpleTypes: [String: PureXML.Schema.SimpleType]
-    var attributeGroups: [String: Tree]
-    var groups: [String: Tree]
-    var visitingGroups: Set<String> = []
-
-    func visiting(_ group: String) -> Context {
-        var copy = self
-        copy.visitingGroups.insert(group)
-        return copy
-    }
-}
-
 extension PureXML.Schema {
     /// Parses an XSD schema document into its global element declarations and its
     /// named-type table. Matches the schema vocabulary by local name, so the XML
@@ -62,21 +9,25 @@ extension PureXML.Schema {
     enum XSDParser {
         static func parse(
             _ xsd: String,
+            loader: (String) -> String? = { _ in nil },
         ) throws -> (elements: [String: ElementType], types: [String: ElementType]) {
             let root = try PureXML.parseTree(xsd)
             guard let schema = XSDNode.elementChildren(root).first(where: { XSDNode.localName($0) == "schema" }) else {
                 throw PureXML.Schema.SchemaError.notASchema
             }
-            var context = Context(
+            var visited: Set<String> = []
+            let containers = XSDNode.collectContainers(schema, loader, &visited)
+            var context = XSDContext(
                 simpleTypes: [:],
-                attributeGroups: indexByName(XSDNode.children(schema, named: "attributeGroup")),
-                groups: indexByName(XSDNode.children(schema, named: "group")),
+                attributeGroups: indexByName(allChildren(containers, named: "attributeGroup")),
+                groups: indexByName(allChildren(containers, named: "group")),
+                substitutions: XSDNode.substitutionMembers(containers),
             )
             // Named simple types may restrict or list one another regardless of
             // document order, so resolve them over repeated passes: each pass sees
             // the types resolved by the previous one. A chain of length n settles
             // in at most n passes.
-            let simpleNodes = XSDNode.children(schema, named: "simpleType").filter { XSDNode.attribute($0, "name") != nil }
+            let simpleNodes = allChildren(containers, named: "simpleType").filter { XSDNode.attribute($0, "name") != nil }
             for _ in simpleNodes.indices {
                 for node in simpleNodes {
                     if let name = XSDNode.attribute(node, "name") {
@@ -85,13 +36,13 @@ extension PureXML.Schema {
                 }
             }
             var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
-            for node in XSDNode.children(schema, named: "complexType") {
+            for node in allChildren(containers, named: "complexType") {
                 if let name = XSDNode.attribute(node, "name") {
                     types[name] = .complex(complexType(node, context))
                 }
             }
             var elements: [String: ElementType] = [:]
-            for node in XSDNode.children(schema, named: "element") {
+            for node in allChildren(containers, named: "element") {
                 if let name = XSDNode.attribute(node, "name") {
                     let type = elementType(node, context)
                     elements[name] = type
@@ -105,12 +56,16 @@ extension PureXML.Schema {
             return (elements, types)
         }
 
+        private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {
+            containers.flatMap { XSDNode.children($0, named: name) }
+        }
+
         static func elementKey(_ name: String) -> String {
             "element:\(name)"
         }
 
-        private static func indexByName(_ nodes: [Tree]) -> [String: Tree] {
-            var index: [String: Tree] = [:]
+        private static func indexByName(_ nodes: [XSDTree]) -> [String: XSDTree] {
+            var index: [String: XSDTree] = [:]
             for node in nodes {
                 if let name = XSDNode.attribute(node, "name") { index[name] = node }
             }
@@ -119,7 +74,7 @@ extension PureXML.Schema {
 
         // MARK: Element and type references
 
-        private static func elementType(_ node: Tree, _ context: Context) -> ElementType {
+        private static func elementType(_ node: XSDTree, _ context: XSDContext) -> ElementType {
             if let typeName = XSDNode.attribute(node, "type") {
                 return typeReference(typeName)
             }
@@ -149,7 +104,7 @@ extension PureXML.Schema {
 
         // MARK: Complex types
 
-        private static func complexType(_ node: Tree, _ context: Context) -> ComplexType {
+        private static func complexType(_ node: XSDTree, _ context: XSDContext) -> ComplexType {
             let mixed = XSDNode.attribute(node, "mixed") == "true"
             var attributes = attributeUses(under: node, context)
             if let simpleContent = XSDNode.firstChild(node, named: "simpleContent") {
@@ -165,11 +120,11 @@ extension PureXML.Schema {
             return ComplexType(attributes: attributes, content: mixed ? .mixed(particle) : .elementOnly(particle))
         }
 
-        private static func derivation(_ node: Tree) -> Tree? {
+        private static func derivation(_ node: XSDTree) -> XSDTree? {
             XSDNode.firstChild(node, named: "restriction") ?? XSDNode.firstChild(node, named: "extension")
         }
 
-        private static func simpleContentType(_ node: Tree, _ context: Context) -> SimpleType {
+        private static func simpleContentType(_ node: XSDTree, _ context: XSDContext) -> SimpleType {
             guard let inner = derivation(node) else { return SimpleType(base: .string) }
             let baseName = XSDNode.stripPrefix(XSDNode.attribute(inner, "base") ?? "string")
             let base = BuiltinType(rawValue: baseName) ?? context.simpleTypes[baseName]?.base ?? .string
@@ -180,7 +135,7 @@ extension PureXML.Schema {
 
         // MARK: Attribute uses and groups
 
-        private static func attributeUses(under node: Tree, _ context: Context, visited: Set<String> = []) -> [AttributeUse] {
+        private static func attributeUses(under node: XSDTree, _ context: XSDContext, visited: Set<String> = []) -> [AttributeUse] {
             var uses: [AttributeUse] = []
             for child in XSDNode.elementChildren(node) {
                 switch XSDNode.localName(child) {
@@ -198,7 +153,7 @@ extension PureXML.Schema {
             return uses
         }
 
-        private static func attributeUse(_ node: Tree, _ context: Context) -> AttributeUse? {
+        private static func attributeUse(_ node: XSDTree, _ context: XSDContext) -> AttributeUse? {
             guard let name = XSDNode.attribute(node, "name") else { return nil }
             let required = XSDNode.attribute(node, "use") == "required"
             let type: SimpleType = if let typeName = XSDNode.attribute(node, "type") {
@@ -213,7 +168,7 @@ extension PureXML.Schema {
 
         // MARK: Model groups
 
-        private static func modelGroup(in node: Tree, _ context: Context) -> Particle? {
+        private static func modelGroup(in node: XSDTree, _ context: XSDContext) -> Particle? {
             for (name, compositor) in [("sequence", Compositor.sequence), ("choice", .choice), ("all", .all)] {
                 if let group = XSDNode.firstChild(node, named: name) {
                     return groupParticle(group, compositor, context)
@@ -226,9 +181,9 @@ extension PureXML.Schema {
         }
 
         private static func groupParticle(
-            _ node: Tree,
+            _ node: XSDTree,
             _ compositor: Compositor,
-            _ context: Context,
+            _ context: XSDContext,
         ) -> Particle {
             var particles: [Particle] = []
             for child in XSDNode.elementChildren(node) {
@@ -242,7 +197,7 @@ extension PureXML.Schema {
             )
         }
 
-        private static func particle(_ node: Tree, _ context: Context) -> Particle? {
+        private static func particle(_ node: XSDTree, _ context: XSDContext) -> Particle? {
             let (minimum, maximum) = XSDNode.occurrence(node)
             switch XSDNode.localName(node) {
             case "element":
@@ -262,14 +217,18 @@ extension PureXML.Schema {
             }
         }
 
-        private static func elementParticle(_ node: Tree, _ minimum: Int, _ maximum: Int?, _ context: Context) -> Particle {
+        private static func elementParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle {
             if let ref = XSDNode.attribute(node, "ref") {
                 let name = XSDNode.stripPrefix(ref)
-                return Particle(
-                    minOccurs: minimum,
-                    maxOccurs: maximum,
-                    term: .element(name: PureXML.Model.QualifiedName(name), type: .typeReference(elementKey(name))),
-                )
+                let alternatives = [name] + (context.substitutions[name] ?? [])
+                if alternatives.count == 1 {
+                    return Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(name))
+                }
+                // The reference admits its substitution-group members, so expand it
+                // to a choice over the head and every member, each carrying its own
+                // declared type.
+                let members = alternatives.map { Particle(term: elementReferenceTerm($0)) }
+                return Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(Group(compositor: .choice, particles: members)))
             }
             let name = XSDNode.attribute(node, "name") ?? ""
             return Particle(
@@ -279,7 +238,11 @@ extension PureXML.Schema {
             )
         }
 
-        private static func groupReferenceParticle(_ node: Tree, _ minimum: Int, _ maximum: Int?, _ context: Context) -> Particle? {
+        private static func elementReferenceTerm(_ name: String) -> Term {
+            .element(name: PureXML.Model.QualifiedName(name), type: .typeReference(elementKey(name)))
+        }
+
+        private static func groupReferenceParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle? {
             guard let ref = XSDNode.attribute(node, "ref") else { return nil }
             let name = XSDNode.stripPrefix(ref)
             guard !context.visitingGroups.contains(name), let definition = context.groups[name],
@@ -288,104 +251,6 @@ extension PureXML.Schema {
                 return nil
             }
             return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
-        }
-    }
-
-    /// Parses XSD simple types: atomic restrictions with the full facet set, and
-    /// the `list` and `union` varieties. Kept beside ``XSDParser`` so the two
-    /// share the file-scope tree helpers and parsing context.
-    enum XSDSimpleParser {
-        fileprivate static func simpleType(_ node: Tree, _ context: Context) -> SimpleType {
-            if let list = XSDNode.firstChild(node, named: "list") {
-                return listType(list, context)
-            }
-            if let union = XSDNode.firstChild(node, named: "union") {
-                return unionType(union, context)
-            }
-            guard let restriction = XSDNode.firstChild(node, named: "restriction") else {
-                return SimpleType(base: .string)
-            }
-            let baseName = XSDNode.stripPrefix(XSDNode.attribute(restriction, "base") ?? "string")
-            var base = BuiltinType.string
-            var facets = Facets()
-            var variety = Variety.atomic
-            if let builtin = BuiltinType(rawValue: baseName) {
-                base = builtin
-            } else if let parent = context.simpleTypes[baseName] {
-                base = parent.base
-                facets = parent.facets
-                variety = parent.variety
-            }
-            applyFacets(restriction, into: &facets)
-            return SimpleType(base: base, facets: facets, variety: variety)
-        }
-
-        fileprivate static func simpleTypeReference(_ typeName: String, _ context: Context) -> SimpleType {
-            let local = XSDNode.stripPrefix(typeName)
-            if let builtin = BuiltinType(rawValue: local) { return SimpleType(base: builtin) }
-            return context.simpleTypes[local] ?? SimpleType(base: .string)
-        }
-
-        fileprivate static func applyFacets(_ restriction: Tree, into facets: inout Facets) {
-            for facet in XSDNode.elementChildren(restriction) {
-                let value = XSDNode.attribute(facet, "value")
-                applyStringFacet(XSDNode.localName(facet), value, into: &facets)
-                applyNumericFacet(XSDNode.localName(facet), value, into: &facets)
-            }
-        }
-
-        private static func listType(_ node: Tree, _ context: Context) -> SimpleType {
-            let item: SimpleType = if let itemType = XSDNode.attribute(node, "itemType") {
-                simpleTypeReference(itemType, context)
-            } else if let inline = XSDNode.firstChild(node, named: "simpleType") {
-                simpleType(inline, context)
-            } else {
-                SimpleType(base: .string)
-            }
-            return .list(item: item)
-        }
-
-        private static func unionType(_ node: Tree, _ context: Context) -> SimpleType {
-            var members: [SimpleType] = []
-            if let names = XSDNode.attribute(node, "memberTypes") {
-                members += names.split(whereSeparator: \.isWhitespace).map { simpleTypeReference(String($0), context) }
-            }
-            members += XSDNode.children(node, named: "simpleType").map { simpleType($0, context) }
-            return .union(members)
-        }
-
-        private static func applyStringFacet(_ name: String?, _ value: String?, into facets: inout Facets) {
-            switch name {
-            case "pattern": if let value { facets.patterns.append(value) }
-            case "enumeration": if let value { facets.enumeration = (facets.enumeration ?? []) + [value] }
-            case "minInclusive": facets.minInclusive = value
-            case "maxInclusive": facets.maxInclusive = value
-            case "minExclusive": facets.minExclusive = value
-            case "maxExclusive": facets.maxExclusive = value
-            case "whiteSpace": facets.whiteSpace = whiteSpace(value)
-            default: break
-            }
-        }
-
-        private static func applyNumericFacet(_ name: String?, _ value: String?, into facets: inout Facets) {
-            let number = value.flatMap(Int.init)
-            switch name {
-            case "length": facets.length = number
-            case "minLength": facets.minLength = number
-            case "maxLength": facets.maxLength = number
-            case "totalDigits": facets.totalDigits = number
-            case "fractionDigits": facets.fractionDigits = number
-            default: break
-            }
-        }
-
-        private static func whiteSpace(_ value: String?) -> WhiteSpace? {
-            switch value {
-            case "preserve": .preserve
-            case "replace": .replace
-            case "collapse": .collapse
-            default: nil
-            }
         }
     }
 }
