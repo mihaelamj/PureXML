@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- All thirteen XPath axes (toward #21 full XPath 1.0). `PureXML.XPath.Query` now
+  navigates `child`, `descendant`, `parent`, `ancestor`, `following-sibling`,
+  `preceding-sibling`, `following`, `preceding`, `attribute`, `namespace`,
+  `self`, `descendant-or-self`, and `ancestor-or-self`, with the `.`/`..`/`@`/`//`
+  abbreviations and the `processing-instruction()` node test. Evaluation runs
+  over the parent-aware tree, so upward and sibling navigation are first-class;
+  results come back de-duplicated and in document order regardless of axis
+  direction. The attribute axis excludes `xmlns` declarations and the namespace
+  axis surfaces in-scope namespace nodes.
 - Pull-cursor reader (the libxml2 `xmlTextReader` model).
   `PureXML.Parsing.TextReader` (via `PureXML.reader(_:)`) walks a document one
   node at a time with `read()`, exposing `nodeKind`, `name`, `value`, `depth`,

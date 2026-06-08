@@ -79,10 +79,10 @@ struct XPathTests {
         #expect(selections.map(\.stringValue) == ["Wired"])
     }
 
-    @Test("Unsupported upward axis is rejected at compile time")
-    func test_unsupportedAxis() {
+    @Test("An unknown axis name is rejected at compile time")
+    func test_unknownAxis() {
         #expect(throws: PureXML.XPath.QueryError.self) {
-            _ = try PureXML.XPath.Query("/catalog/..")
+            _ = try PureXML.XPath.Query("/catalog/bogus::book")
         }
     }
 

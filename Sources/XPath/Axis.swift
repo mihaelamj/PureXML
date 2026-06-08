@@ -1,15 +1,48 @@
 extension PureXML.XPath {
-    /// The supported XPath axes. The model is a value tree without parent
-    /// pointers, so only the forward axes are available; upward axes (parent,
-    /// ancestor) and sibling axes are intentionally out of scope.
+    /// The thirteen XPath 1.0 axes. Every axis is reachable now that the tree is
+    /// parent-aware, so upward and sibling navigation are first-class.
     enum Axis: Equatable {
-        /// Immediate children (the default axis).
         case child
-        /// All descendants at any depth (reached with `//`).
         case descendant
-        /// The context node itself (`.`).
-        case selfNode
-        /// Attributes of the context element (`@`).
+        case parent
+        case ancestor
+        case followingSibling
+        case precedingSibling
+        case following
+        case preceding
         case attribute
+        case namespace
+        case selfAxis
+        case descendantOrSelf
+        case ancestorOrSelf
+
+        /// Whether the axis is a reverse axis (its nodes are numbered in reverse
+        /// document order for positional predicates).
+        var isReverse: Bool {
+            switch self {
+            case .parent, .ancestor, .precedingSibling, .preceding, .ancestorOrSelf:
+                true
+            default:
+                false
+            }
+        }
+
+        /// The principal node kind of the axis: attributes for the attribute axis,
+        /// namespaces for the namespace axis, elements otherwise. Governs what a
+        /// name test or `*` selects.
+        var principalKind: PrincipalKind {
+            switch self {
+            case .attribute: .attribute
+            case .namespace: .namespace
+            default: .element
+            }
+        }
+    }
+
+    /// The principal node kind selected by name tests on an axis.
+    enum PrincipalKind: Equatable {
+        case element
+        case attribute
+        case namespace
     }
 }
