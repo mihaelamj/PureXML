@@ -37,10 +37,7 @@ extension PureXML.Schema.RelaxNGEngine {
         for attribute in element.attributes where !Self.isNamespaceDeclaration(attribute) {
             let next = attributeDeriv(residual, attribute)
             if isNotAllowed(next) {
-                errors.append(.init(
-                    reason: "attribute @\(attribute.name.description) is not allowed on <\(name)> or has an invalid value",
-                    at: path + [.attribute(attribute.name.description)],
-                ))
+                errors.append(.init(reason: attributeDetail(residual, attribute, on: name), at: path + [.attribute(attribute.name.description)]))
             } else {
                 residual = next
             }
@@ -113,6 +110,32 @@ extension PureXML.Schema.RelaxNGEngine {
         }
         validateElement(opened, child, path, &errors)
         return (forceClose(opened), false)
+    }
+
+    /// Explains an attribute failure: an undeclared attribute, or, when the name
+    /// is declared, why its value is invalid (reusing the datatype detail).
+    private func attributeDetail(_ residual: Pattern, _ attribute: PureXML.Model.Attribute, on name: String) -> String {
+        guard let content = attributeContent(residual, attribute.name, visiting: []) else {
+            return "attribute @\(attribute.name.description) is not allowed on <\(name)>"
+        }
+        return "attribute @\(attribute.name.description) on <\(name)>: \(textDetail(content, attribute.value))"
+    }
+
+    /// The value pattern of a declared attribute whose name matches, or nil when
+    /// no attribute of that name is permitted at this point.
+    private func attributeContent(_ pattern: Pattern, _ wanted: PureXML.Model.QualifiedName, visiting: Set<String>) -> Pattern? {
+        switch pattern {
+        case let .attribute(nameClass, content):
+            nameClass.contains(wanted) ? content : nil
+        case let .choice(lhs, rhs), let .group(lhs, rhs), let .interleave(lhs, rhs):
+            attributeContent(lhs, wanted, visiting: visiting) ?? attributeContent(rhs, wanted, visiting: visiting)
+        case let .after(lhs, _), let .oneOrMore(lhs):
+            attributeContent(lhs, wanted, visiting: visiting)
+        case let .ref(reference):
+            visiting.contains(reference) ? nil : attributeContent(resolve(reference), wanted, visiting: visiting.union([reference]))
+        default:
+            nil
+        }
     }
 
     /// Explains why `value` does not satisfy the text/datatype `pattern`, quoting

@@ -78,7 +78,23 @@ struct RelaxNGLocatedErrorTests {
         let found = try errors(rng, "<n count='abc'/>")
         #expect(found.count == 1)
         #expect(found.first?.reason.contains("@count") == true)
+        // The declared attribute's bad value is quoted and the type named.
+        #expect(found.first?.reason.contains("'abc'") == true)
+        #expect(found.first?.reason.contains("integer") == true)
         #expect(found.first?.codingPath.map(\.stringValue) == ["n", "@count"])
+    }
+
+    @Test("An undeclared attribute is distinguished from a bad value")
+    func test_undeclaredAttribute() throws {
+        let rng = """
+        <element name="n" xmlns="http://relaxng.org/ns/structure/1.0">
+          <attribute name="a"><text/></attribute>
+        </element>
+        """
+        let found = try errors(rng, "<n a='x' b='y'/>")
+        #expect(found.count == 1)
+        #expect(found.first?.reason.contains("@b") == true)
+        #expect(found.first?.reason.contains("is not allowed") == true)
     }
 
     @Test("Invalid datatype content is located on the element")
