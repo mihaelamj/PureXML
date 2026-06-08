@@ -50,9 +50,13 @@ public extension PureXML.Catalog {
         /// always wins; this only governs the fallback.
         private let preferPublic: Bool
 
-        /// Parses an OASIS XML catalog document.
-        public init(_ xml: String) throws {
-            self = try CatalogParser.parse(xml)
+        /// Parses an OASIS XML catalog document. Replacement URIs are resolved
+        /// against `baseURI` (the catalog's own location) and any in-scope
+        /// `xml:base`, so a catalog that uses relative URIs resolves them like a
+        /// validating processor would. An empty `baseURI` leaves relative URIs as
+        /// written.
+        public init(_ xml: String, baseURI: String = "") throws {
+            self = try CatalogParser.parse(xml, baseURI: baseURI)
         }
 
         init(
