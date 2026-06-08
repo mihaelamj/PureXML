@@ -148,10 +148,12 @@ public extension PureXML.Regex {
     /// A compiled regular expression in the XML Schema flavor: literals, `.`, the
     /// character-class escapes (`\d \D \w \W \s \S \i \I \c \C`), single-character
     /// escapes, character classes with ranges and negation, grouping, alternation
-    /// (`|`), and the quantifiers `?`, `*`, `+`, `{n}`, `{n,}`, `{n,m}`. Matching
-    /// is whole-string (anchored), as XSD `pattern` facets require. Built on a
+    /// (`|`), and the quantifiers `?`, `*`, `+`, `{n}`, `{n,}`, `{n,m}`. Character
+    /// classes also support Unicode category and block escapes (`\p{L}`, `\P{Nd}`,
+    /// `\p{IsBasicLatin}`) and subtraction (`[a-z-[aeiou]]`). Matching is
+    /// whole-string (anchored), as XSD `pattern` facets require. Built on a
     /// Thompson NFA, so it runs in time linear in the input with no backtracking
-    /// blow-up. Unicode category escapes (`\p{...}`) are not yet supported.
+    /// blow-up.
     struct Pattern: Sendable {
         private let nfa: NFA
 

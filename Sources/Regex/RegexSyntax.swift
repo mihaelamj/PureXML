@@ -49,14 +49,21 @@ extension PureXML.Regex {
         var ranges: [ClosedRange<Unicode.Scalar>] = []
         var named: [NamedClass] = []
         var negatedNamed: [NamedClass] = []
+        /// `\p{...}`/`\P{...}` Unicode category and block tests.
+        var categories: [CategoryPredicate] = []
+        /// A character-class subtraction (`[a-z-[aeiou]]`): characters this class
+        /// otherwise admits are removed when the subtrahend matches them. Nests.
+        var subtraction: [CharClass] = []
 
         func matches(_ character: Character) -> Bool {
             guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else {
                 return false
             }
-            let hit = ranges.contains { $0.contains(scalar) }
+            var hit = ranges.contains { $0.contains(scalar) }
                 || named.contains { $0.contains(scalar) }
                 || negatedNamed.contains { !$0.contains(scalar) }
+                || categories.contains { $0.contains(scalar) }
+            if hit, subtraction.contains(where: { $0.matches(character) }) { hit = false }
             return negated ? !hit : hit
         }
 

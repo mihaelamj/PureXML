@@ -4,6 +4,7 @@ private enum ClassMember {
     case scalar(Unicode.Scalar)
     case named(PureXML.Regex.NamedClass)
     case negatedNamed(PureXML.Regex.NamedClass)
+    case category(PureXML.Regex.CategoryPredicate)
 }
 
 extension PureXML.Regex {
@@ -112,7 +113,28 @@ extension PureXML.Regex {
             if let member = Self.classEscape(character) {
                 return classFrom(member)
             }
+            if character == "p" || character == "P" {
+                return try CharClass(categories: [parseCategory(negated: character == "P")])
+            }
             throw RegexError.badEscape(String(character))
+        }
+
+        /// Parses the `{name}` of a `\p`/`\P` escape into a category predicate,
+        /// rejecting an unknown category or block name.
+        private mutating func parseCategory(negated: Bool) throws -> CategoryPredicate {
+            guard peek() == "{" else { throw RegexError.badEscape(negated ? "P" : "p") }
+            advance()
+            var name = ""
+            while let character = peek(), character != "}" {
+                name.append(character)
+                advance()
+            }
+            guard peek() == "}" else { throw RegexError.badClass }
+            advance()
+            guard let predicate = CategoryPredicate(name: name, negated: negated) else {
+                throw RegexError.unsupported("\\p{\(name)}")
+            }
+            return predicate
         }
 
         private func classFrom(_ member: ClassMember) -> CharClass {
@@ -120,6 +142,7 @@ extension PureXML.Regex {
             case let .scalar(value): .single(value)
             case let .named(named): CharClass(named: [named])
             case let .negatedNamed(named): CharClass(negatedNamed: [named])
+            case let .category(predicate): CharClass(categories: [predicate])
             }
         }
 
@@ -156,6 +179,11 @@ extension PureXML.Regex {
                 cls.negated = true
             }
             while let character = peek(), character != "]" {
+                if character == "-", peek(1) == "[" {
+                    advance()
+                    cls.subtraction = try [parseClass()]
+                    break
+                }
                 try parseClassMember(into: &cls)
             }
             guard peek() == "]" else { throw RegexError.badClass }
@@ -183,6 +211,7 @@ extension PureXML.Regex {
             case let .scalar(value): cls.ranges.append(value ... value)
             case let .named(named): cls.named.append(named)
             case let .negatedNamed(named): cls.negatedNamed.append(named)
+            case let .category(predicate): cls.categories.append(predicate)
             }
         }
 
@@ -194,6 +223,9 @@ extension PureXML.Regex {
             advance()
             if let single = Self.singleEscape(escaped) { return .scalar(single) }
             if let member = Self.classEscape(escaped) { return member }
+            if escaped == "p" || escaped == "P" {
+                return try .category(parseCategory(negated: escaped == "P"))
+            }
             throw RegexError.badEscape(String(escaped))
         }
 
