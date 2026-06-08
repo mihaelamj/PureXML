@@ -40,6 +40,7 @@ extension PureXML.Validation {
     /// context selects it (the ISO Schematron firing rule).
     struct SchematronPattern {
         let id: String?
+        let lets: [SchematronLet]
         let rules: [SchematronRule]
     }
 
@@ -49,6 +50,9 @@ extension PureXML.Validation {
         let patterns: [SchematronPattern]
         let phases: [String: [String]]
         let defaultPhase: String?
+        /// Schema-level `<let>` bindings, evaluated once at the document root and
+        /// available to every rule's tests.
+        let lets: [SchematronLet]
         /// `<diagnostic id=>` message templates, keyed by id, referenced from an
         /// assertion's `diagnostics=` attribute.
         let diagnostics: [String: [SchematronMessagePart]]

@@ -19,6 +19,7 @@ extension PureXML.Validation {
                 patterns: patterns,
                 phases: phases(root),
                 defaultPhase: attribute(schema, "defaultPhase"),
+                lets: ruleLets(schema),
                 diagnostics: diagnostics(root),
             )
         }
@@ -43,7 +44,7 @@ extension PureXML.Validation {
             let rules = try ruleNodes
                 .filter { attribute($0, "abstract") != "true" }
                 .compactMap { try rule($0, abstracts) }
-            return SchematronPattern(id: attribute(node, "id"), rules: rules)
+            return try SchematronPattern(id: attribute(node, "id"), lets: ruleLets(node), rules: rules)
         }
 
         private static func rule(_ node: PureXML.Model.TreeNode, _ abstracts: [String: AbstractRule]) throws -> SchematronRule? {
