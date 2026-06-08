@@ -48,10 +48,13 @@ public extension PureXML.Schema {
         }
     }
 
-    /// The declared type of an element: a simple type (text only) or a complex one.
+    /// The declared type of an element: a simple type (text only), a complex one,
+    /// or a named reference resolved against the schema's type table (which lets
+    /// recursive schemas be represented without an infinite value).
     indirect enum ElementType: Sendable {
         case simple(SimpleType)
         case complex(ComplexType)
+        case typeReference(String)
     }
 
     /// An attribute use on a complex type.

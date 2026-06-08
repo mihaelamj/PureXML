@@ -3,7 +3,12 @@ public extension PureXML.Schema {
     /// content model, and, recursively, each child element against the type
     /// declared for its name.
     struct ComplexValidator {
-        public init() {}
+        /// The named type table that `ElementType.typeReference` resolves against.
+        private let types: [String: ElementType]
+
+        public init(types: [String: ElementType] = [:]) {
+            self.types = types
+        }
 
         /// Validates `element` against `type`, returning one issue per violation.
         public func validate(
@@ -13,6 +18,17 @@ public extension PureXML.Schema {
             var issues: [PureXML.Validation.Issue] = []
             validateAttributes(element, type, into: &issues)
             validateContent(element, type.content, into: &issues)
+            return issues
+        }
+
+        /// Validates `element` against any element type, resolving a
+        /// `typeReference` through the type table.
+        public func validate(
+            _ element: PureXML.Model.Element,
+            as type: ElementType,
+        ) -> [PureXML.Validation.Issue] {
+            var issues: [PureXML.Validation.Issue] = []
+            validateChild(element, against: type, into: &issues)
             return issues
         }
 
@@ -91,27 +107,41 @@ public extension PureXML.Schema {
                 issues.append(.init(severity: .error, message: "content does not match the content model"))
                 return
             }
-            validateChildren(children, types: Self.elementTypes(in: particle.term), into: &issues)
+            validateChildren(children, childTypes: Self.elementTypes(in: particle.term), into: &issues)
         }
 
         private func validateChildren(
             _ children: [PureXML.Model.Element],
-            types: [String: ElementType],
+            childTypes: [String: ElementType],
             into issues: inout [PureXML.Validation.Issue],
         ) {
             for child in children {
-                guard let type = types[Self.key(child.name)] else { continue }
-                switch type {
-                case let .simple(simple):
-                    if !child.children.compactMap(\.element).isEmpty {
-                        issues.append(.init(severity: .error, message: "'\(child.name.localName)' must not have children"))
-                    }
-                    if let error = simple.validate(Self.textContent(child)) {
-                        issues.append(.init(severity: .error, message: "'\(child.name.localName)': \(error)"))
-                    }
-                case let .complex(complex):
-                    issues.append(contentsOf: validate(child, against: complex))
+                guard let declared = childTypes[Self.key(child.name)] else { continue }
+                validateChild(child, against: declared, into: &issues)
+            }
+        }
+
+        private func validateChild(
+            _ child: PureXML.Model.Element,
+            against declared: ElementType,
+            into issues: inout [PureXML.Validation.Issue],
+        ) {
+            switch declared {
+            case let .simple(simple):
+                if !child.children.compactMap(\.element).isEmpty {
+                    issues.append(.init(severity: .error, message: "'\(child.name.localName)' must not have children"))
                 }
+                if let error = simple.validate(Self.textContent(child)) {
+                    issues.append(.init(severity: .error, message: "'\(child.name.localName)': \(error)"))
+                }
+            case let .complex(complex):
+                issues.append(contentsOf: validate(child, against: complex))
+            case let .typeReference(name):
+                guard let resolved = types[name] else {
+                    issues.append(.init(severity: .error, message: "unknown type '\(name)'"))
+                    return
+                }
+                validateChild(child, against: resolved, into: &issues)
             }
         }
 

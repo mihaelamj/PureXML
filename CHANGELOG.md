@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSD schema-document parser, completing the XSD validation pipeline (toward #2).
+  `PureXML.Schema.Document(xsd)` compiles a schema document into its global
+  element declarations and named-type table, and `validate(_:)` checks an
+  instance document end to end. The parser matches the schema vocabulary by local
+  name and supports global and local element declarations, named and inline
+  simple and complex types, `sequence`/`choice`/`all` model groups with
+  occurrence, attribute uses, simple content (restriction/extension), the full
+  facet set, and recursive types (via named type references resolved during
+  validation).
 - XSD complex types and particles (toward #2 schema validation).
   `PureXML.Schema.ComplexValidator` validates an element against a
   `ComplexType`: its attribute uses (required and typed, with unknown-attribute
