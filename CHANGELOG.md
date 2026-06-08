@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The XPath evaluation context, completing full XPath 1.0 (#21).
+  `Query.value(at:position:size:variables:)` evaluates an expression against an
+  explicit context node already in a tree, with its proximity position, size,
+  and variable bindings, so `position()`, `last()`, and the upward axes resolve
+  from that node. This is the per-node entry point downstream engines (XSLT,
+  Schematron) drive.
 - The full XPath 1.0 function library (toward #21 full XPath 1.0). Beyond the
   core functions, the string family (`concat`, `starts-with`, `contains`,
   `substring-before`, `substring-after`, `substring`, `string-length`,
