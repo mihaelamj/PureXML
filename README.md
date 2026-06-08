@@ -44,16 +44,16 @@ flowchart TB
   Validator["Validation framework + recovering reader shipped: #92 (one located severity-aware ValidationError, never-crash read)"]:::done
   Editor["Editor integration shipped: #94 (source spans, unified lint, schema completions, structured quick-fixes)"]:::done
   Conformance["Conformance push shipped: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89"]:::done
-  LDone ~~~ LReview
-  LReview ~~~ LEpic
-  LEpic ~~~ LTodo
-  LTodo ~~~ Core
-  Core ~~~ Query
-  Query ~~~ Transform
-  Transform ~~~ Parity
-  Parity ~~~ Validator
-  Validator ~~~ Editor
-  Editor ~~~ Conformance
+  LDone --> LReview
+  LReview --> LEpic
+  LEpic --> LTodo
+  LTodo --> Core
+  Core --> Query
+  Query --> Transform
+  Transform --> Parity
+  Parity --> Validator
+  Validator --> Editor
+  Editor --> Conformance
 ```
 
 The goal is full libxml2 feature parity in pure Swift with zero dependencies, by
@@ -81,10 +81,10 @@ flowchart TB
   Epic74["#74 Parser-breadth sub-epic: standalone/decl #95, XML 1.1 #96, reader #98, recovery #100 done; encodings #97 #99 open"]:::epic
   Partial["Partial in main: RELAX NG #79, Schematron #80, catalog #86, XInclude #87, XPath/XPointer #88, DOM #90, serialization #91"]:::todo
   Open["Open: XSLT #81 #82, HTML5 #83 #84, C14N #85, encoding tables #97 #99, validator decomposition #101"]:::todo
-  Epic71 ~~~ AuditDone
-  AuditDone ~~~ Epic74
-  Epic74 ~~~ Partial
-  Partial ~~~ Open
+  Epic71 --> AuditDone
+  AuditDone --> Epic74
+  Epic74 --> Partial
+  Partial --> Open
 ```
 
 ## Status
