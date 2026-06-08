@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Serialization option parity for the XML declaration (the libxml2 save-option
+  model). `PureXML.Emitting.Options` gains `includeXMLDeclaration`, `xmlVersion`,
+  `encodingName`, and `standalone`; when requested, both the tree serializer and
+  the incremental writer prepend an `<?xml ...?>` declaration from a single shared
+  computation. `Writer.writeStartDocument()` emits it. Defaults stay off so
+  fragment output is unchanged.
 - Spec-exact XML character classification (`PureXML.Parsing.XMLCharacter`, the
   libxml2 `chvalid.h` parity): the XML 1.0 (Fifth Edition) `Char`,
   `NameStartChar`, and `NameChar` productions as public predicates over Unicode

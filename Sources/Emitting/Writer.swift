@@ -29,6 +29,14 @@ public extension PureXML.Emitting {
             self.options = options
         }
 
+        /// Emits the XML declaration if the options request one. Call before the
+        /// root element; a no-op when `includeXMLDeclaration` is off.
+        public mutating func writeStartDocument() {
+            if let declaration = options.xmlDeclaration {
+                output += declaration + "\n"
+            }
+        }
+
         /// Opens an element. Attributes may follow until any content or close.
         public mutating func writeStartElement(_ name: String) {
             closeStartTag()

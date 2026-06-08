@@ -31,6 +31,9 @@ public extension PureXML.Emitting {
         /// Serializes a node into an XML string.
         public func serialize(_ node: PureXML.Model.Node) -> String {
             var output = ""
+            if let declaration = options.xmlDeclaration {
+                output += declaration + "\n"
+            }
             var stack: [SerializeStep] = [.node(node, 0, options.prettyPrint)]
             while let step = stack.popLast() {
                 switch step {
