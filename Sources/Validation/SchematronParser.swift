@@ -1,15 +1,31 @@
 extension PureXML.Validation {
-    /// Parses a Schematron schema document into patterns. Namespace-agnostic: it
-    /// matches the `schema`, `pattern`, `rule`, `assert`, and `report` elements by
-    /// local name, so both the ISO and the legacy Schematron namespaces work.
+    /// Parses a Schematron schema document into patterns and phases. Namespace
+    /// agnostic: it matches the `schema`, `phase`, `active`, `pattern`, `rule`,
+    /// `assert`, and `report` elements by local name, so both the ISO and the
+    /// legacy Schematron namespaces work.
     enum SchematronParser {
-        static func parse(_ xml: String) throws -> [SchematronPattern] {
+        static func parse(_ xml: String) throws -> SchematronSchema {
             let root = try PureXML.parseTree(xml)
-            return try descendants(root, localName: "pattern").map(pattern)
+            let schema = descendants(root, localName: "schema").first ?? root
+            let patterns = try descendants(root, localName: "pattern").map(pattern)
+            return SchematronSchema(
+                patterns: patterns,
+                phases: phases(root),
+                defaultPhase: attribute(schema, "defaultPhase"),
+            )
+        }
+
+        private static func phases(_ root: PureXML.Model.TreeNode) -> [String: [String]] {
+            var result: [String: [String]] = [:]
+            for phase in descendants(root, localName: "phase") {
+                guard let id = attribute(phase, "id") else { continue }
+                result[id] = children(phase, localName: "active").compactMap { attribute($0, "pattern") }
+            }
+            return result
         }
 
         private static func pattern(_ node: PureXML.Model.TreeNode) throws -> SchematronPattern {
-            try SchematronPattern(rules: children(node, localName: "rule").compactMap(rule))
+            try SchematronPattern(id: attribute(node, "id"), rules: children(node, localName: "rule").compactMap(rule))
         }
 
         private static func rule(_ node: PureXML.Model.TreeNode) throws -> SchematronRule? {
@@ -22,12 +38,29 @@ extension PureXML.Validation {
 
         private static func assertion(_ node: PureXML.Model.TreeNode) throws -> SchematronAssertion? {
             guard let test = attribute(node, "test") else { return nil }
-            let isReport = node.name?.localName == "report"
             return try SchematronAssertion(
-                isReport: isReport,
+                isReport: node.name?.localName == "report",
                 test: PureXML.XPath.Query(test),
-                message: node.stringValue.trimmingXMLWhitespace(),
+                message: messageParts(node),
             )
+        }
+
+        /// Builds an assertion message template from a node's children: text nodes
+        /// become literal parts, `<value-of select=>` an XPath part, and `<name>` a
+        /// context-name part. The parts render against the context node at
+        /// validation time.
+        private static func messageParts(_ node: PureXML.Model.TreeNode) throws -> [SchematronMessagePart] {
+            var parts: [SchematronMessagePart] = []
+            for child in node.children {
+                if child.kind == .text || child.kind == .cdata {
+                    parts.append(.text(child.value))
+                } else if child.kind == .element, child.name?.localName == "value-of", let select = attribute(child, "select") {
+                    try parts.append(.valueOf(PureXML.XPath.Query(select)))
+                } else if child.kind == .element, child.name?.localName == "name" {
+                    parts.append(.name)
+                }
+            }
+            return parts
         }
 
         private static func isAssertion(_ node: PureXML.Model.TreeNode) -> Bool {
