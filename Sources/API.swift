@@ -107,6 +107,17 @@ public extension PureXML {
         Emitting.Serializer(options: options).serialize(node)
     }
 
+    /// Parses an XML document into a mutable, parent-aware ``Model/TreeNode`` for
+    /// in-place editing (insert, remove, replace, copy, and upward navigation).
+    /// Serialize the result back with `serialize(tree.node)`.
+    static func parseTree(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) throws -> Model.TreeNode {
+        try Model.TreeNode(parse(xml, limits: limits, resolver: resolver))
+    }
+
     /// Validates a parsed XML node with the default validation rules.
     @discardableResult
     static func validate(

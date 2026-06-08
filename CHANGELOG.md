@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Mutable, parent-aware document tree (the libxml2 `tree.h` model).
+  `PureXML.Model.TreeNode` is a reference type that knows its parent and
+  siblings, so a document can be navigated upward and sideways (`parent`,
+  `nextSibling`, `previousSibling`, `ancestors`, `root`, `elementChildren`,
+  `stringValue`) and edited in place (`append`, `insert(before:)`,
+  `insert(after:)`, `removeFromParent`, `replace(with:)`, `copy`). Children are
+  held strongly and the parent weakly; attaching a node detaches it from any
+  previous parent, and a node can never become its own ancestor. `parseTree(_:)`
+  builds one from XML and `TreeNode.node` converts back to the value tree for
+  serialization.
 - External and parameter entities (the libxml2 `entities.h` model), secure by
   default. Internal parameter entities (`<!ENTITY % name "value">`) are stored
   and expanded within the DTD, including bare `%name;` references that inject
