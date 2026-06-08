@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XInclude, URI resolution, and `xml:base` (#24, the libxml2 `xinclude.h`/`uri.h`
+  model). The new `PureXML.XInclude` namespace adds RFC 3986 reference
+  resolution (`URIReference.resolve(_:against:)`, with dot-segment removal) and
+  `process(_:base:loadingURI:)`, which replaces `xi:include` elements with their
+  targets. `href`s resolve against the supplied base and the in-scope `xml:base`,
+  `parse="xml"` includes the document element (or an `xpointer()` fragment via
+  `PureXML.XPointer`), `parse="text"` includes raw text, and a failed load uses
+  `xi:fallback` or errors. Includes nest. PureXML does no I/O itself: fetching is
+  only through the injected `loadingURI` closure, so the default fetches nothing.
 - XML Catalog resolution (#27, the libxml2 `catalog.h` model). The new
   `PureXML.Catalog` namespace parses an OASIS XML catalog (matching `public`,
   `system`, `uri`, `rewriteSystem`, `rewriteURI`, and `group`/`catalog` by local
