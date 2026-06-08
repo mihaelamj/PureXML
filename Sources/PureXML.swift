@@ -33,4 +33,7 @@ public enum PureXML {
 
     /// OASIS XML Catalog types (resolving public/system identifiers to URIs).
     public enum Catalog {}
+
+    /// XInclude processing, URI reference resolution, and `xml:base`.
+    public enum XInclude {}
 }

@@ -106,7 +106,7 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Xslt["#3 XSLT 1.0"]:::epic
-  XInclude["#24 XInclude, URI, xml:base"]:::epic
+  XInclude["#24 XInclude, URI, xml:base"]:::done
   C14n["#26 Canonical XML"]:::epic
   Catalog["#27 XML Catalog"]:::done
   Xslt --> C14n
