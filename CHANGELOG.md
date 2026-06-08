@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSD complex types and particles (toward #2 schema validation).
+  `PureXML.Schema.ComplexValidator` validates an element against a
+  `ComplexType`: its attribute uses (required and typed, with unknown-attribute
+  rejection), and its content model. Content is `empty`, `simpleContent` (text
+  validated against a simple type), `elementOnly`, or `mixed`. Particles compile
+  to a Thompson NFA over element names honoring `minOccurs`/`maxOccurs`, with
+  `sequence`/`choice` compositors; `all` groups are validated order-independently
+  by counting. Child elements are validated recursively against their declared
+  types (the XSD Element-Declarations-Consistent rule makes the name-to-type map
+  well defined).
 - XSD simple-type datatype library (toward #2 schema validation). The new
   `PureXML.Schema` namespace validates a lexical value against the XSD Part 2
   built-in datatypes (`string`, `boolean`, `decimal`, the bounded integer family,
