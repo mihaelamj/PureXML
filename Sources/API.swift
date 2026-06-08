@@ -89,6 +89,20 @@ public extension PureXML {
         return Validation.DTD.validator(strict: strict).errors(for: parsed.node, in: schema)
     }
 
+    /// Parses an XML document and returns its tree with the DTD attribute defaults
+    /// from the internal subset applied: every element gains any attribute its
+    /// `<!ATTLIST>` declares with a default or `#FIXED` value and that the element
+    /// omits, so an editor sees the same effective attributes a validating
+    /// processor would. DTD processing must be enabled.
+    static func parseApplyingInternalDTDDefaults(
+        _ xml: String,
+        limits: Parsing.Limits = .init(allowDoctype: true),
+        resolver: Parsing.EntityResolver = .refusing,
+    ) throws -> Model.Node {
+        let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits, resolver: resolver)
+        return Validation.DTDSchema(parsed.documentType).applyingDefaults(to: parsed.node)
+    }
+
     /// Compiles and evaluates an XPath query over a node, returning the selected
     /// node-set. Compile once with ``XPath/Query`` to reuse a query.
     static func xpath(_ path: String, over node: Model.Node) throws -> [XPath.Selection] {

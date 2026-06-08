@@ -75,5 +75,12 @@ public extension PureXML.Parsing {
             }
             return true
         }
+
+        /// `Nmtoken`: one or more NameChar (no name-start requirement).
+        public static func isNmtoken(_ token: String) -> Bool {
+            let scalars = token.unicodeScalars
+            guard !scalars.isEmpty else { return false }
+            return scalars.allSatisfy(isNameChar)
+        }
     }
 }
