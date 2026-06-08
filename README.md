@@ -63,7 +63,7 @@ flowchart TB
   Ent["#29 External and parameter entities"]:::done
   TreeApi["#31 Tree manipulation API"]:::done
   Writer["#32 xmlTextWriter"]:::done
-  Reader["#33 xmlTextReader with validation"]:::epic
+  Reader["#33 xmlTextReader with validation"]:::done
   Save["#34 Serialization option parity"]:::done
   Chars["#35 Character and name validity"]:::done
   Core --> Push

@@ -107,6 +107,17 @@ public extension PureXML {
         Emitting.Serializer(options: options).serialize(node)
     }
 
+    /// Returns a pull cursor (the libxml2 `xmlTextReader` model) over an XML
+    /// string. Call `read()` to advance node by node, reading `nodeKind`, `name`,
+    /// `value`, `depth`, and `attributes` at each step.
+    static func reader(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) -> Parsing.TextReader {
+        Parsing.TextReader(xml, limits: limits, resolver: resolver)
+    }
+
     /// Parses an XML document into a mutable, parent-aware ``Model/TreeNode`` for
     /// in-place editing (insert, remove, replace, copy, and upward navigation).
     /// Serialize the result back with `serialize(tree.node)`.
