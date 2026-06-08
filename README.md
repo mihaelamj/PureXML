@@ -43,16 +43,25 @@ flowchart TB
   Parity["Parity completion shipped: #61 (XSLT keys/output, XSD union/import/identity, RELAX NG compact, HTML5 doc structure, C14N 2.0 trim)"]:::done
   Validator["Validation framework + recovering reader shipped: #92 (one located severity-aware ValidationError, never-crash read)"]:::done
   Editor["Editor integration shipped: #94 (source spans, unified lint, schema completions, structured quick-fixes)"]:::done
-  LDone --> LReview
-  LReview --> LEpic
-  LEpic --> LTodo
+  Conformance["Conformance push shipped: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89"]:::done
+  LDone ~~~ LReview
+  LReview ~~~ LEpic
+  LEpic ~~~ LTodo
+  LTodo ~~~ Core
+  Core ~~~ Query
+  Query ~~~ Transform
+  Transform ~~~ Parity
+  Parity ~~~ Validator
+  Validator ~~~ Editor
+  Editor ~~~ Conformance
 ```
 
 The goal is full libxml2 feature parity in pure Swift with zero dependencies, by
 clean-room reimplementation (behavior reproduced from the private PureXML-research
-analysis, no upstream source copied). The streaming core plus DTD validation
-(content models, attributes, ID/IDREF) and an XPath 1.0 subset is shipped; the
-remaining libxml2 surface is tracked as epics. Deliberate non-goals: network
+analysis, no upstream source copied). The streaming core, the schema languages
+(DTD, XSD, RELAX NG, Schematron), XPath 1.0, and the transform/canonicalization
+stack are shipped; the remaining depth gaps are tracked under epic #71. Deliberate
+non-goals: network
 fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out,
 and external resolution is opt-in through an injected resolver so XXE stays closed.
 
@@ -67,14 +76,22 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Gaps["#71 Beyond-parity libxml2 gaps: DTD entities/defaulting (#72 #73), parser breadth (#74), XSD instance/derivation/wildcards/namespaces (#75 #76 #77 #78), RELAX NG + Schematron (#79 #80), XSLT elements/functions (#81 #82), HTML5 full tree (#83 #84), C14N/catalog/XInclude (#85 #86 #87), XPath/XPointer (#88), regex (#89), DOM/serialization (#90 #91)"]:::epic
+  Epic71["#71 Beyond-parity libxml2 audit"]:::epic
+  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89"]:::done
+  Epic74["#74 Parser-breadth sub-epic: standalone/decl #95, XML 1.1 #96, reader #98, recovery #100 done; encodings #97 #99 open"]:::epic
+  Partial["Partial in main: RELAX NG #79, Schematron #80, catalog #86, XInclude #87, XPath/XPointer #88, DOM #90, serialization #91"]:::todo
+  Open["Open: XSLT #81 #82, HTML5 #83 #84, C14N #85, encoding tables #97 #99, validator decomposition #101"]:::todo
+  Epic71 ~~~ AuditDone
+  AuditDone ~~~ Epic74
+  Epic74 ~~~ Partial
+  Partial ~~~ Open
 ```
 
 ## Status
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **135 tests in 18 suites** (`swift test`).
+currently runs **506 tests in 69 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
@@ -94,14 +111,19 @@ currently runs **135 tests in 18 suites** (`swift test`).
   subset is parsed; internal general entities expand with a bounded cap; external
   entities and external subsets are refused unless an injected
   `EntityResolver` supplies replacement text.
-- **Validation** (`PureXML.Validation`): structural checks (duplicate attributes,
-  etc.) plus **DTD validation** against declared content models, attribute lists,
-  and ID/IDREF rules (`DTDSchema`, `validateAgainstInternalDTD`). XSD, RELAX NG,
-  and Schematron remain open epics (#2, #25).
-- **Emitting** (`PureXML.Emitting`): `Serializer` (save-option parity) and an
-  incremental `Writer` (libxml2 `xmlTextWriter`) with compact and pretty modes.
-- **XPath** (`PureXML.XPath`): a **subset** of XPath 1.0 (location paths, common
-  axes, node tests, basic predicates). Full XPath 1.0 is epic #21.
+- **Validation** (`PureXML.Validation`): one composable framework (the OpenAPIKit
+  idiom, parameterized over subject and document) backing structural checks, **DTD
+  validation** (content models, attribute lists/defaulting, tokenized types,
+  ID/IDREF), **XSD** (datatypes, complex types, derivation control, wildcards,
+  namespace qualification), **RELAX NG** (XML and compact syntax), and
+  **Schematron** (rules, phases, dynamic messages). Errors are located by coding
+  path for editor use.
+- **Emitting** (`PureXML.Emitting`): `Serializer` (save options, quote style,
+  `xml:space`, line endings) and an incremental, namespace-aware `Writer` (libxml2
+  `xmlTextWriter`) with compact and pretty modes.
+- **XPath / XPointer** (`PureXML.XPath`): XPath 1.0 (all axes, the core function
+  library, eval-time namespace bindings) and XPointer (`element()`, `xpointer()`,
+  `xpath1()`, `xmlns()`).
 
 ### Safe defaults
 
@@ -113,25 +135,23 @@ threading/memory infrastructure are deliberate non-goals.
 
 ### Remaining toward full libxml2 feature parity
 
-**12 of 20 epics are still open**; each now has filed child issues (#4–#60). The
-shipped eight cover the core I/O stack; most remaining work is whole standards:
+The original parity epics (the core I/O stack, query, transform, the schema
+languages, the validation framework, and editor integration) are all shipped. The
+remaining work is the depth gaps a read-only conformance audit surfaced, tracked
+under epic **#71** (and its parser-breadth sub-epic **#74**):
 
-| Open epic | Child issues | What it adds |
+| Open work | Issues | What it adds |
 |---|---|---|
-| #1 Push / feed API | #4–#7 | Resumable scanner + push parser |
-| #20 HTML parser | #36–#39 | Tag-soup HTML parse and serialize |
-| #21 Full XPath 1.0 | #40–#43 | Unlocks #22, #23, #25, #3 |
-| #22 xmlPattern | #44–#45 | Streaming pattern match (needs #21) |
-| #23 XPointer | #46–#47 | element() / xpointer() (needs #21) |
-| #24 XInclude | #48–#51 | URI, xml:base, xi:include |
-| #25 Schematron | #52–#53 | Rule validation (needs #21) |
-| #26 C14N | #54–#56 | Canonical XML variants |
-| #27 XML Catalog | #57–#58 | OASIS catalog resolver |
-| #30 → #2 | #59–#60, #8–#13 | Regex engine, then XSD / RELAX NG |
-| #3 XSLT 1.0 | #14–#18 | Stylesheet transform (needs #21) |
+| XSLT 1.0 breadth | #81 #82 | Missing top-level elements and functions, html output |
+| HTML5 | #83 #84 | Full tree construction, tokenizer states, entity table |
+| C14N | #85 | Node-subset canonicalization, `xml:*` inheritance, 2.0 prefix rewrite |
+| Legacy encodings | #97 #99 | Single-byte and CJK multi-byte to-Unicode tables |
+| Validator decomposition | #101 | Inner XSD/DTD validators as composable rules |
+| Partial follow-ups | #79 #80 #86 #87 #88 #90 #91 | Remaining bullets on already-advanced areas |
 
-**40 open enhancement issues** under those epics (plus the 12 epic parents). Critical
-path: **#30 → #2** (schema) and **#21 → #22/#23/#25/#3** (query/transform).
+Each open issue carries a checklist of done vs remaining bullets. The encoding
+tables (#97, #99) are deferred until they can be vendored from authoritative
+Unicode mapping files rather than transcribed.
 
 ## Usage
 
@@ -163,7 +183,7 @@ let issues = try PureXML.validateAgainstInternalDTD(
     limits: .init(allowDoctype: true),
 )
 
-// XPath subset over a parsed tree.
+// XPath over a parsed tree.
 let titles = try PureXML.xpath("//title", over: node)
     .compactMap(\.element)
 ```
