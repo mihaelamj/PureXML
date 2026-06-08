@@ -229,11 +229,29 @@ private final class RNCParser {
         advance()
         guard word.contains(":") else { return .ref(word) }
         let type = PureXML.Schema.BuiltinType(rawValue: strip(word)) ?? .string
-        if peek() == .symbol("{") { skipBraces() }
+        var facets = PureXML.Schema.Facets()
+        if peek() == .symbol("{") { parseParams(into: &facets) }
         if case let .string(value) = peek() { advance()
             return .value(value)
         }
-        return .data(PureXML.Schema.SimpleType(base: type))
+        return .data(PureXML.Schema.SimpleType(base: type, facets: facets))
+    }
+
+    /// Parses a datatype parameter block `{ name = "value" ... }` into facets (the
+    /// compact-syntax form of `<param>`).
+    private func parseParams(into facets: inout PureXML.Schema.Facets) {
+        advance() // {
+        while position < tokens.count, peek() != .symbol("}") {
+            guard case let .word(name) = peek() else { advance()
+                continue
+            }
+            advance()
+            if peek() == .symbol("=") { advance() }
+            guard case let .string(value) = peek() else { continue }
+            advance()
+            PureXML.Schema.RelaxNGFacets.apply(name, value, into: &facets)
+        }
+        if peek() == .symbol("}") { advance() }
     }
 
     private func parseElement() -> Pattern {
@@ -351,18 +369,6 @@ private extension RNCParser {
             return value
         }
         return ""
-    }
-
-    private func skipBraces() {
-        guard peek() == .symbol("{") else { return }
-        var depth = 0
-        repeat {
-            switch advance() {
-            case .symbol("{"): depth += 1
-            case .symbol("}"): depth -= 1
-            default: break
-            }
-        } while depth > 0 && position < tokens.count
     }
 
     private func strip(_ qualified: String) -> String {
