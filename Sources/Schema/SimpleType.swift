@@ -109,6 +109,37 @@ public extension PureXML.Schema {
             return nil
         }
 
+        /// Whether `instance` and `literal` denote the same value in this type's
+        /// value space, the comparison a RELAX NG `<value>` performs. Ordered
+        /// types (numeric, date/time) compare in value space, so `1` equals `01`
+        /// and `1.0` equals `1.00`; booleans treat `1`/`true` and `0`/`false` as
+        /// equal. Every other type, including `string`/`token`, compares by its
+        /// whitespace-normalized lexical form. (Durations and binary types fall
+        /// under the lexical rule, so only their normalized forms compare equal.)
+        public func valueMatches(_ instance: String, literal: String) -> Bool {
+            let whiteSpace = facets.whiteSpace ?? base.whiteSpace
+            let left = Self.process(instance, whiteSpace: whiteSpace)
+            let right = Self.process(literal, whiteSpace: whiteSpace)
+            switch base.primitive {
+            case .decimal, .integer, .double, .float, .dateKind:
+                guard let leftValue = base.primitive.ordered(left), let rightValue = base.primitive.ordered(right) else { return false }
+                return leftValue == rightValue
+            case .boolean:
+                guard let leftValue = Self.booleanValue(left) else { return false }
+                return leftValue == Self.booleanValue(right)
+            default:
+                return left == right
+            }
+        }
+
+        private static func booleanValue(_ value: String) -> Bool? {
+            switch value {
+            case "true", "1": true
+            case "false", "0": false
+            default: nil
+            }
+        }
+
         private func validateUnion(_ lexical: String, members: [SimpleType]) -> String? {
             for member in members where member.validate(lexical) == nil {
                 return nil

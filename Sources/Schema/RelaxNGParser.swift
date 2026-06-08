@@ -134,19 +134,25 @@ private final class RNGCompiler {
         return .data(PureXML.Schema.SimpleType(base: base, facets: facets))
     }
 
-    /// Builds a `<value>` pattern. An explicit `type` that the in-scope
-    /// `datatypeLibrary` does not define makes the value unmatchable; otherwise
-    /// the literal is compared lexically.
+    /// Builds a `<value>` pattern carrying its datatype, so the value compares in
+    /// that type's value space. An untyped `<value>` uses the built-in `token`
+    /// type; an explicit `type` the in-scope `datatypeLibrary` does not define is
+    /// an unknown datatype, so the value matches nothing.
     private func valuePattern(_ node: Tree) -> Pattern {
-        if hasUnknownType(node) { return .notAllowed }
-        return .value(RNGNode.text(node))
+        guard let type = valueType(node) else { return .notAllowed }
+        return .value(type, RNGNode.text(node))
     }
 
-    /// Whether `node` declares a `type` the in-scope `datatypeLibrary` does not
-    /// define (an untyped `<value>` is always known: it compares lexically).
-    private func hasUnknownType(_ node: Tree) -> Bool {
-        guard let declared = RNGNode.attribute(node, "type") else { return false }
-        return resolvedBuiltin(RNGNode.strip(declared), library: datatypeLibrary(of: node)) == nil
+    /// The datatype of a `<value>`: `token` when untyped, the library-resolved
+    /// built-in when typed, or nil when the declared type is unknown.
+    private func valueType(_ node: Tree) -> PureXML.Schema.SimpleType? {
+        guard let declared = RNGNode.attribute(node, "type") else {
+            return PureXML.Schema.SimpleType(base: .token)
+        }
+        guard let base = resolvedBuiltin(RNGNode.strip(declared), library: datatypeLibrary(of: node)) else {
+            return nil
+        }
+        return PureXML.Schema.SimpleType(base: base)
     }
 
     /// Resolves a datatype name within a library. The default (empty) library

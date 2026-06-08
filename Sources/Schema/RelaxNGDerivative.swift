@@ -83,9 +83,8 @@ extension PureXML.Schema {
 
         private func valueDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String) -> PureXML.Schema.Pattern {
             switch pattern {
-            case let .value(literal):
-                SimpleType(base: .token).validate(string) == nil
-                    && SimpleType.process(string, whiteSpace: .collapse) == literal ? .empty : .notAllowed
+            case let .value(type, literal):
+                type.valueMatches(string, literal: literal) ? .empty : .notAllowed
             case let .data(type): type.validate(string) == nil ? .empty : .notAllowed
             case let .list(inner): listMatches(inner, string) ? .empty : .notAllowed
             default: .notAllowed
