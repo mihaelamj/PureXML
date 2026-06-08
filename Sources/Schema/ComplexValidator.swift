@@ -11,9 +11,19 @@ public extension PureXML.Schema {
     struct ComplexValidator {
         /// The named type table that `ElementType.typeReference` resolves against.
         private let types: [String: ElementType]
+        /// Local names of elements declared `nillable="true"`.
+        private let nillableElements: Set<String>
+        /// The `default`/`fixed` value constraint declared on each element name.
+        private let elementConstraints: [String: ValueConstraint]
 
-        public init(types: [String: ElementType] = [:]) {
+        public init(
+            types: [String: ElementType] = [:],
+            nillableElements: Set<String> = [],
+            elementConstraints: [String: ValueConstraint] = [:],
+        ) {
             self.types = types
+            self.nillableElements = nillableElements
+            self.elementConstraints = elementConstraints
         }
 
         /// Validates `element` against `type` at `path`, one error per violation.
@@ -24,8 +34,37 @@ public extension PureXML.Schema {
         ) -> [PureXML.Validation.ValidationError] {
             var errors: [XSDFailure] = []
             validateAttributes(element, type, at: path, into: &errors)
+            // An xsi:nil element keeps its attribute obligations but must have no
+            // content; its content model is not otherwise checked.
+            if let nilErrors = nilErrors(element, at: path) {
+                return errors + nilErrors
+            }
             validateContent(element, type.content, at: path, into: &errors)
+            errors += elementFixedErrors(element, at: path)
             return errors
+        }
+
+        /// The errors from an `xsi:nil="true"` element: rejecting it when the
+        /// element is not nillable, or when it carries content. Returns nil when
+        /// the element is not nilled.
+        private func nilErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure]? {
+            guard Self.isNil(element) else { return nil }
+            let name = element.name.localName
+            if !nillableElements.contains(name) {
+                return [XSDFailure(reason: "element '\(name)' is not nillable but has xsi:nil", at: path)]
+            }
+            if Self.hasContent(element) {
+                return [XSDFailure(reason: "nil element '\(name)' must be empty", at: path)]
+            }
+            return []
+        }
+
+        /// The error from a `fixed` element value constraint: the element's text
+        /// must equal the fixed value.
+        private func elementFixedErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure] {
+            guard let fixed = elementConstraints[element.name.localName]?.fixedValue else { return [] }
+            let text = Self.textContent(element)
+            return text == fixed ? [] : [XSDFailure(reason: "element '\(element.name.localName)' is fixed and must be '\(fixed)'", at: path)]
         }
 
         /// Validates `element` against any element type at `path`, resolving a
@@ -54,6 +93,9 @@ public extension PureXML.Schema {
                 if let match {
                     if let error = use.type.validate(match.value) {
                         errors.append(XSDFailure(reason: "attribute '\(use.name.localName)': \(error)", at: path))
+                    }
+                    if let fixed = use.valueConstraint?.fixedValue, match.value != fixed {
+                        errors.append(XSDFailure(reason: "attribute '\(use.name.localName)' is fixed and must be '\(fixed)'", at: path))
                     }
                 } else if use.required {
                     errors.append(XSDFailure(reason: "missing required attribute '\(use.name.localName)'", at: path))
@@ -145,12 +187,17 @@ public extension PureXML.Schema {
             }
             switch declared {
             case let .simple(simple):
+                if let nilErrors = nilErrors(child, at: path) {
+                    errors += nilErrors
+                    return
+                }
                 if !child.children.compactMap(\.element).isEmpty {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)' must not have children", at: path))
                 }
                 if let error = simple.validate(Self.textContent(child)) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
                 }
+                errors += elementFixedErrors(child, at: path)
             case let .complex(complex):
                 errors.append(contentsOf: validate(child, against: complex, at: path))
             case let .typeReference(name):
@@ -258,5 +305,21 @@ public extension PureXML.Schema {
             }
             return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
         }
+    }
+}
+
+extension PureXML.Schema.ComplexValidator {
+    /// Whether the element carries `xsi:nil="true"`.
+    static func isNil(_ element: PureXML.Model.Element) -> Bool {
+        element.attributes.contains { attribute in
+            attribute.name.localName == "nil"
+                && (attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi")
+                && attribute.value == "true"
+        }
+    }
+
+    /// Whether the element has any child element or non-whitespace text.
+    static func hasContent(_ element: PureXML.Model.Element) -> Bool {
+        !textContent(element).isEmpty || element.children.contains { if case .element = $0 { true } else { false } }
     }
 }

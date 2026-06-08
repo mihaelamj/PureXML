@@ -50,43 +50,14 @@ extension PureXML.Schema {
                     types[elementKey(name)] = type
                 }
             }
-            return XSDCompiled(elements: elements, types: types, constraints: identityConstraints(containers))
-        }
-
-        /// Gathers identity constraints (`unique`, `key`, `keyref`) declared on
-        /// any element at any depth, keyed by the element's name.
-        private static func identityConstraints(_ containers: [XSDTree]) -> [String: [IdentityConstraint]] {
-            var map: [String: [IdentityConstraint]] = [:]
-            for container in containers {
-                for element in descendants(container, named: "element") {
-                    guard let name = XSDNode.attribute(element, "name") else { continue }
-                    let constraints = XSDNode.elementChildren(element).compactMap(constraint)
-                    if !constraints.isEmpty { map[name, default: []] += constraints }
-                }
-            }
-            return map
-        }
-
-        private static func constraint(_ node: XSDTree) -> IdentityConstraint? {
-            let kind: IdentityConstraintKind
-            switch XSDNode.localName(node) {
-            case "unique": kind = .unique
-            case "key": kind = .key
-            case "keyref": kind = .keyref(refer: XSDNode.stripPrefix(XSDNode.attribute(node, "refer") ?? ""))
-            default: return nil
-            }
-            let selector = XSDNode.firstChild(node, named: "selector").flatMap { XSDNode.attribute($0, "xpath") } ?? ""
-            let fields = XSDNode.children(node, named: "field").compactMap { XSDNode.attribute($0, "xpath") }
-            return IdentityConstraint(name: XSDNode.attribute(node, "name") ?? "", kind: kind, selector: selector, fields: fields)
-        }
-
-        private static func descendants(_ node: XSDTree, named name: String) -> [XSDTree] {
-            var result: [XSDTree] = []
-            for child in XSDNode.elementChildren(node) {
-                if XSDNode.localName(child) == name { result.append(child) }
-                result += descendants(child, named: name)
-            }
-            return result
+            let (nillable, elementConstraints) = elementMetadata(containers)
+            return XSDCompiled(
+                elements: elements,
+                types: types,
+                constraints: identityConstraints(containers),
+                nillableElements: nillable,
+                elementConstraints: elementConstraints,
+            )
         }
 
         private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {
@@ -196,7 +167,20 @@ extension PureXML.Schema {
             } else {
                 SimpleType(base: .string)
             }
-            return AttributeUse(name: PureXML.Model.QualifiedName(name), type: type, required: required)
+            return AttributeUse(
+                name: PureXML.Model.QualifiedName(name),
+                type: type,
+                required: required,
+                valueConstraint: valueConstraint(of: node),
+            )
+        }
+
+        /// The `default` or `fixed` value constraint declared on an attribute or
+        /// element node, if any (`fixed` takes precedence).
+        static func valueConstraint(of node: XSDTree) -> ValueConstraint? {
+            if let fixed = XSDNode.attribute(node, "fixed") { return .fixed(fixed) }
+            if let value = XSDNode.attribute(node, "default") { return .default(value) }
+            return nil
         }
 
         // MARK: Model groups
@@ -285,5 +269,58 @@ extension PureXML.Schema {
             }
             return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
         }
+    }
+}
+
+extension PureXML.Schema.XSDParser {
+    /// Gathers `nillable` and `default`/`fixed` value constraints from every
+    /// element declaration at any depth, keyed by the element's name.
+    static func elementMetadata(_ containers: [XSDTree]) -> (Set<String>, [String: PureXML.Schema.ValueConstraint]) {
+        var nillable: Set<String> = []
+        var constraints: [String: PureXML.Schema.ValueConstraint] = [:]
+        for container in containers {
+            for element in descendants(container, named: "element") {
+                guard let name = PureXML.Schema.XSDNode.attribute(element, "name") else { continue }
+                if PureXML.Schema.XSDNode.attribute(element, "nillable") == "true" { nillable.insert(name) }
+                if let constraint = valueConstraint(of: element) { constraints[name] = constraint }
+            }
+        }
+        return (nillable, constraints)
+    }
+
+    /// Gathers identity constraints (`unique`, `key`, `keyref`) declared on any
+    /// element at any depth, keyed by the element's name.
+    static func identityConstraints(_ containers: [XSDTree]) -> [String: [PureXML.Schema.IdentityConstraint]] {
+        var map: [String: [PureXML.Schema.IdentityConstraint]] = [:]
+        for container in containers {
+            for element in descendants(container, named: "element") {
+                guard let name = PureXML.Schema.XSDNode.attribute(element, "name") else { continue }
+                let constraints = PureXML.Schema.XSDNode.elementChildren(element).compactMap(constraint)
+                if !constraints.isEmpty { map[name, default: []] += constraints }
+            }
+        }
+        return map
+    }
+
+    private static func constraint(_ node: XSDTree) -> PureXML.Schema.IdentityConstraint? {
+        let kind: PureXML.Schema.IdentityConstraintKind
+        switch PureXML.Schema.XSDNode.localName(node) {
+        case "unique": kind = .unique
+        case "key": kind = .key
+        case "keyref": kind = .keyref(refer: PureXML.Schema.XSDNode.stripPrefix(PureXML.Schema.XSDNode.attribute(node, "refer") ?? ""))
+        default: return nil
+        }
+        let selector = PureXML.Schema.XSDNode.firstChild(node, named: "selector").flatMap { PureXML.Schema.XSDNode.attribute($0, "xpath") } ?? ""
+        let fields = PureXML.Schema.XSDNode.children(node, named: "field").compactMap { PureXML.Schema.XSDNode.attribute($0, "xpath") }
+        return PureXML.Schema.IdentityConstraint(name: PureXML.Schema.XSDNode.attribute(node, "name") ?? "", kind: kind, selector: selector, fields: fields)
+    }
+
+    private static func descendants(_ node: XSDTree, named name: String) -> [XSDTree] {
+        var result: [XSDTree] = []
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            if PureXML.Schema.XSDNode.localName(child) == name { result.append(child) }
+            result += descendants(child, named: name)
+        }
+        return result
     }
 }

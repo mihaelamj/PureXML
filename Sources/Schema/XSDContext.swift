@@ -101,6 +101,10 @@ extension PureXML.Schema {
         var elements: [String: ElementType]
         var types: [String: ElementType]
         var constraints: [String: [IdentityConstraint]]
+        /// Local names of elements declared `nillable="true"`.
+        var nillableElements: Set<String> = []
+        /// The `default`/`fixed` value constraint declared on each element name.
+        var elementConstraints: [String: ValueConstraint] = [:]
     }
 
     /// The parsing context: the named simple types resolved so far, plus the

@@ -57,16 +57,36 @@ public extension PureXML.Schema {
         case typeReference(String)
     }
 
+    /// A value constraint on an attribute or element: a default value supplied
+    /// when the item is absent, or a fixed value the item must equal.
+    enum ValueConstraint: Sendable, Equatable {
+        case `default`(String)
+        case fixed(String)
+
+        /// The fixed value, when this is a `fixed` constraint.
+        public var fixedValue: String? {
+            if case let .fixed(value) = self { return value }
+            return nil
+        }
+    }
+
     /// An attribute use on a complex type.
     struct AttributeUse: Sendable {
         public var name: PureXML.Model.QualifiedName
         public var type: SimpleType
         public var required: Bool
+        public var valueConstraint: ValueConstraint?
 
-        public init(name: PureXML.Model.QualifiedName, type: SimpleType, required: Bool = false) {
+        public init(
+            name: PureXML.Model.QualifiedName,
+            type: SimpleType,
+            required: Bool = false,
+            valueConstraint: ValueConstraint? = nil,
+        ) {
             self.name = name
             self.type = type
             self.required = required
+            self.valueConstraint = valueConstraint
         }
     }
 
