@@ -61,6 +61,7 @@ extension PureXML.Validation.DTD {
     static func attributeViolations(
         _ declaration: PureXML.Validation.AttributeDeclaration,
         on element: DTDElement,
+        schema: PureXML.Validation.DTDSchema,
         at path: DTDPath,
     ) -> [DTDFailure] {
         let name = element.name.description
@@ -79,36 +80,56 @@ extension PureXML.Validation.DTD {
         if case let .enumeration(allowed) = declaration.type, !allowed.contains(value) {
             result.append(DTDFailure(reason: "attribute '\(declaration.name)' on <\(name)> has a value outside its enumeration", at: path))
         }
-        if let tokenError = tokenizedTypeError(declaration, value: value, on: name, at: path) {
+        if let tokenError = tokenizedTypeError(declaration, value: value, on: name, entities: schema.unparsedEntities, at: path) {
             result.append(tokenError)
+        }
+        if let notationError = notationError(declaration, value: value, on: name, notations: schema.notations, at: path) {
+            result.append(notationError)
         }
         return result
     }
 
+    /// The error when a `NOTATION` attribute value is not one of the names its
+    /// declaration lists, or names a notation that is not declared with
+    /// `<!NOTATION>`. Returns nil for any other attribute type.
+    static func notationError(
+        _ declaration: PureXML.Validation.AttributeDeclaration,
+        value: String,
+        on element: String,
+        notations: Set<String>,
+        at path: DTDPath,
+    ) -> DTDFailure? {
+        guard case let .notation(allowed) = declaration.type else { return nil }
+        if !allowed.contains(value) {
+            return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element)> has a value outside its NOTATION list", at: path)
+        }
+        if !notations.contains(value) {
+            return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element)> names undeclared notation '\(value)'", at: path)
+        }
+        return nil
+    }
+
     /// The error when a tokenized attribute value does not match its declared
-    /// lexical form: `NMTOKEN(S)` must be name token(s), `ENTITY`/`ENTITIES` must be
-    /// XML name(s). The ID family is checked separately for cross-reference
-    /// integrity.
-    ///
-    /// Note: `ENTITY`/`ENTITIES` are checked only for name syntax. That the named
-    /// entity is a declared *unparsed* entity is not verified, since NDATA entity
-    /// declarations are not yet tracked.
+    /// lexical form: `NMTOKEN(S)` must be name token(s), and `ENTITY`/`ENTITIES`
+    /// must name declared unparsed (`NDATA`) entities. The ID family is checked
+    /// separately for cross-reference integrity.
     static func tokenizedTypeError(
         _ declaration: PureXML.Validation.AttributeDeclaration,
         value: String,
         on element: String,
+        entities: Set<String>,
         at path: DTDPath,
     ) -> DTDFailure? {
-        let isName = PureXML.Parsing.XMLCharacter.isValidName
         let isNmtoken = PureXML.Parsing.XMLCharacter.isNmtoken
+        let isEntity = { (token: String) in PureXML.Parsing.XMLCharacter.isValidName(token) && entities.contains(token) }
         let tokens = value.split(whereSeparator: \.isWhitespace).map(String.init)
         let valid: Bool
         switch declaration.type {
         case .nmToken: valid = isNmtoken(value)
         case .nmTokens: valid = !tokens.isEmpty && tokens.allSatisfy(isNmtoken)
-        case .entity: valid = isName(value)
-        case .entities: valid = !tokens.isEmpty && tokens.allSatisfy(isName)
-        case .cdata, .enumeration, .id, .idReference, .idReferences: return nil
+        case .entity: valid = isEntity(value)
+        case .entities: valid = !tokens.isEmpty && tokens.allSatisfy(isEntity)
+        case .cdata, .enumeration, .notation, .id, .idReference, .idReferences: return nil
         }
         guard !valid else { return nil }
         return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element)> is not a valid \(typeName(declaration.type))", at: path)
@@ -183,7 +204,7 @@ extension PureXML.Validation.DTD {
                 for token in value.split(whereSeparator: { $0.isWhitespace }) {
                     references.append((String(token), name))
                 }
-            case .cdata, .enumeration, .nmToken, .nmTokens, .entity, .entities:
+            case .cdata, .enumeration, .notation, .nmToken, .nmTokens, .entity, .entities:
                 break
             }
         }

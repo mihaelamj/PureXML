@@ -35,8 +35,9 @@ public extension PureXML.Validation {
             .init(description: "Element attributes satisfy their DTD declarations") { context in
                 let element = context.subject
                 guard let declarations = context.document.attributes[element.name.description] else { return [] }
+                let schema = context.document
                 return declarations.flatMap { declaration in
-                    attributeViolations(declaration, on: element, at: context.codingPath)
+                    attributeViolations(declaration, on: element, schema: schema, at: context.codingPath)
                 }
             }
         }

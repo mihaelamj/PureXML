@@ -5,8 +5,16 @@ public extension PureXML.Validation {
     struct DTDSchema: Sendable {
         let models: [String: ContentModel]
         let attributes: [String: [AttributeDeclaration]]
+        /// The names declared by `<!NOTATION>`, against which a `NOTATION` attribute
+        /// value (and the names listed in its declaration) are checked.
+        let notations: Set<String>
+        /// The names of declared unparsed (`NDATA`) entities, against which an
+        /// `ENTITY`/`ENTITIES` attribute value is checked.
+        let unparsedEntities: Set<String>
 
         init(_ documentType: PureXML.Parsing.DocumentType) {
+            notations = Set(documentType.notations.keys)
+            unparsedEntities = Set(documentType.unparsedEntities.keys)
             var parsedModels: [String: ContentModel] = [:]
             for (name, model) in documentType.elementModels {
                 parsedModels[name] = ContentModelParser.parse(model)

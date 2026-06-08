@@ -109,10 +109,54 @@ private struct DTDScanner {
             }
             if character == "%" {
                 try scanParameterReference(&reader, depth: depth, at: mark)
+            } else if reader.matches("<![") {
+                try scanConditionalSection(&reader, depth: depth, at: mark)
             } else {
                 scanMarkupDeclaration(&reader)
             }
         }
+    }
+
+    /// Processes a conditional section `<![INCLUDE[ … ]]>` or `<![IGNORE[ … ]]>`.
+    /// The keyword may be a parameter-entity reference, so it is parameter-expanded
+    /// first. An INCLUDE section's declarations are scanned; an IGNORE section's
+    /// body is discarded. Nested sections are handled by re-scanning the body.
+    private mutating func scanConditionalSection(_ reader: inout Reader, depth: Int, at mark: Mark) throws {
+        reader.consume("<![")
+        var keywordRaw = ""
+        while let character = reader.peek(), character != "[" {
+            keywordRaw.append(character)
+            reader.advance()
+        }
+        reader.consume("[")
+        let body = readConditionalBody(&reader)
+        if expandParameterReferences(keywordRaw).trimmingXMLWhitespace() == "INCLUDE", depth < maxDepth {
+            var sub = Reader(body)
+            try scanDeclarations(&sub, depth: depth + 1, terminatedByBracket: false, at: mark)
+        }
+    }
+
+    /// Reads the body of a conditional section up to its matching `]]>`, keeping
+    /// any nested `<![ … ]]>` sections intact so an INCLUDE can re-scan them.
+    private mutating func readConditionalBody(_ reader: inout Reader) -> String {
+        var body = ""
+        var nesting = 1
+        while reader.peek() != nil {
+            if reader.matches("<![") {
+                nesting += 1
+                reader.consume("<![")
+                body += "<!["
+            } else if reader.matches("]]>") {
+                reader.consume("]]>")
+                nesting -= 1
+                if nesting == 0 { break }
+                body += "]]>"
+            } else if let character = reader.peek() {
+                body.append(character)
+                reader.advance()
+            }
+        }
+        return body
     }
 
     private mutating func scanMarkupDeclaration(_ reader: inout Reader) {
@@ -122,13 +166,12 @@ private struct DTDScanner {
             scanElementDeclaration(&reader)
         } else if reader.matches("<!ATTLIST") {
             scanAttributeListDeclaration(&reader)
+        } else if reader.matches("<!NOTATION") {
+            scanNotationDeclaration(&reader)
         } else if reader.matches("<!--") {
             skip(&reader, until: "-->")
         } else if reader.matches("<?") {
             skip(&reader, until: "?>")
-        } else if reader.matches("<![") {
-            // Conditional section (INCLUDE/IGNORE): skipped as a unit for now.
-            skip(&reader, until: "]]>")
         } else if reader.matches("<!") {
             skip(&reader, until: ">")
         } else {
@@ -169,12 +212,46 @@ private struct DTDScanner {
             return
         }
         let id = parseExternalID(&reader)
+        reader.skipSpace()
+        let notation = reader.consume("NDATA") ? notationName(&reader) : nil
         skip(&reader, until: ">")
-        // Internal parameter entities and internal general entities are stored;
-        // external general entities record their identifier for the resolver;
-        // external parameter entities are not loaded in this build.
-        if let id, !isParameter, !name.isEmpty, doctype.externalEntities[name] == nil {
+        guard let id, !name.isEmpty else { return }
+        storeExternalEntity(name: name, id: id, isParameter: isParameter, notation: notation)
+    }
+
+    /// Files an external entity declaration by kind: an `NDATA` entity is unparsed
+    /// (recorded with its notation); an external general entity records its
+    /// identifier for the resolver; an external parameter entity is loaded through
+    /// the resolver so its replacement text is available for `%name;` expansion
+    /// (the default refusing resolver loads nothing, keeping XXE closed).
+    private mutating func storeExternalEntity(name: String, id: ExternalID, isParameter: Bool, notation: String?) {
+        if let notation, !notation.isEmpty, !isParameter {
+            if doctype.unparsedEntities[name] == nil {
+                doctype.unparsedEntities[name] = PureXML.Parsing.UnparsedEntity(id: id, notation: notation)
+            }
+        } else if isParameter {
+            if doctype.parameterEntities[name] == nil, let text = resolver.resolveExternalSubset(id) {
+                doctype.parameterEntities[name] = expandParameterReferences(text)
+            }
+        } else if doctype.externalEntities[name] == nil {
             doctype.externalEntities[name] = id
+        }
+    }
+
+    private mutating func notationName(_ reader: inout Reader) -> String {
+        reader.skipSpace()
+        return scanName(&reader)
+    }
+
+    private mutating func scanNotationDeclaration(_ reader: inout Reader) {
+        reader.consume("<!NOTATION")
+        reader.skipSpace()
+        let name = scanName(&reader)
+        reader.skipSpace()
+        let id = parseExternalID(&reader)
+        skip(&reader, until: ">")
+        if !name.isEmpty, let id, doctype.notations[name] == nil {
+            doctype.notations[name] = id
         }
     }
 
@@ -212,7 +289,9 @@ private struct DTDScanner {
             doctype.attributeLists[name] = trimmed
         }
     }
+}
 
+extension DTDScanner {
     /// Replaces `%name;` references with their (already-expanded) parameter-entity
     /// values. Undefined references are left literal. A single forward pass is
     /// enough because each value was expanded against the entities defined before

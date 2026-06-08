@@ -6,6 +6,9 @@ extension PureXML.Validation {
     enum AttributeType: Equatable {
         case cdata
         case enumeration([String])
+        /// `NOTATION (a|b)`: the value must be one of the listed notation names,
+        /// each of which must be a declared `<!NOTATION>`.
+        case notation([String])
         /// `ID`: the value must be unique across the document.
         case id
         /// `IDREF`: the value must match some declared `ID`.
