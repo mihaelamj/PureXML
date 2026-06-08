@@ -51,6 +51,34 @@ struct EncodingTests {
         }
     }
 
+    @Test("Detects UTF-32 byte-order marks")
+    func test_detectUTF32() {
+        #expect(PureXML.Parsing.InputEncoding.detect([0x00, 0x00, 0xFE, 0xFF, 0x00]) == .utf32BigEndian)
+        #expect(PureXML.Parsing.InputEncoding.detect([0xFF, 0xFE, 0x00, 0x00, 0x00]) == .utf32LittleEndian)
+    }
+
+    @Test("Parses UTF-32 bytes in both byte orders")
+    func test_parseUTF32() throws {
+        try #expect(rootText(PureXML.parse(bytes: utf32("<r>hi</r>", bigEndian: true))) == "hi")
+        try #expect(rootText(PureXML.parse(bytes: utf32("<r>hi</r>", bigEndian: false))) == "hi")
+    }
+
+    @Test("Honors a declared ISO-8859-1 encoding")
+    func test_latin1() throws {
+        var bytes = Array("<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?><r>caf".utf8)
+        bytes.append(0xE9) // small letter e with acute, in Latin-1
+        bytes += Array("</r>".utf8)
+        try #expect(rootText(PureXML.parse(bytes: bytes)) == "caf\u{E9}")
+    }
+
+    @Test("Honors a declared Windows-1252 encoding")
+    func test_windows1252() throws {
+        var bytes = Array("<?xml version=\"1.0\" encoding=\"windows-1252\"?><r>".utf8)
+        bytes.append(0x80) // euro sign in CP1252
+        bytes += Array("</r>".utf8)
+        try #expect(rootText(PureXML.parse(bytes: bytes)) == "\u{20AC}")
+    }
+
     private func byteSource(_ bytes: [UInt8]) -> () -> UInt8? {
         var index = 0
         return {
@@ -66,6 +94,21 @@ struct EncodingTests {
             let high = UInt8(unit >> 8)
             let low = UInt8(unit & 0xFF)
             bytes += bigEndian ? [high, low] : [low, high]
+        }
+        return bytes
+    }
+
+    private func utf32(_ string: String, bigEndian: Bool) -> [UInt8] {
+        var bytes: [UInt8] = bigEndian ? [0x00, 0x00, 0xFE, 0xFF] : [0xFF, 0xFE, 0x00, 0x00]
+        for scalar in string.unicodeScalars {
+            let value = scalar.value
+            let bigEndianBytes = [
+                UInt8(value >> 24 & 0xFF),
+                UInt8(value >> 16 & 0xFF),
+                UInt8(value >> 8 & 0xFF),
+                UInt8(value & 0xFF),
+            ]
+            bytes += bigEndian ? bigEndianBytes : bigEndianBytes.reversed()
         }
         return bytes
     }
