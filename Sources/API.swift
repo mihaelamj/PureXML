@@ -83,10 +83,10 @@ public extension PureXML {
         limits: Parsing.Limits = .init(allowDoctype: true),
         strict: Bool = false,
         resolver: Parsing.EntityResolver = .refusing,
-    ) throws -> [Validation.Issue] {
+    ) throws -> [Validation.ValidationError] {
         let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits, resolver: resolver)
         let schema = Validation.DTDSchema(parsed.documentType)
-        return schema.validate(parsed.node, strict: strict)
+        return Validation.DTD.validator(strict: strict).errors(for: parsed.node, in: schema)
     }
 
     /// Compiles and evaluates an XPath query over a node, returning the selected

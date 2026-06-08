@@ -3,7 +3,7 @@ import Testing
 
 @Suite("DTD validation")
 struct DTDValidationTests {
-    private func issues(_ xml: String, strict: Bool = false) throws -> [PureXML.Validation.Issue] {
+    private func issues(_ xml: String, strict: Bool = false) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.validateAgainstInternalDTD(xml, strict: strict)
     }
 
@@ -70,5 +70,13 @@ struct DTDValidationTests {
     @Test("A document without a DTD reports no content-model issues")
     func test_noDTD() throws {
         try #expect(issues("<r><a/></r>").isEmpty)
+    }
+
+    @Test("A content-model violation is located by coding path")
+    func test_violationCarriesPath() throws {
+        let dtd = "<!DOCTYPE r [<!ELEMENT r (a)><!ELEMENT a EMPTY>]>"
+        let found = try issues("\(dtd)<r><a>oops</a></r>")
+        #expect(found.count == 1)
+        #expect(String(describing: found[0]) == "element <a> is declared EMPTY but has content at path: r/a")
     }
 }

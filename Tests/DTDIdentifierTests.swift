@@ -3,7 +3,7 @@ import Testing
 
 @Suite("DTD ID and IDREF validation")
 struct DTDIdentifierTests {
-    private func issues(_ xml: String) throws -> [PureXML.Validation.Issue] {
+    private func issues(_ xml: String) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.validateAgainstInternalDTD(xml)
     }
 
