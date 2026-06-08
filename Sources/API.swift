@@ -125,13 +125,15 @@ public extension PureXML {
         try Model.TreeNode(parse(xml, limits: limits, resolver: resolver))
     }
 
-    /// Validates a parsed XML node with the default validation rules.
-    @discardableResult
+    /// Validates a parsed XML node with the default structural rules, throwing a
+    /// ``PureXML/Validation/ValidationErrorCollection`` that locates every failure
+    /// by coding path. Pass a custom ``PureXML/Validation/Validator`` to add or
+    /// remove rules, or call ``Validation/Validator/errors(for:)`` to collect the
+    /// errors without throwing.
     static func validate(
         _ node: Model.Node,
-        using validator: Validation.Validator = .init(),
-        strict: Bool = true,
-    ) throws -> [Validation.Issue] {
-        try validator.validate(node, strict: strict)
+        using validator: Validation.Validator<Void> = .init(),
+    ) throws {
+        try validator.validate(node)
     }
 }
