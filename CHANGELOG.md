@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Schema conformance fixtures, completing XSD and RELAX NG validation (#2). A
+  cross-cutting suite validates realistic schemas (a patterned, bounded,
+  ID-keyed XSD purchase order and a RELAX NG contact card using interleave,
+  attribute value choices, and optional/repeatable elements) against conforming
+  and non-conforming instances, plus datatype boundary fixtures.
 - RELAX NG validation by derivatives (toward #2). `PureXML.Schema.RelaxNG`
   parses a RELAX NG schema in the XML syntax into a pattern grammar (`element`,
   `attribute`, `text`, `empty`, `notAllowed`, `group`, `choice`, `interleave`,
