@@ -34,10 +34,27 @@ extension PureXML.Validation.DTD {
         if content.hasText {
             result.append(DTDFailure(reason: "element <\(name)> has element content but contains character data", at: path))
         }
-        if !PureXML.Validation.ContentModelMatcher.matchesChildren(particle, content.names) {
-            result.append(DTDFailure(reason: "the children of <\(name)> do not match its content model", at: path))
+        guard !PureXML.Validation.ContentModelMatcher.matchesChildren(particle, content.names) else { return result }
+        // Name each child outside the model's alphabet; if every child is in the
+        // alphabet the fault is order or count, so report it once with the allowed
+        // elements as a recovery hint.
+        let allowed = PureXML.Validation.ContentModelMatcher.allowedNames(particle)
+        let stray = content.names.filter { !allowed.contains($0) }
+        if stray.isEmpty {
+            let hint = allowed.sorted().map { "<\($0)>" }.joined(separator: ", ")
+            result.append(DTDFailure(reason: "the children of <\(name)> do not match its content model; allowed: \(hint)", at: path))
+        } else {
+            for child in orderedUnique(stray) {
+                result.append(DTDFailure(reason: "element <\(child)> is not allowed in <\(name)>", at: path))
+            }
         }
         return result
+    }
+
+    /// The distinct values of `names`, in first-seen order.
+    private static func orderedUnique(_ names: [String]) -> [String] {
+        var seen: Set<String> = []
+        return names.filter { seen.insert($0).inserted }
     }
 
     private static func childContent(of element: DTDElement) -> (names: [String], hasText: Bool) {
