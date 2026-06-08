@@ -104,8 +104,8 @@ private final class RNGCompiler {
         case "empty": .empty
         case "notAllowed": .notAllowed
         case "text": .text
-        case "data": .data(dataType(node))
-        case "value": .value(RNGNode.text(node))
+        case "data": dataPattern(node)
+        case "value": valuePattern(node)
         case "ref": .ref(RNGNode.attribute(node, "name") ?? "")
         case "externalRef": externalRef(node)
         case "element": element(node)
@@ -114,18 +114,61 @@ private final class RNGCompiler {
         }
     }
 
-    /// Builds the datatype of a `<data type=>` pattern: its base built-in plus the
-    /// facets its `<param name= >value</param>` children constrain it with (the
-    /// same facet set the XSD datatypes use).
-    private func dataType(_ node: Tree) -> PureXML.Schema.SimpleType {
-        let base = PureXML.Schema.BuiltinType(rawValue: RNGNode.strip(RNGNode.attribute(node, "type") ?? "string")) ?? .string
+    /// The URI of the W3C XML Schema datatype library; the only non-default
+    /// library RELAX NG processors are required to support.
+    private static let xsdDatatypeLibrary = "http://www.w3.org/2001/XMLSchema-datatypes"
+
+    /// Builds a `<data type=>` pattern: its base built-in plus the facets its
+    /// `<param name= >value</param>` children constrain it with (the same facet
+    /// set the XSD datatypes use). A `type` that the in-scope `datatypeLibrary`
+    /// does not define is an unknown datatype, so the pattern matches nothing.
+    private func dataPattern(_ node: Tree) -> Pattern {
+        let typeName = RNGNode.strip(RNGNode.attribute(node, "type") ?? "string")
+        guard let base = resolvedBuiltin(typeName, library: datatypeLibrary(of: node)) else { return .notAllowed }
         var facets = PureXML.Schema.Facets()
         for param in RNGNode.children(node, named: "param") {
             if let name = RNGNode.attribute(param, "name") {
                 PureXML.Schema.RelaxNGFacets.apply(name, RNGNode.text(param), into: &facets)
             }
         }
-        return PureXML.Schema.SimpleType(base: base, facets: facets)
+        return .data(PureXML.Schema.SimpleType(base: base, facets: facets))
+    }
+
+    /// Builds a `<value>` pattern. An explicit `type` that the in-scope
+    /// `datatypeLibrary` does not define makes the value unmatchable; otherwise
+    /// the literal is compared lexically.
+    private func valuePattern(_ node: Tree) -> Pattern {
+        if hasUnknownType(node) { return .notAllowed }
+        return .value(RNGNode.text(node))
+    }
+
+    /// Whether `node` declares a `type` the in-scope `datatypeLibrary` does not
+    /// define (an untyped `<value>` is always known: it compares lexically).
+    private func hasUnknownType(_ node: Tree) -> Bool {
+        guard let declared = RNGNode.attribute(node, "type") else { return false }
+        return resolvedBuiltin(RNGNode.strip(declared), library: datatypeLibrary(of: node)) == nil
+    }
+
+    /// Resolves a datatype name within a library. The default (empty) library
+    /// defines only `string` and `token`; the XSD library defines every built-in;
+    /// any other library is unsupported, so its names are unknown.
+    private func resolvedBuiltin(_ typeName: String, library: String) -> PureXML.Schema.BuiltinType? {
+        switch library {
+        case "": typeName == "string" || typeName == "token" ? PureXML.Schema.BuiltinType(rawValue: typeName) : nil
+        case Self.xsdDatatypeLibrary: PureXML.Schema.BuiltinType(rawValue: typeName)
+        default: nil
+        }
+    }
+
+    /// The `datatypeLibrary` in scope at `node`: the nearest value on the node or
+    /// an ancestor, defaulting to the empty (RELAX NG built-in) library.
+    private func datatypeLibrary(of node: Tree) -> String {
+        var current: Tree? = node
+        while let candidate = current {
+            if let library = RNGNode.attribute(candidate, "datatypeLibrary") { return library }
+            current = candidate.parent
+        }
+        return ""
     }
 
     /// Resolves an `externalRef` to the referenced schema's pattern, merging any
@@ -204,7 +247,7 @@ private final class RNGCompiler {
         case "anyName":
             anyName(node)
         case "nsName":
-            .nsName(RNGNode.attribute(node, "ns") ?? "")
+            nsName(node)
         case "choice":
             nameClassChoice(RNGNode.elementChildren(node))
         default:
@@ -213,12 +256,22 @@ private final class RNGCompiler {
     }
 
     private func anyName(_ node: Tree) -> NameClass {
-        guard let except = RNGNode.children(node, named: "except").first,
-              let inner = RNGNode.elementChildren(except).first
-        else {
-            return .anyName
-        }
-        return .anyNameExcept(nameClass(inner))
+        guard let except = exceptClass(node) else { return .anyName }
+        return .anyNameExcept(except)
+    }
+
+    private func nsName(_ node: Tree) -> NameClass {
+        let namespace = RNGNode.attribute(node, "ns") ?? ""
+        guard let except = exceptClass(node) else { return .nsName(namespace) }
+        return .nsNameExcept(namespace: namespace, except: except)
+    }
+
+    /// The name class of a `<name-class>`'s `<except>` child, treating multiple
+    /// children as an implicit choice (`anyName`/`nsName` minus the union).
+    private func exceptClass(_ node: Tree) -> NameClass? {
+        guard let except = RNGNode.children(node, named: "except").first else { return nil }
+        let children = RNGNode.elementChildren(except)
+        return children.isEmpty ? nil : nameClassChoice(children)
     }
 
     private func nameClassChoice(_ nodes: [Tree]) -> NameClass {

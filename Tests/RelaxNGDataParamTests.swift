@@ -3,7 +3,7 @@ import Testing
 
 @Suite("RELAX NG data param facets")
 struct RelaxNGDataParamTests {
-    private let rngNamespace = "xmlns=\"http://relaxng.org/ns/structure/1.0\""
+    private let rngNamespace = "xmlns=\"http://relaxng.org/ns/structure/1.0\" datatypeLibrary=\"http://www.w3.org/2001/XMLSchema-datatypes\""
 
     private func valid(_ rng: String, _ xml: String) throws -> Bool {
         try PureXML.Schema.RelaxNG(rng).validate(xml)

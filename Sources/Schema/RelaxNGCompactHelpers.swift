@@ -13,26 +13,45 @@ extension RNCParser {
     }
 
     private func parseSimpleNameClass(attribute: Bool) -> NameClass {
+        let base = parseNameClassPrimary(attribute: attribute)
+        // `*` and `ns:*` may be narrowed by `- nameClass` subtraction.
+        guard peek() == .symbol("-") else { return base }
+        advance()
+        return subtract(base, parseSimpleNameClass(attribute: attribute))
+    }
+
+    private func parseNameClassPrimary(attribute: Bool) -> NameClass {
         switch peek() {
         case .symbol("*"):
             advance()
-            // `* - nameClass` is any name except the subtracted class.
-            if peek() == .symbol("-") {
-                advance()
-                return .anyNameExcept(parseSimpleNameClass(attribute: attribute))
-            }
             return .anyName
         case .symbol("("):
             advance()
             let nameClass = parseNameClass(attribute: attribute)
             expectSymbol(")")
             return nameClass
+        // `prefix:*` lexes as the word `prefix:` (a `:` is a name character)
+        // followed by a `*` symbol: a namespace wildcard.
+        case let .word(word) where word.hasSuffix(":") && peek(1) == .symbol("*"):
+            advance()
+            advance()
+            return .nsName(namespaces[String(word.dropLast())] ?? "")
         case let .word(word):
             advance()
             return qualifiedName(word, attribute: attribute)
         default:
             advance()
             return .anyName
+        }
+    }
+
+    /// Applies name-class subtraction, which RELAX NG defines only for the open
+    /// classes `anyName` (`*`) and `nsName` (`prefix:*`).
+    private func subtract(_ base: NameClass, _ except: NameClass) -> NameClass {
+        switch base {
+        case .anyName: .anyNameExcept(except)
+        case let .nsName(namespace): .nsNameExcept(namespace: namespace, except: except)
+        default: base
         }
     }
 
