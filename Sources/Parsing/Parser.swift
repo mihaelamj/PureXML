@@ -46,7 +46,7 @@ public extension PureXML.Parsing {
             limits: Limits = .default,
             resolver: EntityResolver = .refusing,
         ) -> ReadResult {
-            readRecovering(EventReader(xml, limits: limits, resolver: resolver))
+            readRecovering(EventReader(xml, limits: limits, resolver: resolver, recovering: true))
         }
 
         /// Parses a single XML document from raw bytes, detecting the encoding
@@ -150,60 +150,37 @@ public extension PureXML.Parsing {
             return (.document(roots), reader.documentType)
         }
 
-        /// Drains the reader the way ``build`` does, but never throws: each error
-        /// is recorded as a ``Diagnostic`` and the reader resynchronizes past it,
-        /// so reading continues to the end of input. Elements left open by
-        /// truncated input are closed, and an end tag with no open element is
-        /// dropped, yielding the maximal best-effort tree. The transformation is
-        /// deterministic: the same input always produces the same tree and the
-        /// same diagnostics.
+        /// Drains a recovering ``EventReader`` (which repairs malformed input in
+        /// place and never throws), then closes any elements the input left open by
+        /// truncation, innermost first. The reader's diagnostics carry every
+        /// problem found. The transformation is deterministic: the same input
+        /// always produces the same tree and the same diagnostics.
         func readRecovering(_ source: EventReader) -> ReadResult {
             var reader = source
             var roots: [PureXML.Model.Node] = []
             var stack: [ElementFrame] = []
-            var diagnostics: [Diagnostic] = []
 
-            loop: while true {
-                let start = reader.offset
-                let event: Event?
-                do {
-                    event = try reader.next()
-                } catch let error as ParseError {
-                    diagnostics.append(Diagnostic(error))
-                    if !reader.recover(from: start) { break loop }
-                    continue
-                } catch {
-                    diagnostics.append(Diagnostic(message: "\(error)"))
-                    if !reader.recover(from: start) { break loop }
-                    continue
-                }
-                guard let event else { break }
-                consume(event, into: &stack, roots: &roots, diagnostics: &diagnostics)
+            while let event = try? reader.next() {
+                consume(event, into: &stack, roots: &roots)
             }
 
-            // Close any elements the input left open (truncation), innermost first.
             while !stack.isEmpty {
                 let frame = stack.removeLast()
                 let element = PureXML.Model.Element(name: frame.name, attributes: frame.attributes, children: frame.children)
                 attach(.element(element), to: &stack, roots: &roots)
             }
-            return ReadResult(node: .document(roots), diagnostics: diagnostics)
+            return ReadResult(node: .document(roots), diagnostics: reader.diagnostics)
         }
 
-        private func consume(
-            _ event: Event,
-            into stack: inout [ElementFrame],
-            roots: inout [PureXML.Model.Node],
-            diagnostics: inout [Diagnostic],
-        ) {
+        private func consume(_ event: Event, into stack: inout [ElementFrame], roots: inout [PureXML.Model.Node]) {
             switch event {
             case let .startElement(name, attributes):
                 stack.append(ElementFrame(name: name, attributes: attributes))
-            case let .endElement(name):
-                guard let frame = stack.popLast() else {
-                    diagnostics.append(Diagnostic(message: "unmatched end tag </\(name.description)>"))
-                    return
-                }
+            case .endElement:
+                // The recovering reader only emits an end tag for an element it
+                // actually closed, so the builder stack stays in step; a stray one
+                // (already diagnosed) is simply dropped.
+                guard let frame = stack.popLast() else { return }
                 let element = PureXML.Model.Element(name: frame.name, attributes: frame.attributes, children: frame.children)
                 attach(.element(element), to: &stack, roots: &roots)
             case let .characters(text):

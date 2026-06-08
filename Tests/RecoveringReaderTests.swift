@@ -31,6 +31,22 @@ struct RecoveringReaderTests {
         #expect(result.diagnostics.allSatisfy { $0.message.contains("expected </b>") })
     }
 
+    @Test("A duplicate attribute is dropped but the element is kept")
+    func test_duplicateAttributeKeepsElement() throws {
+        let result = PureXML.read("<a id='1' id='2'>y</a>")
+        #expect(try result.node == PureXML.parse("<a id='1'>y</a>"))
+        #expect(result.diagnostics.count == 1)
+        #expect(result.diagnostics[0].message.contains("duplicate attribute 'id'"))
+    }
+
+    @Test("A mismatched end tag pops to the matching ancestor, closing nested elements")
+    func test_popToMatch() throws {
+        let result = PureXML.read("<a><b><c>x</b></a>")
+        #expect(try result.node == PureXML.parse("<a><b><c>x</c></b></a>"))
+        #expect(result.diagnostics.count == 1)
+        #expect(result.diagnostics[0].message.contains("expected </c> but found </b>"))
+    }
+
     @Test("Junk around the root is dropped and the element is kept")
     func test_strayJunk() throws {
         let result = PureXML.read("garbage<a>x</a>z")
