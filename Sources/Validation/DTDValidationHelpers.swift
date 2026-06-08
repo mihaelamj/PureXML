@@ -79,7 +79,49 @@ extension PureXML.Validation.DTD {
         if case let .enumeration(allowed) = declaration.type, !allowed.contains(value) {
             result.append(DTDFailure(reason: "attribute '\(declaration.name)' on <\(name)> has a value outside its enumeration", at: path))
         }
+        if let tokenError = tokenizedTypeError(declaration, value: value, on: name, at: path) {
+            result.append(tokenError)
+        }
         return result
+    }
+
+    /// The error when a tokenized attribute value does not match its declared
+    /// lexical form: `NMTOKEN(S)` must be name token(s), `ENTITY`/`ENTITIES` must be
+    /// XML name(s). The ID family is checked separately for cross-reference
+    /// integrity.
+    ///
+    /// Note: `ENTITY`/`ENTITIES` are checked only for name syntax. That the named
+    /// entity is a declared *unparsed* entity is not verified, since NDATA entity
+    /// declarations are not yet tracked.
+    static func tokenizedTypeError(
+        _ declaration: PureXML.Validation.AttributeDeclaration,
+        value: String,
+        on element: String,
+        at path: DTDPath,
+    ) -> DTDFailure? {
+        let isName = PureXML.Parsing.XMLCharacter.isValidName
+        let isNmtoken = PureXML.Parsing.XMLCharacter.isNmtoken
+        let tokens = value.split(whereSeparator: \.isWhitespace).map(String.init)
+        let valid: Bool
+        switch declaration.type {
+        case .nmToken: valid = isNmtoken(value)
+        case .nmTokens: valid = !tokens.isEmpty && tokens.allSatisfy(isNmtoken)
+        case .entity: valid = isName(value)
+        case .entities: valid = !tokens.isEmpty && tokens.allSatisfy(isName)
+        case .cdata, .enumeration, .id, .idReference, .idReferences: return nil
+        }
+        guard !valid else { return nil }
+        return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element)> is not a valid \(typeName(declaration.type))", at: path)
+    }
+
+    private static func typeName(_ type: PureXML.Validation.AttributeType) -> String {
+        switch type {
+        case .nmToken: "NMTOKEN"
+        case .nmTokens: "NMTOKENS"
+        case .entity: "ENTITY"
+        case .entities: "ENTITIES"
+        default: "value"
+        }
     }
 
     // MARK: ID / IDREF integrity
@@ -141,7 +183,7 @@ extension PureXML.Validation.DTD {
                 for token in value.split(whereSeparator: { $0.isWhitespace }) {
                     references.append((String(token), name))
                 }
-            case .cdata, .enumeration:
+            case .cdata, .enumeration, .nmToken, .nmTokens, .entity, .entities:
                 break
             }
         }
