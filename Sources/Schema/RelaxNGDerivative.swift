@@ -13,7 +13,7 @@ extension PureXML.Schema {
 
         // MARK: Simplifying constructors
 
-        private func choice(_ lhs: PureXML.Schema.Pattern, _ rhs: PureXML.Schema.Pattern) -> PureXML.Schema.Pattern {
+        func choice(_ lhs: PureXML.Schema.Pattern, _ rhs: PureXML.Schema.Pattern) -> PureXML.Schema.Pattern {
             if case .notAllowed = lhs { return rhs }
             if case .notAllowed = rhs { return lhs }
             return .choice(lhs, rhs)
@@ -41,7 +41,7 @@ extension PureXML.Schema {
             return .after(lhs, rhs)
         }
 
-        private func resolve(_ name: String) -> PureXML.Schema.Pattern {
+        func resolve(_ name: String) -> PureXML.Schema.Pattern {
             defines[name] ?? .notAllowed
         }
 
@@ -64,7 +64,7 @@ extension PureXML.Schema {
 
         // MARK: Text and attribute derivatives
 
-        private func textDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String) -> PureXML.Schema.Pattern {
+        func textDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String) -> PureXML.Schema.Pattern {
             switch pattern {
             case let .choice(lhs, rhs): return choice(textDeriv(lhs, string), textDeriv(rhs, string))
             case let .interleave(lhs, rhs):
@@ -99,7 +99,7 @@ extension PureXML.Schema {
             return nullable(residual)
         }
 
-        private func attributeDeriv(_ pattern: PureXML.Schema.Pattern, _ attribute: PureXML.Model.Attribute) -> PureXML.Schema.Pattern {
+        func attributeDeriv(_ pattern: PureXML.Schema.Pattern, _ attribute: PureXML.Model.Attribute) -> PureXML.Schema.Pattern {
             switch pattern {
             case let .choice(lhs, rhs): return choice(attributeDeriv(lhs, attribute), attributeDeriv(rhs, attribute))
             case let .group(lhs, rhs):
@@ -152,7 +152,7 @@ extension PureXML.Schema.RelaxNGEngine {
         return endTagDeriv(withChildren)
     }
 
-    private func startTagOpenDeriv(_ pattern: PureXML.Schema.Pattern, _ name: PureXML.Model.QualifiedName) -> PureXML.Schema.Pattern {
+    func startTagOpenDeriv(_ pattern: PureXML.Schema.Pattern, _ name: PureXML.Model.QualifiedName) -> PureXML.Schema.Pattern {
         switch pattern {
         case let .choice(lhs, rhs):
             return choice(startTagOpenDeriv(lhs, name), startTagOpenDeriv(rhs, name))
@@ -185,7 +185,7 @@ extension PureXML.Schema.RelaxNGEngine {
         }
     }
 
-    private func startTagCloseDeriv(_ pattern: PureXML.Schema.Pattern) -> PureXML.Schema.Pattern {
+    func startTagCloseDeriv(_ pattern: PureXML.Schema.Pattern) -> PureXML.Schema.Pattern {
         switch pattern {
         case let .choice(lhs, rhs): choice(startTagCloseDeriv(lhs), startTagCloseDeriv(rhs))
         case let .group(lhs, rhs): group(startTagCloseDeriv(lhs), startTagCloseDeriv(rhs))
@@ -222,7 +222,7 @@ extension PureXML.Schema.RelaxNGEngine {
     // MARK: Helpers
 
     /// Merges adjacent text and CDATA nodes into single text nodes.
-    private static func coalesceText(_ children: [PureXML.Model.Node]) -> [PureXML.Model.Node] {
+    static func coalesceText(_ children: [PureXML.Model.Node]) -> [PureXML.Model.Node] {
         var result: [PureXML.Model.Node] = []
         var run = ""
         for child in children {
@@ -246,12 +246,20 @@ extension PureXML.Schema.RelaxNGEngine {
         string.allSatisfy(\.isWhitespace)
     }
 
-    private static func isWhitespaceText(_ node: PureXML.Model.Node) -> Bool {
+    static func isWhitespaceText(_ node: PureXML.Model.Node) -> Bool {
         if case let .text(value) = node { return isWhitespace(value) }
         return false
     }
 
-    private static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
+    static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
         attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
+    }
+
+    static func elementNameCounts(_ children: [PureXML.Model.Node]) -> [String: Int] {
+        var counts: [String: Int] = [:]
+        for case let .element(element) in children {
+            counts[element.name.description, default: 0] += 1
+        }
+        return counts
     }
 }
