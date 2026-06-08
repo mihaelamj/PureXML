@@ -23,4 +23,7 @@ public enum PureXML {
 
     /// XPath query types.
     public enum XPath {}
+
+    /// Streaming pattern types (the libxml2 `pattern.h` XPath subset).
+    public enum Pattern {}
 }
