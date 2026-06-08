@@ -7,7 +7,7 @@ struct RelaxNGTests {
         try PureXML.Schema.RelaxNG(rng).validate(xml)
     }
 
-    private let rngNamespace = "xmlns=\"http://relaxng.org/ns/structure/1.0\""
+    private let rngNamespace = "xmlns=\"http://relaxng.org/ns/structure/1.0\" datatypeLibrary=\"http://www.w3.org/2001/XMLSchema-datatypes\""
 
     @Test("An element with text content")
     func test_elementText() throws {

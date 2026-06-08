@@ -5,6 +5,7 @@ public extension PureXML.Schema {
         case anyNameExcept(NameClass)
         case name(namespace: String, localName: String)
         case nsName(String)
+        case nsNameExcept(namespace: String, except: NameClass)
         case choice(NameClass, NameClass)
 
         /// Whether `name` is in this class.
@@ -15,6 +16,7 @@ public extension PureXML.Schema {
             case let .anyNameExcept(except): return !except.contains(name)
             case let .name(wantedNamespace, wantedLocal): return namespace == wantedNamespace && name.localName == wantedLocal
             case let .nsName(wantedNamespace): return namespace == wantedNamespace
+            case let .nsNameExcept(wantedNamespace, except): return namespace == wantedNamespace && !except.contains(name)
             case let .choice(left, right): return left.contains(name) || right.contains(name)
             }
         }
