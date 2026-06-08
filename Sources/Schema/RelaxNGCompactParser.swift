@@ -308,6 +308,11 @@ private extension RNCParser {
         switch peek() {
         case .symbol("*"):
             advance()
+            // `* - nameClass` is any name except the subtracted class.
+            if peek() == .symbol("-") {
+                advance()
+                return .anyNameExcept(parseSimpleNameClass(attribute: attribute))
+            }
             return .anyName
         case .symbol("("):
             advance()
