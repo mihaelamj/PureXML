@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT 1.0 stylesheet model and parser (toward #3). `PureXML.XSLT` gains a
+  stylesheet model (template rules with match patterns and computed default
+  priorities, the instruction sequence constructor, attribute value templates)
+  and a parser that compiles an `xsl:stylesheet` document into it. Recognizes the
+  XSLT vocabulary by namespace or `xsl` prefix; other elements are literal result
+  elements. Supports `template`, `apply-templates`, `value-of`, `for-each`, `if`,
+  `choose`, `element`, `attribute`, `copy`, `copy-of`, `call-template`,
+  `variable`, `text`, and `sort`.
 - Schema conformance fixtures, completing XSD and RELAX NG validation (#2). A
   cross-cutting suite validates realistic schemas (a patterned, bounded,
   ID-keyed XSD purchase order and a RELAX NG contact card using interleave,
