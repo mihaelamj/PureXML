@@ -43,6 +43,30 @@ extension PureXML.Schema {
             return current.contains(accept)
         }
 
+        /// After consuming `names`, the labels the automaton can accept next and
+        /// whether the content may legally end here. The follow-set: the exact set
+        /// of element names allowed at this point, for completions and for telling
+        /// whether something is still required. Returns an empty, not-complete
+        /// result when the prefix is already invalid.
+        func follow(after names: [PureXML.Model.QualifiedName]) -> (allowed: [TermLabel], complete: Bool) {
+            var current = closure([start])
+            for name in names {
+                var next: Set<Int> = []
+                for state in current {
+                    if let label = states[state].label, let target = states[state].target, label.matches(name) {
+                        next.insert(target)
+                    }
+                }
+                if next.isEmpty { return ([], false) }
+                current = closure(next)
+            }
+            var labels: [TermLabel] = []
+            for state in current where states[state].target != nil {
+                if let label = states[state].label { labels.append(label) }
+            }
+            return (labels, current.contains(accept))
+        }
+
         private func closure(_ seed: Set<Int>) -> Set<Int> {
             var seen = seed
             var stack = Array(seed)
