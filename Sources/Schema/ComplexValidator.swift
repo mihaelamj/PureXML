@@ -166,15 +166,13 @@ public extension PureXML.Schema {
             at path: XSDPath,
             into errors: inout [XSDFailure],
         ) {
-            let names = children.map(\.name)
-            let structureValid: Bool = if case let .group(group) = particle.term, group.compositor == .all {
-                Self.matchesAll(group, names: names)
+            // Locate each content-model violation at the offending child (or the
+            // missing one), with a recovery hint, rather than one opaque failure,
+            // then still validate every well-placed child's own content.
+            if case let .group(group) = particle.term, group.compositor == .all {
+                allStructureErrors(group, children: children, at: path, into: &errors)
             } else {
-                ContentNFABuilder.build(particle).matchesWhole(names)
-            }
-            if !structureValid {
-                errors.append(XSDFailure(reason: "content does not match the content model", at: path))
-                return
+                sequenceStructureErrors(particle, children: children, at: path, into: &errors)
             }
             validateChildren(
                 children,
@@ -275,5 +273,72 @@ public extension PureXML.Schema {
                 validateChild(child, against: resolved, at: path, into: &errors)
             }
         }
+    }
+}
+
+/// Located content-model diagnostics: pinpoint which child breaks the model and
+/// what was expected there, so an editor shows placed errors with recovery hints
+/// rather than one opaque "content does not match" per element.
+private extension PureXML.Schema.ComplexValidator {
+    /// Walks the children through the content automaton, flagging the first child
+    /// the follow-set rejects, or the missing content when the sequence ends early.
+    func sequenceStructureErrors(_ particle: PureXML.Schema.Particle, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
+        let nfa = PureXML.Schema.ContentNFABuilder.build(particle)
+        let steps = Self.childSteps(children)
+        var prefix: [PureXML.Model.QualifiedName] = []
+        for (index, child) in children.enumerated() {
+            let allowed = nfa.follow(after: prefix).allowed
+            if allowed.contains(where: { $0.matches(child.name) }) {
+                prefix.append(child.name)
+            } else {
+                errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here\(Self.expectation(allowed))", at: path + [steps[index]]))
+                return
+            }
+        }
+        let (allowed, complete) = nfa.follow(after: prefix)
+        if !complete {
+            errors.append(XSDFailure(reason: "content is incomplete\(Self.expectation(allowed))", at: path))
+        }
+    }
+
+    /// Locates `all`-group violations: each child that is not an in-bounds member,
+    /// recovering past it, then each required member that never appeared.
+    func allStructureErrors(_ group: PureXML.Schema.Group, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
+        var counts = [Int](repeating: 0, count: group.particles.count)
+        let steps = Self.childSteps(children)
+        for (index, child) in children.enumerated() {
+            guard let position = group.particles.indices.first(where: { slot in
+                let member = group.particles[slot]
+                let room = member.maxOccurs.map { counts[slot] < $0 } ?? true
+                return room && Self.memberMatches(member.term, child.name)
+            }) else {
+                errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here", at: path + [steps[index]]))
+                continue
+            }
+            counts[position] += 1
+        }
+        for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
+            if case let .element(name, _) = member.term {
+                errors.append(XSDFailure(reason: "element '\(name.localName)' is required but missing", at: path))
+            }
+        }
+    }
+
+    static func memberMatches(_ term: PureXML.Schema.Term, _ name: PureXML.Model.QualifiedName) -> Bool {
+        switch term {
+        case let .element(declared, _): declared.localName == name.localName && declared.namespaceURI == name.namespaceURI
+        case let .wildcard(wildcard): wildcard.admits(name)
+        case .group: false
+        }
+    }
+
+    /// A "; expected a, b" hint naming the elements the automaton accepts next.
+    static func expectation(_ labels: [PureXML.Schema.TermLabel]) -> String {
+        let names = labels.compactMap { label -> String? in
+            if case let .name(qualified) = label { return "<\(qualified.localName)>" }
+            return nil
+        }
+        let unique = Set(names).sorted()
+        return unique.isEmpty ? "" : "; expected \(unique.joined(separator: ", "))"
     }
 }

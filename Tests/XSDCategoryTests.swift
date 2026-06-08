@@ -65,14 +65,16 @@ struct XSDCategoryTests {
         #expect(!validate(element("a", children: [.text("x")]), type).isEmpty)
     }
 
-    @Test("Content: a child outside the content model is a model mismatch")
+    @Test("Content: a child outside the content model is located with an expected hint")
     func test_contentModelMismatch() {
         let particle = Schema.Particle(term: .group(Schema.Group(compositor: .sequence, particles: [
             Schema.Particle(term: .element(name: Name("b"), type: nil)),
         ])))
         let type = Schema.ComplexType(content: .elementOnly(particle))
         #expect(validate(element("a", children: [.element(element("b"))]), type).isEmpty)
-        #expect(validate(element("a", children: [.element(element("c"))]), type).first?.reason == "content does not match the content model")
+        let failure = validate(element("a", children: [.element(element("c"))]), type).first
+        #expect(failure?.reason == "element 'c' is not allowed here; expected <b>")
+        #expect(failure?.codingPath.map(\.stringValue) == ["a", "c"])
     }
 
     // MARK: Nillable and fixed
