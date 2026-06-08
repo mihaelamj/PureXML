@@ -33,7 +33,7 @@ public extension PureXML.Emitting {
         /// root element; a no-op when `includeXMLDeclaration` is off.
         public mutating func writeStartDocument() {
             if let declaration = options.xmlDeclaration {
-                output += declaration + "\n"
+                output += declaration + options.lineEnding
             }
         }
 
@@ -41,7 +41,7 @@ public extension PureXML.Emitting {
         public mutating func writeStartElement(_ name: String) {
             closeStartTag()
             if options.prettyPrint, !open.isEmpty {
-                output += "\n" + pad(open.count)
+                output += options.lineEnding + pad(open.count)
             }
             output += "<\(name)"
             markParentHasElements()
@@ -50,10 +50,28 @@ public extension PureXML.Emitting {
             startTagOpen = true
         }
 
+        /// Opens an element with a namespace-qualified name, optionally declaring
+        /// the namespace on it. A nil `prefix` writes an unprefixed name and, with a
+        /// URI, a default-namespace declaration.
+        public mutating func writeStartElementNS(prefix: String?, localName: String, namespaceURI: String?) {
+            let qualified = prefix.map { "\($0):\(localName)" } ?? localName
+            writeStartElement(qualified)
+            if let namespaceURI {
+                writeNamespace(prefix: prefix, uri: namespaceURI)
+            }
+        }
+
+        /// Declares a namespace on the currently open start tag: `xmlns:prefix`, or
+        /// `xmlns` when `prefix` is nil, bound to `uri`.
+        public mutating func writeNamespace(prefix: String?, uri: String) {
+            writeAttribute(prefix.map { "xmlns:\($0)" } ?? "xmlns", uri)
+        }
+
         /// Writes an attribute on the currently open start tag.
         public mutating func writeAttribute(_ name: String, _ value: String) {
             guard startTagOpen else { return }
-            output += " \(name)=\"\(Escaping.attribute(value))\""
+            let quote = options.attributeQuote.character
+            output += " \(name)=\(quote)\(Escaping.attribute(value, quote: quote))\(quote)"
         }
 
         /// Writes escaped character data into the current element.
@@ -74,7 +92,7 @@ public extension PureXML.Emitting {
         public mutating func writeComment(_ text: String) {
             closeStartTag()
             if options.prettyPrint, !open.isEmpty {
-                output += "\n" + pad(open.count)
+                output += options.lineEnding + pad(open.count)
             }
             output += "<!--\(text)-->"
             markParentHasElements()
@@ -84,7 +102,7 @@ public extension PureXML.Emitting {
         public mutating func writeProcessingInstruction(target: String, data: String) {
             closeStartTag()
             if options.prettyPrint, !open.isEmpty {
-                output += "\n" + pad(open.count)
+                output += options.lineEnding + pad(open.count)
             }
             output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(data)?>"
             markParentHasElements()
@@ -104,7 +122,7 @@ public extension PureXML.Emitting {
                 return
             }
             if options.prettyPrint, line == .elements {
-                output += "\n" + pad(open.count)
+                output += options.lineEnding + pad(open.count)
             }
             output += "</\(name)>"
         }

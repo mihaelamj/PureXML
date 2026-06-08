@@ -2,11 +2,26 @@ public extension PureXML.Emitting {
     /// Explicit emitter options. The default is pretty-printed output with
     /// two-space indentation and a self-closing tag for empty elements, and no
     /// XML declaration.
+    /// Which quote character delimits attribute values in the output.
+    enum QuoteStyle: Equatable, Hashable, Sendable {
+        case double
+        case single
+
+        var character: Character {
+            self == .double ? "\"" : "'"
+        }
+    }
+
     struct Options: Equatable, Hashable, Sendable {
         /// Whether to indent nested elements onto their own lines.
         public var prettyPrint: Bool
         /// The indentation unit used when ``prettyPrint`` is enabled.
         public var indent: String
+        /// The quote character that delimits attribute values.
+        public var attributeQuote: QuoteStyle
+        /// The line terminator inserted by pretty-printing and after the
+        /// declaration. A line feed by default; set to `\r\n` for CRLF output.
+        public var lineEnding: String
         /// Whether childless elements collapse to `<name/>`.
         public var selfCloseEmptyElements: Bool
         /// Whether to emit an `<?xml ...?>` declaration (libxml2 emits one by
@@ -22,6 +37,8 @@ public extension PureXML.Emitting {
         public init(
             prettyPrint: Bool = true,
             indent: String = "  ",
+            attributeQuote: QuoteStyle = .double,
+            lineEnding: String = "\n",
             selfCloseEmptyElements: Bool = true,
             includeXMLDeclaration: Bool = false,
             xmlVersion: String = "1.0",
@@ -30,6 +47,8 @@ public extension PureXML.Emitting {
         ) {
             self.prettyPrint = prettyPrint
             self.indent = indent
+            self.attributeQuote = attributeQuote
+            self.lineEnding = lineEnding
             self.selfCloseEmptyElements = selfCloseEmptyElements
             self.includeXMLDeclaration = includeXMLDeclaration
             self.xmlVersion = xmlVersion

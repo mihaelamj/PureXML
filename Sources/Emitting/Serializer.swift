@@ -32,7 +32,7 @@ public extension PureXML.Emitting {
         public func serialize(_ node: PureXML.Model.Node) -> String {
             var output = ""
             if let declaration = options.xmlDeclaration {
-                output += declaration + "\n"
+                output += declaration + options.lineEnding
             }
             var stack: [SerializeStep] = [.node(node, 0, options.prettyPrint)]
             while let step = stack.popLast() {
@@ -45,7 +45,7 @@ public extension PureXML.Emitting {
                     }
                     output += "</\(close.name)>"
                     if close.formatted {
-                        output += "\n"
+                        output += options.lineEnding
                     }
                 }
             }
@@ -86,14 +86,15 @@ public extension PureXML.Emitting {
                 output += pad(depth)
             }
             output += "<" + element.name.description
+            let quote = options.attributeQuote.character
             for attribute in element.attributes {
-                output += " \(attribute.name.description)=\"\(Escaping.attribute(attribute.value))\""
+                output += " \(attribute.name.description)=\(quote)\(Escaping.attribute(attribute.value, quote: quote))\(quote)"
             }
 
             if element.children.isEmpty, options.selfCloseEmptyElements {
                 output += "/>"
                 if formatted {
-                    output += "\n"
+                    output += options.lineEnding
                 }
                 return
             }
@@ -108,9 +109,9 @@ public extension PureXML.Emitting {
                 default: false
                 }
             }
-            let childFormatted = formatted && !hasInlineContent && !element.children.isEmpty
+            let childFormatted = childFormatting(of: element, parentFormatted: formatted, hasInlineContent: hasInlineContent)
             if childFormatted {
-                output += "\n"
+                output += options.lineEnding
             }
             stack.append(.close(SerializeClose(
                 name: element.name.description,
@@ -124,6 +125,23 @@ public extension PureXML.Emitting {
                 formatted: childFormatted,
                 into: &stack,
             )
+        }
+
+        /// Whether to format (indent) an element's children: never when it has
+        /// inline content or none, never under `xml:space="preserve"` (its content
+        /// is emitted verbatim), and otherwise as the parent decided, with
+        /// `xml:space="default"` re-enabling formatting if the options pretty-print.
+        private func childFormatting(of element: PureXML.Model.Element, parentFormatted: Bool, hasInlineContent: Bool) -> Bool {
+            guard !hasInlineContent, !element.children.isEmpty else { return false }
+            switch Self.xmlSpace(of: element) {
+            case "preserve": return false
+            case "default": return options.prettyPrint
+            default: return parentFormatted
+            }
+        }
+
+        private static func xmlSpace(of element: PureXML.Model.Element) -> String? {
+            element.attributes.first { $0.name.localName == "space" && $0.name.prefix == "xml" }?.value
         }
 
         /// Pushes children in reverse so they pop off the work stack in order.
