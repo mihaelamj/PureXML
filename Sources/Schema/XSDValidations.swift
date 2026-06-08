@@ -34,10 +34,23 @@ public extension PureXML.Validation {
     }
 
     /// XSD validation expressed as composable ``Validation`` values over an
-    /// ``XSDContext``. The content-model check is inherently recursive (a child's
-    /// type depends on its position), so each rule delegates to the recursive
-    /// validators while contributing located ``ValidationError`` results to one
-    /// collection.
+    /// ``XSDContext``, in the OpenAPIKit idiom: each rule is a named, removable
+    /// ``Validation`` value with a positive description, and the ``validator()``
+    /// composes them; failures are located ``ValidationError``s.
+    ///
+    /// Scope note (the #101 decision). XSD content validation is *one* recursive
+    /// ``Validation`` (``contentValidity``) rather than a separate rule per
+    /// constraint, because XSD is a recursive type system: a child's type is
+    /// resolved from its parent's content model and position, then rewritten by
+    /// `xsi:type` and the derivation controls mid-walk. The constraint categories
+    /// (attributes, content model, derivation, nillability, fixed values) are
+    /// interdependent through that resolution, so they cannot be split into
+    /// independent rules without either changing semantics or duplicating the
+    /// recursion. This is the sanctioned multi-error form (the rule's `check`
+    /// returns one located error per violation). Each category is isolation-tested
+    /// through crafted inputs so it is verifiable on its own, which is the
+    /// testability the idiom asks for. Identity constraints, which *are*
+    /// independent, are a separate rule (``identityConstraints``).
     enum XSD {
         /// The document element is valid against its declared XSD type.
         static var contentValidity: Validation<PureXML.Model.Node, XSDContext> {
