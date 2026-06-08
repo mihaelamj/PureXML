@@ -1,6 +1,10 @@
 extension PureXML.XPath {
-    /// Compiles an XPath location-path string (the supported subset) into a list
-    /// of steps. A small recursive-descent parser over the characters.
+    /// Compiles an XPath location path into a list of steps. A small
+    /// recursive-descent parser over the characters supporting the full axis set:
+    /// the thirteen named axes (`ancestor::`, `following-sibling::`, …), the
+    /// abbreviations `.`, `..`, `@`, `//`, the node tests (name, `*`, `text()`,
+    /// `node()`, `comment()`, `processing-instruction()`), and the predicate
+    /// subset `[n]`, `[@a]`, `[@a='v']`, `[child]`, `[child='v']`.
     struct Compiler {
         private let chars: [Character]
         private var index = 0
@@ -14,82 +18,142 @@ extension PureXML.XPath {
             return try compiler.parse()
         }
 
+        private static func descendantOrSelfStep() -> Step {
+            Step(axis: .descendantOrSelf, test: .node, predicates: [])
+        }
+
         private mutating func parse() throws -> (absolute: Bool, steps: [Step]) {
             skipSpace()
             guard !isAtEnd else { throw QueryError.empty }
             var absolute = false
             var steps: [Step] = []
 
-            if peek() == "/" {
+            if consume("/") {
                 absolute = true
-                advance()
-                if peek() == "/" {
-                    advance()
-                    try steps.append(parseStep(axisOverride: .descendant))
+                if consume("/") {
+                    steps.append(Self.descendantOrSelfStep())
+                    try steps.append(parseStep())
                 } else if isAtEnd {
                     return (true, [])
                 } else {
-                    try steps.append(parseStep(axisOverride: nil))
+                    try steps.append(parseStep())
                 }
             } else {
-                try steps.append(parseStep(axisOverride: nil))
+                try steps.append(parseStep())
             }
 
-            while true {
-                skipSpace()
-                guard peek() == "/" else {
-                    if isAtEnd { break }
-                    throw QueryError.unexpectedToken(String(peek() ?? " "))
-                }
-                advance()
-                if peek() == "/" {
-                    advance()
-                    try steps.append(parseStep(axisOverride: .descendant))
-                } else {
-                    try steps.append(parseStep(axisOverride: nil))
-                }
-            }
+            try parseTrailingSteps(into: &steps)
             return (absolute, steps)
         }
 
-        private mutating func parseStep(axisOverride: Axis?) throws -> Step {
-            skipSpace()
-            if peek() == "." {
-                advance()
-                if peek() == "." {
-                    throw QueryError.unsupportedAxis("..")
+        private mutating func parseTrailingSteps(into steps: inout [Step]) throws {
+            while true {
+                skipSpace()
+                if isAtEnd { return }
+                guard consume("/") else {
+                    throw QueryError.unexpectedToken(String(peek() ?? " "))
                 }
-                return try Step(axis: .selfNode, test: .node, predicates: parsePredicates())
+                if consume("/") {
+                    steps.append(Self.descendantOrSelfStep())
+                }
+                try steps.append(parseStep())
             }
-            var axis = axisOverride ?? .child
-            if peek() == "@" {
+        }
+
+        private mutating func parseStep() throws -> Step {
+            skipSpace()
+            if matches("..") {
                 advance()
-                axis = .attribute
+                advance()
+                return try Step(axis: .parent, test: .node, predicates: parsePredicates())
             }
+            if peek() == ".", peek(1) != "." {
+                advance()
+                return try Step(axis: .selfAxis, test: .node, predicates: parsePredicates())
+            }
+            let axis = try parseAxis()
             let test = try parseNodeTest()
             return try Step(axis: axis, test: test, predicates: parsePredicates())
         }
 
+        private mutating func parseAxis() throws -> Axis {
+            if consume("@") {
+                return .attribute
+            }
+            let save = index
+            let word = parseName()
+            if !word.isEmpty, matches("::") {
+                advance()
+                advance()
+                return try Self.namedAxis(word)
+            }
+            index = save
+            return .child
+        }
+
+        private static func namedAxis(_ name: String) throws -> Axis {
+            if let axis = verticalAxis(name) ?? lateralAxis(name) {
+                return axis
+            }
+            throw QueryError.unsupportedAxis(name)
+        }
+
+        private static func verticalAxis(_ name: String) -> Axis? {
+            switch name {
+            case "child": .child
+            case "descendant": .descendant
+            case "descendant-or-self": .descendantOrSelf
+            case "parent": .parent
+            case "ancestor": .ancestor
+            case "ancestor-or-self": .ancestorOrSelf
+            case "self": .selfAxis
+            default: nil
+            }
+        }
+
+        private static func lateralAxis(_ name: String) -> Axis? {
+            switch name {
+            case "following-sibling": .followingSibling
+            case "preceding-sibling": .precedingSibling
+            case "following": .following
+            case "preceding": .preceding
+            case "attribute": .attribute
+            case "namespace": .namespace
+            default: nil
+            }
+        }
+
         private mutating func parseNodeTest() throws -> NodeTest {
+            skipSpace()
             if peek() == "*" {
                 advance()
                 return .wildcard
             }
             let name = parseName()
             guard !name.isEmpty else { throw QueryError.expectedNodeTest }
-            if peek() == "(" {
-                advance()
-                skipSpace()
-                guard peek() == ")" else { throw QueryError.unexpectedToken(String(peek() ?? " ")) }
-                advance()
-                switch name {
-                case "text": return .text
-                case "node": return .node
-                case "comment": return .comment
-                default: throw QueryError.unexpectedToken("\(name)()")
-                }
+            guard peek() == "(" else {
+                return .name(name)
             }
-            return .name(name)
+            return try parseNodeTypeTest(name)
+        }
+
+        private mutating func parseNodeTypeTest(_ name: String) throws -> NodeTest {
+            advance()
+            skipSpace()
+            if name == "processing-instruction", peek() != ")" {
+                let target = try parseLiteral()
+                skipSpace()
+                try expect(")")
+                return .processingInstruction(target: target)
+            }
+            try expect(")")
+            switch name {
+            case "text": return .text
+            case "node": return .node
+            case "comment": return .comment
+            case "processing-instruction": return .processingInstruction(target: nil)
+            default: throw QueryError.unexpectedToken("\(name)()")
+            }
         }
 
         private mutating func parsePredicates() throws -> [Predicate] {
@@ -103,28 +167,31 @@ extension PureXML.XPath {
 
         private mutating func parsePredicate() throws -> Predicate {
             skipSpace()
-            let predicate: Predicate
-            if let digit = peek(), digit.isNumber {
-                predicate = .position(parseNumber())
-            } else if peek() == "@" {
-                advance()
-                let name = parseName()
-                predicate = try parseEquality(
-                    makeEquals: { .attributeEquals(name: name, value: $0) },
-                    makeExists: { .hasAttribute(name) },
-                )
-            } else {
-                let name = parseName()
-                guard !name.isEmpty else { throw QueryError.unsupportedPredicate("empty") }
-                predicate = try parseEquality(
-                    makeEquals: { .childEquals(name: name, value: $0) },
-                    makeExists: { .hasChild(name) },
-                )
-            }
+            let predicate = try parsePredicateBody()
             skipSpace()
             guard peek() == "]" else { throw QueryError.unterminatedPredicate }
             advance()
             return predicate
+        }
+
+        private mutating func parsePredicateBody() throws -> Predicate {
+            if let digit = peek(), digit.isNumber {
+                return .position(parseNumber())
+            }
+            if peek() == "@" {
+                advance()
+                let name = parseName()
+                return try parseEquality(
+                    makeEquals: { .attributeEquals(name: name, value: $0) },
+                    makeExists: { .hasAttribute(name) },
+                )
+            }
+            let name = parseName()
+            guard !name.isEmpty else { throw QueryError.unsupportedPredicate("empty") }
+            return try parseEquality(
+                makeEquals: { .childEquals(name: name, value: $0) },
+                makeExists: { .hasChild(name) },
+            )
         }
 
         private mutating func parseEquality(
@@ -156,6 +223,9 @@ extension PureXML.XPath {
         private mutating func parseName() -> String {
             var name = ""
             while let character = peek(), character.isXMLNameContinuation {
+                // A `::` is the axis separator, not part of a QName, so stop
+                // before it even though a single colon is a valid name character.
+                if character == ":", peek(1) == ":" { break }
                 name.append(character)
                 advance()
             }
@@ -171,12 +241,36 @@ extension PureXML.XPath {
             return Int(digits) ?? 0
         }
 
+        private mutating func expect(_ character: Character) throws {
+            guard peek() == character else {
+                throw QueryError.unexpectedToken(String(peek() ?? " "))
+            }
+            advance()
+        }
+
         private var isAtEnd: Bool {
             index >= chars.count
         }
 
-        private func peek() -> Character? {
-            index < chars.count ? chars[index] : nil
+        private func peek(_ ahead: Int = 0) -> Character? {
+            let target = index + ahead
+            return target < chars.count ? chars[target] : nil
+        }
+
+        private func matches(_ literal: String) -> Bool {
+            let target = Array(literal)
+            guard index + target.count <= chars.count else { return false }
+            for (offset, character) in target.enumerated() where chars[index + offset] != character {
+                return false
+            }
+            return true
+        }
+
+        @discardableResult
+        private mutating func consume(_ literal: String) -> Bool {
+            guard matches(literal) else { return false }
+            index += literal.count
+            return true
         }
 
         private mutating func advance() {

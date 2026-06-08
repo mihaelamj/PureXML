@@ -6,10 +6,8 @@ public extension PureXML.XPath {
         case expectedNodeTest
         case unterminatedPredicate
         case unsupportedPredicate(String)
-        /// An upward or sibling axis was used; only forward axes are supported.
+        /// An axis name was not one of the thirteen XPath axes.
         case unsupportedAxis(String)
-        /// An attribute step appeared before the end of the path.
-        case attributeStepNotLast
 
         public var description: String {
             switch self {
@@ -19,7 +17,6 @@ public extension PureXML.XPath {
             case .unterminatedPredicate: "unterminated predicate"
             case let .unsupportedPredicate(detail): "unsupported predicate: \(detail)"
             case let .unsupportedAxis(axis): "unsupported axis: \(axis)"
-            case .attributeStepNotLast: "an attribute step must be the last step"
             }
         }
     }
