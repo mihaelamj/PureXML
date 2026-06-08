@@ -33,7 +33,7 @@ public extension PureXML.Schema {
         case oneOrMore(Pattern)
         case element(NameClass, Pattern)
         case attribute(NameClass, Pattern)
-        case data(BuiltinType)
+        case data(SimpleType)
         case value(String)
         case list(Pattern)
         case ref(String)
