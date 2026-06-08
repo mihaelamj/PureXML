@@ -48,4 +48,7 @@ public enum PureXML {
 
     /// XSLT 1.0 transformation types.
     public enum XSLT {}
+
+    /// Lenient HTML parsing and serialization types.
+    public enum HTML {}
 }

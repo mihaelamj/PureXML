@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- HTML parser and serializer (#20, the libxml2 `HTMLparser.h`/`HTMLtree.h`
+  model). `PureXML.HTML.parse` reads tag-soup HTML leniently (case-insensitive
+  tags; quoted, unquoted, and boolean attributes; comments; doctype; character
+  references) and builds a node tree handling void elements (no end tag),
+  optional end tags (implicit close of `li`, `p`, table rows and cells, and the
+  like), raw-text elements (`script`, `style`), and unmatched end tags.
+  `PureXML.HTML.serialize` writes it back with void elements unclosed and
+  raw-text content unescaped.
 - XSLT 1.0 transformation engine, completing #3. `PureXML.XSLT.transform`
   applies a stylesheet to a source document by the XSLT processing model: it
   matches each node to the highest-priority template (or the built-in rules) and
