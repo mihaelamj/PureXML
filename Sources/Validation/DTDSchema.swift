@@ -25,52 +25,77 @@ public extension PureXML.Validation {
             models.isEmpty && attributes.isEmpty
         }
 
-        /// Validates a node tree against the declared content models. In strict
-        /// mode an element with no declaration is itself an error; otherwise
-        /// undeclared elements are skipped.
+        /// Validates a node tree against the declared content models and attribute
+        /// rules. Element structure and attribute presence/value are checked in one
+        /// walk; ID uniqueness and IDREF resolution are checked afterward, since a
+        /// reference may point forward to an ID later in the document. In strict
+        /// mode an element with no declaration is itself an error.
         public func validate(_ node: PureXML.Model.Node, strict: Bool = false) -> [Issue] {
-            var issues: [Issue] = []
-            walk(node, strict: strict, into: &issues)
-            return issues
+            var state = DTDState()
+            walk(node, strict: strict, into: &state)
+            for (value, count) in state.idCounts where count > 1 {
+                state.issues.append(error("duplicate ID '\(value)' (declared \(count) times)"))
+            }
+            for reference in state.references where state.idCounts[reference.value] == nil {
+                state.issues.append(error("IDREF '\(reference.value)' on <\(reference.element)> matches no ID"))
+            }
+            return state.issues
         }
 
-        private func walk(_ node: PureXML.Model.Node, strict: Bool, into issues: inout [Issue]) {
+        private func walk(_ node: PureXML.Model.Node, strict: Bool, into state: inout DTDState) {
             switch node {
             case let .document(children):
                 for child in children {
-                    walk(child, strict: strict, into: &issues)
+                    walk(child, strict: strict, into: &state)
                 }
             case let .element(element):
-                validateElement(element, strict: strict, into: &issues)
+                validateElement(element, strict: strict, into: &state)
                 for child in element.children {
-                    walk(child, strict: strict, into: &issues)
+                    walk(child, strict: strict, into: &state)
                 }
             case .text, .cdata, .comment, .processingInstruction:
                 break
             }
         }
 
-        private func validateElement(_ element: PureXML.Model.Element, strict: Bool, into issues: inout [Issue]) {
+        private func validateElement(_ element: PureXML.Model.Element, strict: Bool, into state: inout DTDState) {
             let name = element.name.description
             if let model = models[name] {
                 let content = childContent(of: element)
-                issues.append(contentsOf: violations(name: name, model: model, content: content))
+                state.issues.append(contentsOf: violations(name: name, model: model, content: content))
             } else if strict {
-                issues.append(error("element <\(name)> is not declared in the DTD"))
+                state.issues.append(error("element <\(name)> is not declared in the DTD"))
             }
-            issues.append(contentsOf: attributeViolations(name: name, element: element))
-        }
-
-        private func attributeViolations(name: String, element: PureXML.Model.Element) -> [Issue] {
-            guard let declarations = attributes[name] else { return [] }
-            var result: [Issue] = []
+            guard let declarations = attributes[name] else { return }
             for declaration in declarations {
                 let value = element.attributes.first {
                     $0.name.description == declaration.name || $0.name.localName == declaration.name
                 }?.value
-                result.append(contentsOf: checkAttribute(declaration, value: value, on: name))
+                state.issues.append(contentsOf: checkAttribute(declaration, value: value, on: name))
+                if let value {
+                    collectIdentifiers(declaration, value: value, element: name, into: &state)
+                }
             }
-            return result
+        }
+
+        private func collectIdentifiers(
+            _ declaration: AttributeDeclaration,
+            value: String,
+            element: String,
+            into state: inout DTDState,
+        ) {
+            switch declaration.type {
+            case .id:
+                state.idCounts[value, default: 0] += 1
+            case .idReference:
+                state.references.append((value, element))
+            case .idReferences:
+                for token in value.split(whereSeparator: { $0.isWhitespace }) {
+                    state.references.append((String(token), element))
+                }
+            case .cdata, .enumeration:
+                break
+            }
         }
 
         private func checkAttribute(_ declaration: AttributeDeclaration, value: String?, on element: String) -> [Issue] {
@@ -145,4 +170,12 @@ public extension PureXML.Validation {
             Issue(severity: .error, message: message)
         }
     }
+}
+
+/// Mutable state carried through one DTD validation walk: the issues found, the
+/// count of each declared ID, and the IDREF references to resolve afterward.
+private struct DTDState {
+    var issues: [PureXML.Validation.Issue] = []
+    var idCounts: [String: Int] = [:]
+    var references: [(value: String, element: String)] = []
 }

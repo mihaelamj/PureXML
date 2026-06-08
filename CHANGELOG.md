@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DTD ID/IDREF validation. Attributes typed `ID` must be unique across the
+  document; `IDREF` and `IDREFS` values must each resolve to a declared `ID`
+  (forward references included, via a second pass). Completes the structural DTD
+  validation layer alongside content models and attribute rules.
 - DTD attribute validation (`<!ATTLIST>`). The parser surfaces attribute
   declarations alongside element models, and `DTDSchema` now checks `#REQUIRED`
   attributes are present, `#FIXED` attributes match when present, and enumerated

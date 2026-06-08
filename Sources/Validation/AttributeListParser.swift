@@ -36,13 +36,16 @@ extension PureXML.Validation {
                 return .enumeration(parseEnumeration())
             }
             let token = parseName()
-            if token == "NOTATION" {
+            switch token {
+            case "ID": return .id
+            case "IDREF": return .idReference
+            case "IDREFS": return .idReferences
+            case "NOTATION":
                 skipSpace()
-                if peek() == "(" {
-                    return .enumeration(parseEnumeration())
-                }
+                return peek() == "(" ? .enumeration(parseEnumeration()) : .cdata
+            default:
+                return .cdata
             }
-            return .cdata
         }
 
         private mutating func parseEnumeration() -> [String] {
