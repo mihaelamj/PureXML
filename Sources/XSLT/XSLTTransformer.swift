@@ -1,24 +1,8 @@
-/// One produced item: a node for the result tree, or an attribute to attach to
-/// the enclosing element. File-scope and private.
-private enum ResultItem {
-    case node(PureXML.Model.Node)
-    case attribute(PureXML.Model.Attribute)
-}
-
-/// The evaluation context during instantiation. File-scope and private.
-private struct XSLTContext {
-    var node: PureXML.Model.TreeNode
-    var position: Int
-    var size: Int
-    var variables: [String: PureXML.XPath.Value]
-}
-
-/// Shared, mutable signal that an `xsl:message terminate="yes"` fired, carrying
-/// its text. A reference type so the value-semantics transformer can set it.
-/// File-scope and private.
-private final class Termination {
-    var message: String?
-}
+/// The transformer's runtime types are defined in XSLTRuntime.swift (nested in
+/// the namespace); these file-private aliases keep them unqualified here.
+private typealias ResultItem = PureXML.XSLT.ResultItem
+private typealias XSLTContext = PureXML.XSLT.XSLTContext
+private typealias Termination = PureXML.XSLT.Termination
 
 extension PureXML.XSLT {
     /// Runs a compiled stylesheet against a source tree, producing a result tree
@@ -58,9 +42,9 @@ extension PureXML.XSLT {
 
         // MARK: Template matching
 
-        fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?) -> Template? {
+        fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?, below ceiling: Int = .max) -> Template? {
             stylesheet.templates.enumerated()
-                .filter { $0.element.mode == mode && ($0.element.match.map { matches(node, $0) } ?? false) }
+                .filter { $0.element.mode == mode && $0.element.importPrecedence < ceiling && ($0.element.match.map { matches(node, $0) } ?? false) }
                 .max { lhs, rhs in
                     (lhs.element.importPrecedence, lhs.element.priority, lhs.offset)
                         < (rhs.element.importPrecedence, rhs.element.priority, rhs.offset)
@@ -89,7 +73,7 @@ extension PureXML.XSLT {
         ) -> [ResultItem] {
             var items: [ResultItem] = []
             for (offset, node) in nodes.enumerated() {
-                let nodeContext = XSLTContext(node: node, position: offset + 1, size: nodes.count, variables: context.variables)
+                let nodeContext = XSLTContext(node: node, position: offset + 1, size: nodes.count, variables: context.variables, mode: mode)
                 if let template = bestTemplate(for: node, mode: mode) {
                     items += instantiateTemplate(template, nodeContext, passing: parameters, from: context)
                 } else {
@@ -108,6 +92,7 @@ extension PureXML.XSLT {
             from caller: XSLTContext,
         ) -> [ResultItem] {
             var context = context
+            context.importPrecedence = template.importPrecedence
             for parameter in template.parameters {
                 if let passed = parameters.first(where: { $0.name == parameter.name }) {
                     context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
@@ -254,9 +239,21 @@ extension PureXML.XSLT.Transformer {
             [.node(.processingInstruction(target: avt(name, context), data: Self.text(of: instantiate(body, context))))]
         case let .message(terminate, body):
             message(terminate, body, context)
+        case .applyImports:
+            applyImports(context)
         default:
             []
         }
+    }
+
+    /// Re-applies templates to the current node in the current mode, considering
+    /// only those below the current template's import precedence, falling back to
+    /// the built-in rule when none match.
+    private func applyImports(_ context: XSLTContext) -> [ResultItem] {
+        if let template = bestTemplate(for: context.node, mode: context.mode, below: context.importPrecedence) {
+            return instantiateTemplate(template, context, passing: [], from: context)
+        }
+        return builtInRule(context.node, mode: context.mode, context)
     }
 
     private func forEach(

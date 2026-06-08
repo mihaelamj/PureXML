@@ -246,6 +246,7 @@ extension PureXML.XSLT {
             case "variable", "param": variable(node)
             case "copy": .copy(body: body(node))
             case "message": .message(terminate: XSLTNode.attribute(node, "terminate") == "yes", body: body(node))
+            case "apply-imports": .applyImports
             default: nil
             }
         }
