@@ -18,46 +18,47 @@ private struct CatalogBuilder {
     var nextCatalogs: [String] = []
     var preferPublic = true
 
-    mutating func add(_ node: PureXML.Model.TreeNode) {
+    mutating func add(_ node: PureXML.Model.TreeNode, base: String) {
         switch node.name?.localName {
         case "system":
-            insert(node, key: "systemId", value: "uri", into: &systemMap)
+            insert(node, key: "systemId", base: base, into: &systemMap)
         case "public":
-            insert(node, key: "publicId", value: "uri", into: &publicMap)
+            insert(node, key: "publicId", base: base, into: &publicMap)
         case "uri":
-            insert(node, key: "name", value: "uri", into: &uriMap)
+            insert(node, key: "name", base: base, into: &uriMap)
         case "rewriteSystem":
-            appendRewrite(node, start: "systemIdStartString", into: &rewriteSystem)
+            appendRewrite(node, start: "systemIdStartString", base: base, into: &rewriteSystem)
         case "rewriteURI":
-            appendRewrite(node, start: "uriStartString", into: &rewriteURI)
+            appendRewrite(node, start: "uriStartString", base: base, into: &rewriteURI)
         case "systemSuffix":
-            appendSuffix(node, suffix: "systemIdSuffix", into: &systemSuffix)
+            appendSuffix(node, suffix: "systemIdSuffix", base: base, into: &systemSuffix)
         case "uriSuffix":
-            appendSuffix(node, suffix: "uriSuffix", into: &uriSuffix)
+            appendSuffix(node, suffix: "uriSuffix", base: base, into: &uriSuffix)
         default:
-            addDelegation(node)
+            addDelegation(node, base: base)
         }
     }
 
     private func appendSuffix(
         _ node: PureXML.Model.TreeNode,
         suffix: String,
+        base: String,
         into rules: inout [SuffixRule],
     ) {
         guard let suffixString = attribute(node, suffix), let uri = attribute(node, "uri") else { return }
-        rules.append(SuffixRule(suffixString: suffixString, uri: uri))
+        rules.append(SuffixRule(suffixString: suffixString, uri: resolve(uri, base)))
     }
 
-    private mutating func addDelegation(_ node: PureXML.Model.TreeNode) {
+    private mutating func addDelegation(_ node: PureXML.Model.TreeNode, base: String) {
         switch node.name?.localName {
         case "delegateSystem":
-            appendDelegate(node, start: "systemIdStartString", into: &delegateSystem)
+            appendDelegate(node, start: "systemIdStartString", base: base, into: &delegateSystem)
         case "delegatePublic":
-            appendDelegate(node, start: "publicIdStartString", into: &delegatePublic)
+            appendDelegate(node, start: "publicIdStartString", base: base, into: &delegatePublic)
         case "delegateURI":
-            appendDelegate(node, start: "uriStartString", into: &delegateURI)
+            appendDelegate(node, start: "uriStartString", base: base, into: &delegateURI)
         case "nextCatalog":
-            if let catalog = attribute(node, "catalog") { nextCatalogs.append(catalog) }
+            if let catalog = attribute(node, "catalog") { nextCatalogs.append(resolve(catalog, base)) }
         default:
             break
         }
@@ -66,29 +67,38 @@ private struct CatalogBuilder {
     private func appendDelegate(
         _ node: PureXML.Model.TreeNode,
         start: String,
+        base: String,
         into rules: inout [DelegateRule],
     ) {
         guard let startString = attribute(node, start), let catalog = attribute(node, "catalog") else { return }
-        rules.append(DelegateRule(startString: startString, catalog: catalog))
+        rules.append(DelegateRule(startString: startString, catalog: resolve(catalog, base)))
     }
 
     private func insert(
         _ node: PureXML.Model.TreeNode,
         key: String,
-        value: String,
+        base: String,
         into map: inout [String: String],
     ) {
-        guard let identifier = attribute(node, key), let uri = attribute(node, value) else { return }
-        map[identifier] = uri
+        guard let identifier = attribute(node, key), let uri = attribute(node, "uri") else { return }
+        map[identifier] = resolve(uri, base)
     }
 
     private func appendRewrite(
         _ node: PureXML.Model.TreeNode,
         start: String,
+        base: String,
         into rules: inout [RewriteRule],
     ) {
         guard let startString = attribute(node, start), let rewrite = attribute(node, "rewritePrefix") else { return }
-        rules.append(RewriteRule(startString: startString, rewritePrefix: rewrite))
+        rules.append(RewriteRule(startString: startString, rewritePrefix: resolve(rewrite, base)))
+    }
+
+    /// Resolves a catalog replacement URI against the in-scope base (RFC 3986). An
+    /// empty base leaves a relative URI relative, so a catalog with no base behaves
+    /// exactly as before.
+    private func resolve(_ uri: String, _ base: String) -> String {
+        base.isEmpty ? uri : PureXML.XInclude.URIReference.resolve(uri, against: base)
     }
 
     private func attribute(_ node: PureXML.Model.TreeNode, _ name: String) -> String? {
@@ -116,15 +126,16 @@ private struct CatalogBuilder {
 extension PureXML.Catalog {
     /// Parses an OASIS XML catalog document into a ``Resolver``. Entries are
     /// matched by local name, so the catalog namespace is not required; `group`
-    /// and `catalog` elements are recursed into.
+    /// and `catalog` elements are recursed into. Replacement URIs are resolved
+    /// against `baseURI` and the in-scope `xml:base` (RFC 3986).
     enum CatalogParser {
-        static func parse(_ xml: String) throws -> Resolver {
+        static func parse(_ xml: String, baseURI: String = "") throws -> Resolver {
             let root = try PureXML.parseTree(xml)
             var builder = CatalogBuilder()
             if let catalog = catalogElement(root), prefer(of: catalog) == "system" {
                 builder.preferPublic = false
             }
-            collect(root, into: &builder)
+            collect(root, base: baseURI, into: &builder)
             return builder.resolver()
         }
 
@@ -136,13 +147,23 @@ extension PureXML.Catalog {
             node.attributes.first { $0.name.localName == "prefer" }?.value
         }
 
-        private static func collect(_ node: PureXML.Model.TreeNode, into builder: inout CatalogBuilder) {
+        private static func collect(_ node: PureXML.Model.TreeNode, base: String, into builder: inout CatalogBuilder) {
             for child in node.children where child.kind == .element {
-                builder.add(child)
+                let childBase = elementBase(child, base)
+                builder.add(child, base: childBase)
                 if child.name?.localName == "group" || child.name?.localName == "catalog" {
-                    collect(child, into: &builder)
+                    collect(child, base: childBase, into: &builder)
                 }
             }
+        }
+
+        /// The base URI in scope for `node`: its own `xml:base` (resolved against
+        /// the inherited base), or the inherited base when it declares none.
+        private static func elementBase(_ node: PureXML.Model.TreeNode, _ inherited: String) -> String {
+            guard let xmlBase = node.attributes.first(where: { $0.name.localName == "base" && $0.name.prefix == "xml" })?.value else {
+                return inherited
+            }
+            return inherited.isEmpty ? xmlBase : PureXML.XInclude.URIReference.resolve(xmlBase, against: inherited)
         }
     }
 }
