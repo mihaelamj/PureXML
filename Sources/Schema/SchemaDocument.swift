@@ -58,5 +58,19 @@ public extension PureXML.Schema {
             )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
         }
+
+        /// What the schema allows at the element a coding `path` addresses in
+        /// `tree`: the next child elements (the content-model follow-set), whether
+        /// the content may end there, and the declared attributes with their
+        /// required/present status. For editor completions and "what's missing".
+        /// Returns nil when the path does not address a declared element.
+        public func completions(at path: [PureXML.Validation.PathKey], in tree: PureXML.Model.TreeNode) -> Completions? {
+            guard let node = tree.node(at: path), case let .element(element) = node.node,
+                  let type = CompletionEngine.elementType(at: path, elements: elements, types: types)
+            else {
+                return nil
+            }
+            return CompletionEngine.completions(for: element, type: type, types: types)
+        }
     }
 }
