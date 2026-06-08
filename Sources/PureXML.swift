@@ -26,4 +26,8 @@ public enum PureXML {
 
     /// Streaming pattern types (the libxml2 `pattern.h` XPath subset).
     public enum Pattern {}
+
+    /// XPointer fragment-identifier types (the `element()` and `xpointer()`
+    /// schemes over XPath).
+    public enum XPointer {}
 }

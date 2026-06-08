@@ -81,21 +81,6 @@ flowchart TB
   Core --> Chars
 ```
 
-Querying:
-
-```mermaid
-flowchart TB
-  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
-  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
-  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
-  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  XPathFull["#21 Full XPath 1.0"]:::done
-  Pattern["#22 xmlPattern streaming match"]:::done
-  XPointer["#23 XPointer"]:::epic
-  XPathFull --> Pattern
-  XPathFull --> XPointer
-```
-
 Validation:
 
 ```mermaid
@@ -104,11 +89,12 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Querying["Querying: #21 XPath, #22 xmlPattern, #23 XPointer (shipped)"]:::done
   Regexp["#30 Regular expression engine"]:::epic
   Xsd["#2 XSD / RELAX NG validation"]:::epic
   Schematron["#25 Schematron validation"]:::epic
   Regexp --> Xsd
-  Xsd --> Schematron
+  Querying --> Schematron
 ```
 
 Transformation and integrity:
