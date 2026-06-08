@@ -54,15 +54,19 @@ public extension PureXML.Validation {
         public let codingPath: [PathKey]
     }
 
-    /// A validation failure: a reason and the coding path where it occurred. The
-    /// description strips a trailing period and renders the location consistently.
+    /// A validation finding: a reason, the coding path where it occurred, and a
+    /// severity (an error by default; a warning for advisory findings such as a
+    /// matched Schematron `report`). The description strips a trailing period and
+    /// renders the location consistently.
     struct ValidationError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
         public let reason: String
         public let codingPath: [PathKey]
+        public let severity: Severity
 
-        public init(reason: String, at path: [PathKey]) {
+        public init(reason: String, at path: [PathKey], severity: Severity = .error) {
             self.reason = reason
             codingPath = path
+            self.severity = severity
         }
 
         public var description: String {
