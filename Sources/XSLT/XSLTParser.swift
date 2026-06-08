@@ -225,7 +225,11 @@ extension PureXML.XSLT {
         }
 
         private static func xslInstruction(_ node: Tree) -> Instruction? {
-            simpleInstruction(node) ?? structuralInstruction(node)
+            if let known = simpleInstruction(node) ?? structuralInstruction(node) { return known }
+            // An unrecognized XSLT element instantiates its xsl:fallback children
+            // (forwards-compatible processing); with none, it is dropped.
+            let fallback = XSLTNode.children(node, named: "fallback").flatMap(body)
+            return fallback.isEmpty ? nil : .fallback(body: fallback)
         }
 
         private static func simpleInstruction(_ node: Tree) -> Instruction? {

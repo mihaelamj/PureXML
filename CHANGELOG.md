@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:fallback` (#81). An unrecognized XSLT element instantiates its
+  `xsl:fallback` children in its place (forwards-compatible processing), or is
+  dropped when it has none; a fallback under a supported instruction is ignored.
 - XSLT `xsl:apply-imports` (#81). Re-applies templates to the current node in the
   current mode, considering only templates of lower import precedence than the
   one being instantiated (so an overriding template can extend the imported one),
