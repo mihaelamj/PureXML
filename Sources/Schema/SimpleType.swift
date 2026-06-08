@@ -44,16 +44,38 @@ public extension PureXML.Schema {
         }
     }
 
-    /// A simple type: a built-in base restricted by facets. Validates a lexical
-    /// value against the XSD Part 2 rules: whitespace processing, the base value
-    /// space, the base's intrinsic bounds, then the facets.
+    /// A simple type's variety (XSD Part 2): atomic, a whitespace-separated list
+    /// of an item type, or a union of member types.
+    indirect enum Variety: Sendable {
+        case atomic
+        case list(SimpleType)
+        case union([SimpleType])
+    }
+
+    /// A simple type: a built-in base restricted by facets, of one of the three
+    /// varieties. Validates a lexical value against the XSD Part 2 rules:
+    /// whitespace processing, the base value space, the base's intrinsic bounds,
+    /// then the facets. A list checks each item against the item type and counts
+    /// items for the length facets; a union admits a value valid for any member.
     struct SimpleType: Sendable {
         public var base: BuiltinType
         public var facets: Facets
+        public var variety: Variety
 
-        public init(base: BuiltinType, facets: Facets = Facets()) {
+        public init(base: BuiltinType, facets: Facets = Facets(), variety: Variety = .atomic) {
             self.base = base
             self.facets = facets
+            self.variety = variety
+        }
+
+        /// A list type whose items are `item`, carrying its own (list) facets.
+        public static func list(item: SimpleType, facets: Facets = Facets()) -> SimpleType {
+            SimpleType(base: .string, facets: facets, variety: .list(item))
+        }
+
+        /// A union of `members`: a value is valid if any member admits it.
+        public static func union(_ members: [SimpleType]) -> SimpleType {
+            SimpleType(base: .string, variety: .union(members))
         }
 
         /// Whether `lexical` is a valid value of this type.
@@ -64,6 +86,37 @@ public extension PureXML.Schema {
         /// A description of the first constraint `lexical` violates, or nil when it
         /// is valid.
         public func validate(_ lexical: String) -> String? {
+            switch variety {
+            case .atomic: validateAtomic(lexical)
+            case let .list(item): validateList(lexical, item: item)
+            case let .union(members): validateUnion(lexical, members: members)
+            }
+        }
+
+        private func validateList(_ lexical: String, item: SimpleType) -> String? {
+            let normalized = Self.process(lexical, whiteSpace: facets.whiteSpace ?? .collapse)
+            let tokens = normalized.isEmpty ? [] : normalized.split(separator: " ").map(String.init)
+            for token in tokens {
+                if let error = item.validate(token) { return error }
+            }
+            if let exact = facets.length, tokens.count != exact { return "list length \(tokens.count) is not \(exact)" }
+            if let minimum = facets.minLength, tokens.count < minimum { return "list length \(tokens.count) is below \(minimum)" }
+            if let maximum = facets.maxLength, tokens.count > maximum { return "list length \(tokens.count) is above \(maximum)" }
+            if let error = patternError(normalized) { return error }
+            if let enumeration = facets.enumeration, !enumeration.contains(normalized) {
+                return "'\(normalized)' is not in the enumeration"
+            }
+            return nil
+        }
+
+        private func validateUnion(_ lexical: String, members: [SimpleType]) -> String? {
+            for member in members where member.validate(lexical) == nil {
+                return nil
+            }
+            return "'\(lexical)' does not match any member type of the union"
+        }
+
+        private func validateAtomic(_ lexical: String) -> String? {
             let value = Self.process(lexical, whiteSpace: facets.whiteSpace ?? base.whiteSpace)
             let primitive = base.primitive
             guard primitive.isValid(value) else {
