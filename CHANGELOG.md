@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Push / feed streaming API (#1), the last epic. A resumable scanner reports a
+  token only once its terminator is fully buffered and otherwise signals
+  need-more (the Expat `XML_TOK_PARTIAL` model), so `PureXML.Parsing.PushParser`
+  parses input fed in arbitrary chunks with `feed(_:)`/`finish()`, driving a
+  `SAXHandler`, while retaining only the current incomplete token plus the
+  open-element stack. `PureXML.events(feeding:)` exposes an `AsyncThrowingStream`
+  of events over any async sequence of text chunks. Splitting a document at any
+  byte boundary, down to one character per feed, yields identical events.
 - HTML parser and serializer (#20, the libxml2 `HTMLparser.h`/`HTMLtree.h`
   model). `PureXML.HTML.parse` reads tag-soup HTML leniently (case-insensitive
   tags; quoted, unquoted, and boolean attributes; comments; doctype; character
