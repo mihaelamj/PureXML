@@ -48,7 +48,10 @@ extension PureXML.XSLT {
         fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?) -> Template? {
             stylesheet.templates.enumerated()
                 .filter { $0.element.mode == mode && ($0.element.match.map { matches(node, $0) } ?? false) }
-                .max { lhs, rhs in (lhs.element.priority, lhs.offset) < (rhs.element.priority, rhs.offset) }?
+                .max { lhs, rhs in
+                    (lhs.element.importPrecedence, lhs.element.priority, lhs.offset)
+                        < (rhs.element.importPrecedence, rhs.element.priority, rhs.offset)
+                }?
                 .element
         }
 
@@ -222,6 +225,10 @@ extension PureXML.XSLT.Transformer {
             copyInstruction(body, context)
         case let .number(count, _, format):
             [.node(.text(PureXML.XSLT.Numbering.value(of: context.node, count: count, format: format)))]
+        case let .comment(body):
+            [.node(.comment(Self.text(of: instantiate(body, context))))]
+        case let .processingInstruction(name, body):
+            [.node(.processingInstruction(target: avt(name, context), data: Self.text(of: instantiate(body, context))))]
         default:
             []
         }
@@ -356,10 +363,11 @@ public extension PureXML.XSLT {
         options: PureXML.Emitting.Options = .compact,
         documentLoader: @escaping (String) -> String? = { _ in nil },
     ) throws -> String {
-        try PureXML.serialize(
-            transformToNode(stylesheet: stylesheet, source: source, documentLoader: documentLoader),
-            options: options,
-        )
+        let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
+        let root = try PureXML.parseTree(source)
+        let result = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
+        if sheet.output.method == "text" { return textValue(of: result) }
+        return PureXML.serialize(result, options: options.applying(sheet.output))
     }
 
     /// Transforms `source` with `stylesheet`, returning the result tree.
@@ -368,8 +376,19 @@ public extension PureXML.XSLT {
         source: String,
         documentLoader: @escaping (String) -> String? = { _ in nil },
     ) throws -> PureXML.Model.Node {
-        let sheet = try XSLTParser.parse(stylesheet)
+        let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source)
         return Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
+    }
+
+    /// The concatenated text content of a result tree, for the `text` output
+    /// method: character data only, with markup, comments, and PIs dropped.
+    private static func textValue(of node: PureXML.Model.Node) -> String {
+        switch node {
+        case let .text(value), let .cdata(value): value
+        case let .document(children): children.map(textValue).joined()
+        case let .element(element): element.children.map(textValue).joined()
+        case .comment, .processingInstruction: ""
+        }
     }
 }

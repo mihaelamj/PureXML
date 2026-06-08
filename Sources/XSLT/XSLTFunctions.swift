@@ -183,3 +183,18 @@ extension PureXML.XSLT {
         }
     }
 }
+
+extension PureXML.Emitting.Options {
+    /// These options with an `xsl:output`'s settings layered over them. Only an
+    /// explicit setting overrides; unspecified `xsl:output` attributes leave the
+    /// caller's corresponding option untouched.
+    func applying(_ output: PureXML.XSLT.Output) -> Self {
+        var copy = self
+        if let indent = output.indent { copy.prettyPrint = indent }
+        if let omit = output.omitXMLDeclaration { copy.includeXMLDeclaration = !omit }
+        if let encoding = output.encoding { copy.encodingName = encoding }
+        if let version = output.version { copy.xmlVersion = version }
+        if let standalone = output.standalone { copy.standalone = standalone }
+        return copy
+    }
+}

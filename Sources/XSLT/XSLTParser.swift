@@ -44,25 +44,71 @@ extension PureXML.XSLT {
     /// vocabulary is recognized by namespace or the `xsl` prefix; other elements
     /// are literal result elements.
     enum XSLTParser {
-        static func parse(_ xsl: String) throws -> Stylesheet {
+        static func parse(_ xsl: String, loader: (String) -> String? = { _ in nil }) throws -> Stylesheet {
             let root = try PureXML.parseTree(xsl)
+            guard let top = stylesheetElement(root) else { throw XSLTError.notAStylesheet }
+            return compile(top, loader: loader, precedence: 0)
+        }
+
+        private static func stylesheetElement(_ root: Tree) -> Tree? {
             guard let top = XSLTNode.elementChildren(root).first, XSLTNode.isXSL(top),
                   XSLTNode.localName(top) == "stylesheet" || XSLTNode.localName(top) == "transform"
             else {
-                throw XSLTError.notAStylesheet
+                return nil
             }
+            return top
+        }
+
+        /// Compiles a stylesheet element, recursively folding in `xsl:include`
+        /// (same import precedence) and `xsl:import` (one lower) resolved through
+        /// `loader`.
+        private static func compile(_ top: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
             var templates: [Template] = []
             var globals: [Instruction] = []
             var keys: [Key] = []
+            var output = Output()
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
                 switch XSLTNode.localName(child) {
-                case "template": templates.append(template(child))
+                case "template": templates.append(template(child, precedence: precedence))
                 case "variable", "param": globals.append(variable(child))
                 case "key": keys.append(key(child))
+                case "output": output = output.merged(with: parseOutput(child))
+                case "include":
+                    guard let sub = load(child, loader: loader, precedence: precedence) else { break }
+                    templates += sub.templates
+                    globals += sub.globals
+                    keys += sub.keys
+                    output = output.merged(with: sub.output)
+                case "import":
+                    guard let sub = load(child, loader: loader, precedence: precedence - 1) else { break }
+                    templates += sub.templates
+                    globals = sub.globals + globals
+                    keys += sub.keys
+                    output = sub.output.merged(with: output)
                 default: break
                 }
             }
-            return Stylesheet(templates: templates, globals: globals, keys: keys)
+            return Stylesheet(templates: templates, globals: globals, keys: keys, output: output)
+        }
+
+        private static func load(_ node: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet? {
+            guard let href = XSLTNode.attribute(node, "href"), let text = loader(href),
+                  let root = try? PureXML.parseTree(text), let top = stylesheetElement(root)
+            else {
+                return nil
+            }
+            return compile(top, loader: loader, precedence: precedence)
+        }
+
+        private static func parseOutput(_ node: Tree) -> Output {
+            Output(
+                method: XSLTNode.attribute(node, "method"),
+                indent: XSLTNode.attribute(node, "indent").map { $0 == "yes" },
+                omitXMLDeclaration: XSLTNode.attribute(node, "omit-xml-declaration").map { $0 == "yes" },
+                encoding: XSLTNode.attribute(node, "encoding"),
+                version: XSLTNode.attribute(node, "version"),
+                standalone: XSLTNode.attribute(node, "standalone").map { $0 == "yes" },
+            )
         }
 
         private static func key(_ node: Tree) -> Key {
@@ -75,7 +121,7 @@ extension PureXML.XSLT {
 
         // MARK: Templates
 
-        private static func template(_ node: Tree) -> Template {
+        private static func template(_ node: Tree, precedence: Int) -> Template {
             let match = XSLTNode.attribute(node, "match")
             let priority = XSLTNode.attribute(node, "priority").flatMap(Double.init)
                 ?? match.map(defaultPriority) ?? 0
@@ -88,6 +134,7 @@ extension PureXML.XSLT {
                 name: XSLTNode.attribute(node, "name"),
                 mode: XSLTNode.attribute(node, "mode"),
                 priority: priority,
+                importPrecedence: precedence,
                 parameters: parameters,
                 body: body,
             )
@@ -174,6 +221,10 @@ extension PureXML.XSLT {
                     from: XSLTNode.attribute(node, "from"),
                     format: XSLTNode.attribute(node, "format") ?? "1",
                 )
+            case "comment":
+                .comment(body: body(node))
+            case "processing-instruction":
+                .processingInstruction(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
             default:
                 nil
             }
