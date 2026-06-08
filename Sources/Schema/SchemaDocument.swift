@@ -2,10 +2,20 @@ public extension PureXML.Schema {
     /// An error compiling or applying a schema.
     enum SchemaError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
         case notASchema
+        /// A type derives from a base that declares that derivation method `final`.
+        case finalViolation(type: String, base: String, method: String)
+        /// A type inside `xs:redefine` does not redefine itself: its restriction or
+        /// extension base must name the type it redefines.
+        case redefineIncompatible(type: String)
 
         public var description: String {
             switch self {
-            case .notASchema: "the document is not an xs:schema"
+            case .notASchema:
+                "the document is not an xs:schema"
+            case let .finalViolation(type, base, method):
+                "type '\(type)' derives from '\(base)' by \(method), which '\(base)' declares final"
+            case let .redefineIncompatible(type):
+                "redefined type '\(type)' must derive from itself"
             }
         }
     }
@@ -18,6 +28,10 @@ public extension PureXML.Schema {
         private let constraints: [String: [IdentityConstraint]]
         private let nillableElements: Set<String>
         private let elementConstraints: [String: ValueConstraint]
+        private let abstractTypes: Set<String>
+        private let abstractElements: Set<String>
+        private let typeBlock: [String: Set<DerivationMethod>]
+        private let typeDerivation: [String: TypeDerivation]
 
         /// Compiles a schema document. `schemaLoader` resolves the
         /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
@@ -31,6 +45,10 @@ public extension PureXML.Schema {
             constraints = compiled.constraints
             nillableElements = compiled.nillableElements
             elementConstraints = compiled.elementConstraints
+            abstractTypes = compiled.abstractTypes
+            abstractElements = compiled.abstractElements
+            typeBlock = compiled.typeBlock
+            typeDerivation = compiled.typeDerivation
         }
 
         /// Validates an instance document against the schema, returning one located
@@ -49,12 +67,20 @@ public extension PureXML.Schema {
             guard let declaration = elements[root.name.localName] else {
                 return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [])]
             }
+            // An abstract element may not appear in an instance directly; only a
+            // concrete substitution-group member may stand in its place.
+            if abstractElements.contains(root.name.localName) {
+                return [.init(reason: "abstract element '\(root.name.localName)' must not appear in an instance", at: [.element(root.name.description)])]
+            }
             let context = PureXML.Validation.XSDContext(
                 types: types,
                 constraints: constraints,
                 rootDeclaration: declaration,
                 nillableElements: nillableElements,
                 elementConstraints: elementConstraints,
+                abstractTypes: abstractTypes,
+                typeBlock: typeBlock,
+                typeDerivation: typeDerivation,
             )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
         }

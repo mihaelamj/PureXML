@@ -44,7 +44,7 @@ struct XSDImportTests {
         <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
           <xs:redefine schemaLocation="base.xsd">
             <xs:simpleType name="quantity">
-              <xs:restriction base="xs:integer"><xs:maxInclusive value="10"/></xs:restriction>
+              <xs:restriction base="quantity"><xs:maxInclusive value="10"/></xs:restriction>
             </xs:simpleType>
           </xs:redefine>
           <xs:element name="q" type="quantity"/>

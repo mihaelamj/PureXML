@@ -105,6 +105,17 @@ extension PureXML.Schema {
         var nillableElements: Set<String> = []
         /// The `default`/`fixed` value constraint declared on each element name.
         var elementConstraints: [String: ValueConstraint] = [:]
+        /// Local names of complex types declared `abstract="true"`: an element of
+        /// such a type must supply an `xsi:type` naming a concrete derived type.
+        var abstractTypes: Set<String> = []
+        /// Local names of element declarations declared `abstract="true"`: they may
+        /// not appear in an instance directly, only through a substitution member.
+        var abstractElements: Set<String> = []
+        /// Derivation methods the named type forbids when used through `xsi:type`.
+        var typeBlock: [String: Set<DerivationMethod>] = [:]
+        /// Each named complex type's base type and derivation method, the backbone
+        /// the `block` check walks from an `xsi:type` to its declared type.
+        var typeDerivation: [String: TypeDerivation] = [:]
     }
 
     /// The parsing context: the named simple types resolved so far, plus the
@@ -114,17 +125,32 @@ extension PureXML.Schema {
         var simpleTypes: [String: SimpleType]
         var attributeGroups: [String: XSDTree]
         var groups: [String: XSDTree]
+        /// Named complex-type definition nodes, so a `complexContent` derivation can
+        /// resolve and compose its base type's content model and attributes.
+        var complexTypeNodes: [String: XSDTree] = [:]
         /// The schema's target namespace, for resolving `##other`/`##targetNamespace`
         /// in wildcard constraints.
         var targetNamespace: String?
         /// Each substitution-group head maps to its transitive member element
         /// names, so an `xs:element ref` to a head also admits its members.
         var substitutions: [String: [String]] = [:]
+        /// Local names of element declarations declared `abstract="true"`, so a
+        /// reference to an abstract head expands to its members but not the head.
+        var abstractElements: Set<String> = []
         var visitingGroups: Set<String> = []
+        /// Named complex types being resolved up the current `complexContent`
+        /// derivation chain, a guard against a cyclic base reference.
+        var visitingTypes: Set<String> = []
 
         func visiting(_ group: String) -> XSDContext {
             var copy = self
             copy.visitingGroups.insert(group)
+            return copy
+        }
+
+        func visitingType(_ type: String) -> XSDContext {
+            var copy = self
+            copy.visitingTypes.insert(type)
             return copy
         }
     }
