@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT 1.0 transformation engine, completing #3. `PureXML.XSLT.transform`
+  applies a stylesheet to a source document by the XSLT processing model: it
+  matches each node to the highest-priority template (or the built-in rules) and
+  instantiates the template's sequence constructor. Implements `apply-templates`
+  (with template dispatch and `sort`), `value-of`, `for-each`, `if`, `choose`,
+  `element`, `attribute`, `copy`, `copy-of`, `call-template`, `variable`, literal
+  result elements, and attribute value templates, all over the existing XPath
+  engine. The identity transform round-trips a document including its attributes.
 - XSLT 1.0 stylesheet model and parser (toward #3). `PureXML.XSLT` gains a
   stylesheet model (template rules with match patterns and computed default
   priorities, the instruction sequence constructor, attribute value templates)
