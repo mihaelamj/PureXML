@@ -55,8 +55,9 @@ fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out
 and external resolution is opt-in through an injected resolver so XXE stays closed.
 
 The original epics and the documented-subset parity work (#61) are all shipped
-(summarized above). A read-only conformance audit then surfaced the remaining
-depth gaps versus libxml2, tracked under one epic with per-subsystem children:
+(summarized above). The current focus is the differentiator: fault-tolerant
+reading and a rich, composable validation layer (#92). A read-only conformance
+audit also surfaced the remaining depth gaps versus libxml2 (#71):
 
 ```mermaid
 flowchart TB
@@ -64,7 +65,9 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Validation["#92 OpenAPIKit-idiom validation framework + recovering reader: read invalid documents without crashing, return rich located results"]:::epic
   Gaps["#71 Beyond-parity libxml2 gaps: DTD entities/defaulting (#72 #73), parser breadth (#74), XSD instance/derivation/wildcards/namespaces (#75 #76 #77 #78), RELAX NG + Schematron (#79 #80), XSLT elements/functions (#81 #82), HTML5 full tree (#83 #84), C14N/catalog/XInclude (#85 #86 #87), XPath/XPointer (#88), regex (#89), DOM/serialization (#90 #91)"]:::epic
+  Validation --> Gaps
 ```
 
 ## Status

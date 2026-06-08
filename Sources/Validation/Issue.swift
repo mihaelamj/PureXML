@@ -14,3 +14,5 @@ public extension PureXML.Validation {
         }
     }
 }
+
+extension PureXML.Validation.Issue: Swift.Error {}
