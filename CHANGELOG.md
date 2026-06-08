@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:message` (#81). The message body is instantiated as diagnostic text;
+  `terminate="yes"` aborts the transformation with that text as an
+  `XSLTError.terminated`, and processing stops at that point. A non-terminating
+  message produces no result-tree output.
 - XSLT `xsl:strip-space` / `xsl:preserve-space` (#81). Whitespace-only text nodes
   are removed from the source tree for elements named by `strip-space` before
   transformation, with `preserve-space` and a more specific name test winning over

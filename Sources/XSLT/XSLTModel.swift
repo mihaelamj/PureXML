@@ -59,6 +59,9 @@ public extension PureXML.XSLT {
         /// `xsl:processing-instruction` whose target is `name` and whose data is
         /// the instantiated body.
         case processingInstruction(name: ValueTemplate, body: [Instruction])
+        /// `xsl:message`: instantiates its body as a diagnostic. `terminate` ends
+        /// the transformation with that text; it produces no result-tree output.
+        case message(terminate: Bool, body: [Instruction])
     }
 
     /// The `xsl:output` controls that shape serialization: the output method, and
