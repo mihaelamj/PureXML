@@ -16,20 +16,32 @@ public extension PureXML.Schema {
     /// path, and the results are ``PureXML/Validation/ValidationError`` values.
     struct ComplexValidator {
         /// The named type table that `ElementType.typeReference` resolves against.
-        private let types: [String: ElementType]
+        let types: [String: ElementType]
         /// Local names of elements declared `nillable="true"`.
         private let nillableElements: Set<String>
         /// The `default`/`fixed` value constraint declared on each element name.
         private let elementConstraints: [String: ValueConstraint]
+        /// Local names of complex types declared `abstract="true"`.
+        let abstractTypes: Set<String>
+        /// Derivation methods each named type forbids through `xsi:type`.
+        let typeBlock: [String: Set<DerivationMethod>]
+        /// Each named complex type's base and derivation method.
+        let typeDerivation: [String: TypeDerivation]
 
         public init(
             types: [String: ElementType] = [:],
             nillableElements: Set<String> = [],
             elementConstraints: [String: ValueConstraint] = [:],
+            abstractTypes: Set<String> = [],
+            typeBlock: [String: Set<DerivationMethod>] = [:],
+            typeDerivation: [String: TypeDerivation] = [:],
         ) {
             self.types = types
             self.nillableElements = nillableElements
             self.elementConstraints = elementConstraints
+            self.abstractTypes = abstractTypes
+            self.typeBlock = typeBlock
+            self.typeDerivation = typeDerivation
         }
 
         /// Validates `element` against `type` at `path`, one error per violation.
@@ -225,7 +237,17 @@ public extension PureXML.Schema {
         ) {
             // An instance `xsi:type` overrides the declared type, provided the named
             // type exists in the schema. Resolve to the type itself rather than a
-            // reference so re-entry does not re-read the same xsi:type.
+            // reference so re-entry does not re-read the same xsi:type. A `block` on
+            // the declared type can forbid the substitution; an abstract declared
+            // type requires one.
+            if let blocked = blockedSubstitutionError(declared: declared, child: child, at: path) {
+                errors.append(blocked)
+                return
+            }
+            if case let .typeReference(name) = declared, let missing = abstractTypeError(named: name, child: child, at: path) {
+                errors.append(missing)
+                return
+            }
             var declared = declared
             if let overriding = Self.xsiTypeName(child), let resolved = types[overriding] {
                 declared = resolved
@@ -253,139 +275,5 @@ public extension PureXML.Schema {
                 validateChild(child, against: resolved, at: path, into: &errors)
             }
         }
-    }
-}
-
-extension PureXML.Schema.ComplexValidator {
-    // MARK: Helpers
-
-    /// The coding-path step for each child: its name, with a sibling index only
-    /// when more than one child shares that name.
-    static func childSteps(_ children: [PureXML.Model.Element]) -> [PureXML.Validation.PathKey] {
-        var totals: [String: Int] = [:]
-        for child in children {
-            totals[child.name.description, default: 0] += 1
-        }
-        var seen: [String: Int] = [:]
-        return children.map { child in
-            let name = child.name.description
-            let index = (seen[name] ?? 0) + 1
-            seen[name] = index
-            return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
-        }
-    }
-
-    /// Validates an `all` group order-independently: every child matches a
-    /// member within its occurrence bounds, and each member meets its minimum.
-    fileprivate static func matchesAll(_ group: XSDGroup, names: [PureXML.Model.QualifiedName]) -> Bool {
-        var counts = [Int](repeating: 0, count: group.particles.count)
-        for name in names {
-            guard let index = group.particles.indices.first(where: { position in
-                let member = group.particles[position]
-                let room = member.maxOccurs.map { counts[position] < $0 } ?? true
-                return room && label(of: member.term).matches(name)
-            }) else { return false }
-            counts[index] += 1
-        }
-        for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
-            return false
-        }
-        return true
-    }
-
-    fileprivate static func label(of term: XSDTerm) -> XSDTermLabel {
-        switch term {
-        case let .element(name, _): .name(name)
-        case let .wildcard(wildcard): .wildcard(wildcard)
-        case .group: .wildcard(XSDWildcard())
-        }
-    }
-
-    /// The `processContents` of a wildcard reachable in `term`, if the content
-    /// model contains one.
-    fileprivate static func wildcard(in term: XSDTerm) -> XSDProcessContents? {
-        switch term {
-        case let .wildcard(wildcard):
-            return wildcard.processContents
-        case let .group(group):
-            for member in group.particles {
-                if let found = wildcard(in: member.term) { return found }
-            }
-            return nil
-        case .element:
-            return nil
-        }
-    }
-
-    fileprivate static func elementTypes(in term: XSDTerm) -> [String: XSDElementType] {
-        var result: [String: XSDElementType] = [:]
-        collectTypes(term, into: &result)
-        return result
-    }
-
-    fileprivate static func collectTypes(_ term: XSDTerm, into result: inout [String: XSDElementType]) {
-        switch term {
-        case let .element(name, type):
-            if let type { result[key(name)] = type }
-        case let .group(group):
-            for member in group.particles {
-                collectTypes(member.term, into: &result)
-            }
-        case .wildcard:
-            break
-        }
-    }
-
-    static func key(_ name: PureXML.Model.QualifiedName) -> String {
-        "{\(name.namespaceURI ?? "")}\(name.localName)"
-    }
-
-    static func textContent(_ element: PureXML.Model.Element) -> String {
-        let text = element.children.reduce(into: "") { result, child in
-            switch child {
-            case let .text(value), let .cdata(value): result += value
-            default: break
-            }
-        }
-        return text.trimmingXMLWhitespace()
-    }
-
-    static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
-        attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
-    }
-
-    /// Whether an attribute belongs to the XML Schema instance namespace
-    /// (`xsi:type`, `xsi:nil`, and the schema-location hints), which are
-    /// processing directives rather than declared attributes.
-    static func isSchemaInstanceAttribute(_ attribute: PureXML.Model.Attribute) -> Bool {
-        attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi"
-    }
-
-    /// The local name of an element's `xsi:type` attribute value, or nil when it
-    /// carries none. Recognizes the attribute by the XML Schema instance
-    /// namespace or, failing namespace resolution, the conventional `xsi` prefix.
-    static func xsiTypeName(_ element: PureXML.Model.Element) -> String? {
-        let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
-        let match = element.attributes.first { attribute in
-            attribute.name.localName == "type"
-                && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
-        }
-        return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
-    }
-}
-
-extension PureXML.Schema.ComplexValidator {
-    /// Whether the element carries `xsi:nil="true"`.
-    static func isNil(_ element: PureXML.Model.Element) -> Bool {
-        element.attributes.contains { attribute in
-            attribute.name.localName == "nil"
-                && (attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi")
-                && attribute.value == "true"
-        }
-    }
-
-    /// Whether the element has any child element or non-whitespace text.
-    static func hasContent(_ element: PureXML.Model.Element) -> Bool {
-        !textContent(element).isEmpty || element.children.contains { if case .element = $0 { true } else { false } }
     }
 }

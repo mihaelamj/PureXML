@@ -8,6 +8,9 @@ public extension PureXML.Validation {
         public let rootDeclaration: PureXML.Schema.ElementType?
         public let nillableElements: Set<String>
         public let elementConstraints: [String: PureXML.Schema.ValueConstraint]
+        public let abstractTypes: Set<String>
+        public let typeBlock: [String: Set<PureXML.Schema.DerivationMethod>]
+        public let typeDerivation: [String: PureXML.Schema.TypeDerivation]
 
         public init(
             types: [String: PureXML.Schema.ElementType],
@@ -15,12 +18,18 @@ public extension PureXML.Validation {
             rootDeclaration: PureXML.Schema.ElementType?,
             nillableElements: Set<String> = [],
             elementConstraints: [String: PureXML.Schema.ValueConstraint] = [:],
+            abstractTypes: Set<String> = [],
+            typeBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
+            typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:],
         ) {
             self.types = types
             self.constraints = constraints
             self.rootDeclaration = rootDeclaration
             self.nillableElements = nillableElements
             self.elementConstraints = elementConstraints
+            self.abstractTypes = abstractTypes
+            self.typeBlock = typeBlock
+            self.typeDerivation = typeDerivation
         }
     }
 
@@ -42,6 +51,9 @@ public extension PureXML.Validation {
                         types: context.document.types,
                         nillableElements: context.document.nillableElements,
                         elementConstraints: context.document.elementConstraints,
+                        abstractTypes: context.document.abstractTypes,
+                        typeBlock: context.document.typeBlock,
+                        typeDerivation: context.document.typeDerivation,
                     )
                     .validate(root, as: declaration, at: [.element(root.name.description)])
                 },
