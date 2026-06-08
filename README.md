@@ -41,6 +41,8 @@ flowchart TB
   Query["Query + validation shipped: #21 #22 #23 query, #30 regex, #2 XSD/RELAX NG, #25 Schematron"]:::done
   Transform["Transform + HTML shipped: #3 XSLT, #20 HTML, #24 XInclude, #26 C14N, #27 Catalog"]:::done
   Parity["Parity completion shipped: #61 (XSLT keys/output, XSD union/import/identity, RELAX NG compact, HTML5 doc structure, C14N 2.0 trim)"]:::done
+  Validator["Validation framework + recovering reader shipped: #92 (one located severity-aware ValidationError, never-crash read)"]:::done
+  Editor["Editor integration shipped: #94 (source spans, unified lint, schema completions, structured quick-fixes)"]:::done
   LDone --> LReview
   LReview --> LEpic
   LEpic --> LTodo
@@ -54,10 +56,10 @@ remaining libxml2 surface is tracked as epics. Deliberate non-goals: network
 fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out,
 and external resolution is opt-in through an injected resolver so XXE stays closed.
 
-The original epics and the documented-subset parity work (#61) are all shipped
-(summarized above). The current focus is the differentiator: fault-tolerant
-reading and a rich, composable validation layer (#92). A read-only conformance
-audit also surfaced the remaining depth gaps versus libxml2 (#71):
+The original epics, the documented-subset parity work (#61), the validation
+framework and recovering reader (#92), and the editor-integration layer (#94)
+are all shipped (summarized above). The remaining work is the depth gaps versus
+libxml2 a read-only conformance audit surfaced (#71):
 
 ```mermaid
 flowchart TB
@@ -65,11 +67,7 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Validation["#92 OpenAPIKit-idiom validation framework + recovering reader: read invalid documents without crashing, return rich located results"]:::epic
-  Editor["#94 Editor integration: source spans on the tree, unified lint, expected-here, so findings map to screen positions"]:::epic
   Gaps["#71 Beyond-parity libxml2 gaps: DTD entities/defaulting (#72 #73), parser breadth (#74), XSD instance/derivation/wildcards/namespaces (#75 #76 #77 #78), RELAX NG + Schematron (#79 #80), XSLT elements/functions (#81 #82), HTML5 full tree (#83 #84), C14N/catalog/XInclude (#85 #86 #87), XPath/XPointer (#88), regex (#89), DOM/serialization (#90 #91)"]:::epic
-  Validation --> Editor
-  Editor --> Gaps
 ```
 
 ## Status
