@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RELAX NG conformance: `datatypeLibrary`, value-space `<value>`, name-class
+  subtraction, and compact-syntax breadth (#79). The in-scope `datatypeLibrary`
+  is now inherited from the nearest ancestor; the default library defines only
+  `string` and `token`, the W3C XML Schema library defines the full built-in set,
+  and a type no in-scope library defines is an unknown datatype, so its `<data>`
+  or `<value>` matches nothing rather than validating silently. A `<value>`
+  carries its datatype and compares in that type's value space, so `1` equals
+  `01` and `1.5` equals `1.50`, booleans treat `1`/`true` and `0`/`false` as
+  equal, and `string`/`token` compare by their whitespace-normalized form. A new
+  `nsNameExcept` name class backs `<nsName>` with `<except>` and the compact
+  `prefix:* - name` subtraction. The compact parser also skips `[ … ]`
+  annotations, treats `div { … }` as transparent grouping, and folds `~` string
+  concatenation.
 - XSLT template parameters and modes (toward full parity, #61). `xsl:param`
   declarations (with defaults), `xsl:with-param` on `apply-templates` and
   `call-template`, and `mode` on templates and `apply-templates` are now honored:
