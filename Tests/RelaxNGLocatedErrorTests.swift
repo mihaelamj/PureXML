@@ -90,6 +90,19 @@ struct RelaxNGLocatedErrorTests {
         """
         let found = try reasons(rng, "<n>abc</n>")
         #expect(found.contains { $0.contains("<n>") })
+        // The message quotes the offending value and names the expected datatype.
+        #expect(found.contains { $0.contains("'abc'") && $0.contains("integer") })
+    }
+
+    @Test("A value mismatch quotes both the actual text and the required literal")
+    func test_valueMismatchDetail() throws {
+        let rng = """
+        <element name="flag" xmlns="http://relaxng.org/ns/structure/1.0">
+          <value>on</value>
+        </element>
+        """
+        let found = try reasons(rng, "<flag>off</flag>")
+        #expect(found.contains { $0.contains("'off'") && $0.contains("'on'") })
     }
 
     @Test("The validation() value composes with the framework like the other validators")
