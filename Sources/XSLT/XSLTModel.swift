@@ -136,12 +136,34 @@ public extension PureXML.XSLT {
         public var body: [Instruction]
     }
 
-    /// A compiled stylesheet: its template rules, global variables, keys, and
-    /// output controls (with `xsl:include`/`xsl:import` already folded in).
+    /// A compiled stylesheet: its template rules, global variables, keys, output
+    /// controls, and the `xsl:strip-space`/`xsl:preserve-space` name tests (with
+    /// `xsl:include`/`xsl:import` already folded in).
     struct Stylesheet: Sendable {
         public var templates: [Template]
         public var globals: [Instruction]
         public var keys: [Key]
         public var output: Output
+        /// Element name tests whose whitespace-only text children are stripped from
+        /// the source (an NCName, a qualified name, or `*`).
+        public var stripSpace: Set<String>
+        /// Element name tests that keep their whitespace, overriding `stripSpace`.
+        public var preserveSpace: Set<String>
+
+        public init(
+            templates: [Template],
+            globals: [Instruction],
+            keys: [Key],
+            output: Output,
+            stripSpace: Set<String> = [],
+            preserveSpace: Set<String> = [],
+        ) {
+            self.templates = templates
+            self.globals = globals
+            self.keys = keys
+            self.output = output
+            self.stripSpace = stripSpace
+            self.preserveSpace = preserveSpace
+        }
     }
 }

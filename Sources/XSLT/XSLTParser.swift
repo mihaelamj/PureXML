@@ -1,5 +1,33 @@
 private typealias Tree = PureXML.Model.TreeNode
 
+/// The accumulating declarations of a stylesheet as its top-level elements are
+/// compiled, plus the folding of an included or imported sub-stylesheet. File
+/// scope and private.
+private struct Parts {
+    var templates: [PureXML.XSLT.Template] = []
+    var globals: [PureXML.XSLT.Instruction] = []
+    var keys: [PureXML.XSLT.Key] = []
+    var output = PureXML.XSLT.Output()
+    var stripSpace: Set<String> = []
+    var preserveSpace: Set<String> = []
+
+    var stylesheet: PureXML.XSLT.Stylesheet {
+        PureXML.XSLT.Stylesheet(templates: templates, globals: globals, keys: keys, output: output, stripSpace: stripSpace, preserveSpace: preserveSpace)
+    }
+
+    /// Folds a sub-stylesheet in: an import has lower precedence, so its globals
+    /// come before and its output is overridden by this stylesheet's.
+    mutating func fold(_ sub: PureXML.XSLT.Stylesheet?, isImport: Bool) {
+        guard let sub else { return }
+        templates += sub.templates
+        keys += sub.keys
+        stripSpace.formUnion(sub.stripSpace)
+        preserveSpace.formUnion(sub.preserveSpace)
+        globals = isImport ? sub.globals + globals : globals + sub.globals
+        output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
+    }
+}
+
 /// Tree helpers for the XSLT parser. File-scope and private.
 private enum XSLTNode {
     static let namespace = "http://www.w3.org/1999/XSL/Transform"
@@ -63,32 +91,31 @@ extension PureXML.XSLT {
         /// (same import precedence) and `xsl:import` (one lower) resolved through
         /// `loader`.
         private static func compile(_ top: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
-            var templates: [Template] = []
-            var globals: [Instruction] = []
-            var keys: [Key] = []
-            var output = Output()
+            var parts = Parts()
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
-                switch XSLTNode.localName(child) {
-                case "template": templates.append(template(child, precedence: precedence))
-                case "variable", "param": globals.append(variable(child))
-                case "key": keys.append(key(child))
-                case "output": output = output.merged(with: parseOutput(child))
-                case "include":
-                    guard let sub = load(child, loader: loader, precedence: precedence) else { break }
-                    templates += sub.templates
-                    globals += sub.globals
-                    keys += sub.keys
-                    output = output.merged(with: sub.output)
-                case "import":
-                    guard let sub = load(child, loader: loader, precedence: precedence - 1) else { break }
-                    templates += sub.templates
-                    globals = sub.globals + globals
-                    keys += sub.keys
-                    output = sub.output.merged(with: output)
-                default: break
-                }
+                absorb(child, into: &parts, loader: loader, precedence: precedence)
             }
-            return Stylesheet(templates: templates, globals: globals, keys: keys, output: output)
+            return parts.stylesheet
+        }
+
+        private static func absorb(_ child: Tree, into parts: inout Parts, loader: (String) -> String?, precedence: Int) {
+            switch XSLTNode.localName(child) {
+            case "template": parts.templates.append(template(child, precedence: precedence))
+            case "variable", "param": parts.globals.append(variable(child))
+            case "key": parts.keys.append(key(child))
+            case "output": parts.output = parts.output.merged(with: parseOutput(child))
+            case "strip-space": parts.stripSpace.formUnion(elementNames(child))
+            case "preserve-space": parts.preserveSpace.formUnion(elementNames(child))
+            case "include": parts.fold(load(child, loader: loader, precedence: precedence), isImport: false)
+            case "import": parts.fold(load(child, loader: loader, precedence: precedence - 1), isImport: true)
+            default: break
+            }
+        }
+
+        /// The whitespace-separated element name tests of an `xsl:strip-space` or
+        /// `xsl:preserve-space` element's `elements` attribute.
+        private static func elementNames(_ node: Tree) -> Set<String> {
+            Set((XSLTNode.attribute(node, "elements") ?? "").split(whereSeparator: \.isWhitespace).map(String.init))
         }
 
         private static func load(_ node: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet? {

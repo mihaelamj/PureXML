@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:strip-space` / `xsl:preserve-space` (#81). Whitespace-only text nodes
+  are removed from the source tree for elements named by `strip-space` before
+  transformation, with `preserve-space` and a more specific name test winning over
+  `*`, and `xml:space="preserve"` on a source element or ancestor overriding the
+  stripping. Folded across `xsl:include`/`xsl:import`.
 - DTD located content-model errors. An element whose children break its content
   model now names each stray child individually (`element <x> is not allowed in
   <r>`), and reports a pure order/count violation once with the allowed elements
