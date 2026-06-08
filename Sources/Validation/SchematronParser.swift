@@ -1,3 +1,10 @@
+/// The lets and assertions of an abstract Schematron rule, named by id so an
+/// `<extends>` can pull them into a concrete rule. File-scope and private.
+private struct AbstractRule {
+    let lets: [PureXML.Validation.SchematronLet]
+    let assertions: [PureXML.Validation.SchematronAssertion]
+}
+
 extension PureXML.Validation {
     /// Parses a Schematron schema document into patterns and phases. Namespace
     /// agnostic: it matches the `schema`, `phase`, `active`, `pattern`, `rule`,
@@ -25,16 +32,41 @@ extension PureXML.Validation {
         }
 
         private static func pattern(_ node: PureXML.Model.TreeNode) throws -> SchematronPattern {
-            try SchematronPattern(id: attribute(node, "id"), rules: children(node, localName: "rule").compactMap(rule))
+            let ruleNodes = children(node, localName: "rule")
+            var abstracts: [String: AbstractRule] = [:]
+            for ruleNode in ruleNodes where attribute(ruleNode, "abstract") == "true" {
+                if let id = attribute(ruleNode, "id") {
+                    abstracts[id] = try AbstractRule(lets: ruleLets(ruleNode), assertions: ruleAssertions(ruleNode))
+                }
+            }
+            let rules = try ruleNodes
+                .filter { attribute($0, "abstract") != "true" }
+                .compactMap { try rule($0, abstracts) }
+            return SchematronPattern(id: attribute(node, "id"), rules: rules)
         }
 
-        private static func rule(_ node: PureXML.Model.TreeNode) throws -> SchematronRule? {
+        private static func rule(_ node: PureXML.Model.TreeNode, _ abstracts: [String: AbstractRule]) throws -> SchematronRule? {
             guard let context = attribute(node, "context") else { return nil }
-            let lets = try children(node, localName: "let").compactMap(letBinding)
-            let assertions = try node.children
+            var lets = try ruleLets(node)
+            var assertions = try ruleAssertions(node)
+            // An <extends rule="id"> prepends the abstract rule's lets and
+            // assertions, so the concrete rule extends rather than replaces them.
+            for ext in children(node, localName: "extends") {
+                guard let id = attribute(ext, "rule"), let base = abstracts[id] else { continue }
+                lets = base.lets + lets
+                assertions = base.assertions + assertions
+            }
+            return try SchematronRule(context: PureXML.XPath.Query(contextExpression(context)), lets: lets, assertions: assertions)
+        }
+
+        private static func ruleLets(_ node: PureXML.Model.TreeNode) throws -> [SchematronLet] {
+            try children(node, localName: "let").compactMap(letBinding)
+        }
+
+        private static func ruleAssertions(_ node: PureXML.Model.TreeNode) throws -> [SchematronAssertion] {
+            try node.children
                 .filter { $0.kind == .element && isAssertion($0) }
                 .compactMap(assertion)
-            return try SchematronRule(context: PureXML.XPath.Query(contextExpression(context)), lets: lets, assertions: assertions)
         }
 
         private static func letBinding(_ node: PureXML.Model.TreeNode) throws -> SchematronLet? {
