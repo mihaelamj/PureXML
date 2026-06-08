@@ -65,9 +65,11 @@ public extension PureXML.Emitting {
             case let .element(element):
                 write(element, depth: depth, formatted: formatted, output: &output, stack: &stack)
             case let .text(value):
-                output += Escaping.text(value)
+                output += Escaping.text(value, asciiOnly: options.asciiOnly)
             case let .cdata(value):
-                output += "<![CDATA[\(value)]]>"
+                output += options.cdataAsText
+                    ? Escaping.text(value, asciiOnly: options.asciiOnly)
+                    : "<![CDATA[\(value)]]>"
             case let .comment(value):
                 output += "<!--\(value)-->"
             case let .processingInstruction(target, data):
@@ -88,7 +90,8 @@ public extension PureXML.Emitting {
             output += "<" + element.name.description
             let quote = options.attributeQuote.character
             for attribute in element.attributes {
-                output += " \(attribute.name.description)=\(quote)\(Escaping.attribute(attribute.value, quote: quote))\(quote)"
+                let value = Escaping.attribute(attribute.value, quote: quote, asciiOnly: options.asciiOnly)
+                output += " \(attribute.name.description)=\(quote)\(value)\(quote)"
             }
 
             if element.children.isEmpty, options.selfCloseEmptyElements {

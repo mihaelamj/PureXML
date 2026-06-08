@@ -71,20 +71,21 @@ public extension PureXML.Emitting {
         public mutating func writeAttribute(_ name: String, _ value: String) {
             guard startTagOpen else { return }
             let quote = options.attributeQuote.character
-            output += " \(name)=\(quote)\(Escaping.attribute(value, quote: quote))\(quote)"
+            output += " \(name)=\(quote)\(Escaping.attribute(value, quote: quote, asciiOnly: options.asciiOnly))\(quote)"
         }
 
         /// Writes escaped character data into the current element.
         public mutating func writeString(_ text: String) {
             closeStartTag()
-            output += Escaping.text(text)
+            output += Escaping.text(text, asciiOnly: options.asciiOnly)
             setTopContent(.text)
         }
 
-        /// Writes a `<![CDATA[ ... ]]>` section.
+        /// Writes a `<![CDATA[ ... ]]>` section, or its escaped text when
+        /// `cdataAsText` is set.
         public mutating func writeCData(_ text: String) {
             closeStartTag()
-            output += "<![CDATA[\(text)]]>"
+            output += options.cdataAsText ? Escaping.text(text, asciiOnly: options.asciiOnly) : "<![CDATA[\(text)]]>"
             setTopContent(.text)
         }
 
