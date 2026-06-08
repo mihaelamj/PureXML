@@ -8,6 +8,17 @@ extension PureXML.Validation {
             advance(particle, names, from: [0]).contains(names.count)
         }
 
+        /// Every element name the content model can contain (its alphabet), used to
+        /// tell a stray child from one that is merely out of order or count.
+        static func allowedNames(_ particle: Particle) -> Set<String> {
+            switch particle {
+            case let .name(name, _):
+                [name]
+            case let .sequence(items, _), let .choice(items, _):
+                items.reduce(into: Set<String>()) { $0.formUnion(allowedNames($1)) }
+            }
+        }
+
         /// End positions reachable by matching `particle` (with its occurrence)
         /// once from each given start position.
         private static func advance(_ particle: Particle, _ names: [String], from starts: Set<Int>) -> Set<Int> {

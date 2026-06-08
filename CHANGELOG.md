@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DTD located content-model errors. An element whose children break its content
+  model now names each stray child individually (`element <x> is not allowed in
+  <r>`), and reports a pure order/count violation once with the allowed elements
+  as a hint (`… do not match its content model; allowed: <a>, <b>`), instead of a
+  single opaque message, matching the editor-grade diagnostics of the other
+  validators.
 - XSD located content-model errors. A content-model violation is now placed at
   the offending child with a recovery hint naming what was expected there
   (`element 'x' is not allowed here; expected <b>`, `content is incomplete;
