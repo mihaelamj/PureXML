@@ -116,6 +116,9 @@ extension PureXML.Schema {
         /// Each named complex type's base type and derivation method, the backbone
         /// the `block` check walks from an `xsi:type` to its declared type.
         var typeDerivation: [String: TypeDerivation] = [:]
+        /// The schema's target namespace, so the root element's namespace can be
+        /// checked against it.
+        var targetNamespace: String?
     }
 
     /// The parsing context: the named simple types resolved so far, plus the
@@ -129,8 +132,15 @@ extension PureXML.Schema {
         /// resolve and compose its base type's content model and attributes.
         var complexTypeNodes: [String: XSDTree] = [:]
         /// The schema's target namespace, for resolving `##other`/`##targetNamespace`
-        /// in wildcard constraints.
+        /// in wildcard constraints and qualifying global and qualified-form local
+        /// declarations.
         var targetNamespace: String?
+        /// Whether `elementFormDefault="qualified"`: local element declarations are
+        /// in the target namespace unless their own `form` overrides it.
+        var elementFormQualified: Bool = false
+        /// Whether `attributeFormDefault="qualified"`: local attribute declarations
+        /// are in the target namespace unless their own `form` overrides it.
+        var attributeFormQualified: Bool = false
         /// Each substitution-group head maps to its transitive member element
         /// names, so an `xs:element ref` to a head also admits its members.
         var substitutions: [String: [String]] = [:]

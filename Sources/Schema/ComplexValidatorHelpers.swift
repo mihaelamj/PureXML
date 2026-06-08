@@ -89,6 +89,13 @@ extension PureXML.Schema.ComplexValidator {
         "{\(name.namespaceURI ?? "")}\(name.localName)"
     }
 
+    /// Whether two names match by namespace and local name. Used to match an
+    /// instance attribute against a declared attribute use, so attributes that
+    /// share a local name in different namespaces are kept distinct.
+    static func sameName(_ lhs: PureXML.Model.QualifiedName, _ rhs: PureXML.Model.QualifiedName) -> Bool {
+        lhs.namespaceURI == rhs.namespaceURI && lhs.localName == rhs.localName
+    }
+
     static func textContent(_ element: PureXML.Model.Element) -> String {
         let text = element.children.reduce(into: "") { result, child in
             switch child {
