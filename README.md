@@ -64,7 +64,7 @@ flowchart TB
   TreeApi["#31 Tree manipulation API"]:::epic
   Writer["#32 xmlTextWriter"]:::done
   Reader["#33 xmlTextReader with validation"]:::epic
-  Save["#34 Serialization option parity"]:::epic
+  Save["#34 Serialization option parity"]:::done
   Chars["#35 Character and name validity"]:::done
   Core --> Push
   Core --> Sax
