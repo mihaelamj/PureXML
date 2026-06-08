@@ -52,16 +52,31 @@ private final class RNGCompiler {
             mergeInclude(include)
         }
         for define in RNGNode.children(node, named: "define") {
-            if let name = RNGNode.attribute(define, "name") {
-                defines[name] = combined(RNGNode.elementChildren(define), .sequence)
-            }
+            addDefine(define)
         }
         let start = RNGNode.children(node, named: "start").first
         return start.map { combined(RNGNode.elementChildren($0), .sequence) } ?? .notAllowed
     }
 
+    /// Adds a `define`, honoring `combine`: a second definition of the same name
+    /// with `combine="choice"`/`"interleave"` merges with the existing one rather
+    /// than replacing it (a plain redefinition still replaces).
+    private func addDefine(_ define: Tree) {
+        guard let name = RNGNode.attribute(define, "name") else { return }
+        let pattern = combined(RNGNode.elementChildren(define), .sequence)
+        guard let existing = defines[name] else {
+            defines[name] = pattern
+            return
+        }
+        switch RNGNode.attribute(define, "combine") {
+        case "choice": defines[name] = .choice(existing, pattern)
+        case "interleave": defines[name] = .interleave(existing, pattern)
+        default: defines[name] = pattern
+        }
+    }
+
     /// Merges an `include`d grammar: its `define`s first, then the `include`'s own
-    /// nested `define`s, which override the included ones.
+    /// nested `define`s, which override or (with `combine`) merge with them.
     private func mergeInclude(_ node: Tree) {
         guard let href = RNGNode.attribute(node, "href"), !visited.contains(href),
               let text = loader(href), let root = try? PureXML.parseTree(text),
@@ -71,14 +86,10 @@ private final class RNGCompiler {
         }
         visited.insert(href)
         for define in RNGNode.children(grammar, named: "define") {
-            if let name = RNGNode.attribute(define, "name") {
-                defines[name] = combined(RNGNode.elementChildren(define), .sequence)
-            }
+            addDefine(define)
         }
         for define in RNGNode.children(node, named: "define") {
-            if let name = RNGNode.attribute(define, "name") {
-                defines[name] = combined(RNGNode.elementChildren(define), .sequence)
-            }
+            addDefine(define)
         }
     }
 
