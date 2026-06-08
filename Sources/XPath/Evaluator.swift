@@ -5,7 +5,7 @@ extension PureXML.XPath {
     enum Evaluator {
         /// The full XPath 1.0 function library: the core functions plus the
         /// string, node, and number families.
-        static let library = CoreFunctions.table
+        nonisolated(unsafe) static let library = CoreFunctions.table
             .merging(StringFunctions.table)
             .merging(NodeFunctions.table)
 
@@ -32,13 +32,17 @@ extension PureXML.XPath {
         /// Evaluates a node-set expression against a pre-built tree and returns the
         /// matched tree nodes in document order (attribute and namespace results
         /// are dropped). Lets a caller build the tree once and query it repeatedly.
-        static func nodes(_ expression: Expression, over root: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
+        static func nodes(
+            _ expression: Expression,
+            over root: PureXML.Model.TreeNode,
+            functions: FunctionTable = FunctionTable(),
+        ) -> [PureXML.Model.TreeNode] {
             let context = EvaluationContext(
                 node: .tree(root),
                 position: 1,
                 size: 1,
                 variables: [:],
-                functions: library,
+                functions: library.merging(functions),
             )
             guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
                 return []
@@ -55,13 +59,14 @@ extension PureXML.XPath {
             position: Int,
             size: Int,
             variables: [String: Value],
+            functions: FunctionTable = FunctionTable(),
         ) throws -> Value {
             let context = EvaluationContext(
                 node: .tree(node),
                 position: position,
                 size: size,
                 variables: variables,
-                functions: library,
+                functions: library.merging(functions),
             )
             return try eval(expression, context)
         }

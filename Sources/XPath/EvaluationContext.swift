@@ -1,7 +1,7 @@
 extension PureXML.XPath {
     /// One XPath function: it receives its already-evaluated argument values and
     /// the evaluation context, and returns a value.
-    typealias FunctionImplementation = @Sendable (_ arguments: [Value], _ context: EvaluationContext) throws -> Value
+    typealias FunctionImplementation = (_ arguments: [Value], _ context: EvaluationContext) throws -> Value
 
     /// The evaluation context an expression is evaluated against: the context
     /// node, its position and size within the current node-set, the variable
@@ -29,7 +29,7 @@ extension PureXML.XPath {
 
     /// The XPath function library: a name-to-implementation table. The core set is
     /// built in; further functions extend it.
-    struct FunctionTable: Sendable {
+    struct FunctionTable {
         private var table: [String: FunctionImplementation]
 
         init(_ table: [String: FunctionImplementation] = [:]) {

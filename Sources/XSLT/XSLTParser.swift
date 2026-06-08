@@ -53,14 +53,24 @@ extension PureXML.XSLT {
             }
             var templates: [Template] = []
             var globals: [Instruction] = []
+            var keys: [Key] = []
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
                 switch XSLTNode.localName(child) {
                 case "template": templates.append(template(child))
                 case "variable", "param": globals.append(variable(child))
+                case "key": keys.append(key(child))
                 default: break
                 }
             }
-            return Stylesheet(templates: templates, globals: globals)
+            return Stylesheet(templates: templates, globals: globals, keys: keys)
+        }
+
+        private static func key(_ node: Tree) -> Key {
+            Key(
+                name: XSLTNode.attribute(node, "name") ?? "",
+                match: XSLTNode.attribute(node, "match") ?? "",
+                use: XSLTNode.attribute(node, "use") ?? ".",
+            )
         }
 
         // MARK: Templates
@@ -158,6 +168,12 @@ extension PureXML.XSLT {
                 .element(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
             case "attribute":
                 .attribute(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
+            case "number":
+                .number(
+                    count: XSLTNode.attribute(node, "count"),
+                    from: XSLTNode.attribute(node, "from"),
+                    format: XSLTNode.attribute(node, "format") ?? "1",
+                )
             default:
                 nil
             }

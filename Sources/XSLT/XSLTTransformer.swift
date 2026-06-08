@@ -21,6 +21,15 @@ extension PureXML.XSLT {
     struct Transformer {
         let stylesheet: Stylesheet
         let root: PureXML.Model.TreeNode
+        let documentLoader: (String) -> String?
+        private let keyIndex: PureXML.XSLT.KeyIndex
+
+        init(stylesheet: Stylesheet, root: PureXML.Model.TreeNode, documentLoader: @escaping (String) -> String? = { _ in nil }) {
+            self.stylesheet = stylesheet
+            self.root = root
+            self.documentLoader = documentLoader
+            keyIndex = PureXML.XSLT.Library.buildKeyIndex(stylesheet: stylesheet, root: root)
+        }
 
         fileprivate func run() -> PureXML.Model.Node {
             var variables: [String: PureXML.XPath.Value] = [:]
@@ -133,6 +142,7 @@ extension PureXML.XSLT {
                 position: context.position,
                 size: context.size,
                 variables: context.variables,
+                functions: PureXML.XSLT.Library.table(current: context.node, keys: keyIndex, loader: documentLoader),
             )
         }
 
@@ -210,6 +220,8 @@ extension PureXML.XSLT.Transformer {
             [.attribute(.init(avt(nameTemplate, context), Self.text(of: instantiate(body, context))))]
         case let .copy(body):
             copyInstruction(body, context)
+        case let .number(count, _, format):
+            [.node(.text(PureXML.XSLT.Numbering.value(of: context.node, count: count, format: format)))]
         default:
             []
         }
@@ -334,18 +346,30 @@ extension PureXML.XSLT.Transformer {
 
 public extension PureXML.XSLT {
     /// Transforms `source` with `stylesheet`, returning the serialized result.
+    /// `documentLoader` resolves the URI argument of the `document()` function to
+    /// source text; it returns `nil` (the default) when external documents are
+    /// not available, which keeps `document()` from reaching the filesystem or
+    /// network by default.
     static func transform(
         stylesheet: String,
         source: String,
         options: PureXML.Emitting.Options = .compact,
+        documentLoader: @escaping (String) -> String? = { _ in nil },
     ) throws -> String {
-        try PureXML.serialize(transformToNode(stylesheet: stylesheet, source: source), options: options)
+        try PureXML.serialize(
+            transformToNode(stylesheet: stylesheet, source: source, documentLoader: documentLoader),
+            options: options,
+        )
     }
 
     /// Transforms `source` with `stylesheet`, returning the result tree.
-    static func transformToNode(stylesheet: String, source: String) throws -> PureXML.Model.Node {
+    static func transformToNode(
+        stylesheet: String,
+        source: String,
+        documentLoader: @escaping (String) -> String? = { _ in nil },
+    ) throws -> PureXML.Model.Node {
         let sheet = try XSLTParser.parse(stylesheet)
         let root = try PureXML.parseTree(source)
-        return Transformer(stylesheet: sheet, root: root).run()
+        return Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
     }
 }

@@ -7,7 +7,7 @@ extension PureXML.XPath {
     /// ID, so `id()` matches elements by an attribute named `id` or `xml:id`, the
     /// near-universal convention.
     enum NodeFunctions {
-        static let table = FunctionTable([
+        nonisolated(unsafe) static let table = FunctionTable([
             "local-name": { arguments, context in .string(named(arguments, context)?.localName ?? "") },
             "name": { arguments, context in .string(named(arguments, context)?.description ?? "") },
             "namespace-uri": { arguments, context in .string(named(arguments, context)?.namespaceURI ?? "") },
