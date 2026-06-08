@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSD located content-model errors. A content-model violation is now placed at
+  the offending child with a recovery hint naming what was expected there
+  (`element 'x' is not allowed here; expected <b>`, `content is incomplete;
+  expected <b>`), instead of one opaque "content does not match the content
+  model" per element. An `xs:all` group recovers past each stray child and
+  reports every missing required member, and well-placed children are still
+  validated for their own content, so an editor sees every problem at once. This
+  brings XSD content validation to the same located, recovering standard as the
+  RELAX NG, DTD, and Schematron validators.
 - RELAX NG located, recovering validation errors (#79). Alongside the boolean
   `validate(_:)`, `RelaxNG.errors(in:)` now reports every way a document fails the
   schema as individual located errors (each with a coding path), recovering past
