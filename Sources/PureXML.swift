@@ -42,4 +42,7 @@ public enum PureXML {
 
     /// Regular-expression types (the XML Schema regex flavor).
     public enum Regex {}
+
+    /// XML Schema (XSD) and RELAX NG validation types.
+    public enum Schema {}
 }

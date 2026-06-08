@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSD simple-type datatype library (toward #2 schema validation). The new
+  `PureXML.Schema` namespace validates a lexical value against the XSD Part 2
+  built-in datatypes (`string`, `boolean`, `decimal`, the bounded integer family,
+  `float`/`double`, `duration`, the eight date/time types, `hexBinary`,
+  `base64Binary`, `anyURI`, `QName`, and the `Name`/`NCName`/`NMTOKEN`/`language`
+  family) and the constraining facets (`length`/`minLength`/`maxLength`,
+  `pattern` via the regex engine, `enumeration`, `whiteSpace`,
+  `min`/`maxInclusive`/`Exclusive`, `totalDigits`, `fractionDigits`). Decimals are
+  compared exactly with no floating-point loss, date/time fields are
+  range-validated (leap years, `24:00:00`, timezone bounds), and the integer
+  types enforce their intrinsic bounds.
 - Regular-expression engine (#30, the XML Schema regex flavor, gating XSD). The
   new `PureXML.Regex` namespace compiles a pattern (literals, `.`, character
   classes with ranges and negation, the escapes `\d \D \w \W \s \S \i \I \c \C`,
