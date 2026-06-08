@@ -19,20 +19,28 @@ public extension PureXML.Canonical {
         /// Prefixes always rendered in exclusive mode even when not visibly used
         /// (the `InclusiveNamespaces` PrefixList).
         public var inclusiveNamespacePrefixes: [String]
+        /// The Canonical XML 2.0 `TrimTextNodes` parameter: when true, leading and
+        /// trailing whitespace is stripped from each text node, and a text node
+        /// that is all whitespace is dropped.
+        public var trimTextNodes: Bool
 
         public init(
             mode: Mode = .inclusive,
             includeComments: Bool = false,
             inclusiveNamespacePrefixes: [String] = [],
+            trimTextNodes: Bool = false,
         ) {
             self.mode = mode
             self.includeComments = includeComments
             self.inclusiveNamespacePrefixes = inclusiveNamespacePrefixes
+            self.trimTextNodes = trimTextNodes
         }
 
         /// Inclusive C14N without comments.
         public static let inclusive = Options(mode: .inclusive)
         /// Exclusive C14N without comments.
         public static let exclusive = Options(mode: .exclusive)
+        /// Canonical XML 2.0 with text-node trimming enabled.
+        public static let canonical2 = Options(mode: .inclusive, trimTextNodes: true)
     }
 }

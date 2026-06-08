@@ -33,7 +33,8 @@ public extension PureXML.Canonical {
             case let .element(element):
                 emit(element, inScope: inScope, rendered: rendered, output: &output)
             case let .text(value), let .cdata(value):
-                output += Self.escapeText(value)
+                let text = options.trimTextNodes ? value.trimmingXMLWhitespace() : value
+                output += Self.escapeText(text)
             case let .comment(value):
                 if options.includeComments { output += "<!--\(value)-->" }
             case let .processingInstruction(target, data):
