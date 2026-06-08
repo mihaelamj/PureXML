@@ -108,7 +108,7 @@ flowchart TB
   Xslt["#3 XSLT 1.0"]:::epic
   XInclude["#24 XInclude, URI, xml:base"]:::epic
   C14n["#26 Canonical XML"]:::epic
-  Catalog["#27 XML Catalog"]:::epic
+  Catalog["#27 XML Catalog"]:::done
   Xslt --> C14n
   XInclude --> Catalog
 ```
