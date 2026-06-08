@@ -34,6 +34,9 @@ public extension PureXML.Parsing {
         var reachedEnd = false
         /// The problems found so far, when reading in recovering mode.
         var diagnostics: [Diagnostic] = []
+        /// The source position where the most recently produced event's node began,
+        /// so a pull cursor can report each node's line and column.
+        private(set) var eventStart: Mark = .start
 
         /// Creates a reader over a character-pulling source. The closure returns
         /// the next character or nil at end of input.
@@ -94,6 +97,7 @@ public extension PureXML.Parsing {
                 guard let lead = reader.peek() else {
                     return nil
                 }
+                eventStart = reader.mark
                 if reader.matches("<!--") {
                     return try scanComment()
                 }
@@ -129,6 +133,7 @@ public extension PureXML.Parsing {
             guard let lead = reader.peek() else {
                 throw ParseError.unexpectedEndOfInput(reader.mark)
             }
+            eventStart = reader.mark
             if reader.matches("</") { return try scanEndTag() }
             if reader.matches("<!--") { return try scanComment() }
             if reader.matches("<![CDATA[") { return try scanCDATA() }
