@@ -7,6 +7,7 @@ extension PureXML.Parsing.EventReader {
             throw PureXML.Parsing.ParseError.malformedDeclaration(mark)
         }
         xmlDeclaration = declaration
+        if declaration.version == "1.1" { reader.xml11 = true }
     }
 
     /// The current source offset, used to tell whether a failing ``next()`` made
