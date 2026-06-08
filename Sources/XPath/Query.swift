@@ -38,6 +38,14 @@ public extension PureXML.XPath {
             try Evaluator.value(expression, over: node, variables: variables)
         }
 
+        /// Evaluates the query over a pre-built tree and returns the matched tree
+        /// nodes in document order. Build the tree once (``PureXML/parseTree(_:)``)
+        /// and query it repeatedly; pair with ``value(at:position:size:variables:)``
+        /// to evaluate further expressions relative to each result.
+        public func nodes(over root: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
+            Evaluator.nodes(expression, over: root)
+        }
+
         /// Evaluates the query against an explicit context: a node already in a
         /// tree (``PureXML/Model/TreeNode``), its one-based proximity `position`
         /// within a node-set of `size`, and variable bindings. Downstream engines
