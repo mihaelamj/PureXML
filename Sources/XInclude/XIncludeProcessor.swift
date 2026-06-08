@@ -5,48 +5,65 @@ private struct XIncludeRun {
     typealias Node = PureXML.Model.Node
     typealias Element = PureXML.Model.Element
 
-    let load: (String) -> String?
+    typealias Request = PureXML.XInclude.XIncludeRequest
+
+    let load: (Request) -> String?
     let maxDepth = 30
     let namespace = "http://www.w3.org/2001/XInclude"
 
-    func process(_ node: Node, base: String, depth: Int) throws -> [Node] {
+    func process(_ node: Node, base: String, depth: Int, visited: Set<String>) throws -> [Node] {
         switch node {
         case let .document(children):
-            try [.document(children.flatMap { try process($0, base: base, depth: depth) })]
+            try [.document(children.flatMap { try process($0, base: base, depth: depth, visited: visited) })]
         case let .element(element):
-            try processElement(element, base: base, depth: depth)
+            try processElement(element, base: base, depth: depth, visited: visited)
         default:
             [node]
         }
     }
 
-    private func processElement(_ element: Element, base: String, depth: Int) throws -> [Node] {
+    private func processElement(_ element: Element, base: String, depth: Int, visited: Set<String>) throws -> [Node] {
         if isInclude(element) {
-            return try resolveInclude(element, base: base, depth: depth)
+            return try resolveInclude(element, base: base, depth: depth, visited: visited)
         }
         let elementBase = baseURI(of: element, base: base)
-        let children = try element.children.flatMap { try process($0, base: elementBase, depth: depth) }
+        let children = try element.children.flatMap { try process($0, base: elementBase, depth: depth, visited: visited) }
         return [.element(Element(name: element.name, attributes: element.attributes, children: children))]
     }
 
-    private func resolveInclude(_ element: Element, base: String, depth: Int) throws -> [Node] {
+    private func resolveInclude(_ element: Element, base: String, depth: Int, visited: Set<String>) throws -> [Node] {
         guard depth < maxDepth else { throw PureXML.XInclude.XIncludeError.toodeep }
         let elementBase = baseURI(of: element, base: base)
         guard let href = attribute(element, "href") else {
-            return try fallback(element, base: base, depth: depth, error: .missingHref)
+            return try fallback(element, base: base, depth: depth, visited: visited, error: .missingHref)
         }
         let resolved = PureXML.XInclude.URIReference.resolve(href, against: elementBase)
-        guard let content = load(resolved) else {
-            return try fallback(element, base: base, depth: depth, error: .unresolved(href))
+        let isText = attribute(element, "parse") == "text"
+        let xpointer = attribute(element, "xpointer")
+        if isText, xpointer != nil { throw PureXML.XInclude.XIncludeError.textWithFragment }
+        // A resource already on its own inclusion chain is a cycle.
+        guard !visited.contains(resolved) else { throw PureXML.XInclude.XIncludeError.cycle(resolved) }
+        guard let content = load(request(element, uri: resolved, isText: isText)) else {
+            return try fallback(element, base: base, depth: depth, visited: visited, error: .unresolved(href))
         }
-        if attribute(element, "parse") == "text" {
+        if isText {
             return [.text(content)]
         }
         guard let parsed = try? PureXML.parse(content) else {
-            return try fallback(element, base: base, depth: depth, error: .unresolved(href))
+            return try fallback(element, base: base, depth: depth, visited: visited, error: .unresolved(href))
         }
-        let selected = selectedNodes(from: parsed, xpointer: attribute(element, "xpointer"))
-        return try selected.flatMap { try process($0, base: resolved, depth: depth + 1) }
+        let selected = selectedNodes(from: parsed, xpointer: xpointer)
+        return try selected.flatMap { try process($0, base: resolved, depth: depth + 1, visited: visited.union([resolved])) }
+    }
+
+    private func request(_ element: Element, uri: String, isText: Bool) -> Request {
+        Request(
+            uri: uri,
+            accept: attribute(element, "accept"),
+            acceptLanguage: attribute(element, "accept-language"),
+            encoding: isText ? attribute(element, "encoding") : nil,
+            isText: isText,
+        )
     }
 
     private func selectedNodes(from parsed: Node, xpointer: String?) -> [Node] {
@@ -73,6 +90,7 @@ private struct XIncludeRun {
         _ element: Element,
         base: String,
         depth: Int,
+        visited: Set<String>,
         error: PureXML.XInclude.XIncludeError,
     ) throws -> [Node] {
         guard let fallback = element.children.first(where: isFallback),
@@ -80,7 +98,7 @@ private struct XIncludeRun {
         else {
             throw error
         }
-        return try fallbackElement.children.flatMap { try process($0, base: base, depth: depth) }
+        return try fallbackElement.children.flatMap { try process($0, base: base, depth: depth, visited: visited) }
     }
 
     private func baseURI(of element: Element, base: String) -> String {
@@ -118,8 +136,7 @@ public extension PureXML.XInclude {
         base: String = "",
         loadingURI: @escaping (_ uri: String) -> String?,
     ) throws -> PureXML.Model.Node {
-        let run = XIncludeRun(load: loadingURI)
-        return try run.process(node, base: base, depth: 0).first ?? node
+        try process(node, base: base) { loadingURI($0.uri) }
     }
 
     /// Parses `xml` and processes its `xi:include` elements.
@@ -129,5 +146,31 @@ public extension PureXML.XInclude {
         loadingURI: @escaping (_ uri: String) -> String?,
     ) throws -> PureXML.Model.Node {
         try process(PureXML.parse(xml), base: base, loadingURI: loadingURI)
+    }
+
+    /// Processes `xi:include` elements with a content-negotiation-aware loader: the
+    /// loader receives an ``XIncludeRequest`` carrying the resolved URI plus the
+    /// include's `accept`, `accept-language`, and (for `parse="text"`) `encoding`
+    /// hints, and returns the loaded text or nil to fall back. A resource included
+    /// along its own inclusion chain raises ``XIncludeError/cycle(_:)``; a
+    /// `parse="text"` include carrying an `xpointer` raises
+    /// ``XIncludeError/textWithFragment``.
+    static func process(
+        _ node: PureXML.Model.Node,
+        base: String = "",
+        loading: @escaping (_ request: XIncludeRequest) -> String?,
+    ) throws -> PureXML.Model.Node {
+        let run = XIncludeRun(load: loading)
+        return try run.process(node, base: base, depth: 0, visited: []).first ?? node
+    }
+
+    /// Parses `xml` and processes its `xi:include` elements with a
+    /// content-negotiation-aware loader. See ``process(_:base:loading:)-(Node,_,_)``.
+    static func process(
+        _ xml: String,
+        base: String = "",
+        loading: @escaping (_ request: XIncludeRequest) -> String?,
+    ) throws -> PureXML.Model.Node {
+        try process(PureXML.parse(xml), base: base, loading: loading)
     }
 }

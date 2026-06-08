@@ -73,7 +73,7 @@ struct XIncludeTests {
     func test_unresolved() {
         let xml = "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\"><xi:include href=\"missing.xml\"/></doc>"
         #expect(throws: PureXML.XInclude.XIncludeError.self) {
-            _ = try PureXML.XInclude.process(xml) { _ in nil }
+            _ = try PureXML.XInclude.process(xml, loadingURI: { _ in nil })
         }
     }
 
