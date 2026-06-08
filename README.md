@@ -53,7 +53,17 @@ remaining libxml2 surface is tracked as epics. Deliberate non-goals: network
 fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out,
 and external resolution is opt-in through an injected resolver so XXE stays closed.
 
-Every tracked epic is now shipped; the diagram above summarizes the surface.
+The original epics are all shipped (summarized above). The remaining work is
+closing the documented within-subsystem gaps to reach exhaustive libxml2 parity:
+
+```mermaid
+flowchart TB
+  classDef done fill:#ddf9e4,stroke:#34c759,color:#111827
+  classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
+  classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
+  classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
+  Parity["#61 Full parity completion: XSLT params/keys/output, XSD union/import/identity, RELAX NG compact, HTML5 tree construction, C14N 2.0"]:::epic
+```
 
 ## Status
 

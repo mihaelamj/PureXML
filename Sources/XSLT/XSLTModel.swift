@@ -29,8 +29,9 @@ public extension PureXML.XSLT {
         case literalText(String)
         /// `xsl:value-of`: the string value of an XPath expression.
         case valueOf(select: String)
-        /// `xsl:apply-templates` with an optional node-set selection and sorts.
-        case applyTemplates(select: String?, sorts: [Sort])
+        /// `xsl:apply-templates` with an optional node-set selection, mode, sorts,
+        /// and passed parameters.
+        case applyTemplates(select: String?, mode: String?, sorts: [Sort], parameters: [Binding])
         /// `xsl:for-each` over a node-set.
         case forEach(select: String, sorts: [Sort], body: [Instruction])
         /// `xsl:if`.
@@ -47,8 +48,8 @@ public extension PureXML.XSLT {
         case copy(body: [Instruction])
         /// `xsl:copy-of`: a deep copy of a selected node-set.
         case copyOf(select: String)
-        /// `xsl:call-template` by name.
-        case callTemplate(name: String)
+        /// `xsl:call-template` by name with passed parameters.
+        case callTemplate(name: String, parameters: [Binding])
         /// `xsl:variable` bound for the rest of the sequence constructor.
         case variable(name: String, select: String?, body: [Instruction])
     }
@@ -59,11 +60,22 @@ public extension PureXML.XSLT {
         public var body: [Instruction]
     }
 
-    /// A template rule: a match pattern and/or a name, a priority, and a body.
+    /// A name binding: an `xsl:param` declaration (with a default) or an
+    /// `xsl:with-param` value, supplied either by `select` or by a body.
+    struct Binding: Sendable {
+        public var name: String
+        public var select: String?
+        public var body: [Instruction]
+    }
+
+    /// A template rule: a match pattern and/or a name, a mode, a priority, its
+    /// declared parameters, and a body.
     struct Template: Sendable {
         public var match: String?
         public var name: String?
+        public var mode: String?
         public var priority: Double
+        public var parameters: [Binding]
         public var body: [Instruction]
     }
 
