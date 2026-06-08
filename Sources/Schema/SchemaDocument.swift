@@ -37,9 +37,13 @@ public extension PureXML.Schema {
         /// ``PureXML/Validation/ValidationError`` per violation. Reports an error
         /// when the root element has no global declaration.
         public func validate(_ xml: String) throws -> [PureXML.Validation.ValidationError] {
-            guard case let .document(children) = try PureXML.parse(xml),
-                  let root = children.compactMap(\.element).first
-            else {
+            try validate(PureXML.parse(xml))
+        }
+
+        /// Validates an already-parsed node tree, so a caller can validate the same
+        /// (possibly recovered) tree it is editing. See ``validate(_:)-(String)``.
+        public func validate(_ node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {
+            guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
                 return [.init(reason: "the document has no root element", at: [])]
             }
             guard let declaration = elements[root.name.localName] else {
