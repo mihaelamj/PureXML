@@ -67,6 +67,9 @@ public extension PureXML.XSLT {
         /// `xsl:apply-imports`: re-applies templates to the current node, in the
         /// current mode, considering only templates of lower import precedence.
         case applyImports
+        /// The `xsl:fallback` content of an unrecognized XSLT element, instantiated
+        /// in its place under forwards-compatible processing.
+        case fallback(body: [Instruction])
     }
 
     /// The `xsl:output` controls that shape serialization: the output method, and

@@ -121,9 +121,12 @@ extension PureXML.XSLT {
             var context = context
             for instruction in body {
                 if termination.message != nil { break }
-                if case let .variable(name, select, varBody) = instruction {
+                switch instruction {
+                case let .variable(name, select, varBody):
                     context.variables[name] = variableValue(select, varBody, context)
-                } else {
+                case let .fallback(fallbackBody):
+                    items += instantiate(fallbackBody, context)
+                default:
                     items += evaluate(instruction, context)
                 }
             }
