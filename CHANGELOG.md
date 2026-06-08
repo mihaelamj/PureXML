@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Incremental XML writer (`PureXML.Emitting.Writer`, the libxml2 `xmlTextWriter`
+  model): emit a document with start/end and write calls without building a tree.
+  Escaping matches the tree serializer (extracted into a shared `Escaping` helper),
+  so compact output is byte-identical to serializing the equivalent tree.
 - SAX2 push-callback parsing (the libxml2 SAX2 model). `PureXML.Parsing.SAXHandler`
   is a struct of optional callbacks (start/end document, start/end element,
   characters, CDATA, comment, processing instruction); `PureXML.parse(_:sax:)`

@@ -62,7 +62,7 @@ public extension PureXML.Emitting {
             case let .element(element):
                 write(element, depth: depth, formatted: formatted, output: &output, stack: &stack)
             case let .text(value):
-                output += Self.escapeText(value)
+                output += Escaping.text(value)
             case let .cdata(value):
                 output += "<![CDATA[\(value)]]>"
             case let .comment(value):
@@ -84,7 +84,7 @@ public extension PureXML.Emitting {
             }
             output += "<" + element.name.description
             for attribute in element.attributes {
-                output += " \(attribute.name.description)=\"\(Self.escapeAttribute(attribute.value))\""
+                output += " \(attribute.name.description)=\"\(Escaping.attribute(attribute.value))\""
             }
 
             if element.children.isEmpty, options.selfCloseEmptyElements {
@@ -137,40 +137,6 @@ public extension PureXML.Emitting {
 
         private func pad(_ depth: Int) -> String {
             String(repeating: options.indent, count: depth)
-        }
-
-        private static func escapeText(_ value: String) -> String {
-            var result = ""
-            for character in value {
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case ">": result += "&gt;"
-                default: result.append(character)
-                }
-            }
-            return result
-        }
-
-        private static func escapeAttribute(_ value: String) -> String {
-            // Match the libxml2 attribute escape table: the markup characters plus
-            // tab/newline/carriage-return as numeric references. Escaping the
-            // whitespace is what preserves it through a spec-compliant parser's
-            // attribute-value normalization, so an attribute round-trips intact.
-            var result = ""
-            for character in value {
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case ">": result += "&gt;"
-                case "\"": result += "&quot;"
-                case "\t": result += "&#9;"
-                case "\n": result += "&#10;"
-                case "\r": result += "&#13;"
-                default: result.append(character)
-                }
-            }
-            return result
         }
     }
 }

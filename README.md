@@ -62,7 +62,7 @@ flowchart TB
   Enc["#28 Full encoding support"]:::epic
   Ent["#29 External and parameter entities"]:::epic
   TreeApi["#31 Tree manipulation API"]:::epic
-  Writer["#32 xmlTextWriter"]:::epic
+  Writer["#32 xmlTextWriter"]:::done
   Reader["#33 xmlTextReader with validation"]:::epic
   Save["#34 Serialization option parity"]:::epic
   Chars["#35 Character and name validity"]:::epic
