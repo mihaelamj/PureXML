@@ -98,9 +98,22 @@ extension RNCParser {
 
     func expectString() -> String {
         if case let .string(value) = peek() { advance()
-            return value
+            return concatenated(value)
         }
         return ""
+    }
+
+    /// Folds RNC string concatenation: `"a" ~ "b"` is the single literal `"ab"`,
+    /// the way long strings are split across lines. The leading string has been
+    /// consumed; this appends each following `~ "…"`.
+    func concatenated(_ value: String) -> String {
+        var result = value
+        while peek() == .symbol("~"), case let .string(next)? = peek(1) {
+            advance()
+            advance()
+            result += next
+        }
+        return result
     }
 
     func strip(_ qualified: String) -> String {
