@@ -39,4 +39,7 @@ public enum PureXML {
 
     /// Canonical XML (C14N) serialization types.
     public enum Canonical {}
+
+    /// Regular-expression types (the XML Schema regex flavor).
+    public enum Regex {}
 }

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Regular-expression engine (#30, the XML Schema regex flavor, gating XSD). The
+  new `PureXML.Regex` namespace compiles a pattern (literals, `.`, character
+  classes with ranges and negation, the escapes `\d \D \w \W \s \S \i \I \c \C`,
+  single-character escapes, grouping, alternation, and the quantifiers `?`, `*`,
+  `+`, `{n}`, `{n,}`, `{n,m}`) to a Thompson NFA and matches the whole string, as
+  `xs:pattern` facets require. Matching is linear in the input with no
+  backtracking blow-up. `\p{...}` Unicode category escapes are not yet supported.
 - Canonical XML (#26, the libxml2 `c14n.h` model). The new `PureXML.Canonical`
   namespace renders the C14N form of a node: namespace declarations sorted by
   prefix (default first) and attributes by namespace URI then local name, empty
