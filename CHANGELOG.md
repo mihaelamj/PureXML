@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT template parameters and modes (toward full parity, #61). `xsl:param`
+  declarations (with defaults), `xsl:with-param` on `apply-templates` and
+  `call-template`, and `mode` on templates and `apply-templates` are now honored:
+  a passed parameter overrides the declared default, and a mode routes nodes only
+  to templates declared in that mode (the built-in rules recurse in the same
+  mode).
 - Push / feed streaming API (#1), the last epic. A resumable scanner reports a
   token only once its terminator is fully buffered and otherwise signals
   need-more (the Expat `XML_TOK_PARTIAL` model), so `PureXML.Parsing.PushParser`

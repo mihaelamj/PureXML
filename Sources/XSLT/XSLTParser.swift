@@ -69,12 +69,30 @@ extension PureXML.XSLT {
             let match = XSLTNode.attribute(node, "match")
             let priority = XSLTNode.attribute(node, "priority").flatMap(Double.init)
                 ?? match.map(defaultPriority) ?? 0
+            let parameters = XSLTNode.children(node, named: "param").map(binding)
+            let body = node.children
+                .filter { !(XSLTNode.isXSL($0) && XSLTNode.localName($0) == "param") }
+                .compactMap(instruction)
             return Template(
                 match: match,
                 name: XSLTNode.attribute(node, "name"),
+                mode: XSLTNode.attribute(node, "mode"),
                 priority: priority,
+                parameters: parameters,
+                body: body,
+            )
+        }
+
+        private static func binding(_ node: Tree) -> Binding {
+            Binding(
+                name: XSLTNode.attribute(node, "name") ?? "",
+                select: XSLTNode.attribute(node, "select"),
                 body: body(node),
             )
+        }
+
+        private static func withParameters(_ node: Tree) -> [Binding] {
+            XSLTNode.children(node, named: "with-param").map(binding)
         }
 
         /// The XSLT default-priority rules for a match pattern.
@@ -110,9 +128,17 @@ extension PureXML.XSLT {
         private static func simpleInstruction(_ node: Tree) -> Instruction? {
             switch XSLTNode.localName(node) {
             case "value-of": .valueOf(select: XSLTNode.attribute(node, "select") ?? "")
-            case "apply-templates": .applyTemplates(select: XSLTNode.attribute(node, "select"), sorts: sorts(node))
+            case "apply-templates": .applyTemplates(
+                    select: XSLTNode.attribute(node, "select"),
+                    mode: XSLTNode.attribute(node, "mode"),
+                    sorts: sorts(node),
+                    parameters: withParameters(node),
+                )
             case "copy-of": .copyOf(select: XSLTNode.attribute(node, "select") ?? "")
-            case "call-template": .callTemplate(name: XSLTNode.attribute(node, "name") ?? "")
+            case "call-template": .callTemplate(
+                    name: XSLTNode.attribute(node, "name") ?? "",
+                    parameters: withParameters(node),
+                )
             case "text": .literalText(node.stringValue)
             case "variable", "param": variable(node)
             case "copy": .copy(body: body(node))

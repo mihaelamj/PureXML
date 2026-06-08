@@ -31,14 +31,14 @@ extension PureXML.XSLT {
                 }
             }
             let context = XSLTContext(node: root, position: 1, size: 1, variables: variables)
-            return .document(applyTemplates(to: [root], context).compactMap(Self.nodeOf))
+            return .document(applyTemplates(to: [root], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
         // MARK: Template matching
 
-        fileprivate func bestTemplate(for node: PureXML.Model.TreeNode) -> Template? {
+        fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?) -> Template? {
             stylesheet.templates.enumerated()
-                .filter { $0.element.match.map { matches(node, $0) } ?? false }
+                .filter { $0.element.mode == mode && ($0.element.match.map { matches(node, $0) } ?? false) }
                 .max { lhs, rhs in (lhs.element.priority, lhs.offset) < (rhs.element.priority, rhs.offset) }?
                 .element
         }
@@ -56,23 +56,47 @@ extension PureXML.XSLT {
 
         // MARK: apply-templates and built-in rules
 
-        fileprivate func applyTemplates(to nodes: [PureXML.Model.TreeNode], _ context: XSLTContext) -> [ResultItem] {
+        fileprivate func applyTemplates(
+            to nodes: [PureXML.Model.TreeNode],
+            mode: String?,
+            parameters: [Binding],
+            _ context: XSLTContext,
+        ) -> [ResultItem] {
             var items: [ResultItem] = []
             for (offset, node) in nodes.enumerated() {
                 let nodeContext = XSLTContext(node: node, position: offset + 1, size: nodes.count, variables: context.variables)
-                if let template = bestTemplate(for: node) {
-                    items += instantiate(template.body, nodeContext)
+                if let template = bestTemplate(for: node, mode: mode) {
+                    items += instantiateTemplate(template, nodeContext, passing: parameters, from: context)
                 } else {
-                    items += builtInRule(node, nodeContext)
+                    items += builtInRule(node, mode: mode, nodeContext)
                 }
             }
             return items
         }
 
-        private func builtInRule(_ node: PureXML.Model.TreeNode, _ context: XSLTContext) -> [ResultItem] {
+        /// Binds the template's parameters (a passed `with-param` wins over the
+        /// declared default) and instantiates its body.
+        fileprivate func instantiateTemplate(
+            _ template: Template,
+            _ context: XSLTContext,
+            passing parameters: [Binding],
+            from caller: XSLTContext,
+        ) -> [ResultItem] {
+            var context = context
+            for parameter in template.parameters {
+                if let passed = parameters.first(where: { $0.name == parameter.name }) {
+                    context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
+                } else {
+                    context.variables[parameter.name] = variableValue(parameter.select, parameter.body, context)
+                }
+            }
+            return instantiate(template.body, context)
+        }
+
+        private func builtInRule(_ node: PureXML.Model.TreeNode, mode: String?, _ context: XSLTContext) -> [ResultItem] {
             switch node.kind {
             case .element, .document:
-                applyTemplates(to: node.children, context)
+                applyTemplates(to: node.children, mode: mode, parameters: [], context)
             case .text, .cdata:
                 [.node(.text(node.value))]
             default:
@@ -159,13 +183,18 @@ extension PureXML.XSLT.Transformer {
         switch instruction {
         case let .literalText(text): [.node(.text(text))]
         case let .valueOf(select): [.node(.text(string(select, context)))]
-        case let .applyTemplates(select, sorts):
-            applyTemplates(to: sorted(selectNodes(select ?? "node()", context), sorts), context)
+        case let .applyTemplates(select, mode, sorts, parameters):
+            applyTemplates(
+                to: sorted(selectNodes(select ?? "node()", context), sorts),
+                mode: mode,
+                parameters: parameters,
+                context,
+            )
         case let .forEach(select, sorts, body): forEach(select, sorts, body, context)
         case let .ifInstruction(test, body): boolean(test, context) ? instantiate(body, context) : []
         case let .choose(whens, otherwise): chooseInstruction(whens, otherwise, context)
         case let .copyOf(select): copyOf(select, context)
-        case let .callTemplate(name): callTemplate(name, context)
+        case let .callTemplate(name, parameters): callTemplate(name, parameters, context)
         case .variable: []
         default: nil
         }
@@ -211,9 +240,9 @@ extension PureXML.XSLT.Transformer {
         return instantiate(otherwise, context)
     }
 
-    private func callTemplate(_ name: String, _ context: XSLTContext) -> [ResultItem] {
+    private func callTemplate(_ name: String, _ parameters: [PureXML.XSLT.Binding], _ context: XSLTContext) -> [ResultItem] {
         guard let template = stylesheet.templates.first(where: { $0.name == name }) else { return [] }
-        return instantiate(template.body, context)
+        return instantiateTemplate(template, context, passing: parameters, from: context)
     }
 
     private func copyOf(_ select: String, _ context: XSLTContext) -> [ResultItem] {

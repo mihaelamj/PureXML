@@ -9,6 +9,57 @@ struct XSLTTests {
         try PureXML.XSLT.transform(stylesheet: stylesheet, source: source)
     }
 
+    @Test("call-template passes with-param values, falling back to param defaults")
+    func test_callTemplateParams() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/">
+            <out>
+              <xsl:call-template name="greet"><xsl:with-param name="who" select="'Ada'"/></xsl:call-template>
+              <xsl:call-template name="greet"/>
+            </out>
+          </xsl:template>
+          <xsl:template name="greet">
+            <xsl:param name="who" select="'world'"/>
+            <hi><xsl:value-of select="$who"/></hi>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<x/>") == "<out><hi>Ada</hi><hi>world</hi></out>")
+    }
+
+    @Test("apply-templates passes parameters to the matched template")
+    func test_applyTemplatesParams() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/">
+            <xsl:apply-templates select="r/i"><xsl:with-param name="p" select="'X'"/></xsl:apply-templates>
+          </xsl:template>
+          <xsl:template match="i">
+            <xsl:param name="p" select="'-'"/>
+            <v><xsl:value-of select="$p"/><xsl:value-of select="."/></v>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<r><i>a</i><i>b</i></r>") == "<v>Xa</v><v>Xb</v>")
+    }
+
+    @Test("Modes route nodes to mode-specific templates")
+    func test_modes() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/">
+            <toc><xsl:apply-templates select="doc/h" mode="toc"/></toc>
+            <body><xsl:apply-templates select="doc/h"/></body>
+          </xsl:template>
+          <xsl:template match="h" mode="toc"><li><xsl:value-of select="."/></li></xsl:template>
+          <xsl:template match="h"><h1><xsl:value-of select="."/></h1></xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<doc><h>A</h><h>B</h></doc>"
+        #expect(try transform(stylesheet, source) == "<toc><li>A</li><li>B</li></toc><body><h1>A</h1><h1>B</h1></body>")
+    }
+
     @Test("The identity transform reproduces the input")
     func test_identity() throws {
         let stylesheet = """
