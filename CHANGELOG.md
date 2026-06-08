@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Schematron abstract patterns (#80). A `<pattern abstract="true">` is a template
+  whose rule queries carry `$name` references; a `<pattern is-a="…">` with
+  `<param name= value=>` children instantiates it, substituting each parameter
+  into the template's `context`, `test`, `<let>` value, and `<value-of select=>`
+  in a single pass that never rescans a substituted value or lets a short name
+  capture a longer one. The template itself contributes no rules, and `$name`
+  references that are not parameters (ordinary `<let>` variables) are preserved.
 - RELAX NG conformance: `datatypeLibrary`, value-space `<value>`, name-class
   subtraction, and compact-syntax breadth (#79). The in-scope `datatypeLibrary`
   is now inherited from the nearest ancestor; the default library defines only
