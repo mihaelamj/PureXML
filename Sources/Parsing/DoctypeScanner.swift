@@ -48,6 +48,8 @@ extension PureXML.Parsing {
                     try scanEntityDeclaration(&reader, into: &doctype.entities)
                 } else if reader.matches("<!ELEMENT") {
                     scanElementDeclaration(&reader, into: &doctype.elementModels)
+                } else if reader.matches("<!ATTLIST") {
+                    scanAttributeListDeclaration(&reader, into: &doctype.attributeLists)
                 } else if reader.matches("<!--") {
                     skip(&reader, until: "-->")
                 } else if reader.matches("<?") {
@@ -78,6 +80,28 @@ extension PureXML.Parsing {
             reader.consume(">")
             if !name.isEmpty {
                 elementModels[name] = model.trimmingXMLWhitespace()
+            }
+        }
+
+        private static func scanAttributeListDeclaration(
+            _ reader: inout Reader,
+            into attributeLists: inout [String: String],
+        ) {
+            reader.consume("<!ATTLIST")
+            reader.skipSpace()
+            let name = scanName(&reader)
+            var body = ""
+            while let character = reader.peek(), character != ">" {
+                body.append(character)
+                reader.advance()
+            }
+            reader.consume(">")
+            guard !name.isEmpty else { return }
+            let trimmed = body.trimmingXMLWhitespace()
+            if let existing = attributeLists[name] {
+                attributeLists[name] = "\(existing) \(trimmed)"
+            } else {
+                attributeLists[name] = trimmed
             }
         }
 

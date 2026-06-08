@@ -5,10 +5,18 @@ public extension PureXML.Parsing {
     struct DocumentType: Equatable, Sendable {
         public var entities: [String: String]
         public var elementModels: [String: String]
+        /// Raw `<!ATTLIST>` bodies keyed by element name (the text between the
+        /// element name and `>`, concatenated across multiple declarations).
+        public var attributeLists: [String: String]
 
-        public init(entities: [String: String] = [:], elementModels: [String: String] = [:]) {
+        public init(
+            entities: [String: String] = [:],
+            elementModels: [String: String] = [:],
+            attributeLists: [String: String] = [:],
+        ) {
             self.entities = entities
             self.elementModels = elementModels
+            self.attributeLists = attributeLists
         }
     }
 }

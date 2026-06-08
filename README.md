@@ -52,7 +52,7 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Core["Streaming core: parse, emit, namespaces, bytes, DTD, validation, XPath"]:::done
-  Attlist["ATTLIST validation"]:::todo
+  Attlist["ATTLIST validation"]:::done
   Schema["XSD / RELAX NG"]:::todo
   Push["Push / feed streaming API"]:::todo
   Xslt["XSLT 1.0"]:::todo

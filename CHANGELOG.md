@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DTD attribute validation (`<!ATTLIST>`). The parser surfaces attribute
+  declarations alongside element models, and `DTDSchema` now checks `#REQUIRED`
+  attributes are present, `#FIXED` attributes match when present, and enumerated
+  attributes take a declared value. Tokenized types (ID/IDREF/NMTOKEN) are parsed
+  but their value rules (uniqueness, references) are not yet enforced.
 - DTD content-model validation. The parser now surfaces the `<!DOCTYPE>` internal
   subset's `<!ELEMENT>` declarations (`PureXML.Parsing.DocumentType`, via
   `Parser.parseWithDocumentType`), and `PureXML.Validation.DTDSchema` validates a

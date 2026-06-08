@@ -1,22 +1,28 @@
 public extension PureXML.Validation {
-    /// A DTD schema: the element content models declared by `<!ELEMENT>`,
-    /// against which a parsed tree can be validated. Built from the internal
-    /// subset surfaced by the parser. Attribute-list (`<!ATTLIST>`) validation
-    /// is not yet covered.
+    /// A DTD schema: the element content models declared by `<!ELEMENT>` and the
+    /// attribute declarations from `<!ATTLIST>`, against which a parsed tree can
+    /// be validated. Built from the internal subset surfaced by the parser.
     struct DTDSchema: Sendable {
         let models: [String: ContentModel]
+        let attributes: [String: [AttributeDeclaration]]
 
-        init(elementModels: [String: String]) {
-            var parsed: [String: ContentModel] = [:]
-            for (name, model) in elementModels {
-                parsed[name] = ContentModelParser.parse(model)
+        init(_ documentType: PureXML.Parsing.DocumentType) {
+            var parsedModels: [String: ContentModel] = [:]
+            for (name, model) in documentType.elementModels {
+                parsedModels[name] = ContentModelParser.parse(model)
             }
-            models = parsed
+            models = parsedModels
+
+            var parsedAttributes: [String: [AttributeDeclaration]] = [:]
+            for (name, body) in documentType.attributeLists {
+                parsedAttributes[name] = AttributeListParser.parse(body)
+            }
+            attributes = parsedAttributes
         }
 
-        /// Whether the schema declares any elements.
+        /// Whether the schema declares any elements or attributes.
         public var isEmpty: Bool {
-            models.isEmpty
+            models.isEmpty && attributes.isEmpty
         }
 
         /// Validates a node tree against the declared content models. In strict
@@ -46,14 +52,41 @@ public extension PureXML.Validation {
 
         private func validateElement(_ element: PureXML.Model.Element, strict: Bool, into issues: inout [Issue]) {
             let name = element.name.description
-            guard let model = models[name] else {
-                if strict {
-                    issues.append(error("element <\(name)> is not declared in the DTD"))
-                }
-                return
+            if let model = models[name] {
+                let content = childContent(of: element)
+                issues.append(contentsOf: violations(name: name, model: model, content: content))
+            } else if strict {
+                issues.append(error("element <\(name)> is not declared in the DTD"))
             }
-            let content = childContent(of: element)
-            issues.append(contentsOf: violations(name: name, model: model, content: content))
+            issues.append(contentsOf: attributeViolations(name: name, element: element))
+        }
+
+        private func attributeViolations(name: String, element: PureXML.Model.Element) -> [Issue] {
+            guard let declarations = attributes[name] else { return [] }
+            var result: [Issue] = []
+            for declaration in declarations {
+                let value = element.attributes.first {
+                    $0.name.description == declaration.name || $0.name.localName == declaration.name
+                }?.value
+                result.append(contentsOf: checkAttribute(declaration, value: value, on: name))
+            }
+            return result
+        }
+
+        private func checkAttribute(_ declaration: AttributeDeclaration, value: String?, on element: String) -> [Issue] {
+            guard let value else {
+                return declaration.defaultDecl == .required
+                    ? [error("required attribute '\(declaration.name)' is missing on <\(element)>")]
+                    : []
+            }
+            var result: [Issue] = []
+            if case let .fixed(fixedValue) = declaration.defaultDecl, value != fixedValue {
+                result.append(error("attribute '\(declaration.name)' on <\(element)> is #FIXED and must be \"\(fixedValue)\""))
+            }
+            if case let .enumeration(allowed) = declaration.type, !allowed.contains(value) {
+                result.append(error("attribute '\(declaration.name)' on <\(element)> has a value outside its enumeration"))
+            }
+            return result
         }
 
         private func childContent(of element: PureXML.Model.Element) -> (names: [String], hasText: Bool) {

@@ -18,11 +18,13 @@ public extension PureXML.Parsing {
         private var namespaces = NamespaceContext()
         private var entities: [String: String] = [:]
         private var elementModels: [String: String] = [:]
+        private var attributeLists: [String: String] = [:]
         private var entityBudget: Int
 
-        /// The DTD information extracted so far (entities and element models).
+        /// The DTD information extracted so far (entities, element models, and
+        /// attribute lists).
         var documentType: DocumentType {
-            DocumentType(entities: entities, elementModels: elementModels)
+            DocumentType(entities: entities, elementModels: elementModels, attributeLists: attributeLists)
         }
 
         private var pending: [Event] = []
@@ -76,6 +78,7 @@ public extension PureXML.Parsing {
                     let doctype = try DoctypeScanner.scan(&reader, limits: limits)
                     entities = doctype.entities
                     elementModels = doctype.elementModels
+                    attributeLists = doctype.attributeLists
                     continue
                 }
                 if reader.matches("</") || reader.matches("<![CDATA[") {

@@ -74,7 +74,7 @@ public extension PureXML {
         strict: Bool = false,
     ) throws -> [Validation.Issue] {
         let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits)
-        let schema = Validation.DTDSchema(elementModels: parsed.documentType.elementModels)
+        let schema = Validation.DTDSchema(parsed.documentType)
         return schema.validate(parsed.node, strict: strict)
     }
 
