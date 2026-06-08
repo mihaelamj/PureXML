@@ -6,15 +6,21 @@ public extension PureXML.Validation {
         public let types: [String: PureXML.Schema.ElementType]
         public let constraints: [String: [PureXML.Schema.IdentityConstraint]]
         public let rootDeclaration: PureXML.Schema.ElementType?
+        public let nillableElements: Set<String>
+        public let elementConstraints: [String: PureXML.Schema.ValueConstraint]
 
         public init(
             types: [String: PureXML.Schema.ElementType],
             constraints: [String: [PureXML.Schema.IdentityConstraint]],
             rootDeclaration: PureXML.Schema.ElementType?,
+            nillableElements: Set<String> = [],
+            elementConstraints: [String: PureXML.Schema.ValueConstraint] = [:],
         ) {
             self.types = types
             self.constraints = constraints
             self.rootDeclaration = rootDeclaration
+            self.nillableElements = nillableElements
+            self.elementConstraints = elementConstraints
         }
     }
 
@@ -32,8 +38,12 @@ public extension PureXML.Validation {
                     guard case let .element(root) = context.subject, let declaration = context.document.rootDeclaration else {
                         return []
                     }
-                    return PureXML.Schema.ComplexValidator(types: context.document.types)
-                        .validate(root, as: declaration, at: [.element(root.name.description)])
+                    return PureXML.Schema.ComplexValidator(
+                        types: context.document.types,
+                        nillableElements: context.document.nillableElements,
+                        elementConstraints: context.document.elementConstraints,
+                    )
+                    .validate(root, as: declaration, at: [.element(root.name.description)])
                 },
                 when: { $0.codingPath.isEmpty },
             )

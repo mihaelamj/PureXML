@@ -16,6 +16,8 @@ public extension PureXML.Schema {
         private let elements: [String: ElementType]
         private let types: [String: ElementType]
         private let constraints: [String: [IdentityConstraint]]
+        private let nillableElements: Set<String>
+        private let elementConstraints: [String: ValueConstraint]
 
         /// Compiles a schema document. `schemaLoader` resolves the
         /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
@@ -27,6 +29,8 @@ public extension PureXML.Schema {
             elements = compiled.elements
             types = compiled.types
             constraints = compiled.constraints
+            nillableElements = compiled.nillableElements
+            elementConstraints = compiled.elementConstraints
         }
 
         /// Validates an instance document against the schema, returning one located
@@ -41,7 +45,13 @@ public extension PureXML.Schema {
             guard let declaration = elements[root.name.localName] else {
                 return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [])]
             }
-            let context = PureXML.Validation.XSDContext(types: types, constraints: constraints, rootDeclaration: declaration)
+            let context = PureXML.Validation.XSDContext(
+                types: types,
+                constraints: constraints,
+                rootDeclaration: declaration,
+                nillableElements: nillableElements,
+                elementConstraints: elementConstraints,
+            )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
         }
     }
