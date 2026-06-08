@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RELAX NG located, recovering validation errors (#79). Alongside the boolean
+  `validate(_:)`, `RelaxNG.errors(in:)` now reports every way a document fails the
+  schema as individual located errors (each with a coding path), recovering past
+  each failure so an editor can surface all of a faulty document's problems at
+  once rather than only the first. Errors carry recovery hints (`expected <a>,
+  <b>`) naming the element types accepted at the failure point, and distinguish
+  unexpected elements, invalid or missing attributes, invalid text/datatype
+  content, and missing required content. `RelaxNG.validation()` exposes the schema
+  as a `Validation<Node, Void>`, so RELAX NG composes with the same validation
+  framework as the XSD, DTD, and Schematron rules. The boolean engine remains the
+  authority on validity; the walk only places and explains the failures.
 - XML catalog group-level `prefer` (#86). A `prefer` attribute on a `group` (or a
   nested `catalog`) now overrides the catalog-wide preference for the `public`
   entries inside it, inherited through nested groups. Resolution of an external
