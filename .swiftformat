@@ -22,3 +22,7 @@
 
 # PureXML uses OpenAPIKit-style `test_...` method names with Swift Testing.
 --disable swiftTestingTestCaseNames
+
+# The recursive `indirect enum Expression` and its `Step` need explicit Sendable
+# that the compiler does not synthesize; redundantSendable wrongly strips it.
+--disable redundantSendable

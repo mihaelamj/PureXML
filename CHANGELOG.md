@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The XPath expression engine and four-type model (toward #21 full XPath 1.0).
+  `PureXML.XPath.Query` now compiles and evaluates full expressions, not just
+  location paths: the operator grammar (`or`, `and`, `=`, `!=`, `<`, `<=`, `>`,
+  `>=`, `+`, `-`, `*`, `div`, `mod`, unary `-`, `|`) with correct precedence,
+  number and string literals, function calls, variable references, and filter
+  expressions, all over `PureXML.XPath.Value` (node-set, boolean, number,
+  string) with the spec's coercion rules and canonical number formatting.
+  Predicates are now arbitrary expressions (a numeric predicate is a position
+  test). Query gains `value(over:variables:)`, `number`, `string`, and `boolean`
+  accessors, and a binding map for `$variables`. The core functions `last`,
+  `position`, `count`, `not`, `true`, `false`, `boolean`, `number`, and `string`
+  ship with it.
 - All thirteen XPath axes (toward #21 full XPath 1.0). `PureXML.XPath.Query` now
   navigates `child`, `descendant`, `parent`, `ancestor`, `following-sibling`,
   `preceding-sibling`, `following`, `preceding`, `attribute`, `namespace`,

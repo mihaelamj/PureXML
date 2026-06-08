@@ -1,130 +1,107 @@
 extension PureXML.XPath {
-    /// Evaluates compiled steps over a node, returning the selected node-set in
-    /// document order. The provided node is the starting context and, for an
-    /// absolute path, the root.
+    /// Evaluates a compiled ``Expression`` against a document, producing an XPath
+    /// ``Value``. Location paths run over the parent-aware tree; the operator
+    /// grammar, functions, and variables build on the four-type model.
     enum Evaluator {
-        static func evaluate(
-            steps: [Step],
+        /// Evaluates an expression and returns its node-set as selections in
+        /// document order. A non-node-set result yields an empty list; use
+        /// ``value(_:over:variables:)`` for typed results.
+        static func evaluate(_ expression: Expression, over node: PureXML.Model.Node) -> [Selection] {
+            let context = rootContext(node, variables: [:])
+            guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
+                return []
+            }
+            return orderUnique(nodes).map(selection)
+        }
+
+        /// Evaluates an expression to a typed value with optional variable bindings.
+        static func value(
+            _ expression: Expression,
             over node: PureXML.Model.Node,
-        ) -> [Selection] {
+            variables: [String: Value],
+        ) throws -> Value {
+            try eval(expression, rootContext(node, variables: variables))
+        }
+
+        private static func rootContext(_ node: PureXML.Model.Node, variables: [String: Value]) -> EvaluationContext {
             let root = PureXML.Model.TreeNode(node)
-            var context: [Node] = [.tree(root)]
-            for step in steps {
-                context = self.step(step, over: context)
-            }
-            return order(context).map(selection)
+            return EvaluationContext(
+                node: .tree(root),
+                position: 1,
+                size: 1,
+                variables: variables,
+                functions: CoreFunctions.table,
+            )
         }
 
-        private static func step(_ step: Step, over context: [Node]) -> [Node] {
-            var result: [Node] = []
+        static func eval(_ expression: Expression, _ context: EvaluationContext) throws -> Value {
+            switch expression {
+            case let .number(value):
+                return .number(value)
+            case let .string(value):
+                return .string(value)
+            case let .variable(name):
+                guard let value = context.variables[name] else { throw QueryError.undefinedVariable(name) }
+                return value
+            case let .negate(inner):
+                return try .number(-eval(inner, context).number)
+            case let .function(name, arguments):
+                let values = try arguments.map { try eval($0, context) }
+                return try context.functions.call(name, values, context)
+            case let .union(left, right):
+                return try .nodeSet(orderUnique(nodeSet(eval(left, context)) + nodeSet(eval(right, context))))
+            case let .binary(oper, left, right):
+                return try evalBinary(oper, left, right, context)
+            case let .path(absolute, steps):
+                return try evalPath(absolute: absolute, steps: steps, context)
+            case let .filter(primary, predicates, steps):
+                return try evalFilter(primary, predicates, steps, context)
+            }
+        }
+
+        private static func evalPath(absolute: Bool, steps: [Step], _ context: EvaluationContext) throws -> Value {
+            let start: Node = absolute ? root(of: context.node) : context.node
+            return .nodeSet(orderUnique(evaluateSteps(steps, from: [start], context)))
+        }
+
+        private static func evalFilter(
+            _ primary: Expression,
+            _ predicates: [Expression],
+            _ steps: [Step],
+            _ context: EvaluationContext,
+        ) throws -> Value {
+            var nodes = try orderUnique(nodeSet(eval(primary, context)))
+            nodes = try applyPredicates(predicates, to: nodes, context)
+            if !steps.isEmpty {
+                nodes = orderUnique(evaluateSteps(steps, from: nodes, context))
+            }
+            return .nodeSet(nodes)
+        }
+
+        // MARK: Node-set helpers
+
+        static func nodeSet(_ value: Value) throws -> [Node] {
+            guard case let .nodeSet(nodes) = value else {
+                throw QueryError.invalidArguments("a node-set was expected")
+            }
+            return nodes
+        }
+
+        static func orderUnique(_ nodes: [Node]) -> [Node] {
             var seen: Set<Node> = []
-            for contextNode in context {
-                let axisNodes = AxisNavigation.nodes(on: step.axis, from: contextNode)
-                    .filter { matches($0, step.test, on: step.axis) }
-                for node in applyPredicates(step.predicates, to: axisNodes) where seen.insert(node).inserted {
-                    result.append(node)
-                }
+            var unique: [Node] = []
+            for node in nodes where seen.insert(node).inserted {
+                unique.append(node)
             }
-            return result
+            return unique.sorted(by: Node.precedes)
         }
 
-        // MARK: Node tests
-
-        private static func matches(_ node: Node, _ test: NodeTest, on axis: Axis) -> Bool {
-            switch test {
-            case let .name(name):
-                nameMatches(node, name, axis.principalKind)
-            case .wildcard:
-                wildcardMatches(node, axis.principalKind)
-            case .text:
-                isTreeKind(node, in: [.text, .cdata])
-            case .node:
-                true
-            case .comment:
-                isTreeKind(node, in: [.comment])
-            case let .processingInstruction(target):
-                processingInstructionMatches(node, target)
+        private static func root(of node: Node) -> Node {
+            var current = node
+            while let parent = current.parent {
+                current = parent
             }
-        }
-
-        private static func nameMatches(_ node: Node, _ name: String, _ kind: PrincipalKind) -> Bool {
-            switch kind {
-            case .element:
-                guard case let .tree(tree) = node, tree.kind == .element, let qualified = tree.name else {
-                    return false
-                }
-                return qualified.description == name || qualified.localName == name
-            case .attribute:
-                guard case let .attribute(_, attribute) = node else { return false }
-                return attribute.name.description == name || attribute.name.localName == name
-            case .namespace:
-                guard case let .namespace(_, prefix, _) = node else { return false }
-                return prefix == name
-            }
-        }
-
-        private static func wildcardMatches(_ node: Node, _ kind: PrincipalKind) -> Bool {
-            switch kind {
-            case .element: return isTreeKind(node, in: [.element])
-            case .attribute: if case .attribute = node { return true }
-                return false
-            case .namespace: if case .namespace = node { return true }
-                return false
-            }
-        }
-
-        private static func processingInstructionMatches(_ node: Node, _ target: String?) -> Bool {
-            guard case let .tree(tree) = node, tree.kind == .processingInstruction else { return false }
-            guard let target else { return true }
-            return tree.name?.description == target
-        }
-
-        private static func isTreeKind(_ node: Node, in kinds: [PureXML.Model.TreeNodeKind]) -> Bool {
-            guard case let .tree(tree) = node else { return false }
-            return kinds.contains(tree.kind)
-        }
-
-        // MARK: Predicates
-
-        private static func applyPredicates(_ predicates: [Predicate], to nodes: [Node]) -> [Node] {
-            var result = nodes
-            for predicate in predicates {
-                result = apply(predicate, to: result)
-            }
-            return result
-        }
-
-        private static func apply(_ predicate: Predicate, to nodes: [Node]) -> [Node] {
-            switch predicate {
-            case let .position(index):
-                (index >= 1 && index <= nodes.count) ? [nodes[index - 1]] : []
-            case let .hasAttribute(name):
-                nodes.filter { attributeValue($0, name) != nil }
-            case let .attributeEquals(name, value):
-                nodes.filter { attributeValue($0, name) == value }
-            case let .hasChild(name):
-                nodes.filter { childElement($0, name) != nil }
-            case let .childEquals(name, value):
-                nodes.filter { childElement($0, name)?.stringValue == value }
-            }
-        }
-
-        private static func attributeValue(_ node: Node, _ name: String) -> String? {
-            guard case let .tree(tree) = node, tree.kind == .element else { return nil }
-            return tree.attributes.first { $0.name.description == name || $0.name.localName == name }?.value
-        }
-
-        private static func childElement(_ node: Node, _ name: String) -> PureXML.Model.TreeNode? {
-            guard case let .tree(tree) = node else { return nil }
-            return tree.children.first { child in
-                child.kind == .element && (child.name?.description == name || child.name?.localName == name)
-            }
-        }
-
-        // MARK: Result ordering and mapping
-
-        private static func order(_ nodes: [Node]) -> [Node] {
-            nodes.sorted(by: Node.precedes)
+            return current
         }
 
         private static func selection(_ node: Node) -> Selection {
