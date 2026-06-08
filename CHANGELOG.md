@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XPointer (#23, the libxml2 `xpointer.h` schemes). The new `PureXML.XPointer`
+  namespace resolves the shorthand bare-name form (`name` = `id('name')`), the
+  `element()` scheme (child-element positions from an id or the document root,
+  e.g. `element(intro/2)`, `element(/1/2)`), and the `xpointer()` scheme (a full
+  XPath expression). A pointer may chain scheme parts; they are tried in order
+  and the first non-empty selection wins (the fallback rule). Built on
+  `PureXML.XPath`.
 - Streaming pattern matching (#22, the libxml2 `pattern.h` model). The new
   `PureXML.Pattern` namespace compiles the streamable XPath subset (element
   names, `*`, `prefix:*`, `/`, `//`, a leading absolute `/`, and a trailing
