@@ -1,12 +1,14 @@
 /// One produced item: a node for the result tree, or an attribute to attach to
-/// the enclosing element. File-scope and private.
-private enum ResultItem {
+/// the enclosing element. Module-internal so the transformer's helpers can span
+/// files.
+enum ResultItem {
     case node(PureXML.Model.Node)
     case attribute(PureXML.Model.Attribute)
 }
 
-/// The evaluation context during instantiation. File-scope and private.
-private struct XSLTContext {
+/// The evaluation context during instantiation. Module-internal so the
+/// transformer's helpers can span files.
+struct XSLTContext {
     var node: PureXML.Model.TreeNode
     var position: Int
     var size: Int
@@ -131,7 +133,7 @@ extension PureXML.XSLT {
 
         // MARK: Instantiation
 
-        fileprivate func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
+        func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
             for instruction in body {
@@ -238,10 +240,10 @@ extension PureXML.XSLT.Transformer {
 
     private func structuralEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
         switch instruction {
-        case let .literalElement(name, attributes, body):
-            [buildElement(name: name, literalAttributes: attributes, body: body, context)]
-        case let .element(nameTemplate, body):
-            [buildElement(name: .init(avt(nameTemplate, context)), literalAttributes: [], body: body, context)]
+        case let .literalElement(name, attributes, useAttributeSets, body):
+            [buildElement(name: name, literalAttributes: attributes, useAttributeSets: useAttributeSets, body: body, context)]
+        case let .element(nameTemplate, useAttributeSets, body):
+            [buildElement(name: .init(avt(nameTemplate, context)), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
         case let .attribute(nameTemplate, body):
             [.attribute(.init(avt(nameTemplate, context), Self.text(of: instantiate(body, context))))]
         case let .copy(body):
@@ -307,7 +309,7 @@ extension PureXML.XSLT.Transformer {
     private func copyInstruction(_ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
         switch context.node.kind {
         case .element:
-            [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], body: body, context)]
+            [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: [], body: body, context)]
         case .text, .cdata:
             [.node(.text(context.node.value))]
         default:
@@ -320,10 +322,15 @@ extension PureXML.XSLT.Transformer {
     private func buildElement(
         name: PureXML.Model.QualifiedName,
         literalAttributes: [PureXML.XSLT.LiteralAttribute],
+        useAttributeSets: [String],
         body: [PureXML.XSLT.Instruction],
         _ context: XSLTContext,
     ) -> ResultItem {
-        var attributes = literalAttributes.map { PureXML.Model.Attribute(name: $0.name, value: avt($0.value, context)) }
+        // Attribute sets are lowest precedence, then the element's literal
+        // attributes, then its xsl:attribute body; a later same-named attribute
+        // replaces an earlier one.
+        var attributes = attributeSetAttributes(useAttributeSets, context, visiting: [])
+        attributes += literalAttributes.map { PureXML.Model.Attribute(name: $0.name, value: avt($0.value, context)) }
         var children: [PureXML.Model.Node] = []
         for item in instantiate(body, context) {
             switch item {
@@ -331,7 +338,7 @@ extension PureXML.XSLT.Transformer {
             case let .node(node): children.append(node)
             }
         }
-        return .node(.element(.init(name: name, attributes: attributes, children: children)))
+        return .node(.element(.init(name: name, attributes: Self.deduplicated(attributes), children: children)))
     }
 
     private func avt(_ template: PureXML.XSLT.ValueTemplate, _ context: XSLTContext) -> String {
