@@ -11,7 +11,7 @@ extension PureXML.HTML.Tokenizer {
     static func decodeEntities(_ value: String) -> String {
         guard value.contains("&") else { return value }
         var result = ""
-        var characters = Array(value)
+        let characters = Array(value)
         var index = 0
         while index < characters.count {
             guard characters[index] == "&", let semicolon = nextSemicolon(characters, after: index) else {

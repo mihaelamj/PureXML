@@ -172,7 +172,7 @@ extension PureXML.XSLT {
         static func valueTemplate(_ string: String) -> ValueTemplate {
             var parts: [ValuePart] = []
             var literal = ""
-            var characters = Array(string)
+            let characters = Array(string)
             var index = 0
             while index < characters.count {
                 let character = characters[index]

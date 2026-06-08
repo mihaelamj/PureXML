@@ -69,7 +69,7 @@ extension PureXML.Schema {
         private mutating func parseMonthDay() -> DateTimeValue? {
             guard consume("--"), let month = readFixed(2), (1 ... 12).contains(month), consume("-"),
                   let day = readFixed(2) else { return nil }
-            var value = DateTimeValue(year: 2000, month: month, day: day)
+            let value = DateTimeValue(year: 2000, month: month, day: day)
             return dayInRange(value) ? value : nil
         }
 

@@ -79,9 +79,3 @@ extension PureXML.Regex {
         case repeated(Node, min: Int, max: Int?)
     }
 }
-
-extension Unicode.Scalar: @retroactive Comparable {
-    public static func < (lhs: Unicode.Scalar, rhs: Unicode.Scalar) -> Bool {
-        lhs.value < rhs.value
-    }
-}
