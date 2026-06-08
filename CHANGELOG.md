@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:apply-imports` (#81). Re-applies templates to the current node in the
+  current mode, considering only templates of lower import precedence than the
+  one being instantiated (so an overriding template can extend the imported one),
+  falling back to the built-in rule when none match.
 - XSLT `xsl:attribute-set` (#81). Named attribute sets are applied to a literal
   result element or `xsl:element` via `use-attribute-sets`; sets may include other
   sets (recursively, with a cycle guard), set attributes are lowest precedence so

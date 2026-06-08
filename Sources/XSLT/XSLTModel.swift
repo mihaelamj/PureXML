@@ -64,6 +64,9 @@ public extension PureXML.XSLT {
         /// `xsl:message`: instantiates its body as a diagnostic. `terminate` ends
         /// the transformation with that text; it produces no result-tree output.
         case message(terminate: Bool, body: [Instruction])
+        /// `xsl:apply-imports`: re-applies templates to the current node, in the
+        /// current mode, considering only templates of lower import precedence.
+        case applyImports
     }
 
     /// The `xsl:output` controls that shape serialization: the output method, and
