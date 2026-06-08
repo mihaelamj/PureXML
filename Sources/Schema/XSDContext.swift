@@ -94,6 +94,15 @@ extension PureXML.Schema {
         }
     }
 
+    /// The result of compiling a schema document: its global element
+    /// declarations, its named-type table, and the identity constraints declared
+    /// on each element name.
+    struct XSDCompiled {
+        var elements: [String: ElementType]
+        var types: [String: ElementType]
+        var constraints: [String: [IdentityConstraint]]
+    }
+
     /// The parsing context: the named simple types resolved so far, plus the
     /// definition nodes for named attribute groups and model groups (so their
     /// refs can be expanded), and a guard against cyclic group references.

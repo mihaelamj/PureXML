@@ -7,10 +7,7 @@ extension PureXML.Schema {
     /// content, the full facet set, `list` and `union` simple types, named
     /// attribute groups and model groups, and element and group references.
     enum XSDParser {
-        static func parse(
-            _ xsd: String,
-            loader: (String) -> String? = { _ in nil },
-        ) throws -> (elements: [String: ElementType], types: [String: ElementType]) {
+        static func parse(_ xsd: String, loader: (String) -> String? = { _ in nil }) throws -> XSDCompiled {
             let root = try PureXML.parseTree(xsd)
             guard let schema = XSDNode.elementChildren(root).first(where: { XSDNode.localName($0) == "schema" }) else {
                 throw PureXML.Schema.SchemaError.notASchema
@@ -53,7 +50,43 @@ extension PureXML.Schema {
                     types[elementKey(name)] = type
                 }
             }
-            return (elements, types)
+            return XSDCompiled(elements: elements, types: types, constraints: identityConstraints(containers))
+        }
+
+        /// Gathers identity constraints (`unique`, `key`, `keyref`) declared on
+        /// any element at any depth, keyed by the element's name.
+        private static func identityConstraints(_ containers: [XSDTree]) -> [String: [IdentityConstraint]] {
+            var map: [String: [IdentityConstraint]] = [:]
+            for container in containers {
+                for element in descendants(container, named: "element") {
+                    guard let name = XSDNode.attribute(element, "name") else { continue }
+                    let constraints = XSDNode.elementChildren(element).compactMap(constraint)
+                    if !constraints.isEmpty { map[name, default: []] += constraints }
+                }
+            }
+            return map
+        }
+
+        private static func constraint(_ node: XSDTree) -> IdentityConstraint? {
+            let kind: IdentityConstraintKind
+            switch XSDNode.localName(node) {
+            case "unique": kind = .unique
+            case "key": kind = .key
+            case "keyref": kind = .keyref(refer: XSDNode.stripPrefix(XSDNode.attribute(node, "refer") ?? ""))
+            default: return nil
+            }
+            let selector = XSDNode.firstChild(node, named: "selector").flatMap { XSDNode.attribute($0, "xpath") } ?? ""
+            let fields = XSDNode.children(node, named: "field").compactMap { XSDNode.attribute($0, "xpath") }
+            return IdentityConstraint(name: XSDNode.attribute(node, "name") ?? "", kind: kind, selector: selector, fields: fields)
+        }
+
+        private static func descendants(_ node: XSDTree, named name: String) -> [XSDTree] {
+            var result: [XSDTree] = []
+            for child in XSDNode.elementChildren(node) {
+                if XSDNode.localName(child) == name { result.append(child) }
+                result += descendants(child, named: name)
+            }
+            return result
         }
 
         private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {

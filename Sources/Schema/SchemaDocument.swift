@@ -15,6 +15,7 @@ public extension PureXML.Schema {
     struct Document: Sendable {
         private let elements: [String: ElementType]
         private let types: [String: ElementType]
+        private let constraints: [String: [IdentityConstraint]]
 
         /// Compiles a schema document. `schemaLoader` resolves the
         /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
@@ -22,7 +23,10 @@ public extension PureXML.Schema {
         /// not available, which keeps compilation from reaching the filesystem or
         /// network by default.
         public init(_ xsd: String, schemaLoader: @escaping (String) -> String? = { _ in nil }) throws {
-            (elements, types) = try XSDParser.parse(xsd, loader: schemaLoader)
+            let compiled = try XSDParser.parse(xsd, loader: schemaLoader)
+            elements = compiled.elements
+            types = compiled.types
+            constraints = compiled.constraints
         }
 
         /// Validates an instance document against the schema, returning one issue
@@ -37,7 +41,9 @@ public extension PureXML.Schema {
             guard let declaration = elements[root.name.localName] else {
                 return [.init(severity: .error, message: "no element declaration for '\(root.name.localName)'")]
             }
-            return ComplexValidator(types: types).validate(root, as: declaration)
+            var issues = ComplexValidator(types: types).validate(root, as: declaration)
+            issues += IdentityValidator(constraints: constraints).validate(PureXML.Model.TreeNode(.element(root)))
+            return issues
         }
     }
 }
