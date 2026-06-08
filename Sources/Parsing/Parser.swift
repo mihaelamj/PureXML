@@ -56,6 +56,37 @@ public extension PureXML.Parsing {
             return try build(EventReader(pulling: { decoder.next() }, limits: limits)).node
         }
 
+        /// Parses a document, delivering SAX-style callbacks instead of building a
+        /// tree. The handler's callbacks fire as the parse streams.
+        public func parse(_ xml: String, sax handler: SAXHandler, limits: Limits = .default) throws {
+            var reader = EventReader(xml, limits: limits)
+            handler.startDocument?()
+            var produced = false
+            while let event = try reader.next() {
+                produced = true
+                deliver(event, to: handler)
+            }
+            guard produced else { throw ParseError.emptyDocument }
+            handler.endDocument?()
+        }
+
+        private func deliver(_ event: Event, to handler: SAXHandler) {
+            switch event {
+            case let .startElement(name, attributes):
+                handler.startElement?(name, attributes)
+            case let .endElement(name):
+                handler.endElement?(name)
+            case let .characters(text):
+                handler.characters?(text)
+            case let .cdata(text):
+                handler.cdata?(text)
+            case let .comment(text):
+                handler.comment?(text)
+            case let .processingInstruction(target, data):
+                handler.processingInstruction?(target, data)
+            }
+        }
+
         private func build(_ source: EventReader) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
             var reader = source
             var roots: [PureXML.Model.Node] = []

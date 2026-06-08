@@ -57,7 +57,7 @@ flowchart TB
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Core["Streaming core + DTD validation (shipped)"]:::done
   Push["#1 Push / feed streaming API"]:::epic
-  Sax["#19 SAX2 push callbacks"]:::epic
+  Sax["#19 SAX2 push callbacks"]:::done
   Html["#20 HTML parser and serializer"]:::epic
   Enc["#28 Full encoding support"]:::epic
   Ent["#29 External and parameter entities"]:::epic

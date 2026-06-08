@@ -30,6 +30,12 @@ public extension PureXML {
         Parsing.EventReader(xml, limits: limits)
     }
 
+    /// Parses a document, delivering SAX-style callbacks (the libxml2 SAX2 model)
+    /// instead of building a tree.
+    static func parse(_ xml: String, sax handler: Parsing.SAXHandler, limits: Parsing.Limits = .default) throws {
+        try Parsing.Parser().parse(xml, sax: handler, limits: limits)
+    }
+
     /// Returns a streaming ``Parsing/EventReader`` over raw bytes, detecting the
     /// encoding before streaming events.
     static func events(bytes: [UInt8], limits: Parsing.Limits = .default) throws -> Parsing.EventReader {

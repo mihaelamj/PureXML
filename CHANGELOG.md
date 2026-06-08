@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- SAX2 push-callback parsing (the libxml2 SAX2 model). `PureXML.Parsing.SAXHandler`
+  is a struct of optional callbacks (start/end document, start/end element,
+  characters, CDATA, comment, processing instruction); `PureXML.parse(_:sax:)`
+  drives them from the streaming core. Element names are namespace-resolved, so
+  the URI is available on each callback.
 - DTD ID/IDREF validation. Attributes typed `ID` must be unique across the
   document; `IDREF` and `IDREFS` values must each resolve to a declared `ID`
   (forward references included, via a second pass). Completes the structural DTD
