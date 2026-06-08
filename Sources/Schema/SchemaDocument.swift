@@ -29,21 +29,20 @@ public extension PureXML.Schema {
             constraints = compiled.constraints
         }
 
-        /// Validates an instance document against the schema, returning one issue
-        /// per violation. Reports an issue when the root element has no global
-        /// declaration.
-        public func validate(_ xml: String) throws -> [PureXML.Validation.Issue] {
+        /// Validates an instance document against the schema, returning one located
+        /// ``PureXML/Validation/ValidationError`` per violation. Reports an error
+        /// when the root element has no global declaration.
+        public func validate(_ xml: String) throws -> [PureXML.Validation.ValidationError] {
             guard case let .document(children) = try PureXML.parse(xml),
                   let root = children.compactMap(\.element).first
             else {
-                return [.init(severity: .error, message: "the document has no root element")]
+                return [.init(reason: "the document has no root element", at: [])]
             }
             guard let declaration = elements[root.name.localName] else {
-                return [.init(severity: .error, message: "no element declaration for '\(root.name.localName)'")]
+                return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [])]
             }
-            var issues = ComplexValidator(types: types).validate(root, as: declaration)
-            issues += IdentityValidator(constraints: constraints).validate(PureXML.Model.TreeNode(.element(root)))
-            return issues
+            let context = PureXML.Validation.XSDContext(types: types, constraints: constraints, rootDeclaration: declaration)
+            return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
         }
     }
 }

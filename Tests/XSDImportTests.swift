@@ -7,7 +7,7 @@ struct XSDImportTests {
         _ xsd: String,
         _ xml: String,
         loader: @escaping (String) -> String? = { _ in nil },
-    ) throws -> [PureXML.Validation.Issue] {
+    ) throws -> [PureXML.Validation.ValidationError] {
         try PureXML.Schema.Document(xsd, schemaLoader: loader).validate(xml)
     }
 
