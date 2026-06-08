@@ -86,4 +86,72 @@ struct ValidationFrameworkTests {
         let stripped = validator.withoutValidating("Element attribute names are unique")
         #expect(stripped.validationDescriptions.isEmpty)
     }
+
+    // MARK: Combinators against a hand-built context
+
+    private struct Parent: PureXML.Validation.Validatable {
+        var child = PureXML.Model.Element("c")
+        var maybe: PureXML.Model.Element?
+        var count = 2
+    }
+
+    private typealias ParentContext = PureXML.Validation.ValidationContext<Parent, Void>
+
+    private func parentContext(_ parent: Parent) -> ParentContext {
+        ParentContext(document: (), subject: parent, codingPath: [])
+    }
+
+    @Test("The comparison operators lift a KeyPath and a literal into a predicate")
+    func test_comparisonOperators() {
+        let greater: (ParentContext) -> Bool = \Parent.count > 1
+        let atLeast: (ParentContext) -> Bool = \Parent.count >= 2
+        let less: (ParentContext) -> Bool = \Parent.count < 5
+        let atMost: (ParentContext) -> Bool = \Parent.count <= 2
+        let notEqual: (ParentContext) -> Bool = \Parent.count != 3
+        #expect(greater(parentContext(Parent(count: 2))))
+        #expect(!greater(parentContext(Parent(count: 0))))
+        #expect(atLeast(parentContext(Parent(count: 2))))
+        #expect(less(parentContext(Parent(count: 2))))
+        #expect(atMost(parentContext(Parent(count: 2))))
+        #expect(notEqual(parentContext(Parent(count: 2))))
+    }
+
+    @Test("lift runs child-typed validations against a lifted value")
+    func test_lift() {
+        let childNamedC = PureXML.Validation.Validation<Element, Void>(
+            description: "child is named c",
+            check: \Element.name.localName == "c",
+        )
+        let lifted: (ParentContext) -> [Error] = lift(\Parent.child, into: childNamedC)
+        #expect(lifted(parentContext(Parent())).isEmpty)
+        #expect(lifted(parentContext(Parent(child: Element("d")))).count == 1)
+    }
+
+    @Test("unwrap errors on nil and otherwise runs child validations")
+    func test_unwrap() {
+        let alwaysFails = PureXML.Validation.Validation<Element, Void>(description: "no", check: { _ in false })
+        let rule: (ParentContext) -> [Error] = unwrap(\Parent.maybe, into: alwaysFails)
+        let onNil = rule(parentContext(Parent(maybe: nil)))
+        #expect(onNil.count == 1)
+        #expect(onNil.first?.reason.contains("nil") == true)
+        let onValue = rule(parentContext(Parent(maybe: Element("m"))))
+        #expect(onValue.count == 1)
+    }
+
+    @Test("The same value of the same type applied twice yields two errors")
+    func test_erasureAppliedTwice() {
+        let rule = PureXML.Validation.Validation<Element, Void>(description: "always fails", check: { _ in false })
+        let erased = PureXML.Validation.AnyValidation(rule)
+        let atA = erased.apply(to: sample, at: [.element("a")], in: ())
+        let atB = erased.apply(to: sample, at: [.element("b")], in: ())
+        #expect((atA + atB).count == 2)
+    }
+
+    @Test("Error rendering: at-path, at-root, and a stripped trailing period")
+    func test_errorRendering() {
+        let rooted = Error(reason: "Bad.", at: [])
+        #expect(String(describing: rooted) == "Bad at root of document")
+        let located = Error(reason: "Bad value", at: [.element("box"), .element("id")])
+        #expect(String(describing: located) == "Bad value at path: box/id")
+    }
 }
