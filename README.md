@@ -89,7 +89,7 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  XPathFull["#21 Full XPath 1.0"]:::epic
+  XPathFull["#21 Full XPath 1.0"]:::done
   Pattern["#22 xmlPattern streaming match"]:::epic
   XPointer["#23 XPointer"]:::epic
   XPathFull --> Pattern

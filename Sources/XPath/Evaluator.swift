@@ -29,6 +29,26 @@ extension PureXML.XPath {
             try eval(expression, rootContext(node, variables: variables))
         }
 
+        /// Evaluates an expression against an explicit context: a node already in a
+        /// tree, its proximity position and size, and variable bindings. This is
+        /// the entry point downstream engines (XSLT, Schematron) drive per node.
+        static func value(
+            _ expression: Expression,
+            at node: PureXML.Model.TreeNode,
+            position: Int,
+            size: Int,
+            variables: [String: Value],
+        ) throws -> Value {
+            let context = EvaluationContext(
+                node: .tree(node),
+                position: position,
+                size: size,
+                variables: variables,
+                functions: library,
+            )
+            return try eval(expression, context)
+        }
+
         private static func rootContext(_ node: PureXML.Model.Node, variables: [String: Value]) -> EvaluationContext {
             let root = PureXML.Model.TreeNode(node)
             return EvaluationContext(

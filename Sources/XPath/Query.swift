@@ -38,6 +38,20 @@ public extension PureXML.XPath {
             try Evaluator.value(expression, over: node, variables: variables)
         }
 
+        /// Evaluates the query against an explicit context: a node already in a
+        /// tree (``PureXML/Model/TreeNode``), its one-based proximity `position`
+        /// within a node-set of `size`, and variable bindings. Downstream engines
+        /// (XSLT, Schematron) drive this per context node; `position()` and
+        /// `last()` reflect the supplied values.
+        public func value(
+            at node: PureXML.Model.TreeNode,
+            position: Int = 1,
+            size: Int = 1,
+            variables: [String: Value] = [:],
+        ) throws -> Value {
+            try Evaluator.value(expression, at: node, position: position, size: size, variables: variables)
+        }
+
         /// Evaluates the query and coerces the result to a number.
         public func number(over node: PureXML.Model.Node, variables: [String: Value] = [:]) throws -> Double {
             try value(over: node, variables: variables).number
