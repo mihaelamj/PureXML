@@ -75,10 +75,8 @@ SKIP_PATTERNS=(
   '/pre-commit$'
   '/pre-push$'
   '/check-style\.sh$'
+  '/check-commit-attribution\.sh$'
   '/check-staged-style\.sh$'
-  # The CI workflow that enforces the same Cursor prohibition server-side; it
-  # must quote the forbidden tokens to scan for them.
-  '^\.github/workflows/no-cursor-attribution\.yml$'
 )
 
 # Filter STAGED_FILES through the skip list.

@@ -1,0 +1,20 @@
+name: Swift (Linux)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-linux:
+    name: Swift (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build and test
+        run: bash scripts/check-linux.sh

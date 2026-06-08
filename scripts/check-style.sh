@@ -16,8 +16,7 @@ EMDASH=$(printf '\xe2\x80\x94')
 # detect them, so exclude them from the phrase scan.
 is_enforcement_file() {
   case "$1" in
-    .githooks/*|scripts/check-style.sh) return 0 ;;
-    .github/workflows/no-cursor-attribution.yml) return 0 ;;
+    .githooks/*|scripts/check-style.sh|scripts/check-commit-attribution.sh) return 0 ;;
     *) return 1 ;;
   esac
 }

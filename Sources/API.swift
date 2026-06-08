@@ -1,9 +1,5 @@
 public extension PureXML {
     /// Parses an XML document into a ``Model/Node`` tree.
-    ///
-    /// The parser is still being built; this entry point currently raises
-    /// ``Parsing/ParseError/notImplemented(_:)``. The serializer and model are
-    /// usable today for building and emitting trees.
     static func parse(
         _ xml: String,
         limits: Parsing.Limits = .default,

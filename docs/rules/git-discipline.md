@@ -238,6 +238,54 @@ A repo that adopts these rules should ship a mechanical backstop:
 
 **Why mechanical enforcement matters.** A disciplined author following Rule 5.2 can still push a commit whose message contains an em dash, because nothing at the commit boundary stops it. A 3-line `commit-msg` hook prevents this entire failure class at write time, after which `git push` cannot carry a violation regardless of who or what wrote the message. Discipline scales with attention; hooks do not.
 
+## 8. CI workflows and truthful badges
+
+### Rule 8.1: One workflow file per concern, one badge per workflow
+
+Each CI concern (style/gates, and each build-or-test platform) is its own workflow file with a unique `name:`. A README badge points at that one workflow's status endpoint, so the badge tracks exactly one job and is truthful.
+
+Do NOT use a single multi-job workflow (`ci.yml`) with several shields.io `?label=...` badges that all point at the same workflow. The `actions/workflow/status` endpoint reports the whole-workflow status; the `label=` is cosmetic, so every such badge renders the same result. A failure in any one job turns all of them red, and none of them tracks its named platform. That is a lying badge.
+
+Canonical layout (one file each, names are the badge labels):
+
+```
+.github/workflows/style.yml          # name: Style and namespacing
+.github/workflows/swift-macos.yml    # name: Swift (macOS)
+.github/workflows/swift-linux.yml    # name: Swift (Linux)
+.github/workflows/swift-windows.yml  # name: Swift (Windows)
+.github/workflows/swift-wasm.yml     # name: Swift (WASM)
+```
+
+### Rule 8.2: Native per-workflow badge markdown, plus a license badge
+
+Use GitHub's native per-workflow badge (it reflects the real status of that one workflow), not a shields.io workflow-status badge with a cosmetic label:
+
+```markdown
+[![Style and namespacing](https://github.com/<owner>/<repo>/actions/workflows/style.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/style.yml)
+[![Swift macOS](https://github.com/<owner>/<repo>/actions/workflows/swift-macos.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/swift-macos.yml)
+[![Swift Linux](https://github.com/<owner>/<repo>/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/swift-linux.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+```
+
+The license badge is static and links to the repo's `LICENSE`; match the label to the actual license (`MIT`, `AGPL--3.0`, etc.).
+
+### Rule 8.3: Add a platform job and badge ONLY when that platform is genuinely possible
+
+A badge is a claim. Only claim a platform the repo can actually build or test on. Never ship a workflow or badge for a platform the package does not support; an absent badge is honest, a red-or-fictional badge is not.
+
+Decide possibility from the repo's topology (see `cross-platform.md`):
+
+- **Apple platforms (iOS, visionOS, tvOS, watchOS) and any UI build or test run on macOS runners only.** There is no "iOS CI on Linux" and no Windows/Linux UI. An iOS/visionOS app or a SwiftUI/UIKit/AppKit target is exercised by a macOS-hosted job (simulator or `xcodebuild -destination`), reported under the macOS badge or a dedicated `swift-ios.yml` that still `runs-on: macos`. Do not add a Linux or Windows badge for UI code.
+- **Linux** badge only when the product builds on a Linux toolchain (libraries, servers, CLIs). A pure Apple-UI repo has no Linux badge.
+- **Windows** badge only when the targets compile on Windows. If the test tooling is POSIX-only, Windows is a build-only gate: build the portable library targets (debug and release), skip the suite, and say so in a header comment. The badge then truthfully means "compiles on Windows."
+- **WASM/WASI** badge only when the package builds for `wasm32-unknown-wasip1`. Code that needs Foundation networking, threads, or other WASI-absent surface does not get a WASM badge. WASM is typically a build gate; running wasm tests needs a separate runtime and is usually out of scope.
+
+When a platform can build but not run the full suite, the workflow is a build gate, not a test gate. The header comment states the scope so the green badge is not read as "tests pass" when it means "compiles."
+
+### Rule 8.4: Triggers and permissions are uniform across the split
+
+Every workflow uses the same trigger surface so the badges refresh together: `on: push: branches: [main]` plus `pull_request:` plus `workflow_dispatch:`. Keep `permissions:` least-privilege (`contents: read`, plus `issues: read` only where a gate reads issues, e.g. a roadmap check). The commit-message attribution gate (Rule 5.1) lives in the style workflow and needs `fetch-depth: 0` on checkout plus `BASE_SHA` / `HEAD_SHA` from the PR event to scan the commit range.
+
 ## Triggers (when to load this rule)
 
 Load this rule when:
@@ -251,5 +299,6 @@ Load this rule when:
 - Running `git commit --amend` (Rule 5.3)
 - Running `git push` (Rule 6.1, Rule 6.2)
 - Designing a tracker-discipline mechanism for a new repo (Rule 7)
+- Setting up CI workflows or README status badges (Rule 8.1, Rule 8.2, Rule 8.3, Rule 8.4)
 
 Load on demand per the trigger; do not auto-load.

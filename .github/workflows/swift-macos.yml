@@ -1,0 +1,29 @@
+name: Swift (macOS)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  swift-macos:
+    name: Swift (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install format and lint tools
+        run: brew install swiftformat swiftlint
+      - name: Format and lint
+        run: |
+          swiftformat . --config .swiftformat --lint
+          swiftlint --config .swiftlint.yml --strict
+      - name: Build and test
+        run: |
+          swift build
+          swift test
+          swift build -c release
+          swift test -c release

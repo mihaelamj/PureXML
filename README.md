@@ -1,8 +1,11 @@
 # PureXML
 
-[![macOS CI](https://img.shields.io/github/actions/workflow/status/mihaelamj/PureXML/ci.yml?branch=main&label=macOS)](https://github.com/mihaelamj/PureXML/actions/workflows/ci.yml)
-[![Linux CI](https://img.shields.io/github/actions/workflow/status/mihaelamj/PureXML/ci.yml?branch=main&label=Linux)](https://github.com/mihaelamj/PureXML/actions/workflows/ci.yml)
-[![WASI CI](https://img.shields.io/github/actions/workflow/status/mihaelamj/PureXML/ci.yml?branch=main&label=WASI)](https://github.com/mihaelamj/PureXML/actions/workflows/ci.yml)
+[![Style and namespacing](https://github.com/mihaelamj/PureXML/actions/workflows/style.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/style.yml)
+[![Swift macOS](https://github.com/mihaelamj/PureXML/actions/workflows/swift-macos.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-macos.yml)
+[![Swift Linux](https://github.com/mihaelamj/PureXML/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-linux.yml)
+[![Swift Windows](https://github.com/mihaelamj/PureXML/actions/workflows/swift-windows.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-windows.yml)
+[![Swift WASM](https://github.com/mihaelamj/PureXML/actions/workflows/swift-wasm.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-wasm.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 PureXML is a dependency-free XML package written entirely in Swift.
 
@@ -126,27 +129,66 @@ flowchart TB
 
 ## Status
 
-The node model, the emitter, and a streaming parser are implemented and usable
-today.
+PureXML is a working, dependency-free XML library today: parse, emit, validate,
+query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
+currently runs **135 tests in 18 suites** (`swift test`).
 
-- **Model** (`PureXML.Model`): `Node`, `Element`, `Attribute`, `QualifiedName`.
-  Preserves document order and the distinction between text, CDATA, comments,
-  and processing instructions.
-- **Emitting** (`PureXML.Emitting`): `Serializer` turns a node tree into
-  well-formed XML, with pretty-printed and compact options and correct text and
-  attribute escaping.
-- **Validation** (`PureXML.Validation`): structural checks such as duplicate
-  attribute names. Schema validation (DTD/XSD/RELAX NG) is out of scope for the
-  library target.
-- **Parsing** (`PureXML.Parsing`): a streaming, iterative parser. `EventReader`
-  is a pull-based event core that consumes input through a character-source
-  closure and emits one `Event` at a time, never holding the whole document in
-  memory (it drives chunked input). `Parser` builds a `Model.Node` tree
-  iteratively over the event core. Handles elements, attributes, text, the five
-  predefined entities and numeric character references, comments, CDATA, and
-  processing instructions. Safe by default: `<!DOCTYPE>` is rejected, which
-  removes the DTD-based threat classes (XXE, entity-expansion DoS). DTD support,
-  namespaces-as-resolved-URIs, and validation are deliberate future layers.
+### Shipped (libxml2-aligned surface)
+
+- **Model** (`PureXML.Model`): `Node`, `Element`, `Attribute`, `QualifiedName`,
+  and a mutable `TreeNode` for in-place editing (insert, remove, replace, copy,
+  parent navigation).
+- **Parsing** (`PureXML.Parsing`): iterative streaming parser over strings,
+  bytes, or incremental character/byte sources. Pull events via `EventReader`,
+  SAX2-style callbacks via `SAXHandler`, and a pull cursor via `TextReader`
+  (libxml2 `xmlTextReader`). Handles elements, attributes, text, predefined and
+  numeric entities, comments, CDATA, and processing instructions. Namespace
+  bindings (`xmlns`) are resolved to URIs on parse.
+- **Encoding**: UTF-8/16/32 (with BOM sniffing), ISO-8859-1, and Windows-1252
+  from raw bytes or streaming byte input.
+- **DTD (opt-in)**: `<!DOCTYPE>` is **off by default** (`Limits.allowDoctype:
+  false`) to keep XXE and entity-expansion closed. When enabled, the internal
+  subset is parsed; internal general entities expand with a bounded cap; external
+  entities and external subsets are refused unless an injected
+  `EntityResolver` supplies replacement text.
+- **Validation** (`PureXML.Validation`): structural checks (duplicate attributes,
+  etc.) plus **DTD validation** against declared content models, attribute lists,
+  and ID/IDREF rules (`DTDSchema`, `validateAgainstInternalDTD`). XSD, RELAX NG,
+  and Schematron remain open epics (#2, #25).
+- **Emitting** (`PureXML.Emitting`): `Serializer` (save-option parity) and an
+  incremental `Writer` (libxml2 `xmlTextWriter`) with compact and pretty modes.
+- **XPath** (`PureXML.XPath`): a **subset** of XPath 1.0 (location paths, common
+  axes, node tests, basic predicates). Full XPath 1.0 is epic #21.
+
+### Safe defaults
+
+By default the parser rejects `<!DOCTYPE>` and refuses every external reference
+(`EntityResolver.refusing`). Enable DTD processing only when you need internal
+subset validation or internal entities, and wire a resolver only for trusted,
+in-memory replacements. Network fetching (`nanohttp`/`nanoftp`) and libxml2's
+threading/memory infrastructure are deliberate non-goals.
+
+### Remaining toward full libxml2 feature parity
+
+**12 of 20 epics are still open**; each now has filed child issues (#4–#60). The
+shipped eight cover the core I/O stack; most remaining work is whole standards:
+
+| Open epic | Child issues | What it adds |
+|---|---|---|
+| #1 Push / feed API | #4–#7 | Resumable scanner + push parser |
+| #20 HTML parser | #36–#39 | Tag-soup HTML parse and serialize |
+| #21 Full XPath 1.0 | #40–#43 | Unlocks #22, #23, #25, #3 |
+| #22 xmlPattern | #44–#45 | Streaming pattern match (needs #21) |
+| #23 XPointer | #46–#47 | element() / xpointer() (needs #21) |
+| #24 XInclude | #48–#51 | URI, xml:base, xi:include |
+| #25 Schematron | #52–#53 | Rule validation (needs #21) |
+| #26 C14N | #54–#56 | Canonical XML variants |
+| #27 XML Catalog | #57–#58 | OASIS catalog resolver |
+| #30 → #2 | #59–#60, #8–#13 | Regex engine, then XSD / RELAX NG |
+| #3 XSLT 1.0 | #14–#18 | Stylesheet transform (needs #21) |
+
+**40 open enhancement issues** under those epics (plus the 12 epic parents). Critical
+path: **#30 → #2** (schema) and **#21 → #22/#23/#25/#3** (query/transform).
 
 ## Usage
 
@@ -171,6 +213,16 @@ var reader = PureXML.events(xml)
 while let event = try reader.next() {
     // handle .startElement / .characters / .endElement / ...
 }
+
+// DTD validation (opt-in: allowDoctype + optional resolver for trusted externals).
+let issues = try PureXML.validateAgainstInternalDTD(
+    xmlWithDoctype,
+    limits: .init(allowDoctype: true),
+)
+
+// XPath subset over a parsed tree.
+let titles = try PureXML.xpath("//title", over: node)
+    .compactMap(\.element)
 ```
 
 ## Attribution
