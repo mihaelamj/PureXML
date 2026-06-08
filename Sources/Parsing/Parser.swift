@@ -41,7 +41,7 @@ public extension PureXML.Parsing {
             _ xml: String,
             limits: Limits = .default,
             resolver: EntityResolver = .refusing,
-        ) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
+        ) throws -> ParsedDocument {
             try build(EventReader(xml, limits: limits, resolver: resolver))
         }
 
@@ -132,7 +132,7 @@ public extension PureXML.Parsing {
             }
         }
 
-        private func build(_ source: EventReader) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
+        private func build(_ source: EventReader) throws -> ParsedDocument {
             var reader = source
             var roots: [PureXML.Model.Node] = []
             var stack: [ElementFrame] = []
@@ -167,7 +167,7 @@ public extension PureXML.Parsing {
             guard produced else {
                 throw ParseError.emptyDocument
             }
-            return (.document(roots), reader.documentType)
+            return ParsedDocument(node: .document(roots), documentType: reader.documentType, declaration: reader.xmlDeclaration)
         }
 
         /// Drains a recovering ``EventReader`` (which repairs malformed input in

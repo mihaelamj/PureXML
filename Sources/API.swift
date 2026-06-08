@@ -89,6 +89,15 @@ public extension PureXML {
         return Validation.DTD.validator(strict: strict).errors(for: parsed.node, in: schema)
     }
 
+    /// The XML declaration (`version`, `encoding`, `standalone`) at the start of
+    /// `xml`, or nil when the document has none or its declaration is malformed.
+    static func xmlDeclaration(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+    ) -> Parsing.XMLDeclaration? {
+        (try? Parsing.Parser().parseWithDocumentType(xml, limits: limits))?.declaration
+    }
+
     /// Parses an XML document and returns its tree with the DTD attribute defaults
     /// from the internal subset applied: every element gains any attribute its
     /// `<!ATTLIST>` declares with a default or `#FIXED` value and that the element

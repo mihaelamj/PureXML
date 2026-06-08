@@ -31,6 +31,9 @@ public extension PureXML.Parsing {
         case malformedEncoding
         /// Raised by entry points whose parsing path is not implemented yet.
         case notImplemented(String)
+        /// The XML declaration `<?xml ... ?>` is malformed: its pseudo-attributes
+        /// are out of order, unknown, or carry an illegal value.
+        case malformedDeclaration(Mark)
 
         public var description: String {
             switch self {
@@ -82,6 +85,8 @@ public extension PureXML.Parsing {
                 "input bytes are malformed for the detected encoding"
             case let .notImplemented(detail):
                 "not implemented: \(detail)"
+            case let .malformedDeclaration(mark):
+                "malformed XML declaration at \(mark)"
             }
         }
     }
