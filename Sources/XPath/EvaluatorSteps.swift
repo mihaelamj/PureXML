@@ -18,7 +18,7 @@ extension PureXML.XPath.Evaluator {
             var seen: Set<Node> = []
             for contextNode in current {
                 let matched = PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
-                    .filter { matches($0, step.test, on: step.axis) }
+                    .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
                 let filtered = (try? applyPredicates(step.predicates, to: matched, context)) ?? matched
                 for node in filtered where seen.insert(node).inserted {
                     result.append(node)
@@ -61,10 +61,10 @@ extension PureXML.XPath.Evaluator {
 
     // MARK: Node tests
 
-    static func matches(_ node: Node, _ test: NodeTest, on axis: Axis) -> Bool {
+    static func matches(_ node: Node, _ test: NodeTest, on axis: Axis, namespaces: [String: String] = [:]) -> Bool {
         switch test {
         case let .name(name):
-            nameMatches(node, name, axis.principalKind)
+            nameMatches(node, name, axis.principalKind, namespaces)
         case .wildcard:
             wildcardMatches(node, axis.principalKind)
         case .text:
@@ -78,20 +78,35 @@ extension PureXML.XPath.Evaluator {
         }
     }
 
-    private static func nameMatches(_ node: Node, _ name: String, _ kind: PrincipalKind) -> Bool {
+    private static func nameMatches(_ node: Node, _ name: String, _ kind: PrincipalKind, _ namespaces: [String: String]) -> Bool {
         switch kind {
         case .element:
             guard case let .tree(tree) = node, tree.kind == .element, let qualified = tree.name else {
                 return false
             }
-            return qualified.description == name || qualified.localName == name
+            return qualifiedMatches(qualified, name, namespaces)
         case .attribute:
             guard case let .attribute(_, attribute) = node else { return false }
-            return attribute.name.description == name || attribute.name.localName == name
+            return qualifiedMatches(attribute.name, name, namespaces)
         case .namespace:
             guard case let .namespace(_, prefix, _) = node else { return false }
             return prefix == name
         }
+    }
+
+    /// Matches a node's qualified name against a test name. When an eval-time
+    /// prefix binding covers the test's prefix, the match is by namespace URI and
+    /// local name; otherwise it falls back to the in-document prefix string (the
+    /// behavior when no bindings are supplied).
+    private static func qualifiedMatches(_ qualified: PureXML.Model.QualifiedName, _ name: String, _ namespaces: [String: String]) -> Bool {
+        if !namespaces.isEmpty, let colon = name.firstIndex(of: ":") {
+            let prefix = String(name[..<colon])
+            if let uri = namespaces[prefix] {
+                let local = String(name[name.index(after: colon)...])
+                return qualified.localName == local && (qualified.namespaceURI ?? "") == uri
+            }
+        }
+        return qualified.description == name || qualified.localName == name
     }
 
     private static func wildcardMatches(_ node: Node, _ kind: PrincipalKind) -> Bool {

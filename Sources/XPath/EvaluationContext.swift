@@ -13,9 +13,14 @@ extension PureXML.XPath {
         var size: Int
         var variables: [String: Value]
         var functions: FunctionTable
+        /// Prefix-to-URI bindings supplied at evaluation time, so a name test like
+        /// `x:foo` resolves `x` to a URI and matches by namespace rather than by the
+        /// document's own prefix. Empty by default, in which case matching falls
+        /// back to the in-document prefix string.
+        var namespaces: [String: String] = [:]
 
         /// A copy positioned on `node` at one-based `position` within a node-set of
-        /// `size`, keeping the same variables and functions.
+        /// `size`, keeping the same variables, functions, and namespace bindings.
         func focused(on node: Node, position: Int, size: Int) -> EvaluationContext {
             EvaluationContext(
                 node: node,
@@ -23,6 +28,7 @@ extension PureXML.XPath {
                 size: size,
                 variables: variables,
                 functions: functions,
+                namespaces: namespaces,
             )
         }
     }

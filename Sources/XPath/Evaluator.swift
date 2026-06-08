@@ -60,6 +60,7 @@ extension PureXML.XPath {
             size: Int,
             variables: [String: Value],
             functions: FunctionTable = FunctionTable(),
+            namespaces: [String: String] = [:],
         ) throws -> Value {
             let context = EvaluationContext(
                 node: .tree(node),
@@ -67,11 +68,30 @@ extension PureXML.XPath {
                 size: size,
                 variables: variables,
                 functions: library.merging(functions),
+                namespaces: namespaces,
             )
             return try eval(expression, context)
         }
 
-        private static func rootContext(_ node: PureXML.Model.Node, variables: [String: Value]) -> EvaluationContext {
+        /// Evaluates a node-set expression over a value tree with eval-time prefix
+        /// bindings, returning the selected nodes in document order.
+        static func evaluate(
+            _ expression: Expression,
+            over node: PureXML.Model.Node,
+            namespaces: [String: String],
+        ) -> [Selection] {
+            let context = rootContext(node, variables: [:], namespaces: namespaces)
+            guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
+                return []
+            }
+            return orderUnique(nodes).map(selection)
+        }
+
+        private static func rootContext(
+            _ node: PureXML.Model.Node,
+            variables: [String: Value],
+            namespaces: [String: String] = [:],
+        ) -> EvaluationContext {
             let root = PureXML.Model.TreeNode(node)
             return EvaluationContext(
                 node: .tree(root),
@@ -79,6 +99,7 @@ extension PureXML.XPath {
                 size: 1,
                 variables: variables,
                 functions: library,
+                namespaces: namespaces,
             )
         }
 

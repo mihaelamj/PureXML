@@ -1,6 +1,14 @@
+/// One part of an XPointer: either a selection expression (already translated to
+/// XPath) or a namespace binding from an `xmlns()` scheme that applies to the
+/// expression parts that follow it. File-scope and private.
+private enum PointerPart {
+    case expression(String)
+    case namespace(prefix: String, uri: String)
+}
+
 /// Scans an XPointer into its scheme parts, each already translated to an XPath
-/// expression. File-scope and private: an internal detail of
-/// ``PureXML/XPointer/Pointer``.
+/// expression or a namespace binding. File-scope and private: an internal detail
+/// of ``PureXML/XPointer/Pointer``.
 private struct PointerScanner {
     typealias XPointerError = PureXML.XPointer.XPointerError
 
@@ -11,19 +19,19 @@ private struct PointerScanner {
         chars = Array(pointer)
     }
 
-    static func parts(of pointer: String) throws -> [String] {
+    static func parts(of pointer: String) throws -> [PointerPart] {
         let trimmed = pointer.trimmingXMLWhitespace()
         guard !trimmed.isEmpty else { throw XPointerError.empty }
         // A bare name with no scheme parentheses is a shorthand pointer: id(name).
         if !trimmed.contains("(") {
-            return ["id('\(trimmed)')"]
+            return [.expression("id('\(trimmed)')")]
         }
         var scanner = PointerScanner(trimmed)
         return try scanner.scanSchemes()
     }
 
-    private mutating func scanSchemes() throws -> [String] {
-        var parts: [String] = []
+    private mutating func scanSchemes() throws -> [PointerPart] {
+        var parts: [PointerPart] = []
         while true {
             skipSpace()
             guard !isAtEnd else { return parts }
@@ -63,12 +71,22 @@ private struct PointerScanner {
         throw XPointerError.malformed
     }
 
-    private func translate(scheme: String, data: String) throws -> String {
+    private func translate(scheme: String, data: String) throws -> PointerPart {
         switch scheme {
-        case "xpointer": data
-        case "element": Self.elementToXPath(data)
+        case "xpointer", "xpath1": .expression(data)
+        case "element": .expression(Self.elementToXPath(data))
+        case "xmlns": try Self.namespaceBinding(data)
         default: throw XPointerError.unknownScheme(scheme)
         }
+    }
+
+    /// Parses an `xmlns(prefix=uri)` datum into a namespace binding.
+    private static func namespaceBinding(_ data: String) throws -> PointerPart {
+        guard let equals = data.firstIndex(of: "=") else { throw XPointerError.malformed }
+        let prefix = String(data[..<equals]).trimmingXMLWhitespace()
+        let uri = String(data[data.index(after: equals)...]).trimmingXMLWhitespace()
+        guard !prefix.isEmpty else { throw XPointerError.malformed }
+        return .namespace(prefix: prefix, uri: uri)
     }
 
     /// Translates an `element()` scheme datum (`id/1/2`, `/1/2`, `id`) into the
@@ -123,29 +141,38 @@ private struct PointerScanner {
 }
 
 public extension PureXML.XPointer {
-    /// A compiled XPointer over the `element()` and `xpointer()` schemes, plus the
-    /// shorthand bare-name form (`name`, equivalent to `id('name')`). A pointer
-    /// may chain several scheme parts; they are tried in order and the first that
-    /// selects a non-empty node-set wins (the XPointer fallback rule).
+    /// A compiled XPointer over the `element()`, `xpointer()`, `xpath1()`, and
+    /// `xmlns()` schemes, plus the shorthand bare-name form (`name`, equivalent to
+    /// `id('name')`). A pointer may chain several scheme parts; selection parts are
+    /// tried in order and the first that selects a non-empty node-set wins (the
+    /// XPointer fallback rule).
     ///
     /// `element(id/2/3)` navigates by child-element position from an id (or the
-    /// document root for a leading `/`); `xpointer(expr)` evaluates a full XPath
-    /// expression. Reimplemented over ``PureXML/XPath``.
+    /// document root for a leading `/`); `xpointer(expr)` and `xpath1(expr)`
+    /// evaluate a full XPath expression; `xmlns(p=uri)` binds the prefix `p` for the
+    /// expression parts that follow it. Reimplemented over ``PureXML/XPath``.
     struct Pointer: Sendable {
-        private let parts: [String]
+        private let parts: [PointerPart]
 
         /// Compiles an XPointer string.
         public init(_ pointer: String) throws {
             parts = try PointerScanner.parts(of: pointer)
         }
 
-        /// Evaluates the pointer over a node, returning the first scheme part's
-        /// non-empty selection in document order, or an empty list.
+        /// Evaluates the pointer over a node, returning the first selection scheme
+        /// part's non-empty result in document order, or an empty list. An
+        /// `xmlns()` part binds a prefix for the expression parts that follow it.
         public func evaluate(over node: PureXML.Model.Node) -> [PureXML.XPath.Selection] {
+            var namespaces: [String: String] = [:]
             for part in parts {
-                guard let query = try? PureXML.XPath.Query(part) else { continue }
-                let result = query.evaluate(over: node)
-                if !result.isEmpty { return result }
+                switch part {
+                case let .namespace(prefix, uri):
+                    namespaces[prefix] = uri
+                case let .expression(xpath):
+                    guard let query = try? PureXML.XPath.Query(xpath) else { continue }
+                    let result = query.evaluate(over: node, namespaces: namespaces)
+                    if !result.isEmpty { return result }
+                }
             }
             return []
         }

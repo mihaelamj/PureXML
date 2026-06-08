@@ -20,6 +20,13 @@ public extension PureXML.XPath {
             Evaluator.evaluate(expression, over: node)
         }
 
+        /// Evaluates the query with eval-time prefix bindings, so a name test like
+        /// `x:foo` resolves `x` to its URI and matches by namespace regardless of
+        /// the prefix the document uses.
+        public func evaluate(over node: PureXML.Model.Node, namespaces: [String: String]) -> [Selection] {
+            Evaluator.evaluate(expression, over: node, namespaces: namespaces)
+        }
+
         /// Evaluates the query and returns the selected elements only.
         public func elements(over node: PureXML.Model.Node) -> [PureXML.Model.Element] {
             evaluate(over: node).compactMap(\.element)
@@ -56,8 +63,9 @@ public extension PureXML.XPath {
             position: Int = 1,
             size: Int = 1,
             variables: [String: Value] = [:],
+            namespaces: [String: String] = [:],
         ) throws -> Value {
-            try Evaluator.value(expression, at: node, position: position, size: size, variables: variables)
+            try Evaluator.value(expression, at: node, position: position, size: size, variables: variables, namespaces: namespaces)
         }
 
         /// Like ``value(at:position:size:variables:)`` but with an extra function
