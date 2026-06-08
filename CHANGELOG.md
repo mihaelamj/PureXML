@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- RELAX NG validation by derivatives (toward #2). `PureXML.Schema.RelaxNG`
+  parses a RELAX NG schema in the XML syntax into a pattern grammar (`element`,
+  `attribute`, `text`, `empty`, `notAllowed`, `group`, `choice`, `interleave`,
+  `optional`, `zeroOrMore`, `oneOrMore`, `mixed`, `list`, `ref`/`define`, `data`,
+  `value`, and the name classes), and `validate(_:)` checks an instance document
+  by James Clark's derivative algorithm: the pattern is derived through each
+  start-tag, attribute, text, and end-tag event, and the document is valid when
+  the residual pattern is nullable. Handles interleave, recursive grammars, and
+  reuses the XSD datatype library for `data`/`value`.
 - XSD schema-document parser, completing the XSD validation pipeline (toward #2).
   `PureXML.Schema.Document(xsd)` compiles a schema document into its global
   element declarations and named-type table, and `validate(_:)` checks an
