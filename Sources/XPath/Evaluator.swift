@@ -3,6 +3,12 @@ extension PureXML.XPath {
     /// ``Value``. Location paths run over the parent-aware tree; the operator
     /// grammar, functions, and variables build on the four-type model.
     enum Evaluator {
+        /// The full XPath 1.0 function library: the core functions plus the
+        /// string, node, and number families.
+        static let library = CoreFunctions.table
+            .merging(StringFunctions.table)
+            .merging(NodeFunctions.table)
+
         /// Evaluates an expression and returns its node-set as selections in
         /// document order. A non-node-set result yields an empty list; use
         /// ``value(_:over:variables:)`` for typed results.
@@ -30,7 +36,7 @@ extension PureXML.XPath {
                 position: 1,
                 size: 1,
                 variables: variables,
-                functions: CoreFunctions.table,
+                functions: library,
             )
         }
 

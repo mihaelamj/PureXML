@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The full XPath 1.0 function library (toward #21 full XPath 1.0). Beyond the
+  core functions, the string family (`concat`, `starts-with`, `contains`,
+  `substring-before`, `substring-after`, `substring`, `string-length`,
+  `normalize-space`, `translate`), the number family (`sum`, `floor`, `ceiling`,
+  `round`), and the node family (`local-name`, `name`, `namespace-uri`, `id`,
+  `lang`). All pure Swift with no Foundation. Without a DTD, `id()` matches by an
+  attribute named `id` or `xml:id`.
 - The XPath expression engine and four-type model (toward #21 full XPath 1.0).
   `PureXML.XPath.Query` now compiles and evaluates full expressions, not just
   location paths: the operator grammar (`or`, `and`, `=`, `!=`, `<`, `<=`, `>`,
