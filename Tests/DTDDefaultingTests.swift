@@ -86,19 +86,18 @@ struct DTDDefaultingTests {
         #expect(try !validate(bad).isEmpty)
     }
 
-    @Test("ENTITY requires an XML name")
+    @Test("ENTITY must name a declared unparsed entity")
     func test_entity() throws {
-        let valid = "<!DOCTYPE r [<!ATTLIST r t ENTITY #IMPLIED>]><r t=\"logo\"/>"
-        #expect(try validate(valid).isEmpty)
-        let bad = "<!DOCTYPE r [<!ATTLIST r t ENTITY #IMPLIED>]><r t=\"1logo\"/>"
-        #expect(try !validate(bad).isEmpty)
+        let dtd = "<!NOTATION gif SYSTEM \"g\"><!ENTITY logo SYSTEM \"l.gif\" NDATA gif><!ATTLIST r t ENTITY #IMPLIED>"
+        #expect(try validate("<!DOCTYPE r [\(dtd)]><r t=\"logo\"/>").isEmpty)
+        // A syntactically valid name that is not a declared unparsed entity fails.
+        #expect(try !validate("<!DOCTYPE r [\(dtd)]><r t=\"other\"/>").isEmpty)
     }
 
-    @Test("ENTITIES requires every token to be a name")
+    @Test("ENTITIES requires every token to name a declared unparsed entity")
     func test_entities() throws {
-        let valid = "<!DOCTYPE r [<!ATTLIST r t ENTITIES #IMPLIED>]><r t=\"a b\"/>"
-        #expect(try validate(valid).isEmpty)
-        let bad = "<!DOCTYPE r [<!ATTLIST r t ENTITIES #IMPLIED>]><r t=\"a 9b\"/>"
-        #expect(try !validate(bad).isEmpty)
+        let dtd = "<!NOTATION gif SYSTEM \"g\"><!ENTITY a SYSTEM \"a.gif\" NDATA gif><!ENTITY b SYSTEM \"b.gif\" NDATA gif><!ATTLIST r t ENTITIES #IMPLIED>"
+        #expect(try validate("<!DOCTYPE r [\(dtd)]><r t=\"a b\"/>").isEmpty)
+        #expect(try !validate("<!DOCTYPE r [\(dtd)]><r t=\"a c\"/>").isEmpty)
     }
 }

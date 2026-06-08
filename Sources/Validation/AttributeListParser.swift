@@ -46,7 +46,7 @@ extension PureXML.Validation {
             case "ENTITIES": return .entities
             case "NOTATION":
                 skipSpace()
-                return peek() == "(" ? .enumeration(parseEnumeration()) : .cdata
+                return peek() == "(" ? .notation(parseEnumeration()) : .cdata
             default:
                 return .cdata
             }

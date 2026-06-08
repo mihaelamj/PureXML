@@ -19,6 +19,11 @@ public extension PureXML.Parsing {
         /// The external subset identifier from `<!DOCTYPE root SYSTEM/PUBLIC ...>`,
         /// or nil when the DOCTYPE has no external subset.
         public var externalSubset: ExternalID?
+        /// `<!NOTATION>` declarations keyed by name, with their external identifier.
+        public var notations: [String: ExternalID]
+        /// Unparsed general entities (`<!ENTITY name SYSTEM "..." NDATA n>`) keyed by
+        /// name. Their content is never parsed; the notation names how to handle it.
+        public var unparsedEntities: [String: UnparsedEntity]
 
         public init(
             entities: [String: String] = [:],
@@ -27,6 +32,8 @@ public extension PureXML.Parsing {
             parameterEntities: [String: String] = [:],
             externalEntities: [String: ExternalID] = [:],
             externalSubset: ExternalID? = nil,
+            notations: [String: ExternalID] = [:],
+            unparsedEntities: [String: UnparsedEntity] = [:],
         ) {
             self.entities = entities
             self.elementModels = elementModels
@@ -34,6 +41,8 @@ public extension PureXML.Parsing {
             self.parameterEntities = parameterEntities
             self.externalEntities = externalEntities
             self.externalSubset = externalSubset
+            self.notations = notations
+            self.unparsedEntities = unparsedEntities
         }
     }
 }
