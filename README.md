@@ -92,7 +92,7 @@ flowchart TB
   Querying["Querying: #21 XPath, #22 xmlPattern, #23 XPointer (shipped)"]:::done
   Regexp["#30 Regular expression engine"]:::epic
   Xsd["#2 XSD / RELAX NG validation"]:::epic
-  Schematron["#25 Schematron validation"]:::epic
+  Schematron["#25 Schematron validation"]:::done
   Regexp --> Xsd
   Querying --> Schematron
 ```

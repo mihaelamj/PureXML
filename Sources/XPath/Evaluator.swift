@@ -29,6 +29,23 @@ extension PureXML.XPath {
             try eval(expression, rootContext(node, variables: variables))
         }
 
+        /// Evaluates a node-set expression against a pre-built tree and returns the
+        /// matched tree nodes in document order (attribute and namespace results
+        /// are dropped). Lets a caller build the tree once and query it repeatedly.
+        static func nodes(_ expression: Expression, over root: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
+            let context = EvaluationContext(
+                node: .tree(root),
+                position: 1,
+                size: 1,
+                variables: [:],
+                functions: library,
+            )
+            guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
+                return []
+            }
+            return orderUnique(nodes).compactMap(\.treeNode)
+        }
+
         /// Evaluates an expression against an explicit context: a node already in a
         /// tree, its proximity position and size, and variable bindings. This is
         /// the entry point downstream engines (XSLT, Schematron) drive per node.

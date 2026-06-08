@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Schematron validation (#25, the libxml2 `schematron.h` model).
+  `PureXML.Validation.Schematron(schema:)` compiles a Schematron schema
+  (namespace-agnostic over the ISO and legacy namespaces) and `validate(_:)`
+  checks a document: each `<rule>`'s `context` XPath selects the nodes it fires
+  on, and each `<assert>`/`<report>` `test` is evaluated relative to that node, a
+  failed assert becoming an error issue and a matched report a warning. Within a
+  pattern a node fires the first matching rule. Built on the XPath context-node
+  evaluation, with a new `XPath.Query.nodes(over:)` that returns matched tree
+  nodes for repeated querying of one tree.
 - XPointer (#23, the libxml2 `xpointer.h` schemes). The new `PureXML.XPointer`
   namespace resolves the shorthand bare-name form (`name` = `id('name')`), the
   `element()` scheme (child-element positions from an id or the document root,
