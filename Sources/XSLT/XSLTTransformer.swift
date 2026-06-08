@@ -13,6 +13,13 @@ private struct XSLTContext {
     var variables: [String: PureXML.XPath.Value]
 }
 
+/// Shared, mutable signal that an `xsl:message terminate="yes"` fired, carrying
+/// its text. A reference type so the value-semantics transformer can set it.
+/// File-scope and private.
+private final class Termination {
+    var message: String?
+}
+
 extension PureXML.XSLT {
     /// Runs a compiled stylesheet against a source tree, producing a result tree
     /// by the XSLT 1.0 processing model: apply templates from the root, match each
@@ -23,6 +30,12 @@ extension PureXML.XSLT {
         let root: PureXML.Model.TreeNode
         let documentLoader: (String) -> String?
         private let keyIndex: PureXML.XSLT.KeyIndex
+        private let termination = Termination()
+
+        /// The `xsl:message terminate="yes"` text, if one fired during `run()`.
+        var terminationMessage: String? {
+            termination.message
+        }
 
         init(stylesheet: Stylesheet, root: PureXML.Model.TreeNode, documentLoader: @escaping (String) -> String? = { _ in nil }) {
             self.stylesheet = stylesheet
@@ -31,7 +44,7 @@ extension PureXML.XSLT {
             keyIndex = PureXML.XSLT.Library.buildKeyIndex(stylesheet: stylesheet, root: root)
         }
 
-        fileprivate func run() -> PureXML.Model.Node {
+        func run() -> PureXML.Model.Node {
             var variables: [String: PureXML.XPath.Value] = [:]
             let baseContext = XSLTContext(node: root, position: 1, size: 1, variables: variables)
             for global in stylesheet.globals {
@@ -122,6 +135,7 @@ extension PureXML.XSLT {
             var items: [ResultItem] = []
             var context = context
             for instruction in body {
+                if termination.message != nil { break }
                 if case let .variable(name, select, varBody) = instruction {
                     context.variables[name] = variableValue(select, varBody, context)
                 } else {
@@ -213,6 +227,15 @@ extension PureXML.XSLT.Transformer {
         }
     }
 
+    /// Instantiates an `xsl:message` body as its text; `terminate` records the
+    /// signal so the transform aborts with it. Produces no result-tree output.
+    private func message(_ terminate: Bool, _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
+        if terminate, termination.message == nil {
+            termination.message = Self.text(of: instantiate(body, context))
+        }
+        return []
+    }
+
     private func structuralEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
         switch instruction {
         case let .literalElement(name, attributes, body):
@@ -229,6 +252,8 @@ extension PureXML.XSLT.Transformer {
             [.node(.comment(Self.text(of: instantiate(body, context))))]
         case let .processingInstruction(name, body):
             [.node(.processingInstruction(target: avt(name, context), data: Self.text(of: instantiate(body, context))))]
+        case let .message(terminate, body):
+            message(terminate, body, context)
         default:
             []
         }
@@ -348,49 +373,5 @@ extension PureXML.XSLT.Transformer {
     private func keyValue(_ expression: String, _ node: PureXML.Model.TreeNode) -> String {
         guard let query = try? PureXML.XPath.Query(expression) else { return "" }
         return (try? query.value(at: node).string) ?? ""
-    }
-}
-
-public extension PureXML.XSLT {
-    /// Transforms `source` with `stylesheet`, returning the serialized result.
-    /// `documentLoader` resolves the URI argument of the `document()` function to
-    /// source text; it returns `nil` (the default) when external documents are
-    /// not available, which keeps `document()` from reaching the filesystem or
-    /// network by default.
-    static func transform(
-        stylesheet: String,
-        source: String,
-        options: PureXML.Emitting.Options = .compact,
-        documentLoader: @escaping (String) -> String? = { _ in nil },
-    ) throws -> String {
-        let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
-        let root = try PureXML.parseTree(source)
-        Whitespace.strip(root, stylesheet: sheet)
-        let result = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
-        if sheet.output.method == "text" { return textValue(of: result) }
-        return PureXML.serialize(result, options: options.applying(sheet.output))
-    }
-
-    /// Transforms `source` with `stylesheet`, returning the result tree.
-    static func transformToNode(
-        stylesheet: String,
-        source: String,
-        documentLoader: @escaping (String) -> String? = { _ in nil },
-    ) throws -> PureXML.Model.Node {
-        let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
-        let root = try PureXML.parseTree(source)
-        Whitespace.strip(root, stylesheet: sheet)
-        return Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
-    }
-
-    /// The concatenated text content of a result tree, for the `text` output
-    /// method: character data only, with markup, comments, and PIs dropped.
-    private static func textValue(of node: PureXML.Model.Node) -> String {
-        switch node {
-        case let .text(value), let .cdata(value): value
-        case let .document(children): children.map(textValue).joined()
-        case let .element(element): element.children.map(textValue).joined()
-        case .comment, .processingInstruction: ""
-        }
     }
 }

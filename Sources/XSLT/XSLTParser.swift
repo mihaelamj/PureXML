@@ -54,13 +54,16 @@ private enum XSLTNode {
 }
 
 public extension PureXML.XSLT {
-    /// Errors compiling a stylesheet.
+    /// Errors compiling or running a stylesheet.
     enum XSLTError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
         case notAStylesheet
+        /// An `xsl:message terminate="yes"` ended the transformation with this text.
+        case terminated(String)
 
         public var description: String {
             switch self {
             case .notAStylesheet: "the document is not an xsl:stylesheet"
+            case let .terminated(message): "transformation terminated: \(message)"
             }
         }
     }
@@ -226,6 +229,7 @@ extension PureXML.XSLT {
             case "text": .literalText(node.stringValue)
             case "variable", "param": variable(node)
             case "copy": .copy(body: body(node))
+            case "message": .message(terminate: XSLTNode.attribute(node, "terminate") == "yes", body: body(node))
             default: nil
             }
         }
