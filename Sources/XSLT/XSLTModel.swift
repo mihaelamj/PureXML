@@ -54,6 +54,51 @@ public extension PureXML.XSLT {
         case variable(name: String, select: String?, body: [Instruction])
         /// `xsl:number`: a generated sequence number for the context node.
         case number(count: String?, from: String?, format: String)
+        /// `xsl:comment`: a comment node whose text is the instantiated body.
+        case comment(body: [Instruction])
+        /// `xsl:processing-instruction` whose target is `name` and whose data is
+        /// the instantiated body.
+        case processingInstruction(name: ValueTemplate, body: [Instruction])
+    }
+
+    /// The `xsl:output` controls that shape serialization: the output method, and
+    /// the declaration and indentation settings. Each is nil when unspecified, so
+    /// the serializer falls back to the caller's options.
+    struct Output: Sendable {
+        public var method: String?
+        public var indent: Bool?
+        public var omitXMLDeclaration: Bool?
+        public var encoding: String?
+        public var version: String?
+        public var standalone: Bool?
+
+        public init(
+            method: String? = nil,
+            indent: Bool? = nil,
+            omitXMLDeclaration: Bool? = nil,
+            encoding: String? = nil,
+            version: String? = nil,
+            standalone: Bool? = nil,
+        ) {
+            self.method = method
+            self.indent = indent
+            self.omitXMLDeclaration = omitXMLDeclaration
+            self.encoding = encoding
+            self.version = version
+            self.standalone = standalone
+        }
+
+        /// This output's settings with `other`'s non-nil settings layered over them.
+        func merged(with other: Output) -> Output {
+            Output(
+                method: other.method ?? method,
+                indent: other.indent ?? indent,
+                omitXMLDeclaration: other.omitXMLDeclaration ?? omitXMLDeclaration,
+                encoding: other.encoding ?? encoding,
+                version: other.version ?? version,
+                standalone: other.standalone ?? standalone,
+            )
+        }
     }
 
     /// An `xsl:key` declaration: a name, the nodes it indexes (a match pattern),
@@ -79,20 +124,24 @@ public extension PureXML.XSLT {
     }
 
     /// A template rule: a match pattern and/or a name, a mode, a priority, its
-    /// declared parameters, and a body.
+    /// import precedence (higher wins, used to resolve `xsl:import`), its declared
+    /// parameters, and a body.
     struct Template: Sendable {
         public var match: String?
         public var name: String?
         public var mode: String?
         public var priority: Double
+        public var importPrecedence: Int
         public var parameters: [Binding]
         public var body: [Instruction]
     }
 
-    /// A compiled stylesheet: its template rules, global variables, and keys.
+    /// A compiled stylesheet: its template rules, global variables, keys, and
+    /// output controls (with `xsl:include`/`xsl:import` already folded in).
     struct Stylesheet: Sendable {
         public var templates: [Template]
         public var globals: [Instruction]
         public var keys: [Key]
+        public var output: Output
     }
 }
