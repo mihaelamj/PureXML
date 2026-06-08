@@ -4,7 +4,7 @@ extension PureXML.XPath {
     /// and `string`. The broader library (string, node, and number functions)
     /// extends this table.
     enum CoreFunctions {
-        static let table = FunctionTable([
+        nonisolated(unsafe) static let table = FunctionTable([
             "last": { _, context in .number(Double(context.size)) },
             "position": { _, context in .number(Double(context.position)) },
             "count": { arguments, _ in

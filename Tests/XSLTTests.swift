@@ -60,6 +60,63 @@ struct XSLTTests {
         #expect(try transform(stylesheet, source) == "<toc><li>A</li><li>B</li></toc><body><h1>A</h1><h1>B</h1></body>")
     }
 
+    @Test("xsl:key indexes nodes and key() retrieves them")
+    func test_key() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:key name="byCat" match="item" use="@cat"/>
+          <xsl:template match="/">
+            <out><xsl:for-each select="key('byCat', 'fruit')"><n><xsl:value-of select="."/></n></xsl:for-each></out>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<r><item cat=\"fruit\">apple</item><item cat=\"veg\">pea</item><item cat=\"fruit\">pear</item></r>"
+        #expect(try transform(stylesheet, source) == "<out><n>apple</n><n>pear</n></out>")
+    }
+
+    @Test("format-number renders per the picture string")
+    func test_formatNumber() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/">
+            <out>
+              <a><xsl:value-of select="format-number(1234.5, '#,##0.00')"/></a>
+              <b><xsl:value-of select="format-number(0.25, '0%')"/></b>
+            </out>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<x/>") == "<out><a>1,234.50</a><b>25%</b></out>")
+    }
+
+    @Test("xsl:number generates the position of the context node")
+    func test_number() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/"><out><xsl:apply-templates select="r/i"/></out></xsl:template>
+          <xsl:template match="i"><n><xsl:number format="i"/></n></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<r><i/><i/><i/></r>") == "<out><n>i</n><n>ii</n><n>iii</n></out>")
+    }
+
+    @Test("document() loads external source through the injected loader")
+    func test_document() throws {
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:template match="/">
+            <out><xsl:value-of select="document('ext.xml')/data/v"/></out>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: stylesheet,
+            source: "<x/>",
+            documentLoader: { uri in uri == "ext.xml" ? "<data><v>loaded</v></data>" : nil },
+        )
+        #expect(result == "<out>loaded</out>")
+    }
+
     @Test("The identity transform reproduces the input")
     func test_identity() throws {
         let stylesheet = """

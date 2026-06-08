@@ -60,6 +60,30 @@ public extension PureXML.XPath {
             try Evaluator.value(expression, at: node, position: position, size: size, variables: variables)
         }
 
+        /// Like ``value(at:position:size:variables:)`` but with an extra function
+        /// table merged in (for engine-specific functions such as XSLT's `key`).
+        func value(
+            at node: PureXML.Model.TreeNode,
+            position: Int,
+            size: Int,
+            variables: [String: Value],
+            functions: FunctionTable,
+        ) throws -> Value {
+            try Evaluator.value(
+                expression,
+                at: node,
+                position: position,
+                size: size,
+                variables: variables,
+                functions: functions,
+            )
+        }
+
+        /// Like ``nodes(over:)`` but with an extra function table merged in.
+        func nodes(over root: PureXML.Model.TreeNode, functions: FunctionTable) -> [PureXML.Model.TreeNode] {
+            Evaluator.nodes(expression, over: root, functions: functions)
+        }
+
         /// Evaluates the query and coerces the result to a number.
         public func number(over node: PureXML.Model.Node, variables: [String: Value] = [:]) throws -> Double {
             try value(over: node, variables: variables).number

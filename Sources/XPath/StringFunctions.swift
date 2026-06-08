@@ -3,7 +3,7 @@ extension PureXML.XPath {
     /// `substring-before`, `substring-after`, `substring`, `string-length`,
     /// `normalize-space`, and `translate`.
     enum StringFunctions {
-        static let table = FunctionTable([
+        nonisolated(unsafe) static let table = FunctionTable([
             "concat": { arguments, _ in .string(arguments.map(\.string).joined()) },
             "starts-with": { arguments, _ in
                 .boolean(argument(arguments, 0).hasPrefix(argument(arguments, 1)))

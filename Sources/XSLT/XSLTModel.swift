@@ -52,6 +52,16 @@ public extension PureXML.XSLT {
         case callTemplate(name: String, parameters: [Binding])
         /// `xsl:variable` bound for the rest of the sequence constructor.
         case variable(name: String, select: String?, body: [Instruction])
+        /// `xsl:number`: a generated sequence number for the context node.
+        case number(count: String?, from: String?, format: String)
+    }
+
+    /// An `xsl:key` declaration: a name, the nodes it indexes (a match pattern),
+    /// and the key value of each (a `use` expression).
+    struct Key: Sendable {
+        public var name: String
+        public var match: String
+        public var use: String
     }
 
     /// One `xsl:when` branch of a choose.
@@ -79,9 +89,10 @@ public extension PureXML.XSLT {
         public var body: [Instruction]
     }
 
-    /// A compiled stylesheet: its template rules and global variables.
+    /// A compiled stylesheet: its template rules, global variables, and keys.
     struct Stylesheet: Sendable {
         public var templates: [Template]
         public var globals: [Instruction]
+        public var keys: [Key]
     }
 }
