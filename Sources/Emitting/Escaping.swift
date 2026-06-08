@@ -18,14 +18,17 @@ extension PureXML.Emitting {
             return result
         }
 
-        static func attribute(_ value: String) -> String {
+        static func attribute(_ value: String, quote: Character = "\"") -> String {
             var result = ""
             for character in value {
+                if character == quote {
+                    result += quote == "'" ? "&apos;" : "&quot;"
+                    continue
+                }
                 switch character {
                 case "&": result += "&amp;"
                 case "<": result += "&lt;"
                 case ">": result += "&gt;"
-                case "\"": result += "&quot;"
                 case "\t": result += "&#9;"
                 case "\n": result += "&#10;"
                 case "\r": result += "&#13;"
