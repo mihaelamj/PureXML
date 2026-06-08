@@ -10,9 +10,18 @@ private struct Parts {
     var output = PureXML.XSLT.Output()
     var stripSpace: Set<String> = []
     var preserveSpace: Set<String> = []
+    var attributeSets: [String: PureXML.XSLT.AttributeSet] = [:]
 
     var stylesheet: PureXML.XSLT.Stylesheet {
-        PureXML.XSLT.Stylesheet(templates: templates, globals: globals, keys: keys, output: output, stripSpace: stripSpace, preserveSpace: preserveSpace)
+        PureXML.XSLT.Stylesheet(
+            templates: templates,
+            globals: globals,
+            keys: keys,
+            output: output,
+            stripSpace: stripSpace,
+            preserveSpace: preserveSpace,
+            attributeSets: attributeSets,
+        )
     }
 
     /// Folds a sub-stylesheet in: an import has lower precedence, so its globals
@@ -23,6 +32,7 @@ private struct Parts {
         keys += sub.keys
         stripSpace.formUnion(sub.stripSpace)
         preserveSpace.formUnion(sub.preserveSpace)
+        attributeSets.merge(sub.attributeSets) { mine, _ in mine }
         globals = isImport ? sub.globals + globals : globals + sub.globals
         output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
     }
@@ -109,10 +119,16 @@ extension PureXML.XSLT {
             case "output": parts.output = parts.output.merged(with: parseOutput(child))
             case "strip-space": parts.stripSpace.formUnion(elementNames(child))
             case "preserve-space": parts.preserveSpace.formUnion(elementNames(child))
+            case "attribute-set": addAttributeSet(child, into: &parts)
             case "include": parts.fold(load(child, loader: loader, precedence: precedence), isImport: false)
             case "import": parts.fold(load(child, loader: loader, precedence: precedence - 1), isImport: true)
             default: break
             }
+        }
+
+        private static func addAttributeSet(_ child: Tree, into parts: inout Parts) {
+            guard let name = XSLTNode.attribute(child, "name") else { return }
+            parts.attributeSets[name] = AttributeSet(attributes: body(child), use: useAttributeSets(child))
         }
 
         /// The whitespace-separated element name tests of an `xsl:strip-space` or
@@ -243,7 +259,7 @@ extension PureXML.XSLT {
             case "choose":
                 choose(node)
             case "element":
-                .element(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
+                .element(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), useAttributeSets: useAttributeSets(node), body: body(node))
             case "attribute":
                 .attribute(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
             case "number":
@@ -275,10 +291,17 @@ extension PureXML.XSLT {
 
         private static func literalElement(_ node: Tree) -> Instruction {
             guard let name = node.name else { return .literalText("") }
+            // xmlns declarations and the special xsl:* attributes (use-attribute-sets,
+            // version, exclude-result-prefixes …) are not copied to the output.
             let attributes = node.attributes
-                .filter { $0.name.prefix != "xmlns" && !($0.name.prefix == nil && $0.name.localName == "xmlns") }
+                .filter { $0.name.prefix != "xmlns" && !($0.name.prefix == nil && $0.name.localName == "xmlns") && $0.name.prefix != "xsl" }
                 .map { LiteralAttribute(name: $0.name, value: valueTemplate($0.value)) }
-            return .literalElement(name: name, attributes: attributes, body: body(node))
+            return .literalElement(name: name, attributes: attributes, useAttributeSets: useAttributeSets(node), body: body(node))
+        }
+
+        /// The whitespace-separated names of `[xsl:]use-attribute-sets` on `node`.
+        private static func useAttributeSets(_ node: Tree) -> [String] {
+            (XSLTNode.attribute(node, "use-attribute-sets") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
         }
 
         private static func sorts(_ node: Tree) -> [Sort] {

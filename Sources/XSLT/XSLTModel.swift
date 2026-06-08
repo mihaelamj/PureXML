@@ -38,10 +38,12 @@ public extension PureXML.XSLT {
         case ifInstruction(test: String, body: [Instruction])
         /// `xsl:choose` with its `when` branches and optional `otherwise`.
         case choose(whens: [Branch], otherwise: [Instruction])
-        /// A literal result element, copied to the output with its attributes.
-        case literalElement(name: PureXML.Model.QualifiedName, attributes: [LiteralAttribute], body: [Instruction])
-        /// `xsl:element` whose name is an attribute value template.
-        case element(name: ValueTemplate, body: [Instruction])
+        /// A literal result element, copied to the output with its attributes and
+        /// any `use-attribute-sets`.
+        case literalElement(name: PureXML.Model.QualifiedName, attributes: [LiteralAttribute], useAttributeSets: [String], body: [Instruction])
+        /// `xsl:element` whose name is an attribute value template, with any
+        /// `use-attribute-sets`.
+        case element(name: ValueTemplate, useAttributeSets: [String], body: [Instruction])
         /// `xsl:attribute` whose name is an attribute value template.
         case attribute(name: ValueTemplate, body: [Instruction])
         /// `xsl:copy`: a shallow copy of the context node.
@@ -104,6 +106,18 @@ public extension PureXML.XSLT {
         }
     }
 
+    /// An `xsl:attribute-set`: the `xsl:attribute` instructions it contributes and
+    /// the other attribute sets it includes (`use-attribute-sets`).
+    struct AttributeSet: Sendable {
+        public var attributes: [Instruction]
+        public var use: [String]
+
+        public init(attributes: [Instruction], use: [String]) {
+            self.attributes = attributes
+            self.use = use
+        }
+    }
+
     /// An `xsl:key` declaration: a name, the nodes it indexes (a match pattern),
     /// and the key value of each (a `use` expression).
     struct Key: Sendable {
@@ -152,6 +166,8 @@ public extension PureXML.XSLT {
         public var stripSpace: Set<String>
         /// Element name tests that keep their whitespace, overriding `stripSpace`.
         public var preserveSpace: Set<String>
+        /// Named `xsl:attribute-set` declarations, keyed by name.
+        public var attributeSets: [String: AttributeSet]
 
         public init(
             templates: [Template],
@@ -160,6 +176,7 @@ public extension PureXML.XSLT {
             output: Output,
             stripSpace: Set<String> = [],
             preserveSpace: Set<String> = [],
+            attributeSets: [String: AttributeSet] = [:],
         ) {
             self.templates = templates
             self.globals = globals
@@ -167,6 +184,7 @@ public extension PureXML.XSLT {
             self.output = output
             self.stripSpace = stripSpace
             self.preserveSpace = preserveSpace
+            self.attributeSets = attributeSets
         }
     }
 }

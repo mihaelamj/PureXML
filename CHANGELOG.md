@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:attribute-set` (#81). Named attribute sets are applied to a literal
+  result element or `xsl:element` via `use-attribute-sets`; sets may include other
+  sets (recursively, with a cycle guard), set attributes are lowest precedence so
+  the element's own attributes override them, and same-named attributes collapse
+  to the last. Folded across `xsl:include`/`xsl:import`.
 - XSLT `xsl:message` (#81). The message body is instantiated as diagnostic text;
   `terminate="yes"` aborts the transformation with that text as an
   `XSLTError.terminated`, and processing stops at that point. A non-terminating
