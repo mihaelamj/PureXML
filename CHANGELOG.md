@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Streaming pattern matching (#22, the libxml2 `pattern.h` model). The new
+  `PureXML.Pattern` namespace compiles the streamable XPath subset (element
+  names, `*`, `prefix:*`, `/`, `//`, a leading absolute `/`, and a trailing
+  attribute step) into a `Matcher`, rejecting predicates and `.`/`..` as outside
+  the subset. `PureXML.Pattern.matches(_:in:)` streams a document through the
+  pull parser and returns the paths of matching nodes (`/a/b/c`, `/a/@id`) in
+  document order, deciding each match from the open-element stack alone, so no
+  tree is built. `Matcher.matchesElement(path:)` reuses a compiled pattern.
 - The XPath evaluation context, completing full XPath 1.0 (#21).
   `Query.value(at:position:size:variables:)` evaluates an expression against an
   explicit context node already in a tree, with its proximity position, size,
