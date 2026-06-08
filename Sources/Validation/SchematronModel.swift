@@ -15,6 +15,9 @@ extension PureXML.Validation {
         let isReport: Bool
         let test: PureXML.XPath.Query
         let message: [SchematronMessagePart]
+        /// The ids of `<diagnostic>`s referenced by the `diagnostics=` attribute,
+        /// appended to a failure's message for extra detail.
+        let diagnostics: [String]
     }
 
     /// A `<let name= value=>` variable binding: its name and the compiled XPath
@@ -46,5 +49,8 @@ extension PureXML.Validation {
         let patterns: [SchematronPattern]
         let phases: [String: [String]]
         let defaultPhase: String?
+        /// `<diagnostic id=>` message templates, keyed by id, referenced from an
+        /// assertion's `diagnostics=` attribute.
+        let diagnostics: [String: [SchematronMessagePart]]
     }
 }
