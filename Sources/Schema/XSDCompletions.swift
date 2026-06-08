@@ -59,7 +59,7 @@ public extension PureXML.Schema {
             case let .elementOnly(particle), let .mixed(particle):
                 let (labels, complete) = ContentNFABuilder.build(particle).follow(after: childNames)
                 let names = labels.compactMap { if case let .name(name) = $0 { name.description } else { nil } }
-                let anyElement = labels.contains { if case .any = $0 { true } else { false } }
+                let anyElement = labels.contains { if case .wildcard = $0 { true } else { false } }
                 return Completions(elements: names, complete: complete, allowsAnyElement: anyElement, attributes: attributes)
             case .empty, .simpleContent:
                 return Completions(elements: [], complete: true, allowsAnyElement: false, attributes: attributes)

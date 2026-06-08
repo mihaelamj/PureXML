@@ -18,6 +18,7 @@ extension PureXML.Schema {
                 simpleTypes: [:],
                 attributeGroups: indexByName(allChildren(containers, named: "attributeGroup")),
                 groups: indexByName(allChildren(containers, named: "group")),
+                targetNamespace: XSDNode.attribute(schema, "targetNamespace"),
                 substitutions: XSDNode.substitutionMembers(containers),
             )
             // Named simple types may restrict or list one another regardless of
@@ -96,13 +97,16 @@ extension PureXML.Schema {
             if let builtin = BuiltinType(rawValue: local) {
                 return .simple(SimpleType(base: builtin))
             }
+            if let item = XSDSimpleParser.listBuiltinItem(local) {
+                return .simple(.list(item: SimpleType(base: item)))
+            }
             return .typeReference(local)
         }
 
         private static var anyType: ComplexType {
             ComplexType(
-                allowsOtherAttributes: true,
-                content: .mixed(Particle(minOccurs: 0, maxOccurs: nil, term: .wildcard(Wildcard()))),
+                attributeWildcard: Wildcard(processContents: .skip),
+                content: .mixed(Particle(minOccurs: 0, maxOccurs: nil, term: .wildcard(Wildcard(processContents: .skip)))),
             )
         }
 
@@ -114,14 +118,16 @@ extension PureXML.Schema {
             if let simpleContent = XSDNode.firstChild(node, named: "simpleContent") {
                 let inner = derivation(simpleContent)
                 attributes += inner.map { attributeUses(under: $0, context) } ?? []
-                return ComplexType(attributes: attributes, content: .simpleContent(simpleContentType(simpleContent, context)))
+                let wildcard = inner.flatMap { attributeWildcard(under: $0, context) }
+                return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: .simpleContent(simpleContentType(simpleContent, context)))
             }
             let container = XSDNode.firstChild(node, named: "complexContent").flatMap(derivation) ?? node
             attributes += container === node ? [] : attributeUses(under: container, context)
+            let wildcard = attributeWildcard(under: container, context)
             guard let particle = modelGroup(in: container, context) else {
-                return ComplexType(attributes: attributes, content: .empty)
+                return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: .empty)
             }
-            return ComplexType(attributes: attributes, content: mixed ? .mixed(particle) : .elementOnly(particle))
+            return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: mixed ? .mixed(particle) : .elementOnly(particle))
         }
 
         private static func derivation(_ node: XSDTree) -> XSDTree? {
@@ -228,7 +234,7 @@ extension PureXML.Schema {
             case "group":
                 return groupReferenceParticle(node, minimum, maximum, context)
             case "any":
-                return Particle(minOccurs: minimum, maxOccurs: maximum, term: .wildcard(Wildcard()))
+                return Particle(minOccurs: minimum, maxOccurs: maximum, term: .wildcard(wildcard(node, context)))
             default:
                 return nil
             }
@@ -322,5 +328,39 @@ extension PureXML.Schema.XSDParser {
             result += descendants(child, named: name)
         }
         return result
+    }
+}
+
+extension PureXML.Schema.XSDParser {
+    /// The `xs:anyAttribute` wildcard declared directly under `node`, if any.
+    static func attributeWildcard(under node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Wildcard? {
+        PureXML.Schema.XSDNode.firstChild(node, named: "anyAttribute").map { wildcard($0, context) }
+    }
+
+    /// Parses a wildcard's `namespace` and `processContents` constraints.
+    static func wildcard(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Wildcard {
+        let processContents: PureXML.Schema.ProcessContents = switch PureXML.Schema.XSDNode.attribute(node, "processContents") {
+        case "skip": .skip
+        case "lax": .lax
+        default: .strict
+        }
+        let namespace = wildcardNamespace(PureXML.Schema.XSDNode.attribute(node, "namespace"), context)
+        return PureXML.Schema.Wildcard(namespace: namespace, processContents: processContents, targetNamespace: context.targetNamespace)
+    }
+
+    private static func wildcardNamespace(_ value: String?, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.WildcardNamespace {
+        switch value {
+        case nil, "##any": return .any
+        case "##other": return .other
+        default:
+            let uris = (value ?? "").split(whereSeparator: \.isWhitespace).map { token -> String in
+                switch token {
+                case "##targetNamespace": context.targetNamespace ?? ""
+                case "##local": ""
+                default: String(token)
+                }
+            }
+            return .enumerated(Set(uris))
+        }
     }
 }

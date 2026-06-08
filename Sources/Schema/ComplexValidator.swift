@@ -2,6 +2,12 @@
 /// namespace to avoid nesting a type two levels deep.
 private typealias XSDFailure = PureXML.Validation.ValidationError
 private typealias XSDPath = [PureXML.Validation.PathKey]
+private typealias XSDGroup = PureXML.Schema.Group
+private typealias XSDTerm = PureXML.Schema.Term
+private typealias XSDTermLabel = PureXML.Schema.TermLabel
+private typealias XSDProcessContents = PureXML.Schema.ProcessContents
+private typealias XSDElementType = PureXML.Schema.ElementType
+private typealias XSDWildcard = PureXML.Schema.Wildcard
 
 public extension PureXML.Schema {
     /// Validates an element against a ``ComplexType``: its attribute uses, its
@@ -101,8 +107,10 @@ public extension PureXML.Schema {
                     errors.append(XSDFailure(reason: "missing required attribute '\(use.name.localName)'", at: path))
                 }
             }
-            guard !type.allowsOtherAttributes else { return }
+            // An undeclared attribute is allowed only if an xs:anyAttribute wildcard
+            // admits its namespace.
             for attribute in present where !type.attributes.contains(where: { $0.name.localName == attribute.name.localName }) {
+                if type.attributeWildcard?.admits(attribute.name) == true { continue }
                 errors.append(XSDFailure(reason: "undeclared attribute '\(attribute.name.localName)'", at: path))
             }
         }
@@ -156,19 +164,56 @@ public extension PureXML.Schema {
                 errors.append(XSDFailure(reason: "content does not match the content model", at: path))
                 return
             }
-            validateChildren(children, childTypes: Self.elementTypes(in: particle.term), at: path, into: &errors)
+            validateChildren(
+                children,
+                childTypes: Self.elementTypes(in: particle.term),
+                wildcard: Self.wildcard(in: particle.term),
+                at: path,
+                into: &errors,
+            )
         }
 
         private func validateChildren(
             _ children: [PureXML.Model.Element],
             childTypes: [String: ElementType],
+            wildcard: ProcessContents?,
             at path: XSDPath,
             into errors: inout [XSDFailure],
         ) {
             let steps = Self.childSteps(children)
             for (child, step) in zip(children, steps) {
-                guard let declared = childTypes[Self.key(child.name)] else { continue }
-                validateChild(child, against: declared, at: path + [step], into: &errors)
+                if let declared = childTypes[Self.key(child.name)] {
+                    validateChild(child, against: declared, at: path + [step], into: &errors)
+                } else if let wildcard {
+                    // The structure already matched, so an undeclared child here was
+                    // admitted by a wildcard; process its content per the wildcard.
+                    validateWildcardChild(child, processContents: wildcard, at: path + [step], into: &errors)
+                }
+            }
+        }
+
+        /// Validates a wildcard-matched child by its `processContents`: skip does
+        /// nothing, lax validates against a global declaration when one exists, and
+        /// strict requires one.
+        private func validateWildcardChild(
+            _ child: PureXML.Model.Element,
+            processContents: ProcessContents,
+            at path: XSDPath,
+            into errors: inout [XSDFailure],
+        ) {
+            switch processContents {
+            case .skip:
+                return
+            case .lax:
+                if let declaration = types["element:\(child.name.localName)"] {
+                    validateChild(child, against: declaration, at: path, into: &errors)
+                }
+            case .strict:
+                guard let declaration = types["element:\(child.name.localName)"] else {
+                    errors.append(XSDFailure(reason: "no declaration for wildcard-matched element '\(child.name.localName)'", at: path))
+                    return
+                }
+                validateChild(child, against: declaration, at: path, into: &errors)
             }
         }
 
@@ -208,103 +253,124 @@ public extension PureXML.Schema {
                 validateChild(child, against: resolved, at: path, into: &errors)
             }
         }
+    }
+}
 
-        // MARK: Helpers
+extension PureXML.Schema.ComplexValidator {
+    // MARK: Helpers
 
-        /// The coding-path step for each child: its name, with a sibling index only
-        /// when more than one child shares that name.
-        private static func childSteps(_ children: [PureXML.Model.Element]) -> [PureXML.Validation.PathKey] {
-            var totals: [String: Int] = [:]
-            for child in children {
-                totals[child.name.description, default: 0] += 1
+    /// The coding-path step for each child: its name, with a sibling index only
+    /// when more than one child shares that name.
+    static func childSteps(_ children: [PureXML.Model.Element]) -> [PureXML.Validation.PathKey] {
+        var totals: [String: Int] = [:]
+        for child in children {
+            totals[child.name.description, default: 0] += 1
+        }
+        var seen: [String: Int] = [:]
+        return children.map { child in
+            let name = child.name.description
+            let index = (seen[name] ?? 0) + 1
+            seen[name] = index
+            return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
+        }
+    }
+
+    /// Validates an `all` group order-independently: every child matches a
+    /// member within its occurrence bounds, and each member meets its minimum.
+    fileprivate static func matchesAll(_ group: XSDGroup, names: [PureXML.Model.QualifiedName]) -> Bool {
+        var counts = [Int](repeating: 0, count: group.particles.count)
+        for name in names {
+            guard let index = group.particles.indices.first(where: { position in
+                let member = group.particles[position]
+                let room = member.maxOccurs.map { counts[position] < $0 } ?? true
+                return room && label(of: member.term).matches(name)
+            }) else { return false }
+            counts[index] += 1
+        }
+        for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
+            return false
+        }
+        return true
+    }
+
+    fileprivate static func label(of term: XSDTerm) -> XSDTermLabel {
+        switch term {
+        case let .element(name, _): .name(name)
+        case let .wildcard(wildcard): .wildcard(wildcard)
+        case .group: .wildcard(XSDWildcard())
+        }
+    }
+
+    /// The `processContents` of a wildcard reachable in `term`, if the content
+    /// model contains one.
+    fileprivate static func wildcard(in term: XSDTerm) -> XSDProcessContents? {
+        switch term {
+        case let .wildcard(wildcard):
+            return wildcard.processContents
+        case let .group(group):
+            for member in group.particles {
+                if let found = wildcard(in: member.term) { return found }
             }
-            var seen: [String: Int] = [:]
-            return children.map { child in
-                let name = child.name.description
-                let index = (seen[name] ?? 0) + 1
-                seen[name] = index
-                return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
+            return nil
+        case .element:
+            return nil
+        }
+    }
+
+    fileprivate static func elementTypes(in term: XSDTerm) -> [String: XSDElementType] {
+        var result: [String: XSDElementType] = [:]
+        collectTypes(term, into: &result)
+        return result
+    }
+
+    fileprivate static func collectTypes(_ term: XSDTerm, into result: inout [String: XSDElementType]) {
+        switch term {
+        case let .element(name, type):
+            if let type { result[key(name)] = type }
+        case let .group(group):
+            for member in group.particles {
+                collectTypes(member.term, into: &result)
+            }
+        case .wildcard:
+            break
+        }
+    }
+
+    static func key(_ name: PureXML.Model.QualifiedName) -> String {
+        "{\(name.namespaceURI ?? "")}\(name.localName)"
+    }
+
+    static func textContent(_ element: PureXML.Model.Element) -> String {
+        let text = element.children.reduce(into: "") { result, child in
+            switch child {
+            case let .text(value), let .cdata(value): result += value
+            default: break
             }
         }
+        return text.trimmingXMLWhitespace()
+    }
 
-        /// Validates an `all` group order-independently: every child matches a
-        /// member within its occurrence bounds, and each member meets its minimum.
-        private static func matchesAll(_ group: Group, names: [PureXML.Model.QualifiedName]) -> Bool {
-            var counts = [Int](repeating: 0, count: group.particles.count)
-            for name in names {
-                guard let index = group.particles.indices.first(where: { position in
-                    let member = group.particles[position]
-                    let room = member.maxOccurs.map { counts[position] < $0 } ?? true
-                    return room && label(of: member.term).matches(name)
-                }) else { return false }
-                counts[index] += 1
-            }
-            for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
-                return false
-            }
-            return true
-        }
+    static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
+        attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
+    }
 
-        private static func label(of term: Term) -> TermLabel {
-            if case let .element(name, _) = term { return .name(name) }
-            return .any
-        }
+    /// Whether an attribute belongs to the XML Schema instance namespace
+    /// (`xsi:type`, `xsi:nil`, and the schema-location hints), which are
+    /// processing directives rather than declared attributes.
+    static func isSchemaInstanceAttribute(_ attribute: PureXML.Model.Attribute) -> Bool {
+        attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi"
+    }
 
-        private static func elementTypes(in term: Term) -> [String: ElementType] {
-            var result: [String: ElementType] = [:]
-            collectTypes(term, into: &result)
-            return result
+    /// The local name of an element's `xsi:type` attribute value, or nil when it
+    /// carries none. Recognizes the attribute by the XML Schema instance
+    /// namespace or, failing namespace resolution, the conventional `xsi` prefix.
+    static func xsiTypeName(_ element: PureXML.Model.Element) -> String? {
+        let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
+        let match = element.attributes.first { attribute in
+            attribute.name.localName == "type"
+                && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
         }
-
-        private static func collectTypes(_ term: Term, into result: inout [String: ElementType]) {
-            switch term {
-            case let .element(name, type):
-                if let type { result[key(name)] = type }
-            case let .group(group):
-                for member in group.particles {
-                    collectTypes(member.term, into: &result)
-                }
-            case .wildcard:
-                break
-            }
-        }
-
-        private static func key(_ name: PureXML.Model.QualifiedName) -> String {
-            "{\(name.namespaceURI ?? "")}\(name.localName)"
-        }
-
-        private static func textContent(_ element: PureXML.Model.Element) -> String {
-            let text = element.children.reduce(into: "") { result, child in
-                switch child {
-                case let .text(value), let .cdata(value): result += value
-                default: break
-                }
-            }
-            return text.trimmingXMLWhitespace()
-        }
-
-        private static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
-            attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
-        }
-
-        /// Whether an attribute belongs to the XML Schema instance namespace
-        /// (`xsi:type`, `xsi:nil`, and the schema-location hints), which are
-        /// processing directives rather than declared attributes.
-        private static func isSchemaInstanceAttribute(_ attribute: PureXML.Model.Attribute) -> Bool {
-            attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi"
-        }
-
-        /// The local name of an element's `xsi:type` attribute value, or nil when it
-        /// carries none. Recognizes the attribute by the XML Schema instance
-        /// namespace or, failing namespace resolution, the conventional `xsi` prefix.
-        private static func xsiTypeName(_ element: PureXML.Model.Element) -> String? {
-            let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
-            let match = element.attributes.first { attribute in
-                attribute.name.localName == "type"
-                    && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
-            }
-            return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
-        }
+        return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
     }
 }
 
