@@ -1,20 +1,20 @@
-private typealias RNCToken = PureXML.Schema.RNCToken
-private typealias RNCLexer = PureXML.Schema.RNCLexer
+typealias RNCToken = PureXML.Schema.RNCToken
+typealias RNCLexer = PureXML.Schema.RNCLexer
 
 /// A recursive-descent parser from the token stream to the pattern algebra.
-/// File-scope and private.
-private final class RNCParser {
+/// Module-internal; the only entry point is ``PureXML/Schema/RelaxNGCompactParser``.
+final class RNCParser {
     typealias Pattern = PureXML.Schema.Pattern
     typealias NameClass = PureXML.Schema.NameClass
 
-    private let tokens: [RNCToken]
-    private var position = 0
-    private let loader: (String) -> String?
+    let tokens: [RNCToken]
+    var position = 0
+    let loader: (String) -> String?
     private(set) var defines: [String: Pattern] = [:]
-    private var startPattern: Pattern?
-    private var defaultNamespace = ""
-    private var namespaces: [String: String] = [:]
-    private var visited: Set<String>
+    var startPattern: Pattern?
+    var defaultNamespace = ""
+    var namespaces: [String: String] = [:]
+    var visited: Set<String>
 
     init(_ tokens: [RNCToken], loader: @escaping (String) -> String?, visited: Set<String> = []) {
         self.tokens = tokens
@@ -30,11 +30,15 @@ private final class RNCParser {
         }
         return (parsePattern(), defines)
     }
+}
 
-    // MARK: Declarations
+// MARK: Declarations, grammar, and patterns
 
+extension RNCParser {
     private func skipDeclarations() {
-        while case let .word(keyword) = peek() {
+        while true {
+            skipAnnotation()
+            guard case let .word(keyword) = peek() else { return }
             switch keyword {
             case "namespace": parseNamespace(isDefault: false)
             case "default": parseDefault()
@@ -80,10 +84,41 @@ private final class RNCParser {
 
     private func parseGrammarBody() {
         while position < tokens.count, peek() != .symbol("}") {
-            if case .word("include") = peek() {
-                parseInclude()
-            } else {
-                parseDefine()
+            skipAnnotation()
+            guard position < tokens.count, peek() != .symbol("}") else { break }
+            parseGrammarItem()
+        }
+    }
+
+    private func parseGrammarItem() {
+        if case .word("include") = peek() {
+            parseInclude()
+        } else if case .word("div") = peek(), peek(1) == .symbol("{") {
+            parseDiv()
+        } else {
+            parseDefine()
+        }
+    }
+
+    /// A `div { ... }` grouping is transparent: it scopes annotations in the
+    /// full syntax but contributes its defines and `start` directly here.
+    private func parseDiv() {
+        advance() // div
+        expectSymbol("{")
+        parseGrammarBody()
+        expectSymbol("}")
+    }
+
+    /// Skips a leading `[ ... ]` documentation/grammar annotation (balanced over
+    /// nested brackets). Annotations carry no schema semantics, so they are
+    /// dropped wherever they may appear: before a define, or before a pattern.
+    private func skipAnnotation() {
+        while peek() == .symbol("[") {
+            advance()
+            var depth = 1
+            while position < tokens.count, depth > 0 {
+                let token = advance()
+                if token == .symbol("[") { depth += 1 } else if token == .symbol("]") { depth -= 1 }
             }
         }
     }
@@ -169,6 +204,7 @@ private final class RNCParser {
     }
 
     private func parsePrimary() -> Pattern {
+        skipAnnotation()
         guard case let .word(word) = peek() else { return parseNonWordPrimary() }
         if let leaf = leafKeyword(word) {
             advance()
@@ -288,96 +324,6 @@ private final class RNCParser {
         }
         visited = sub.visited
         return start
-    }
-}
-
-/// Name-class and token-stream helpers for ``RNCParser``.
-private extension RNCParser {
-    // MARK: Name classes
-
-    func parseNameClass(attribute: Bool) -> NameClass {
-        var nameClass = parseSimpleNameClass(attribute: attribute)
-        while peek() == .symbol("|") {
-            advance()
-            nameClass = .choice(nameClass, parseSimpleNameClass(attribute: attribute))
-        }
-        return nameClass
-    }
-
-    private func parseSimpleNameClass(attribute: Bool) -> NameClass {
-        switch peek() {
-        case .symbol("*"):
-            advance()
-            // `* - nameClass` is any name except the subtracted class.
-            if peek() == .symbol("-") {
-                advance()
-                return .anyNameExcept(parseSimpleNameClass(attribute: attribute))
-            }
-            return .anyName
-        case .symbol("("):
-            advance()
-            let nameClass = parseNameClass(attribute: attribute)
-            expectSymbol(")")
-            return nameClass
-        case let .word(word):
-            advance()
-            return qualifiedName(word, attribute: attribute)
-        default:
-            advance()
-            return .anyName
-        }
-    }
-
-    private func qualifiedName(_ word: String, attribute: Bool) -> NameClass {
-        let parts = word.split(separator: ":", maxSplits: 1).map(String.init)
-        if parts.count == 2 {
-            if parts[1] == "*" { return .nsName(namespaces[parts[0]] ?? "") }
-            return .name(namespace: namespaces[parts[0]] ?? "", localName: parts[1])
-        }
-        return .name(namespace: attribute ? "" : defaultNamespace, localName: word)
-    }
-
-    // MARK: Token helpers
-
-    private func peek(_ offset: Int = 0) -> RNCToken? {
-        let index = position + offset
-        return index < tokens.count ? tokens[index] : nil
-    }
-
-    @discardableResult
-    private func advance() -> RNCToken? {
-        defer { position += 1 }
-        return peek()
-    }
-
-    private func wordValue() -> String {
-        if case let .word(word) = peek() { advance()
-            return word
-        }
-        return ""
-    }
-
-    private func expectAssignment() -> String {
-        if case let .symbol(symbol) = peek(), symbol == "=" || symbol == "|=" || symbol == "&=" {
-            advance()
-            return symbol
-        }
-        return "="
-    }
-
-    private func expectSymbol(_ symbol: String) {
-        if peek() == .symbol(symbol) { advance() }
-    }
-
-    private func expectString() -> String {
-        if case let .string(value) = peek() { advance()
-            return value
-        }
-        return ""
-    }
-
-    private func strip(_ qualified: String) -> String {
-        qualified.split(separator: ":").last.map(String.init) ?? qualified
     }
 }
 
