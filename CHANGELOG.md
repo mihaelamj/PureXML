@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XML Catalog resolution (#27, the libxml2 `catalog.h` model). The new
+  `PureXML.Catalog` namespace parses an OASIS XML catalog (matching `public`,
+  `system`, `uri`, `rewriteSystem`, `rewriteURI`, and `group`/`catalog` by local
+  name) into a `Resolver` that maps public/system identifiers and URI names to
+  replacement URIs, with longest-prefix rewriting and system-over-public
+  precedence. `Resolver.entityResolver(loadingURI:)` builds a
+  `Parsing.EntityResolver` that resolves an external identifier through the
+  catalog and then loads the URI via an injected closure, so a catalog plus a
+  loader wires external entities and DTDs in while the default (no loader) keeps
+  XXE closed.
 - Schematron validation (#25, the libxml2 `schematron.h` model).
   `PureXML.Validation.Schematron(schema:)` compiles a Schematron schema
   (namespace-agnostic over the ISO and legacy namespaces) and `validate(_:)`

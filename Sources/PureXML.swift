@@ -30,4 +30,7 @@ public enum PureXML {
     /// XPointer fragment-identifier types (the `element()` and `xpointer()`
     /// schemes over XPath).
     public enum XPointer {}
+
+    /// OASIS XML Catalog types (resolving public/system identifiers to URIs).
+    public enum Catalog {}
 }
