@@ -39,7 +39,7 @@ public extension PureXML.Schema {
             _ type: ComplexType,
             into issues: inout [PureXML.Validation.Issue],
         ) {
-            let present = element.attributes.filter { !Self.isNamespaceDeclaration($0) }
+            let present = element.attributes.filter { !Self.isNamespaceDeclaration($0) && !Self.isSchemaInstanceAttribute($0) }
             for use in type.attributes {
                 let match = present.first { $0.name.localName == use.name.localName }
                 if let match {
@@ -126,6 +126,13 @@ public extension PureXML.Schema {
             against declared: ElementType,
             into issues: inout [PureXML.Validation.Issue],
         ) {
+            // An instance `xsi:type` overrides the declared type, provided the
+            // named type exists in the schema. Resolve to the type itself rather
+            // than a reference so re-entry does not re-read the same xsi:type.
+            var declared = declared
+            if let overriding = Self.xsiTypeName(child), let resolved = types[overriding] {
+                declared = resolved
+            }
             switch declared {
             case let .simple(simple):
                 if !child.children.compactMap(\.element).isEmpty {
@@ -205,6 +212,26 @@ public extension PureXML.Schema {
 
         private static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
             attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
+        }
+
+        /// Whether an attribute belongs to the XML Schema instance namespace
+        /// (`xsi:type`, `xsi:nil`, and the schema-location hints), which are
+        /// processing directives rather than declared attributes.
+        private static func isSchemaInstanceAttribute(_ attribute: PureXML.Model.Attribute) -> Bool {
+            attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi"
+        }
+
+        /// The local name of an element's `xsi:type` attribute value, or nil when
+        /// it carries none. Recognizes the attribute by the XML Schema instance
+        /// namespace or, failing namespace resolution, the conventional `xsi`
+        /// prefix.
+        private static func xsiTypeName(_ element: PureXML.Model.Element) -> String? {
+            let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
+            let match = element.attributes.first { attribute in
+                attribute.name.localName == "type"
+                    && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
+            }
+            return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
         }
     }
 }
