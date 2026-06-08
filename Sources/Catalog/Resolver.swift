@@ -49,6 +49,10 @@ public extension PureXML.Catalog {
         /// also carries a system identifier (`prefer="public"`). A system match
         /// always wins; this only governs the fallback.
         private let preferPublic: Bool
+        /// Per-`public`-entry preference, set when a `group`/`catalog` `prefer`
+        /// overrides the catalog default for that entry. A public id absent here
+        /// falls back to ``preferPublic``.
+        private let publicPrefer: [String: Bool]
 
         /// Parses an OASIS XML catalog document. Replacement URIs are resolved
         /// against `baseURI` (the catalog's own location) and any in-scope
@@ -78,6 +82,7 @@ public extension PureXML.Catalog {
             uriSuffix: [SuffixRule] = [],
             nextCatalogs: [String] = [],
             preferPublic: Bool = true,
+            publicPrefer: [String: Bool] = [:],
         ) {
             self.systemMap = systemMap
             self.publicMap = publicMap
@@ -91,6 +96,7 @@ public extension PureXML.Catalog {
             self.uriSuffix = uriSuffix
             self.nextCatalogs = nextCatalogs
             self.preferPublic = preferPublic
+            self.publicPrefer = publicPrefer
         }
 
         /// Resolves a system identifier: an exact `system` entry, else the longest
@@ -121,10 +127,9 @@ public extension PureXML.Catalog {
             if let systemID, let resolved = resolveSystem(systemID) {
                 return resolved
             }
-            if let publicID, preferPublic || systemID == nil {
-                return resolvePublic(publicID)
-            }
-            return nil
+            guard let publicID, let resolved = resolvePublic(publicID) else { return nil }
+            let entryPrefer = publicPrefer[publicID] ?? preferPublic
+            return entryPrefer || systemID == nil ? resolved : nil
         }
 
         /// Resolves a system identifier, following `delegateSystem` and

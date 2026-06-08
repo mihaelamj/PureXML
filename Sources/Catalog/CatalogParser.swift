@@ -17,13 +17,17 @@ private struct CatalogBuilder {
     var uriSuffix: [SuffixRule] = []
     var nextCatalogs: [String] = []
     var preferPublic = true
+    /// Each `public` entry's effective `prefer`, taken from its nearest enclosing
+    /// `group`/`catalog`. Absent means the catalog-wide `preferPublic` applies.
+    var publicPrefer: [String: Bool] = [:]
 
-    mutating func add(_ node: PureXML.Model.TreeNode, base: String) {
+    mutating func add(_ node: PureXML.Model.TreeNode, base: String, prefer: Bool) {
         switch node.name?.localName {
         case "system":
             insert(node, key: "systemId", base: base, into: &systemMap)
         case "public":
             insert(node, key: "publicId", base: base, into: &publicMap)
+            if let id = attribute(node, "publicId") { publicPrefer[id] = prefer }
         case "uri":
             insert(node, key: "name", base: base, into: &uriMap)
         case "rewriteSystem":
@@ -119,6 +123,7 @@ private struct CatalogBuilder {
             uriSuffix: uriSuffix,
             nextCatalogs: nextCatalogs,
             preferPublic: preferPublic,
+            publicPrefer: publicPrefer,
         )
     }
 }
@@ -135,7 +140,7 @@ extension PureXML.Catalog {
             if let catalog = catalogElement(root), prefer(of: catalog) == "system" {
                 builder.preferPublic = false
             }
-            collect(root, base: baseURI, into: &builder)
+            collect(root, base: baseURI, prefer: builder.preferPublic, into: &builder)
             return builder.resolver()
         }
 
@@ -147,13 +152,25 @@ extension PureXML.Catalog {
             node.attributes.first { $0.name.localName == "prefer" }?.value
         }
 
-        private static func collect(_ node: PureXML.Model.TreeNode, base: String, into builder: inout CatalogBuilder) {
+        private static func collect(_ node: PureXML.Model.TreeNode, base: String, prefer: Bool, into builder: inout CatalogBuilder) {
             for child in node.children where child.kind == .element {
                 let childBase = elementBase(child, base)
-                builder.add(child, base: childBase)
+                // A group/catalog `prefer` attribute overrides the inherited
+                // preference for its subtree (OASIS XML Catalogs §4).
+                let childPrefer = preferOverride(child) ?? prefer
+                builder.add(child, base: childBase, prefer: childPrefer)
                 if child.name?.localName == "group" || child.name?.localName == "catalog" {
-                    collect(child, base: childBase, into: &builder)
+                    collect(child, base: childBase, prefer: childPrefer, into: &builder)
                 }
+            }
+        }
+
+        /// The explicit `prefer` on a `group`/`catalog`, or nil when it inherits.
+        private static func preferOverride(_ node: PureXML.Model.TreeNode) -> Bool? {
+            switch prefer(of: node) {
+            case "public": true
+            case "system": false
+            default: nil
             }
         }
 

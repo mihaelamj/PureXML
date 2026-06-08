@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XML catalog group-level `prefer` (#86). A `prefer` attribute on a `group` (or a
+  nested `catalog`) now overrides the catalog-wide preference for the `public`
+  entries inside it, inherited through nested groups. Resolution of an external
+  identifier consults each public entry's own effective preference, so two entries
+  in one catalog can prefer differently. A system match still always wins.
 - Schematron abstract patterns (#80). A `<pattern abstract="true">` is a template
   whose rule queries carry `$name` references; a `<pattern is-a="…">` with
   `<param name= value=>` children instantiates it, substituting each parameter
