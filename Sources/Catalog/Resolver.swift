@@ -12,6 +12,13 @@ extension PureXML.Catalog {
         let startString: String
         let catalog: String
     }
+
+    /// A longest-suffix rewrite rule (`systemSuffix`, `uriSuffix`): an identifier
+    /// ending in `suffixString` maps to `uri`.
+    struct SuffixRule: Sendable {
+        let suffixString: String
+        let uri: String
+    }
 }
 
 public extension PureXML.Catalog {
@@ -35,7 +42,13 @@ public extension PureXML.Catalog {
         private let delegateSystem: [DelegateRule]
         private let delegatePublic: [DelegateRule]
         private let delegateURI: [DelegateRule]
+        private let systemSuffix: [SuffixRule]
+        private let uriSuffix: [SuffixRule]
         private let nextCatalogs: [String]
+        /// Whether `public` entries are consulted for an external identifier that
+        /// also carries a system identifier (`prefer="public"`). A system match
+        /// always wins; this only governs the fallback.
+        private let preferPublic: Bool
 
         /// Parses an OASIS XML catalog document.
         public init(_ xml: String) throws {
@@ -51,7 +64,10 @@ public extension PureXML.Catalog {
             delegateSystem: [DelegateRule] = [],
             delegatePublic: [DelegateRule] = [],
             delegateURI: [DelegateRule] = [],
+            systemSuffix: [SuffixRule] = [],
+            uriSuffix: [SuffixRule] = [],
             nextCatalogs: [String] = [],
+            preferPublic: Bool = true,
         ) {
             self.systemMap = systemMap
             self.publicMap = publicMap
@@ -61,13 +77,18 @@ public extension PureXML.Catalog {
             self.delegateSystem = delegateSystem
             self.delegatePublic = delegatePublic
             self.delegateURI = delegateURI
+            self.systemSuffix = systemSuffix
+            self.uriSuffix = uriSuffix
             self.nextCatalogs = nextCatalogs
+            self.preferPublic = preferPublic
         }
 
         /// Resolves a system identifier: an exact `system` entry, else the longest
-        /// matching `rewriteSystem` prefix.
+        /// matching `rewriteSystem` prefix, else the longest matching `systemSuffix`.
         public func resolveSystem(_ systemID: String) -> String? {
-            systemMap[systemID] ?? Self.rewrite(systemID, with: rewriteSystem)
+            systemMap[systemID]
+                ?? Self.rewrite(systemID, with: rewriteSystem)
+                ?? Self.suffix(systemID, with: systemSuffix)
         }
 
         /// Resolves a public identifier against the `public` entries.
@@ -76,18 +97,23 @@ public extension PureXML.Catalog {
         }
 
         /// Resolves a URI name: an exact `uri` entry, else the longest matching
-        /// `rewriteURI` prefix.
+        /// `rewriteURI` prefix, else the longest matching `uriSuffix`.
         public func resolveURI(_ name: String) -> String? {
-            uriMap[name] ?? Self.rewrite(name, with: rewriteURI)
+            uriMap[name]
+                ?? Self.rewrite(name, with: rewriteURI)
+                ?? Self.suffix(name, with: uriSuffix)
         }
 
-        /// Resolves an external identifier the way a parser would: the system
-        /// identifier takes precedence (OASIS rule), then the public identifier.
+        /// Resolves an external identifier the way a parser would: a system match
+        /// always wins; the public identifier is consulted as a fallback only when
+        /// `prefer="public"` or no system identifier was given (the OASIS rule).
         public func resolveExternalIdentifier(publicID: String?, systemID: String?) -> String? {
             if let systemID, let resolved = resolveSystem(systemID) {
                 return resolved
             }
-            if let publicID { return resolvePublic(publicID) }
+            if let publicID, preferPublic || systemID == nil {
+                return resolvePublic(publicID)
+            }
             return nil
         }
 
@@ -177,6 +203,15 @@ public extension PureXML.Catalog {
                 .max { $0.startString.count < $1.startString.count }
             guard let best else { return nil }
             return best.rewritePrefix + input.dropFirst(best.startString.count)
+        }
+
+        /// The URI of the rule whose `suffixString` is the longest suffix of
+        /// `input`, or nil when none matches.
+        private static func suffix(_ input: String, with rules: [SuffixRule]) -> String? {
+            rules
+                .filter { input.hasSuffix($0.suffixString) }
+                .max { $0.suffixString.count < $1.suffixString.count }?
+                .uri
         }
     }
 }
