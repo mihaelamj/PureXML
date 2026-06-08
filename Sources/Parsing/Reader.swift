@@ -101,19 +101,23 @@ extension StringProtocol {
 }
 
 extension Character {
+    private typealias XML = PureXML.Parsing.XMLCharacter
+
     /// XML S production: space, tab, carriage return, line feed.
     var isXMLWhitespace: Bool {
-        self == " " || self == "\t" || self == "\r" || self == "\n"
+        unicodeScalars.count == 1 && unicodeScalars.first.map(XML.isWhitespace) == true
     }
 
-    /// A character allowed to start an XML name (a practical subset of the spec
-    /// NameStartChar production: letters, underscore, and colon).
+    /// Whether this character may start an XML name. A grapheme qualifies when its
+    /// first scalar is a NameStartChar and any trailing scalars (combining marks)
+    /// are NameChar.
     var isXMLNameStart: Bool {
-        isLetter || self == "_" || self == ":"
+        guard let first = unicodeScalars.first, XML.isNameStart(first) else { return false }
+        return unicodeScalars.dropFirst().allSatisfy(XML.isNameChar)
     }
 
-    /// A character allowed within an XML name after the first.
+    /// Whether this character may continue an XML name (every scalar a NameChar).
     var isXMLNameContinuation: Bool {
-        isXMLNameStart || isNumber || self == "-" || self == "."
+        !unicodeScalars.isEmpty && unicodeScalars.allSatisfy(XML.isNameChar)
     }
 }

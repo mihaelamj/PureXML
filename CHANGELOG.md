@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Spec-exact XML character classification (`PureXML.Parsing.XMLCharacter`, the
+  libxml2 `chvalid.h` parity): the XML 1.0 (Fifth Edition) `Char`,
+  `NameStartChar`, and `NameChar` productions as public predicates over Unicode
+  scalars, plus `isValidName(_:)`. The scanner's name recognition now uses these
+  exact ranges (replacing a loose `isLetter` check) from a single source of truth,
+  and handles both precomposed and combining-mark names.
 - Full encoding support. Byte input now decodes UTF-32 (both byte orders, BOM or
   sniffed) and the single-byte encodings ISO-8859-1 and Windows-1252 selected by
   the XML declaration's `encoding` name, in addition to UTF-8 and UTF-16. The
