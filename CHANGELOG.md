@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- External and parameter entities (the libxml2 `entities.h` model), secure by
+  default. Internal parameter entities (`<!ENTITY % name "value">`) are stored
+  and expanded within the DTD, including bare `%name;` references that inject
+  markup declarations, bounded by depth and the expansion budget. External
+  general entities and the external DTD subset are recorded but never fetched by
+  PureXML itself: they are loaded only through an injected
+  `PureXML.Parsing.EntityResolver` (a struct of closures). The default resolver
+  refuses every external reference, so XXE stays closed; an external entity then
+  fails as undefined and the external subset is left unread. Internal
+  declarations win over the external subset.
 - Serialization option parity for the XML declaration (the libxml2 save-option
   model). `PureXML.Emitting.Options` gains `includeXMLDeclaration`, `xmlVersion`,
   `encodingName`, and `standalone`; when requested, both the tree serializer and

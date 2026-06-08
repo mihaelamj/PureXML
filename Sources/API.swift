@@ -4,8 +4,12 @@ public extension PureXML {
     /// The parser is still being built; this entry point currently raises
     /// ``Parsing/ParseError/notImplemented(_:)``. The serializer and model are
     /// usable today for building and emitting trees.
-    static func parse(_ xml: String, limits: Parsing.Limits = .default) throws -> Model.Node {
-        try Parsing.Parser().parse(xml, limits: limits)
+    static func parse(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) throws -> Model.Node {
+        try Parsing.Parser().parse(xml, limits: limits, resolver: resolver)
     }
 
     /// Parses an XML document from an incremental character source into a
@@ -26,8 +30,12 @@ public extension PureXML {
 
     /// Returns a streaming ``Parsing/EventReader`` over an XML string. Pull events
     /// one at a time with `next()` to process documents without building a tree.
-    static func events(_ xml: String, limits: Parsing.Limits = .default) -> Parsing.EventReader {
-        Parsing.EventReader(xml, limits: limits)
+    static func events(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) -> Parsing.EventReader {
+        Parsing.EventReader(xml, limits: limits, resolver: resolver)
     }
 
     /// Parses a document, delivering SAX-style callbacks (the libxml2 SAX2 model)
@@ -78,8 +86,9 @@ public extension PureXML {
         _ xml: String,
         limits: Parsing.Limits = .init(allowDoctype: true),
         strict: Bool = false,
+        resolver: Parsing.EntityResolver = .refusing,
     ) throws -> [Validation.Issue] {
-        let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits)
+        let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits, resolver: resolver)
         let schema = Validation.DTDSchema(parsed.documentType)
         return schema.validate(parsed.node, strict: strict)
     }

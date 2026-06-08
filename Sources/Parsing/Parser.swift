@@ -15,18 +15,26 @@ public extension PureXML.Parsing {
     struct Parser: Sendable {
         public init() {}
 
-        /// Parses a single XML document from a string into a document node.
-        public func parse(_ xml: String, limits: Limits = .default) throws -> PureXML.Model.Node {
-            try build(EventReader(xml, limits: limits)).node
+        /// Parses a single XML document from a string into a document node. Supply
+        /// a ``EntityResolver`` to opt into external entities; the default refuses
+        /// them, keeping XXE closed.
+        public func parse(
+            _ xml: String,
+            limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
+        ) throws -> PureXML.Model.Node {
+            try build(EventReader(xml, limits: limits, resolver: resolver)).node
         }
 
-        /// Parses a string and surfaces the parsed DTD (entities and element
-        /// content models) alongside the tree, for schema validation.
+        /// Parses a string and surfaces the parsed DTD (entities, element content
+        /// models, parameter entities, external identifiers) alongside the tree,
+        /// for schema validation.
         public func parseWithDocumentType(
             _ xml: String,
             limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
         ) throws -> (node: PureXML.Model.Node, documentType: DocumentType) {
-            try build(EventReader(xml, limits: limits))
+            try build(EventReader(xml, limits: limits, resolver: resolver))
         }
 
         /// Parses a single XML document from raw bytes, detecting the encoding
@@ -58,8 +66,13 @@ public extension PureXML.Parsing {
 
         /// Parses a document, delivering SAX-style callbacks instead of building a
         /// tree. The handler's callbacks fire as the parse streams.
-        public func parse(_ xml: String, sax handler: SAXHandler, limits: Limits = .default) throws {
-            var reader = EventReader(xml, limits: limits)
+        public func parse(
+            _ xml: String,
+            sax handler: SAXHandler,
+            limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
+        ) throws {
+            var reader = EventReader(xml, limits: limits, resolver: resolver)
             handler.startDocument?()
             var produced = false
             while let event = try reader.next() {

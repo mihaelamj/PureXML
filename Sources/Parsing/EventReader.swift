@@ -14,18 +14,13 @@ public extension PureXML.Parsing {
     struct EventReader {
         private var reader: Reader
         private let limits: Limits
+        private let resolver: EntityResolver
         private var open: [PureXML.Model.QualifiedName] = []
         private var namespaces = NamespaceContext()
-        private var entities: [String: String] = [:]
-        private var elementModels: [String: String] = [:]
-        private var attributeLists: [String: String] = [:]
+        /// The DTD information extracted so far (entities, element models,
+        /// attribute lists, parameter entities, and external identifiers).
+        private(set) var documentType = DocumentType()
         private var entityBudget: Int
-
-        /// The DTD information extracted so far (entities, element models, and
-        /// attribute lists).
-        var documentType: DocumentType {
-            DocumentType(entities: entities, elementModels: elementModels, attributeLists: attributeLists)
-        }
 
         private var pending: [Event] = []
         private var sawRoot = false
@@ -33,16 +28,22 @@ public extension PureXML.Parsing {
 
         /// Creates a reader over a character-pulling source. The closure returns
         /// the next character or nil at end of input.
-        init(pulling pull: @escaping () -> Character?, limits: Limits = .default) {
+        init(
+            pulling pull: @escaping () -> Character?,
+            limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
+        ) {
             reader = Reader(pulling: pull)
             self.limits = limits
+            self.resolver = resolver
             entityBudget = limits.maxEntityExpansion
         }
 
         /// Creates a reader over a string (a convenience over the streaming init).
-        init(_ string: String, limits: Limits = .default) {
+        init(_ string: String, limits: Limits = .default, resolver: EntityResolver = .refusing) {
             reader = Reader(string)
             self.limits = limits
+            self.resolver = resolver
             entityBudget = limits.maxEntityExpansion
         }
 
@@ -75,10 +76,7 @@ public extension PureXML.Parsing {
                     return .processingInstruction(target: instruction.target, data: instruction.data)
                 }
                 if reader.matches("<!DOCTYPE") {
-                    let doctype = try DoctypeScanner.scan(&reader, limits: limits)
-                    entities = doctype.entities
-                    elementModels = doctype.elementModels
-                    attributeLists = doctype.attributeLists
+                    documentType = try DoctypeScanner.scan(&reader, limits: limits, resolver: resolver)
                     continue
                 }
                 if reader.matches("</") || reader.matches("<![CDATA[") {
@@ -164,7 +162,7 @@ public extension PureXML.Parsing {
                 raw.append(character)
                 reader.advance()
             }
-            return try .characters(EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark))
+            return try .characters(EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark))
         }
 
         private mutating func scanComment() throws -> Event {
@@ -260,7 +258,7 @@ public extension PureXML.Parsing {
             guard reader.consume(String(quote)) else {
                 throw ParseError.unexpectedEndOfInput(reader.mark)
             }
-            return try EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark)
+            return try EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark)
         }
 
         private mutating func scanName() throws -> PureXML.Model.QualifiedName {
