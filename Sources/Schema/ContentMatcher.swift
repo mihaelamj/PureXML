@@ -3,11 +3,11 @@ extension PureXML.Schema {
     /// element name, or a wildcard.
     enum TermLabel: Sendable {
         case name(PureXML.Model.QualifiedName)
-        case any
+        case wildcard(Wildcard)
 
         func matches(_ actual: PureXML.Model.QualifiedName) -> Bool {
             switch self {
-            case .any: true
+            case let .wildcard(wildcard): wildcard.admits(actual)
             case let .name(declared): declared.localName == actual.localName
                 && declared.namespaceURI == actual.namespaceURI
             }
@@ -134,8 +134,8 @@ extension PureXML.Schema {
             switch term {
             case let .element(name, _):
                 labeled(.name(name))
-            case .wildcard:
-                labeled(.any)
+            case let .wildcard(wildcard):
+                labeled(.wildcard(wildcard))
             case let .group(group):
                 self.group(group)
             }

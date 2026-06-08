@@ -114,6 +114,9 @@ extension PureXML.Schema {
         var simpleTypes: [String: SimpleType]
         var attributeGroups: [String: XSDTree]
         var groups: [String: XSDTree]
+        /// The schema's target namespace, for resolving `##other`/`##targetNamespace`
+        /// in wildcard constraints.
+        var targetNamespace: String?
         /// Each substitution-group head maps to its transitive member element
         /// names, so an `xs:element ref` to a head also admits its members.
         var substitutions: [String: [String]] = [:]

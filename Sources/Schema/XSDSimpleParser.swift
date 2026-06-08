@@ -31,7 +31,19 @@ extension PureXML.Schema {
         static func simpleTypeReference(_ typeName: String, _ context: XSDContext) -> SimpleType {
             let local = XSDNode.stripPrefix(typeName)
             if let builtin = BuiltinType(rawValue: local) { return SimpleType(base: builtin) }
+            if let item = listBuiltinItem(local) { return .list(item: SimpleType(base: item)) }
             return context.simpleTypes[local] ?? SimpleType(base: .string)
+        }
+
+        /// The item type of a built-in list datatype (`IDREFS`, `ENTITIES`,
+        /// `NMTOKENS`), each a whitespace-separated list of its singular form.
+        static func listBuiltinItem(_ name: String) -> BuiltinType? {
+            switch name {
+            case "IDREFS": .idref
+            case "ENTITIES": .entity
+            case "NMTOKENS": .nmtoken
+            default: nil
+            }
         }
 
         static func applyFacets(_ restriction: XSDTree, into facets: inout Facets) {

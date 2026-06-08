@@ -9,10 +9,57 @@ public extension PureXML.Schema {
         case all
     }
 
-    /// An element wildcard (`xs:any`). The minimal namespace constraint: any
-    /// element matches.
-    struct Wildcard: Sendable {
-        public init() {}
+    /// The namespace constraint of a wildcard (`xs:any`/`xs:anyAttribute`).
+    enum WildcardNamespace: Sendable, Equatable {
+        /// `##any`: a name in any namespace, or none.
+        case any
+        /// `##other`: a name in any namespace other than the target, and not in no
+        /// namespace.
+        case other
+        /// A specific set of namespace URIs; the empty string stands for no
+        /// namespace (`##local`).
+        case enumerated(Set<String>)
+    }
+
+    /// How a wildcard-matched item is validated: `skip` (no validation), `lax`
+    /// (validate if a declaration is found), or `strict` (a declaration is
+    /// required).
+    enum ProcessContents: Sendable, Equatable {
+        case skip
+        case lax
+        case strict
+    }
+
+    /// An element or attribute wildcard (`xs:any`/`xs:anyAttribute`): which
+    /// namespaces it admits, and how matched items are validated.
+    struct Wildcard: Sendable, Equatable {
+        public var namespace: WildcardNamespace
+        public var processContents: ProcessContents
+        /// The schema's target namespace, needed to resolve `##other`.
+        public var targetNamespace: String?
+
+        public init(
+            namespace: WildcardNamespace = .any,
+            processContents: ProcessContents = .strict,
+            targetNamespace: String? = nil,
+        ) {
+            self.namespace = namespace
+            self.processContents = processContents
+            self.targetNamespace = targetNamespace
+        }
+
+        /// Whether `name` is admitted by this wildcard's namespace constraint.
+        public func admits(_ name: PureXML.Model.QualifiedName) -> Bool {
+            let namespaceURI = name.namespaceURI ?? ""
+            switch namespace {
+            case .any:
+                return true
+            case .other:
+                return !namespaceURI.isEmpty && namespaceURI != (targetNamespace ?? "")
+            case let .enumerated(uris):
+                return uris.contains(namespaceURI)
+            }
+        }
     }
 
     /// The term of a particle: an element declaration, a nested model group, or a
@@ -102,20 +149,20 @@ public extension PureXML.Schema {
         case mixed(Particle)
     }
 
-    /// A complex type: its attribute uses, whether unknown attributes are allowed,
-    /// and its content model.
+    /// A complex type: its attribute uses, an optional attribute wildcard
+    /// (`xs:anyAttribute`) admitting further attributes, and its content model.
     struct ComplexType: Sendable {
         public var attributes: [AttributeUse]
-        public var allowsOtherAttributes: Bool
+        public var attributeWildcard: Wildcard?
         public var content: ContentType
 
         public init(
             attributes: [AttributeUse] = [],
-            allowsOtherAttributes: Bool = false,
+            attributeWildcard: Wildcard? = nil,
             content: ContentType = .empty,
         ) {
             self.attributes = attributes
-            self.allowsOtherAttributes = allowsOtherAttributes
+            self.attributeWildcard = attributeWildcard
             self.content = content
         }
     }
