@@ -90,7 +90,7 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Querying["Querying: #21 XPath, #22 xmlPattern, #23 XPointer (shipped)"]:::done
-  Regexp["#30 Regular expression engine"]:::epic
+  Regexp["#30 Regular expression engine"]:::done
   Xsd["#2 XSD / RELAX NG validation"]:::epic
   Schematron["#25 Schematron validation"]:::done
   Regexp --> Xsd
