@@ -124,6 +124,9 @@ public extension PureXML.Parsing {
                 return .startElement(name: resolved.name, attributes: resolved.attributes)
             }
             guard reader.consume(">") else {
+                // Balance the namespace scope entered above so a recovering reader
+                // can drop this malformed start tag without leaking a scope.
+                namespaces.leaveElement()
                 throw ParseError.unterminatedTag(reader.mark)
             }
             open.append(resolved.name)
@@ -284,5 +287,31 @@ public extension PureXML.Parsing {
                 throw ParseError.contentTooLong(limit: limits.maxContentLength, mark)
             }
         }
+    }
+}
+
+extension PureXML.Parsing.EventReader {
+    /// The current source offset, used to tell whether a failing ``next()`` made
+    /// progress before throwing.
+    var offset: Int {
+        reader.mark.offset
+    }
+
+    /// Resynchronizes after a failed ``next()`` that started at `offset`, so
+    /// reading can resume past a recorded diagnostic. Returns false at end of
+    /// input. If the failed scan already advanced (it consumed the malformed
+    /// construct), reading retries from the new position; if it threw without
+    /// progress, the offending run is skipped up to the next markup start. Either
+    /// way at least one character is consumed when input remains, so a recovering
+    /// loop is guaranteed to terminate.
+    mutating func recover(from offset: Int) -> Bool {
+        pending.removeAll()
+        guard reader.peek() != nil else { return false }
+        if reader.mark.offset > offset { return true }
+        reader.advance()
+        while let character = reader.peek(), character != "<" {
+            reader.advance()
+        }
+        return true
     }
 }

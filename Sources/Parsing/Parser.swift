@@ -37,6 +37,18 @@ public extension PureXML.Parsing {
             try build(EventReader(xml, limits: limits, resolver: resolver))
         }
 
+        /// Reads a possibly-invalid document without ever throwing: returns the
+        /// maximal best-effort tree and a located ``Diagnostic`` for every problem
+        /// found. Well-formed input yields the same tree as ``parse(_:limits:resolver:)``
+        /// with no diagnostics. See ``readRecovering(_:)`` for the recovery contract.
+        public func read(
+            _ xml: String,
+            limits: Limits = .default,
+            resolver: EntityResolver = .refusing,
+        ) -> ReadResult {
+            readRecovering(EventReader(xml, limits: limits, resolver: resolver))
+        }
+
         /// Parses a single XML document from raw bytes, detecting the encoding
         /// (UTF-8 or UTF-16, with or without a byte-order mark) before parsing.
         public func parse(bytes: [UInt8], limits: Limits = .default) throws -> PureXML.Model.Node {
@@ -136,6 +148,73 @@ public extension PureXML.Parsing {
                 throw ParseError.emptyDocument
             }
             return (.document(roots), reader.documentType)
+        }
+
+        /// Drains the reader the way ``build`` does, but never throws: each error
+        /// is recorded as a ``Diagnostic`` and the reader resynchronizes past it,
+        /// so reading continues to the end of input. Elements left open by
+        /// truncated input are closed, and an end tag with no open element is
+        /// dropped, yielding the maximal best-effort tree. The transformation is
+        /// deterministic: the same input always produces the same tree and the
+        /// same diagnostics.
+        func readRecovering(_ source: EventReader) -> ReadResult {
+            var reader = source
+            var roots: [PureXML.Model.Node] = []
+            var stack: [ElementFrame] = []
+            var diagnostics: [Diagnostic] = []
+
+            loop: while true {
+                let start = reader.offset
+                let event: Event?
+                do {
+                    event = try reader.next()
+                } catch let error as ParseError {
+                    diagnostics.append(Diagnostic(error))
+                    if !reader.recover(from: start) { break loop }
+                    continue
+                } catch {
+                    diagnostics.append(Diagnostic(message: "\(error)"))
+                    if !reader.recover(from: start) { break loop }
+                    continue
+                }
+                guard let event else { break }
+                consume(event, into: &stack, roots: &roots, diagnostics: &diagnostics)
+            }
+
+            // Close any elements the input left open (truncation), innermost first.
+            while !stack.isEmpty {
+                let frame = stack.removeLast()
+                let element = PureXML.Model.Element(name: frame.name, attributes: frame.attributes, children: frame.children)
+                attach(.element(element), to: &stack, roots: &roots)
+            }
+            return ReadResult(node: .document(roots), diagnostics: diagnostics)
+        }
+
+        private func consume(
+            _ event: Event,
+            into stack: inout [ElementFrame],
+            roots: inout [PureXML.Model.Node],
+            diagnostics: inout [Diagnostic],
+        ) {
+            switch event {
+            case let .startElement(name, attributes):
+                stack.append(ElementFrame(name: name, attributes: attributes))
+            case let .endElement(name):
+                guard let frame = stack.popLast() else {
+                    diagnostics.append(Diagnostic(message: "unmatched end tag </\(name.description)>"))
+                    return
+                }
+                let element = PureXML.Model.Element(name: frame.name, attributes: frame.attributes, children: frame.children)
+                attach(.element(element), to: &stack, roots: &roots)
+            case let .characters(text):
+                attach(.text(text), to: &stack, roots: &roots)
+            case let .cdata(text):
+                attach(.cdata(text), to: &stack, roots: &roots)
+            case let .comment(text):
+                attach(.comment(text), to: &stack, roots: &roots)
+            case let .processingInstruction(target, data):
+                attach(.processingInstruction(target: target, data: data), to: &stack, roots: &roots)
+            }
         }
 
         private func attach(

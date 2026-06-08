@@ -125,6 +125,19 @@ public extension PureXML {
         try Model.TreeNode(parse(xml, limits: limits, resolver: resolver))
     }
 
+    /// Reads a possibly-invalid document without throwing, returning the maximal
+    /// best-effort tree and one located ``Parsing/Diagnostic`` per problem.
+    /// Well-formed input gives the same node as ``parse(_:limits:resolver:)`` with
+    /// no diagnostics; malformed input is recovered deterministically rather than
+    /// rejected. The result never crashes, whatever the bytes.
+    static func read(
+        _ xml: String,
+        limits: Parsing.Limits = .default,
+        resolver: Parsing.EntityResolver = .refusing,
+    ) -> Parsing.ReadResult {
+        Parsing.Parser().read(xml, limits: limits, resolver: resolver)
+    }
+
     /// Validates a parsed XML node with the default structural rules, throwing a
     /// ``PureXML/Validation/ValidationErrorCollection`` that locates every failure
     /// by coding path. Pass a custom ``PureXML/Validation/Validator`` to add or
