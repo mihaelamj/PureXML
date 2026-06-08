@@ -45,4 +45,7 @@ public enum PureXML {
 
     /// XML Schema (XSD) and RELAX NG validation types.
     public enum Schema {}
+
+    /// XSLT 1.0 transformation types.
+    public enum XSLT {}
 }
