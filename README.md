@@ -61,7 +61,7 @@ flowchart TB
   Html["#20 HTML parser and serializer"]:::epic
   Enc["#28 Full encoding support"]:::done
   Ent["#29 External and parameter entities"]:::done
-  TreeApi["#31 Tree manipulation API"]:::epic
+  TreeApi["#31 Tree manipulation API"]:::done
   Writer["#32 xmlTextWriter"]:::done
   Reader["#33 xmlTextReader with validation"]:::epic
   Save["#34 Serialization option parity"]:::done
