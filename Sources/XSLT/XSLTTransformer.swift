@@ -1,14 +1,12 @@
 /// One produced item: a node for the result tree, or an attribute to attach to
-/// the enclosing element. Module-internal so the transformer's helpers can span
-/// files.
-enum ResultItem {
+/// the enclosing element. File-scope and private.
+private enum ResultItem {
     case node(PureXML.Model.Node)
     case attribute(PureXML.Model.Attribute)
 }
 
-/// The evaluation context during instantiation. Module-internal so the
-/// transformer's helpers can span files.
-struct XSLTContext {
+/// The evaluation context during instantiation. File-scope and private.
+private struct XSLTContext {
     var node: PureXML.Model.TreeNode
     var position: Int
     var size: Int
@@ -133,7 +131,7 @@ extension PureXML.XSLT {
 
         // MARK: Instantiation
 
-        func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
+        fileprivate func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
             for instruction in body {
@@ -339,6 +337,20 @@ extension PureXML.XSLT.Transformer {
             }
         }
         return .node(.element(.init(name: name, attributes: Self.deduplicated(attributes), children: children)))
+    }
+
+    /// The attributes contributed by `names` and the attribute sets they include,
+    /// lower precedence first, with a `visiting` guard against recursive includes.
+    private func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
+        var result: [PureXML.Model.Attribute] = []
+        for name in names where !visiting.contains(name) {
+            guard let set = stylesheet.attributeSets[name] else { continue }
+            result += attributeSetAttributes(set.use, context, visiting: visiting.union([name]))
+            for item in instantiate(set.attributes, context) {
+                if case let .attribute(attribute) = item { result.append(attribute) }
+            }
+        }
+        return result
     }
 
     private func avt(_ template: PureXML.XSLT.ValueTemplate, _ context: XSLTContext) -> String {
