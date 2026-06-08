@@ -86,7 +86,7 @@ extension PureXML.Schema {
             case let .value(literal):
                 SimpleType(base: .token).validate(string) == nil
                     && SimpleType.process(string, whiteSpace: .collapse) == literal ? .empty : .notAllowed
-            case let .data(type): SimpleType(base: type).validate(string) == nil ? .empty : .notAllowed
+            case let .data(type): type.validate(string) == nil ? .empty : .notAllowed
             case let .list(inner): listMatches(inner, string) ? .empty : .notAllowed
             default: .notAllowed
             }

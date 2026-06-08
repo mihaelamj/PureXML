@@ -183,7 +183,7 @@ private final class RNCParser {
         case "text": .text
         case "empty": .empty
         case "notAllowed": .notAllowed
-        case "string", "token": .data(.string)
+        case "string", "token": .data(PureXML.Schema.SimpleType(base: .string))
         default: nil
         }
     }
@@ -233,7 +233,7 @@ private final class RNCParser {
         if case let .string(value) = peek() { advance()
             return .value(value)
         }
-        return .data(type)
+        return .data(PureXML.Schema.SimpleType(base: type))
     }
 
     private func parseElement() -> Pattern {

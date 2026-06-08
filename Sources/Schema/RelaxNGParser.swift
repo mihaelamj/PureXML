@@ -104,13 +104,54 @@ private final class RNGCompiler {
         case "empty": .empty
         case "notAllowed": .notAllowed
         case "text": .text
-        case "data": .data(PureXML.Schema.BuiltinType(rawValue: RNGNode.strip(RNGNode.attribute(node, "type") ?? "string")) ?? .string)
+        case "data": .data(dataType(node))
         case "value": .value(RNGNode.text(node))
         case "ref": .ref(RNGNode.attribute(node, "name") ?? "")
         case "externalRef": externalRef(node)
         case "element": element(node)
         case "attribute": attribute(node)
         default: nil
+        }
+    }
+
+    /// Builds the datatype of a `<data type=>` pattern: its base built-in plus the
+    /// facets its `<param name= >value</param>` children constrain it with (the
+    /// same facet set the XSD datatypes use).
+    private func dataType(_ node: Tree) -> PureXML.Schema.SimpleType {
+        let base = PureXML.Schema.BuiltinType(rawValue: RNGNode.strip(RNGNode.attribute(node, "type") ?? "string")) ?? .string
+        var facets = PureXML.Schema.Facets()
+        for param in RNGNode.children(node, named: "param") {
+            if let name = RNGNode.attribute(param, "name") {
+                Self.applyParam(name, RNGNode.text(param), into: &facets)
+            }
+        }
+        return PureXML.Schema.SimpleType(base: base, facets: facets)
+    }
+
+    private static func applyParam(_ name: String, _ value: String, into facets: inout PureXML.Schema.Facets) {
+        applyValueParam(name, value, into: &facets)
+        applyNumericParam(name, Int(value), into: &facets)
+    }
+
+    private static func applyValueParam(_ name: String, _ value: String, into facets: inout PureXML.Schema.Facets) {
+        switch name {
+        case "pattern": facets.patterns.append(value)
+        case "minInclusive": facets.minInclusive = value
+        case "maxInclusive": facets.maxInclusive = value
+        case "minExclusive": facets.minExclusive = value
+        case "maxExclusive": facets.maxExclusive = value
+        default: break
+        }
+    }
+
+    private static func applyNumericParam(_ name: String, _ number: Int?, into facets: inout PureXML.Schema.Facets) {
+        switch name {
+        case "length": facets.length = number
+        case "minLength": facets.minLength = number
+        case "maxLength": facets.maxLength = number
+        case "totalDigits": facets.totalDigits = number
+        case "fractionDigits": facets.fractionDigits = number
+        default: break
         }
     }
 
