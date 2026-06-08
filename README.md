@@ -40,6 +40,7 @@ flowchart TB
   Core["Core shipped: #1 push, #19 SAX, #28 encoding, #29 entities, #31 tree, #32 writer, #33 reader, #34 save, #35 chars"]:::done
   Query["Query + validation shipped: #21 #22 #23 query, #30 regex, #2 XSD/RELAX NG, #25 Schematron"]:::done
   Transform["Transform + HTML shipped: #3 XSLT, #20 HTML, #24 XInclude, #26 C14N, #27 Catalog"]:::done
+  Parity["Parity completion shipped: #61 (XSLT keys/output, XSD union/import/identity, RELAX NG compact, HTML5 doc structure, C14N 2.0 trim)"]:::done
   LDone --> LReview
   LReview --> LEpic
   LEpic --> LTodo
@@ -53,8 +54,9 @@ remaining libxml2 surface is tracked as epics. Deliberate non-goals: network
 fetching (`nanohttp`/`nanoftp`) and the threading/memory infrastructure stay out,
 and external resolution is opt-in through an injected resolver so XXE stays closed.
 
-The original epics are all shipped (summarized above). The remaining work is
-closing the documented within-subsystem gaps to reach exhaustive libxml2 parity:
+The original epics and the documented-subset parity work (#61) are all shipped
+(summarized above). A read-only conformance audit then surfaced the remaining
+depth gaps versus libxml2, tracked under one epic with per-subsystem children:
 
 ```mermaid
 flowchart TB
@@ -62,7 +64,7 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Parity["#61 Full parity completion: XSLT params/keys/output, XSD union/import/identity, RELAX NG compact, HTML5 tree construction, C14N 2.0"]:::epic
+  Gaps["#71 Beyond-parity libxml2 gaps: DTD entities/defaulting (#72 #73), parser breadth (#74), XSD instance/derivation/wildcards/namespaces (#75 #76 #77 #78), RELAX NG + Schematron (#79 #80), XSLT elements/functions (#81 #82), HTML5 full tree (#83 #84), C14N/catalog/XInclude (#85 #86 #87), XPath/XPointer (#88), regex (#89), DOM/serialization (#90 #91)"]:::epic
 ```
 
 ## Status
