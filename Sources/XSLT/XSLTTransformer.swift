@@ -365,6 +365,7 @@ public extension PureXML.XSLT {
     ) throws -> String {
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source)
+        Whitespace.strip(root, stylesheet: sheet)
         let result = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
         if sheet.output.method == "text" { return textValue(of: result) }
         return PureXML.serialize(result, options: options.applying(sheet.output))
@@ -378,6 +379,7 @@ public extension PureXML.XSLT {
     ) throws -> PureXML.Model.Node {
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source)
+        Whitespace.strip(root, stylesheet: sheet)
         return Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader).run()
     }
 
