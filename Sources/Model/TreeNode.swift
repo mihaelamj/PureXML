@@ -42,6 +42,11 @@ public extension PureXML.Model {
         /// reader (``PureXML/read(asTree:)``); nil for synthesized or edited nodes.
         /// Lets a located finding be mapped back to characters in the document.
         public internal(set) var sourceRange: PureXML.Parsing.SourceRange?
+        /// For an element, the span between its start tag and end tag (where
+        /// children live), so a quick-fix can place an inserted attribute (just
+        /// before `contentRange.start`) or child (at `contentRange.end`). Nil for
+        /// self-closing or non-element nodes.
+        public internal(set) var contentRange: PureXML.Parsing.SourceRange?
 
         init(
             kind: PureXML.Model.TreeNodeKind,

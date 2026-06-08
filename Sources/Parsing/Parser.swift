@@ -6,6 +6,14 @@ private struct ElementFrame {
     var children: [PureXML.Model.Node] = []
 }
 
+/// An open element during the ranged tree build: the node, the position of its
+/// `<`, and where its content begins (just past the start tag). File-scope.
+private struct OpenTreeElement {
+    let node: PureXML.Model.TreeNode
+    let open: PureXML.Parsing.Mark
+    let contentStart: PureXML.Parsing.Mark
+}
+
 public extension PureXML.Parsing {
     /// Builds a ``PureXML/Model/Node`` tree by draining the streaming
     /// ``EventReader`` with an explicit element stack. It is iterative, not
@@ -192,7 +200,7 @@ public extension PureXML.Parsing {
         func readTreeRecovering(_ source: EventReader) -> (tree: PureXML.Model.TreeNode, diagnostics: [Diagnostic]) {
             var reader = source
             let document = PureXML.Model.TreeNode.document()
-            var stack: [(node: PureXML.Model.TreeNode, start: PureXML.Parsing.Mark)] = []
+            var stack: [OpenTreeElement] = []
 
             func attach(_ node: PureXML.Model.TreeNode) {
                 (stack.last?.node ?? document).append(node)
@@ -203,11 +211,15 @@ public extension PureXML.Parsing {
                 guard let event = try? reader.next() else { break }
                 switch event {
                 case let .startElement(name, attributes):
-                    stack.append((PureXML.Model.TreeNode.element(name, attributes: attributes), start))
+                    // After the start tag is scanned, reader.mark is where content begins.
+                    let element = PureXML.Model.TreeNode.element(name, attributes: attributes)
+                    stack.append(OpenTreeElement(node: element, open: start, contentStart: reader.mark))
                 case .endElement:
-                    guard let (element, openMark) = stack.popLast() else { continue }
-                    element.sourceRange = PureXML.Parsing.SourceRange(start: openMark, end: reader.mark)
-                    attach(element)
+                    guard let open = stack.popLast() else { continue }
+                    open.node.sourceRange = PureXML.Parsing.SourceRange(start: open.open, end: reader.mark)
+                    // `start` is the position just before the end tag was consumed.
+                    open.node.contentRange = PureXML.Parsing.SourceRange(start: open.contentStart, end: start)
+                    attach(open.node)
                 case let .characters(text):
                     attach(ranged(.text(text), from: start, to: reader.mark))
                 case let .cdata(text):
@@ -218,9 +230,10 @@ public extension PureXML.Parsing {
                     attach(ranged(.processingInstruction(target: target, data: data), from: start, to: reader.mark))
                 }
             }
-            while let (element, openMark) = stack.popLast() {
-                element.sourceRange = PureXML.Parsing.SourceRange(start: openMark, end: reader.mark)
-                attach(element)
+            while let open = stack.popLast() {
+                open.node.sourceRange = PureXML.Parsing.SourceRange(start: open.open, end: reader.mark)
+                open.node.contentRange = PureXML.Parsing.SourceRange(start: open.contentStart, end: reader.mark)
+                attach(open.node)
             }
             return (document, reader.diagnostics)
         }

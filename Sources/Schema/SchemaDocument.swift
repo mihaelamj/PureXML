@@ -72,5 +72,15 @@ public extension PureXML.Schema {
             }
             return CompletionEngine.completions(for: element, type: type, types: types)
         }
+
+        /// The quick-fixes the schema offers at the element a coding `path`
+        /// addresses in `tree`: add a required-but-absent attribute, or insert a
+        /// still-expected required child. Derived from the structured
+        /// ``completions(at:in:)``, with precise placement from the node's content
+        /// span, so the edits are exact, not guessed from a message.
+        public func quickFixes(at path: [PureXML.Validation.PathKey], in tree: PureXML.Model.TreeNode) -> [PureXML.QuickFix] {
+            guard let completions = completions(at: path, in: tree), let element = tree.node(at: path) else { return [] }
+            return PureXML.QuickFixEngine.fixes(from: completions, element: element)
+        }
     }
 }
