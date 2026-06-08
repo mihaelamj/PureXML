@@ -17,10 +17,18 @@ extension PureXML.Validation {
         let message: [SchematronMessagePart]
     }
 
+    /// A `<let name= value=>` variable binding: its name and the compiled XPath
+    /// whose value is bound to `$name` for the rule's assertions.
+    struct SchematronLet {
+        let name: String
+        let value: PureXML.XPath.Query
+    }
+
     /// One `<rule>`: a compiled context that selects the nodes the rule fires on,
-    /// and its assertions.
+    /// its `<let>` variable bindings, and its assertions.
     struct SchematronRule {
         let context: PureXML.XPath.Query
+        let lets: [SchematronLet]
         let assertions: [SchematronAssertion]
     }
 

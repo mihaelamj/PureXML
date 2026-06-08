@@ -61,21 +61,37 @@ public extension PureXML.Validation {
             var claimed: Set<ObjectIdentifier> = []
             for rule in pattern.rules {
                 for node in rule.context.nodes(over: root) where claimed.insert(ObjectIdentifier(node)).inserted {
-                    errors += apply(rule.assertions, at: node)
+                    errors += apply(rule.assertions, at: node, variables: bindings(rule.lets, at: node))
                 }
             }
             return errors
         }
 
-        private static func apply(_ assertions: [SchematronAssertion], at node: PureXML.Model.TreeNode) -> [ValidationError] {
+        /// Evaluates a rule's `<let>` bindings at the context node, in order, so a
+        /// later binding can reference an earlier one through `$name`.
+        private static func bindings(_ lets: [SchematronLet], at node: PureXML.Model.TreeNode) -> [String: PureXML.XPath.Value] {
+            var variables: [String: PureXML.XPath.Value] = [:]
+            for binding in lets {
+                if let value = try? binding.value.value(at: node, variables: variables) {
+                    variables[binding.name] = value
+                }
+            }
+            return variables
+        }
+
+        private static func apply(
+            _ assertions: [SchematronAssertion],
+            at node: PureXML.Model.TreeNode,
+            variables: [String: PureXML.XPath.Value],
+        ) -> [ValidationError] {
             let path = codingPath(of: node)
             var errors: [ValidationError] = []
             for assertion in assertions {
-                let holds = (try? assertion.test.value(at: node).boolean) ?? false
+                let holds = (try? assertion.test.value(at: node, variables: variables).boolean) ?? false
                 if assertion.isReport {
-                    if holds { errors.append(ValidationError(reason: render(assertion.message, at: node), at: path, severity: .warning)) }
+                    if holds { errors.append(ValidationError(reason: render(assertion.message, at: node, variables: variables), at: path, severity: .warning)) }
                 } else if !holds {
-                    errors.append(ValidationError(reason: render(assertion.message, at: node), at: path, severity: .error))
+                    errors.append(ValidationError(reason: render(assertion.message, at: node, variables: variables), at: path, severity: .error))
                 }
             }
             return errors
@@ -85,11 +101,15 @@ public extension PureXML.Validation {
         /// `<value-of>` as the string value of its XPath, `<name>` as the node's
         /// name. Whitespace runs are collapsed so the rendered message reads
         /// cleanly regardless of source indentation.
-        private static func render(_ parts: [SchematronMessagePart], at node: PureXML.Model.TreeNode) -> String {
+        private static func render(
+            _ parts: [SchematronMessagePart],
+            at node: PureXML.Model.TreeNode,
+            variables: [String: PureXML.XPath.Value],
+        ) -> String {
             let joined = parts.map { part -> String in
                 switch part {
                 case let .text(text): text
-                case let .valueOf(query): (try? query.value(at: node).string) ?? ""
+                case let .valueOf(query): (try? query.value(at: node, variables: variables).string) ?? ""
                 case .name: node.name?.description ?? ""
                 }
             }.joined()
