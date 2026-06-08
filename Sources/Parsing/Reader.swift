@@ -10,6 +10,13 @@ extension PureXML.Parsing {
         private(set) var offset = 0
         private(set) var line = 1
         private(set) var column = 1
+        /// When true, also fold the XML 1.1 line terminators NEL (U+0085) and LINE
+        /// SEPARATOR (U+2028) to a line feed. Set once the declaration is known to
+        /// name version 1.1.
+        var xml11 = false
+        /// A raw character read past a carriage return that was not part of the
+        /// line ending, held back to be returned next.
+        private var pendingRaw: Character?
 
         init(pulling pull: @escaping () -> Character?) {
             self.pull = pull
@@ -25,12 +32,39 @@ extension PureXML.Parsing {
         /// any single scan needs, never by the document size.
         private mutating func ensure(_ count: Int) {
             while buffer.count < count, !exhausted {
-                if let character = pull() {
+                if let character = normalizedPull() {
                     buffer.append(character)
                 } else {
                     exhausted = true
                 }
             }
+        }
+
+        /// Pulls the next character with XML line-ending normalization: a carriage
+        /// return, alone or followed by a line feed (or by NEL in 1.1), becomes a
+        /// single line feed, as do a lone NEL and LINE SEPARATOR in 1.1. So every
+        /// scan downstream sees line feeds only, as the spec requires.
+        private mutating func normalizedPull() -> Character? {
+            guard let character = rawNext() else { return nil }
+            // Swift coalesces a CR+LF pair into one grapheme-cluster character.
+            if character == "\r\n" { return "\n" }
+            if character == "\r" {
+                let next = rawNext()
+                if next != "\n", !(xml11 && next == "\u{85}") { pendingRaw = next }
+                return "\n"
+            }
+            if xml11, character == "\u{85}" || character == "\u{2028}" {
+                return "\n"
+            }
+            return character
+        }
+
+        private mutating func rawNext() -> Character? {
+            if let pending = pendingRaw {
+                pendingRaw = nil
+                return pending
+            }
+            return pull()
         }
 
         mutating func peek(_ ahead: Int = 0) -> Character? {
