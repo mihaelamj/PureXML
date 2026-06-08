@@ -5,20 +5,31 @@ extension PureXML.Emitting {
     /// quote and the whitespace characters as numeric references (matching
     /// libxml2), so attributes survive attribute-value normalization.
     enum Escaping {
-        static func text(_ value: String) -> String {
+        static func text(_ value: String, asciiOnly: Bool = false) -> String {
             var result = ""
             for character in value {
                 switch character {
                 case "&": result += "&amp;"
                 case "<": result += "&lt;"
                 case ">": result += "&gt;"
-                default: result.append(character)
+                default: result += plain(character, asciiOnly: asciiOnly)
                 }
             }
             return result
         }
 
-        static func attribute(_ value: String, quote: Character = "\"") -> String {
+        /// A character verbatim, or, in ASCII-only mode, each of its non-ASCII
+        /// scalars as a numeric character reference so the output is pure ASCII.
+        private static func plain(_ character: Character, asciiOnly: Bool) -> String {
+            guard asciiOnly else { return String(character) }
+            var result = ""
+            for scalar in character.unicodeScalars {
+                result += scalar.value > 0x7F ? "&#x\(String(scalar.value, radix: 16, uppercase: true));" : String(scalar)
+            }
+            return result
+        }
+
+        static func attribute(_ value: String, quote: Character = "\"", asciiOnly: Bool = false) -> String {
             var result = ""
             for character in value {
                 if character == quote {
@@ -32,7 +43,7 @@ extension PureXML.Emitting {
                 case "\t": result += "&#9;"
                 case "\n": result += "&#10;"
                 case "\r": result += "&#13;"
-                default: result.append(character)
+                default: result += plain(character, asciiOnly: asciiOnly)
                 }
             }
             return result

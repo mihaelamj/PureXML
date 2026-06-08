@@ -24,6 +24,13 @@ public extension PureXML.Emitting {
         public var lineEnding: String
         /// Whether childless elements collapse to `<name/>`.
         public var selfCloseEmptyElements: Bool
+        /// Whether to emit a CDATA section's content as escaped text rather than as
+        /// a `<![CDATA[ ... ]]>` section.
+        public var cdataAsText: Bool
+        /// Whether to escape every non-ASCII character as a numeric character
+        /// reference, so the output is pure ASCII (libxml2's character-reference
+        /// encoding).
+        public var asciiOnly: Bool
         /// Whether to emit an `<?xml ...?>` declaration (libxml2 emits one by
         /// default when saving a document; PureXML defaults to off for fragments).
         public var includeXMLDeclaration: Bool
@@ -40,6 +47,8 @@ public extension PureXML.Emitting {
             attributeQuote: QuoteStyle = .double,
             lineEnding: String = "\n",
             selfCloseEmptyElements: Bool = true,
+            cdataAsText: Bool = false,
+            asciiOnly: Bool = false,
             includeXMLDeclaration: Bool = false,
             xmlVersion: String = "1.0",
             encodingName: String? = "UTF-8",
@@ -50,6 +59,8 @@ public extension PureXML.Emitting {
             self.attributeQuote = attributeQuote
             self.lineEnding = lineEnding
             self.selfCloseEmptyElements = selfCloseEmptyElements
+            self.cdataAsText = cdataAsText
+            self.asciiOnly = asciiOnly
             self.includeXMLDeclaration = includeXMLDeclaration
             self.xmlVersion = xmlVersion
             self.encodingName = encodingName
