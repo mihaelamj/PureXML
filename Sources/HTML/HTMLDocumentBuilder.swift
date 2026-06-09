@@ -3,6 +3,15 @@ private struct DocFrame {
     let name: String
     let attributes: [PureXML.Model.Attribute]
     var children: [PureXML.Model.Node] = []
+    /// The foreign-content namespace URI (SVG or MathML) when this element is in
+    /// foreign content, or nil for ordinary HTML.
+    var namespace: String?
+}
+
+/// The foreign-content namespaces HTML5 switches into. File-scope and private.
+private enum ForeignNamespace {
+    static let svg = "http://www.w3.org/2000/svg"
+    static let mathml = "http://www.w3.org/1998/Math/MathML"
 }
 
 /// The HTML5 tree-construction insertion modes this builder implements: the
@@ -174,11 +183,27 @@ private final class HTMLDocument {
         }
         ensureTableContext(for: name, &stack, &roots)
         let modeled = modelAttributes(attributes)
+        let namespace = foreignNamespace(for: name, in: stack)
         if PureXML.HTML.Elements.void.contains(name) || selfClosing {
-            attach(.element(PureXML.Model.Element(name: .init(name), attributes: modeled)), &stack, &roots)
+            attach(.element(PureXML.Model.Element(name: qualifiedName(name, namespace), attributes: modeled)), &stack, &roots)
         } else {
-            stack.append(DocFrame(name: name, attributes: modeled))
+            stack.append(DocFrame(name: name, attributes: modeled, namespace: namespace))
         }
+    }
+
+    /// The namespace an element enters: SVG for `<svg>`, MathML for `<math>`, the
+    /// namespace of the nearest open foreign ancestor for anything inside one, or
+    /// nil for ordinary HTML content.
+    private func foreignNamespace(for name: String, in stack: [DocFrame]) -> String? {
+        if name == "svg" { return ForeignNamespace.svg }
+        if name == "math" { return ForeignNamespace.mathml }
+        return stack.reversed().first { $0.namespace != nil }?.namespace
+    }
+
+    /// A qualified name carrying its foreign-content namespace URI, so an SVG or
+    /// MathML element is distinguishable from same-named HTML.
+    private func qualifiedName(_ name: String, _ namespace: String?) -> PureXML.Model.QualifiedName {
+        PureXML.Model.QualifiedName(prefix: nil, localName: name, namespaceURI: namespace)
     }
 
     /// HTML table tree construction: a `<tr>` inside a bare `<table>` gets an
@@ -216,7 +241,7 @@ private final class HTMLDocument {
 
     private func pop(_ stack: inout [DocFrame], _ roots: inout [Node]) {
         guard let frame = stack.popLast() else { return }
-        let element = PureXML.Model.Element(name: .init(frame.name), attributes: frame.attributes, children: frame.children)
+        let element = PureXML.Model.Element(name: qualifiedName(frame.name, frame.namespace), attributes: frame.attributes, children: frame.children)
         attach(.element(element), &stack, &roots)
     }
 
