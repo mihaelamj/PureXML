@@ -28,6 +28,20 @@ public extension PureXML.Emitting {
             self.options = options
         }
 
+        /// Serializes a node into bytes in `encoding`, the libxml2
+        /// `xmlSaveToFilename(..., encoding)` model. The XML declaration carries the
+        /// encoding's canonical name, a byte-order mark precedes a UTF-16/32 stream,
+        /// and any scalar the encoding cannot represent becomes a numeric character
+        /// reference. Falls back to UTF-8 for an encoding without an output table.
+        public func serialize(_ node: PureXML.Model.Node, encoding: PureXML.Parsing.InputEncoding) -> [UInt8] {
+            var encodingOptions = options
+            encodingOptions.includeXMLDeclaration = true
+            encodingOptions.encodingName = PureXML.Parsing.ByteEncoder.canonicalName(encoding)
+            let text = Serializer(options: encodingOptions).serialize(node)
+            return PureXML.Parsing.ByteEncoder.byteOrderMark(encoding)
+                + PureXML.Parsing.ByteEncoder.encode(text, as: encoding)
+        }
+
         /// Serializes a node into an XML string.
         public func serialize(_ node: PureXML.Model.Node) -> String {
             var output = ""

@@ -126,6 +126,18 @@ public extension PureXML {
         Emitting.Serializer(options: options).serialize(node)
     }
 
+    /// Serializes a ``Model/Node`` tree into bytes in `encoding` (the libxml2
+    /// save-with-encoding model): the declaration carries the encoding name, a
+    /// UTF-16/32 stream is preceded by a byte-order mark, and any unrepresentable
+    /// scalar becomes a numeric character reference.
+    static func serialize(
+        _ node: Model.Node,
+        encoding: Parsing.InputEncoding,
+        options: Emitting.Options = .default,
+    ) -> [UInt8] {
+        Emitting.Serializer(options: options).serialize(node, encoding: encoding)
+    }
+
     /// Returns a pull cursor (the libxml2 `xmlTextReader` model) over an XML
     /// string. Call `read()` to advance node by node, reading `nodeKind`, `name`,
     /// `value`, `depth`, and `attributes` at each step.
