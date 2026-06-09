@@ -138,6 +138,11 @@ struct EncodingTests {
         try #expect(decoded("koi8-r", [0xE1]) == "\u{0410}") // А
         try #expect(decoded("koi8-r", [0xC1]) == "\u{0430}") // а
         try #expect(decoded("koi8-r", [0xA3]) == "\u{0451}") // ё
+        try #expect(decoded("windows-1255", [0xE0]) == "\u{05D0}") // א
+        try #expect(decoded("windows-1255", [0xA4]) == "\u{20AA}") // ₪
+        try #expect(decoded("windows-1256", [0xC7]) == "\u{0627}") // ا
+        try #expect(decoded("windows-1258", [0xFE]) == "\u{20AB}") // ₫
+        try #expect(decoded("koi8-u", [0xA4]) == "\u{0454}") // є (KOI8-U specific)
     }
 
     @Test("Decodes ISO-8859-5: the Cyrillic block")
