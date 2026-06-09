@@ -27,7 +27,7 @@ extension PureXML.HTML {
     enum Elements {
         /// Void elements: no content and no end tag.
         static let void: Set<String> = [
-            "area", "base", "br", "col", "embed", "hr", "img", "input",
+            "area", "base", "br", "col", "embed", "frame", "hr", "img", "input",
             "link", "meta", "param", "source", "track", "wbr",
         ]
 
