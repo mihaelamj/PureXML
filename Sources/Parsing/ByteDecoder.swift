@@ -19,6 +19,9 @@ extension PureXML.Parsing {
             if encoding == .eucJP {
                 return EUCJP.decode(body)
             }
+            if encoding == .eucKR {
+                return EUCKR.decode(body)
+            }
             if let map = Self.singleByteMap(encoding) {
                 return String(String.UnicodeScalarView(body.map(map)))
             }
@@ -150,6 +153,7 @@ extension PureXML.Parsing {
             "shift_jis": .shiftJIS, "shift-jis": .shiftJIS, "sjis": .shiftJIS, "x-sjis": .shiftJIS,
             "ms_kanji": .shiftJIS, "windows-31j": .shiftJIS, "csshiftjis": .shiftJIS,
             "euc-jp": .eucJP, "eucjp": .eucJP, "x-euc-jp": .eucJP, "cseucpkdfmtjapanese": .eucJP,
+            "euc-kr": .eucKR, "euckr": .eucKR, "cp949": .eucKR, "uhc": .eucKR, "ks_c_5601-1987": .eucKR, "korean": .eucKR,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,

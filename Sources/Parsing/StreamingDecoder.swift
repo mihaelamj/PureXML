@@ -31,15 +31,36 @@ extension PureXML.Parsing {
             if let map = PureXML.Parsing.ByteDecoder.singleByteMap(encoding) {
                 return nextSingleByte(map)
             }
+            return nextWide(encoding)
+        }
+
+        /// Dispatches the non-single-byte encodings (the Unicode transformation
+        /// formats and the multi-byte CJK encodings).
+        private mutating func nextWide(_ encoding: InputEncoding) -> Character? {
             switch encoding {
-            case .utf16BigEndian: return nextUTF16(bigEndian: true)
-            case .utf16LittleEndian: return nextUTF16(bigEndian: false)
-            case .utf32BigEndian: return nextUTF32(bigEndian: true)
-            case .utf32LittleEndian: return nextUTF32(bigEndian: false)
-            case .shiftJIS: return nextShiftJIS()
-            case .eucJP: return nextEUCJP()
-            default: return nextUTF8()
+            case .utf16BigEndian: nextUTF16(bigEndian: true)
+            case .utf16LittleEndian: nextUTF16(bigEndian: false)
+            case .utf32BigEndian: nextUTF32(bigEndian: true)
+            case .utf32LittleEndian: nextUTF32(bigEndian: false)
+            case .shiftJIS: nextShiftJIS()
+            case .eucJP: nextEUCJP()
+            case .eucKR: nextEUCKR()
+            default: nextUTF8()
             }
+        }
+
+        /// Streams one EUC-KR character: ASCII, or a lead+trail through CP949.
+        private mutating func nextEUCKR() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if lead <= 0x7F { return Character(Unicode.Scalar(lead)) }
+            guard (0x81 ... 0xFE).contains(lead) else { return Self.replacement }
+            guard let trail = nextByte() else { finished = true
+                return Self.replacement
+            }
+            return PureXML.Parsing.ByteDecoder.EUCKR.twoByteScalar(lead: lead, trail: trail).map(Character.init) ?? Self.replacement
         }
 
         /// Streams one EUC-JP character: ASCII, `0x8E`+byte (half-width katakana),
