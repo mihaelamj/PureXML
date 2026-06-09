@@ -37,8 +37,36 @@ extension PureXML.Parsing {
             case .utf32BigEndian: return nextUTF32(bigEndian: true)
             case .utf32LittleEndian: return nextUTF32(bigEndian: false)
             case .shiftJIS: return nextShiftJIS()
+            case .eucJP: return nextEUCJP()
             default: return nextUTF8()
             }
+        }
+
+        /// Streams one EUC-JP character: ASCII, `0x8E`+byte (half-width katakana),
+        /// `0x8F`+two bytes (JIS X 0212), or a lead+byte through JIS X 0208.
+        private mutating func nextEUCJP() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if lead <= 0x7F { return Character(Unicode.Scalar(lead)) }
+            if lead == 0x8E {
+                guard let byte = nextByte() else { finished = true
+                    return Self.replacement
+                }
+                guard (0xA1 ... 0xDF).contains(byte) else { return Self.replacement }
+                return Character(Unicode.Scalar(0xFF61 + UInt32(byte) - 0xA1) ?? "\u{FFFD}")
+            }
+            if lead == 0x8F {
+                guard let mid = nextByte(), let trail = nextByte() else { finished = true
+                    return Self.replacement
+                }
+                return PureXML.Parsing.ByteDecoder.EUCJP.twoByteScalar(lead: mid, trail: trail, useJis0212: true).map(Character.init) ?? Self.replacement
+            }
+            guard let trail = nextByte() else { finished = true
+                return Self.replacement
+            }
+            return PureXML.Parsing.ByteDecoder.EUCJP.twoByteScalar(lead: lead, trail: trail, useJis0212: false).map(Character.init) ?? Self.replacement
         }
 
         /// Streams one Shift-JIS character: a single byte (ASCII or half-width
