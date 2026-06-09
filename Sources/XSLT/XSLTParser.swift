@@ -322,12 +322,21 @@ extension PureXML.XSLT {
             (XSLTNode.attribute(node, "use-attribute-sets") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
         }
 
+        private static func caseOrder(_ node: Tree) -> PureXML.XSLT.CaseOrder? {
+            switch XSLTNode.attribute(node, "case-order") {
+            case "upper-first": .upperFirst
+            case "lower-first": .lowerFirst
+            default: nil
+            }
+        }
+
         private static func sorts(_ node: Tree) -> [Sort] {
             XSLTNode.children(node, named: "sort").map { sort in
                 Sort(
                     select: XSLTNode.attribute(sort, "select") ?? ".",
                     descending: XSLTNode.attribute(sort, "order") == "descending",
                     numeric: XSLTNode.attribute(sort, "data-type") == "number",
+                    caseOrder: caseOrder(sort),
                 )
             }
         }

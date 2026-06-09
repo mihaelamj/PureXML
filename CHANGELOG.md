@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:sort case-order` (#82). When `case-order="upper-first"`/`"lower-first"` is set, the sort comparison is case-insensitive with the case used only to break ties among otherwise-equal strings; without it the default codepoint order is kept.
 - XSLT functions `generate-id`, `system-property`, `element-available`,
   `function-available`, and an `unparsed-entity-uri` stub (#82). `generate-id`
   returns a stable per-node identifier (the context node when no argument is
