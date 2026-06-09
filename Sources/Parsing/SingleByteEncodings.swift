@@ -1,9 +1,9 @@
 extension PureXML.Parsing.ByteDecoder {
     /// To-Unicode mappings for the single-byte legacy encodings. Each maps one
     /// byte to its Unicode scalar; bytes `0x00`-`0x7F` are ASCII in every case.
-    /// The encodings here are the ones expressible exactly as ISO-8859-1 with a
-    /// few substitutions or as a contiguous block, so they carry no risk of a
-    /// transcription error.
+    /// A few encodings are expressed exactly (ISO-8859-1 with substitutions, or a
+    /// contiguous block); the rest are vendored verbatim from the authoritative
+    /// `unicode.org` mapping files (see `SingleByteTables.swift`).
     enum SingleByte {
         /// ISO-8859-15 (Latin-9): ISO-8859-1 with the euro sign and seven other
         /// substitutions.
@@ -127,6 +127,22 @@ extension PureXML.Parsing.ByteDecoder {
 
         static func koi8r(_ byte: UInt8) -> Unicode.Scalar {
             fullHigh(byte, koi8rHigh)
+        }
+
+        static func windows1255(_ byte: UInt8) -> Unicode.Scalar {
+            fullHigh(byte, windows1255High)
+        }
+
+        static func windows1256(_ byte: UInt8) -> Unicode.Scalar {
+            fullHigh(byte, windows1256High)
+        }
+
+        static func windows1258(_ byte: UInt8) -> Unicode.Scalar {
+            fullHigh(byte, windows1258High)
+        }
+
+        static func koi8u(_ byte: UInt8) -> Unicode.Scalar {
+            fullHigh(byte, koi8uHigh)
         }
 
         /// Maps a byte through a 96-entry upper-half table (`0xA0`-`0xFF`); bytes
