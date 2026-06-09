@@ -14,6 +14,15 @@ public extension PureXML.Canonical {
 
         /// Canonicalizes a node.
         public func canonicalize(_ node: PureXML.Model.Node) -> String {
+            if options.prefixRewrite == .sequential {
+                // C14N 2.0 sequential rewrite: rebuild with canonical prefixes,
+                // then render exclusive-style so declarations land at first use.
+                let rewritten = PrefixRewriter.rewrite(node, labels: options.qnameAwareLabels)
+                var rendering = options
+                rendering.prefixRewrite = .retain
+                rendering.mode = .exclusive
+                return Canonicalizer(options: rendering).canonicalize(rewritten)
+            }
             var output = ""
             emit(node, inScope: [:], rendered: [:], output: &output)
             return output
@@ -261,6 +270,103 @@ public extension PureXML.Canonical {
                 }
             }
             return result
+        }
+    }
+}
+
+public extension PureXML.Canonical.Canonicalizer {
+    /// Canonicalizes a node-set: only the nodes the predicate selects appear in
+    /// the output (C14N's XPath/position-based node selection). An excluded
+    /// element's start and end tags are omitted but its selected descendants are
+    /// kept, with each one rendering the namespace context in scope at its
+    /// position, so signing a discontiguous selection is well defined. Predicate
+    /// identity is by ``PureXML/Model/TreeNode`` reference, so a caller can select
+    /// specific nodes (for example an XPath result set).
+    func canonicalize(_ node: PureXML.Model.TreeNode, including predicate: (PureXML.Model.TreeNode) -> Bool) -> String {
+        var output = ""
+        emitSelected(node, inScope: Self.inScopeNamespaces(above: node), rendered: [:], including: predicate, output: &output)
+        return output
+    }
+
+    private func emitSelected(
+        _ node: PureXML.Model.TreeNode,
+        inScope: [String: String],
+        rendered: [String: String],
+        including predicate: (PureXML.Model.TreeNode) -> Bool,
+        output: inout String,
+    ) {
+        switch node.kind {
+        case .document:
+            for child in node.children {
+                emitSelected(child, inScope: inScope, rendered: rendered, including: predicate, output: &output)
+            }
+        case .element:
+            emitSelected(element: node, inScope: inScope, rendered: rendered, including: predicate, output: &output)
+        case .text, .cdata:
+            if predicate(node) { output += Self.escapeText(options.trimTextNodes ? node.value.trimmingXMLWhitespace() : node.value) }
+        case .comment:
+            if predicate(node), options.includeComments { output += "<!--\(node.value)-->" }
+        case .processingInstruction:
+            if predicate(node) { output += node.value.isEmpty ? "<?\(node.name?.description ?? "")?>" : "<?\(node.name?.description ?? "") \(node.value)?>" }
+        case .doctype, .entityReference, .namespace:
+            break
+        }
+    }
+
+    private func emitSelected(
+        element node: PureXML.Model.TreeNode,
+        inScope: [String: String],
+        rendered: [String: String],
+        including predicate: (PureXML.Model.TreeNode) -> Bool,
+        output: inout String,
+    ) {
+        let element = PureXML.Model.Element(name: node.name ?? .init(""), attributes: node.attributes, children: [])
+        var childInScope = inScope
+        for (prefix, uri) in Self.namespaceDeclarations(element) {
+            childInScope[prefix] = uri
+        }
+        guard predicate(node) else {
+            // Omitted element: its namespaces stay in scope for descendants, but
+            // nothing is rendered, so a selected descendant renders them itself.
+            for child in node.children {
+                emitSelected(child, inScope: childInScope, rendered: rendered, including: predicate, output: &output)
+            }
+            return
+        }
+        let attributes = Self.plainAttributes(element)
+        let toRender = selectedNamespaces(element, inScope: childInScope, attributes: attributes, rendered: rendered)
+        var childRendered = rendered
+        for (prefix, uri) in toRender {
+            childRendered[prefix] = uri
+        }
+        output += "<" + element.name.description
+        for (prefix, uri) in toRender.sorted(by: { $0.0 < $1.0 }) {
+            output += Self.renderNamespace(prefix, uri)
+        }
+        for attribute in attributes.sorted(by: Self.attributeOrder) {
+            output += " \(attribute.name.description)=\"\(Self.escapeAttribute(attribute.value))\""
+        }
+        output += ">"
+        for child in node.children {
+            emitSelected(child, inScope: childInScope, rendered: childRendered, including: predicate, output: &output)
+        }
+        output += "</\(element.name.description)>"
+    }
+
+    /// The namespaces a selected element renders: in inclusive mode every in-scope
+    /// binding not yet rendered (so an exposed element re-declares its inherited
+    /// context); in exclusive mode only those it visibly uses.
+    private func selectedNamespaces(
+        _ element: PureXML.Model.Element,
+        inScope: [String: String],
+        attributes: [PureXML.Model.Attribute],
+        rendered: [String: String],
+    ) -> [(String, String)] {
+        switch options.mode {
+        case .inclusive:
+            inScope.filter { rendered[$0.key] != $0.value }.map { ($0.key, $0.value) }
+        case .exclusive:
+            exclusiveNamespaces(element, inScope: inScope, attributes: attributes, rendered: rendered)
         }
     }
 }
