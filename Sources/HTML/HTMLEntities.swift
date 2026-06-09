@@ -1,11 +1,4 @@
 extension PureXML.HTML.Tokenizer {
-    private static let named: [String: Character] = [
-        "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'",
-        "nbsp": "\u{A0}", "copy": "\u{A9}", "reg": "\u{AE}", "trade": "\u{2122}",
-        "mdash": "\u{2014}", "ndash": "\u{2013}", "hellip": "\u{2026}",
-        "laquo": "\u{AB}", "raquo": "\u{BB}", "deg": "\u{B0}", "euro": "\u{20AC}",
-    ]
-
     /// The HTML numeric-character-reference fixups for the Windows-1252 C1 range
     /// (`0x80`–`0x9F`): a reference to one of these code points yields the mapped
     /// character rather than the C1 control, per the HTML standard.
@@ -99,7 +92,7 @@ extension PureXML.HTML.Tokenizer {
         }
         // Longest match wins: shrink the candidate until it names an entity.
         while !name.isEmpty {
-            if let character = named[name] {
+            if let character = namedEntities[name] {
                 let end = start + 1 + name.count
                 let semicolon = end < characters.count && characters[end] == ";"
                 return (String(character), name.count + 1 + (semicolon ? 1 : 0))
