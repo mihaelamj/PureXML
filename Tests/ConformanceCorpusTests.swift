@@ -29,9 +29,49 @@ struct ConformanceCorpusTests {
         }
     }
 
+    private struct XPathSpec {
+        let name: String
+        let expression: String
+        let expected: String
+    }
+
+    /// XPath 1.0 core-function conformance points: the function's result coerced
+    /// to a string, against the value the specification mandates.
+    private func xpathCorpus() throws -> [PureXML.Validation.ConformanceCase] {
+        let document = try PureXML.parse("<r><item/><item/><item/></r>")
+        let specs = [
+            XPathSpec(name: "concat", expression: "concat('a','b','c')", expected: "abc"),
+            XPathSpec(name: "substring-length", expression: "substring('12345',2,3)", expected: "234"),
+            XPathSpec(name: "substring-open", expression: "substring('12345',2)", expected: "2345"),
+            XPathSpec(name: "string-length", expression: "string-length('hello')", expected: "5"),
+            XPathSpec(name: "normalize-space", expression: "normalize-space('  a  b  ')", expected: "a b"),
+            XPathSpec(name: "translate", expression: "translate('bar','abc','ABC')", expected: "BAr"),
+            XPathSpec(name: "substring-before", expression: "substring-before('a/b','/')", expected: "a"),
+            XPathSpec(name: "substring-after", expression: "substring-after('a/b','/')", expected: "b"),
+            XPathSpec(name: "contains", expression: "contains('hello','ell')", expected: "true"),
+            XPathSpec(name: "starts-with", expression: "starts-with('hello','he')", expected: "true"),
+            XPathSpec(name: "round-half-up", expression: "round(2.5)", expected: "3"),
+            XPathSpec(name: "floor", expression: "floor(2.9)", expected: "2"),
+            XPathSpec(name: "ceiling", expression: "ceiling(2.1)", expected: "3"),
+            XPathSpec(name: "count", expression: "count(//item)", expected: "3"),
+            XPathSpec(name: "div-by-zero-infinity", expression: "1 div 0", expected: "Infinity"),
+            XPathSpec(name: "zero-div-zero-nan", expression: "0 div 0", expected: "NaN"),
+        ]
+        return try specs.map { spec in
+            let actual = try PureXML.XPath.Query(spec.expression).string(over: document)
+            return PureXML.Validation.ConformanceCase(name: spec.name, actual: actual, expected: spec.expected)
+        }
+    }
+
     @Test("The C14N conformance corpus passes with no located failures")
     func test_corpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: canonicalCorpus())
+        #expect(failures.isEmpty, "\(failures.map(\.reason))")
+    }
+
+    @Test("The XPath core-function conformance corpus passes with no located failures")
+    func test_xpathCorpusConforms() throws {
+        let failures = try PureXML.Validation.Conformance.failures(in: xpathCorpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
 
