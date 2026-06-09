@@ -200,6 +200,38 @@ struct ConformanceCorpusTests {
         }
     }
 
+    /// The serialized body content of a full HTML5 document parse, the spec's
+    /// complete tree-construction path (the fragment `HTML.parse` does not yet
+    /// reconstruct active formatting elements; see #109).
+    private func htmlBody(_ html: String) -> String {
+        let full = PureXML.HTML.serialize(PureXML.HTML.parseDocument(html))
+        let wrapper = "<html><head></head><body>"
+        guard full.hasPrefix(wrapper), full.hasSuffix("</body></html>") else { return full }
+        return String(full.dropFirst(wrapper.count).dropLast("</body></html>".count))
+    }
+
+    /// HTML5 tree-construction conformance: the parsed-then-serialized document
+    /// body, against the normalized form the HTML5 parsing algorithm prescribes.
+    private func htmlCorpus() -> [PureXML.Validation.ConformanceCase] {
+        let specs = [
+            Spec(name: "void-elements", input: "<p>a<br>b<img src=\"x\">c</p>", expected: "<p>a<br>b<img src=\"x\">c</p>"),
+            Spec(name: "implied-li-close", input: "<ul><li>one<li>two</ul>", expected: "<ul><li>one</li><li>two</li></ul>"),
+            Spec(name: "implied-p-close", input: "<p>first<p>second", expected: "<p>first</p><p>second</p>"),
+            Spec(name: "tag-case-normalized", input: "<DIV><SPAN>x</SPAN></DIV>", expected: "<div><span>x</span></div>"),
+            Spec(name: "adoption-agency", input: "<b><i></b></i>", expected: "<b><i></i></b>"),
+            Spec(name: "adoption-agency-with-text", input: "<b><i></b>X</i>", expected: "<b><i></i></b><i>X</i>"),
+            Spec(name: "entities-decoded", input: "<p>a &amp; b &lt; c &#65;</p>", expected: "<p>a &amp; b &lt; c A</p>"),
+            Spec(name: "stray-end-tag-ignored", input: "<b>bold</i></b>", expected: "<b>bold</b>"),
+        ]
+        return specs.map { spec in
+            PureXML.Validation.ConformanceCase(
+                name: spec.name,
+                actual: htmlBody(spec.input),
+                expected: spec.expected,
+            )
+        }
+    }
+
     @Test("The C14N conformance corpus passes with no located failures")
     func test_corpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: canonicalCorpus())
@@ -227,6 +259,12 @@ struct ConformanceCorpusTests {
     @Test("The XSLT transformation conformance corpus passes with no located failures")
     func test_xsltCorpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: xsltCorpus())
+        #expect(failures.isEmpty, "\(failures.map(\.reason))")
+    }
+
+    @Test("The HTML5 tree-construction conformance corpus passes with no located failures")
+    func test_htmlCorpusConforms() {
+        let failures = PureXML.Validation.Conformance.failures(in: htmlCorpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
 
