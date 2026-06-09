@@ -1,13 +1,3 @@
-/// A partially-built element on an open-element stack. File-scope and private.
-private struct DocFrame {
-    let name: String
-    let attributes: [PureXML.Model.Attribute]
-    var children: [PureXML.Model.Node] = []
-    /// The foreign-content namespace URI (SVG or MathML) when this element is in
-    /// foreign content, or nil for ordinary HTML.
-    var namespace: String?
-}
-
 /// The foreign-content namespaces HTML5 switches into. File-scope and private.
 private enum ForeignNamespace {
     static let svg = "http://www.w3.org/2000/svg"
@@ -46,8 +36,8 @@ final class HTMLDocument {
     private var htmlAttributes: [Attribute] = []
     private var headAttributes: [Attribute] = []
     private var bodyAttributes: [Attribute] = []
-    private var headStack: [DocFrame] = []
-    private var headChildren: [Node] = []
+    private let headRoot = PureXML.Model.TreeNode.element("head")
+    private lazy var openHead: [PureXML.Model.TreeNode] = [headRoot]
     /// The body is built as a live mutable tree (the HTML5 model): nodes are
     /// attached to their parent as soon as they open, and `openBody` is the stack
     /// of currently-open elements into that tree, with the body element at the
@@ -64,12 +54,9 @@ final class HTMLDocument {
         for token in tokens {
             process(token)
         }
-        while !headStack.isEmpty {
-            pop(&headStack, &headChildren)
-        }
-        // Open body elements are already attached to the live tree, so no closing
-        // pass is needed: the body's children are read straight off bodyRoot.
-        let head = PureXML.Model.Element(name: .init("head"), attributes: headAttributes, children: headChildren)
+        // Open elements are already attached to their live tree, so head and body
+        // children are read straight off their roots with no closing pass.
+        let head = PureXML.Model.Element(name: .init("head"), attributes: headAttributes, children: headRoot.children.map(\.node))
         let secondChild: Node = if let frameset = framesetStack.first {
             frameset.node
         } else {
@@ -128,27 +115,41 @@ final class HTMLDocument {
     private func processInHead(_ token: Token) {
         switch token {
         case let .startTag(name, attributes, selfClosing) where Self.headElements.contains(name):
-            open(name, attributes, selfClosing: selfClosing, &headStack, &headChildren)
-        case let .endTag(name) where name == "head":
-            while !headStack.isEmpty {
-                pop(&headStack, &headChildren)
-            }
+            headOpen(name, attributes, selfClosing: selfClosing)
+        case .endTag("head"):
+            openHead = [headRoot]
             mode = .afterHead
-        case let .endTag(name) where headStack.contains(where: { $0.name == name }):
-            close(name, &headStack, &headChildren)
+        case let .endTag(name) where openHead.contains(where: { tagName($0) == name }):
+            headClose(name)
         case let .comment(value):
-            attach(.comment(value), &headStack, &headChildren)
-        case let .text(value) where !headStack.isEmpty:
-            attach(.text(value), &headStack, &headChildren)
-        case let .text(value) where value.trimmingXMLWhitespace().isEmpty:
-            attach(.text(value), &headStack, &headChildren)
+            headInsert(.comment(value))
+        case let .text(value) where openHead.count > 1 || value.trimmingXMLWhitespace().isEmpty:
+            headInsert(.text(value))
         default:
-            while !headStack.isEmpty {
-                pop(&headStack, &headChildren)
-            }
+            openHead = [headRoot]
             mode = .afterHead
             process(token)
         }
+    }
+
+    private func headOpen(_ name: String, _ attributes: [(String, String)], selfClosing: Bool) {
+        if let closes = PureXML.HTML.Elements.impliedClose[name] {
+            while let top = openHead.last, top !== headRoot, closes.contains(tagName(top)) {
+                openHead.removeLast()
+            }
+        }
+        let element = PureXML.Model.TreeNode.element(name, attributes: modelAttributes(attributes))
+        openHead.last?.append(element)
+        if !(PureXML.HTML.Elements.void.contains(name) || selfClosing) { openHead.append(element) }
+    }
+
+    private func headClose(_ name: String) {
+        guard let index = openHead.lastIndex(where: { tagName($0) == name }), index >= 1 else { return }
+        openHead.removeLast(openHead.count - index)
+    }
+
+    private func headInsert(_ node: PureXML.Model.TreeNode) {
+        openHead.last?.append(node)
     }
 
     private func processAfterHead(_ token: Token) {
@@ -292,92 +293,12 @@ final class HTMLDocument {
     private static let svgIntegrationPoints: Set<String> = ["foreignobject", "desc", "title"]
 }
 
-/// The head's open-element stack uses the pop-on-close `DocFrame` model; these
-/// primitives drive it, in an extension to keep the class body within budget.
 extension HTMLDocument {
-    private func open(
-        _ name: String,
-        _ attributes: [(String, String)],
-        selfClosing: Bool,
-        _ stack: inout [DocFrame],
-        _ roots: inout [Node],
-    ) {
-        if let closes = PureXML.HTML.Elements.impliedClose[name] {
-            while let top = stack.last, closes.contains(top.name) {
-                pop(&stack, &roots)
-            }
-        }
-        ensureTableContext(for: name, &stack, &roots)
-        let modeled = modelAttributes(attributes)
-        let namespace = foreignNamespace(for: name, in: stack)
-        if PureXML.HTML.Elements.void.contains(name) || selfClosing {
-            attach(.element(PureXML.Model.Element(name: qualifiedName(name, namespace), attributes: modeled)), &stack, &roots)
-        } else {
-            stack.append(DocFrame(name: name, attributes: modeled, namespace: namespace))
-        }
-    }
-
-    /// The namespace an element enters: SVG for `<svg>`, MathML for `<math>`, the
-    /// namespace of the nearest open foreign ancestor for anything inside one, or
-    /// nil for ordinary HTML content.
-    private func foreignNamespace(for name: String, in stack: [DocFrame]) -> String? {
-        if name == "svg" { return ForeignNamespace.svg }
-        if name == "math" { return ForeignNamespace.mathml }
-        return stack.reversed().first { $0.namespace != nil }?.namespace
-    }
-
     /// A qualified name carrying its foreign-content namespace, with SVG element
     /// names restored to their canonical camel case.
     private func qualifiedName(_ name: String, _ namespace: String?) -> PureXML.Model.QualifiedName {
         let local = namespace == ForeignNamespace.svg ? (PureXML.HTML.ForeignNames.svgElements[name] ?? name) : name
         return PureXML.Model.QualifiedName(prefix: nil, localName: local, namespaceURI: namespace)
-    }
-
-    /// HTML table tree construction: a `<tr>` inside a bare `<table>` gets an
-    /// implied `<tbody>`, and a `<td>`/`<th>` gets an implied `<tr>` (and section),
-    /// so a table written without its section and row wrappers still nests
-    /// correctly. Only fires inside an open table.
-    private func ensureTableContext(for name: String, _ stack: inout [DocFrame], _: inout [Node]) {
-        guard let context = nearestTableContext(stack) else { return }
-        switch name {
-        case "tr" where context == "table":
-            stack.append(DocFrame(name: "tbody", attributes: []))
-        case "td", "th":
-            if context == "table" { stack.append(DocFrame(name: "tbody", attributes: [])) }
-            if context == "table" || ["tbody", "thead", "tfoot"].contains(context) {
-                stack.append(DocFrame(name: "tr", attributes: []))
-            }
-        default:
-            break
-        }
-    }
-
-    /// The nearest open table-structural element (`table`/`tbody`/`thead`/`tfoot`/
-    /// `tr`), or nil when no table is open.
-    private func nearestTableContext(_ stack: [DocFrame]) -> String? {
-        let structural: Set = ["table", "tbody", "thead", "tfoot", "tr"]
-        return stack.reversed().first { structural.contains($0.name) }?.name
-    }
-
-    private func close(_ name: String, _ stack: inout [DocFrame], _ roots: inout [Node]) {
-        guard let index = stack.lastIndex(where: { $0.name == name }) else { return }
-        while stack.count > index {
-            pop(&stack, &roots)
-        }
-    }
-
-    private func pop(_ stack: inout [DocFrame], _ roots: inout [Node]) {
-        guard let frame = stack.popLast() else { return }
-        let element = PureXML.Model.Element(name: qualifiedName(frame.name, frame.namespace), attributes: frame.attributes, children: frame.children)
-        attach(.element(element), &stack, &roots)
-    }
-
-    private func attach(_ node: Node, _ stack: inout [DocFrame], _ roots: inout [Node]) {
-        if stack.isEmpty {
-            roots.append(node)
-        } else {
-            stack[stack.count - 1].children.append(node)
-        }
     }
 
     private func modelAttributes(_ attributes: [(String, String)]) -> [Attribute] {
