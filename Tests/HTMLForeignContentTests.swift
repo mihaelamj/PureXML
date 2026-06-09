@@ -79,4 +79,18 @@ struct HTMLForeignContentTests {
         let element = find("p", in: "<p viewbox=\"x\"></p>")
         #expect(element?.attributes.contains { $0.name.description == "viewbox" } == true)
     }
+
+    @Test("HTML content inside an SVG integration point is back in the HTML namespace")
+    func test_integrationPoint() {
+        let html = "<svg><foreignObject><div><span>x</span></div></foreignObject></svg>"
+        #expect(find("foreignObject", in: html)?.name.namespaceURI == svg)
+        #expect(find("div", in: html)?.name.namespaceURI == nil)
+        #expect(find("span", in: html)?.name.namespaceURI == nil)
+    }
+
+    @Test("Re-entering svg inside an integration point switches back to SVG")
+    func test_reentrantForeign() {
+        let html = "<svg><foreignObject><svg><rect></rect></svg></foreignObject></svg>"
+        #expect(find("rect", in: html)?.name.namespaceURI == svg)
+    }
 }

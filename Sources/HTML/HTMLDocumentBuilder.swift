@@ -250,13 +250,23 @@ final class HTMLDocument {
         }
     }
 
-    /// The foreign-content namespace for a body element: SVG/MathML on entry, or
-    /// the nearest open foreign ancestor's namespace inside one.
+    /// The foreign-content namespace for a body element: SVG/MathML on entry, the
+    /// nearest open foreign ancestor's namespace inside one, or HTML (nil) when
+    /// that ancestor is an HTML integration point (`foreignObject`/`desc`/`title`),
+    /// whose content is parsed as ordinary HTML.
     private func bodyForeignNamespace(for name: String) -> String? {
         if name == "svg" { return ForeignNamespace.svg }
         if name == "math" { return ForeignNamespace.mathml }
-        return openBody.reversed().compactMap { $0.name?.namespaceURI }.first
+        for node in openBody.reversed() {
+            guard let namespace = node.name?.namespaceURI else { continue }
+            if Self.svgIntegrationPoints.contains(tagName(node)) { return nil }
+            return namespace
+        }
+        return nil
     }
+
+    /// The SVG elements that are HTML integration points: their content is HTML.
+    private static let svgIntegrationPoints: Set<String> = ["foreignobject", "desc", "title"]
 }
 
 /// The head's open-element stack still uses the pop-on-close `DocFrame` model (it
