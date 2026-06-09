@@ -203,7 +203,7 @@ final class HTMLDocument {
         }
         bodyEnsureTableContext(for: name)
         let namespace = bodyForeignNamespace(for: name)
-        let element = PureXML.Model.TreeNode.element(qualifiedName(name, namespace), attributes: modelAttributes(attributes))
+        let element = PureXML.Model.TreeNode.element(qualifiedName(name, namespace), attributes: adjustedAttributes(modelAttributes(attributes), namespace: namespace))
         openBody.last?.append(element)
         if !(PureXML.HTML.Elements.void.contains(name) || selfClosing) {
             openBody.append(element)
@@ -240,6 +240,16 @@ final class HTMLDocument {
         openBody.append(element)
     }
 
+    /// Restores SVG attribute names to their canonical camel case (`viewBox`, not
+    /// the tokenizer's `viewbox`) for elements in the SVG namespace.
+    private func adjustedAttributes(_ attributes: [Attribute], namespace: String?) -> [Attribute] {
+        guard namespace == ForeignNamespace.svg else { return attributes }
+        return attributes.map { attribute in
+            guard let adjusted = PureXML.HTML.ForeignNames.svgAttributes[attribute.name.localName.lowercased()] else { return attribute }
+            return Attribute(adjusted, attribute.value)
+        }
+    }
+
     /// The foreign-content namespace for a body element: SVG/MathML on entry, or
     /// the nearest open foreign ancestor's namespace inside one.
     private func bodyForeignNamespace(for name: String) -> String? {
@@ -247,9 +257,12 @@ final class HTMLDocument {
         if name == "math" { return ForeignNamespace.mathml }
         return openBody.reversed().compactMap { $0.name?.namespaceURI }.first
     }
+}
 
-    // MARK: Insertion primitives
-
+/// The head's open-element stack still uses the pop-on-close `DocFrame` model (it
+/// needs no adoption agency); these primitives drive it, kept in an extension so
+/// the class body stays within its size budget.
+extension HTMLDocument {
     private func open(
         _ name: String,
         _ attributes: [(String, String)],
