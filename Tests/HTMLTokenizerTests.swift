@@ -1,0 +1,53 @@
+@testable import PureXML
+import Testing
+
+@Suite("HTML tokenizer: references, NUL, RCDATA")
+struct HTMLTokenizerTests {
+    /// The concatenated text content of the first parsed element.
+    private func text(_ html: String) -> String {
+        guard case let .document(children) = PureXML.HTML.parse(html), case let .element(element) = children.first else { return "" }
+        return element.children.compactMap { if case let .text(value) = $0 { value } else { nil } }.joined()
+    }
+
+    @Test("A numeric reference to zero, a surrogate, or an out-of-range value yields U+FFFD")
+    func test_numericInvalid() {
+        #expect(text("<p>&#0;</p>") == "\u{FFFD}")
+        #expect(text("<p>&#xD800;</p>") == "\u{FFFD}")
+        #expect(text("<p>&#x110000;</p>") == "\u{FFFD}")
+    }
+
+    @Test("A numeric reference in the C1 range is mapped to its Windows-1252 character")
+    func test_numericC1() {
+        #expect(text("<p>&#x80;</p>") == "\u{20AC}") // euro
+        #expect(text("<p>&#153;</p>") == "\u{2122}") // trade mark
+    }
+
+    @Test("A valid numeric reference resolves to its code point")
+    func test_numericValid() {
+        #expect(text("<p>&#65;&#x42;</p>") == "AB")
+    }
+
+    @Test("A literal NUL byte becomes U+FFFD")
+    func test_nullReplacement() {
+        #expect(text("<p>a\u{0}b</p>") == "a\u{FFFD}b")
+    }
+
+    @Test("A named reference without a trailing semicolon is still decoded")
+    func test_semicolonless() {
+        #expect(text("<p>&amp</p>") == "&")
+        #expect(text("<p>&copy</p>") == "\u{A9}")
+    }
+
+    @Test("RCDATA content (title, textarea) decodes references; raw text (style) does not")
+    func test_rcdataDecoding() {
+        #expect(text("<title>a &amp; b</title>") == "a & b")
+        #expect(text("<textarea>&lt;x&gt;</textarea>") == "<x>")
+        #expect(text("<style>a &amp; b</style>") == "a &amp; b")
+    }
+
+    @Test("A single leading newline after <textarea> is stripped")
+    func test_textareaLeadingNewline() {
+        #expect(text("<textarea>\nhello</textarea>") == "hello")
+        #expect(text("<textarea>\n\nhello</textarea>") == "\nhello")
+    }
+}

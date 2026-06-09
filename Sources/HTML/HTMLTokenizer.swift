@@ -43,7 +43,7 @@ extension PureXML.HTML {
                 value.append(character)
                 advance()
             }
-            return .text(Self.decodeEntities(value))
+            return .text(Self.decodeEntities(Self.replacingNull(value)))
         }
 
         private mutating func startTag() -> Token {
@@ -131,6 +131,11 @@ extension PureXML.HTML {
                 value.append(chars[index])
                 index += 1
             }
+            value = Self.replacingNull(value)
+            // RCDATA decodes character references; raw text (script/style) does not.
+            if Elements.rcdata.contains(name) { value = Self.decodeEntities(value) }
+            // A single leading newline after <textarea> is stripped (the HTML rule).
+            if name == "textarea", value.first == "\n" { value.removeFirst() }
             return .text(value)
         }
 
