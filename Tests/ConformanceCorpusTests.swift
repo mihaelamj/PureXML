@@ -139,6 +139,67 @@ struct ConformanceCorpusTests {
         }
     }
 
+    private struct XSLTSpec {
+        let name: String
+        let stylesheet: String
+        let source: String
+        let expected: String
+    }
+
+    /// A text-output stylesheet wrapping a single `match="/"` template body, so
+    /// the result is exactly the body's output with no stray whitespace.
+    private func textSheet(_ body: String) -> String {
+        "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">"
+            + "<xsl:output method=\"text\"/><xsl:template match=\"/\">\(body)</xsl:template></xsl:stylesheet>"
+    }
+
+    /// XSLT 1.0 transformation conformance: a stylesheet over a source, with the
+    /// text result checked against what the spec prescribes.
+    private func xsltCorpus() throws -> [PureXML.Validation.ConformanceCase] {
+        let multiTemplate = "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">"
+            + "<xsl:output method=\"text\"/>"
+            + "<xsl:template match=\"/\"><xsl:apply-templates select=\"/r/i\"/></xsl:template>"
+            + "<xsl:template match=\"i\">[<xsl:value-of select=\".\"/>]</xsl:template></xsl:stylesheet>"
+        let calling = "<xsl:stylesheet version=\"1.0\" xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\">"
+            + "<xsl:output method=\"text\"/>"
+            + "<xsl:template match=\"/\"><xsl:call-template name=\"greet\"><xsl:with-param name=\"who\" select=\"'world'\"/></xsl:call-template></xsl:template>"
+            + "<xsl:template name=\"greet\"><xsl:param name=\"who\"/>hi <xsl:value-of select=\"$who\"/></xsl:template></xsl:stylesheet>"
+        let specs = [
+            XSLTSpec(name: "value-of", stylesheet: textSheet("<xsl:value-of select=\"/r/x\"/>"), source: "<r><x>hi</x></r>", expected: "hi"),
+            XSLTSpec(
+                name: "for-each",
+                stylesheet: textSheet("<xsl:for-each select=\"/r/i\"><xsl:value-of select=\".\"/></xsl:for-each>"),
+                source: "<r><i>a</i><i>b</i></r>",
+                expected: "ab",
+            ),
+            XSLTSpec(name: "if", stylesheet: textSheet("<xsl:if test=\"/r/x\">yes</xsl:if>"), source: "<r><x>1</x></r>", expected: "yes"),
+            XSLTSpec(
+                name: "choose-otherwise",
+                stylesheet: textSheet("<xsl:choose><xsl:when test=\"1=2\">no</xsl:when><xsl:otherwise>else</xsl:otherwise></xsl:choose>"),
+                source: "<x/>",
+                expected: "else",
+            ),
+            XSLTSpec(
+                name: "sort",
+                stylesheet: textSheet("<xsl:for-each select=\"/r/i\"><xsl:sort select=\".\"/><xsl:value-of select=\".\"/></xsl:for-each>"),
+                source: "<r><i>3</i><i>1</i><i>2</i></r>",
+                expected: "123",
+            ),
+            XSLTSpec(name: "variable", stylesheet: textSheet("<xsl:variable name=\"v\" select=\"'x'\"/><xsl:value-of select=\"$v\"/>"), source: "<x/>", expected: "x"),
+            XSLTSpec(name: "format-number", stylesheet: textSheet("<xsl:value-of select=\"format-number(1234.5,'#,##0.00')\"/>"), source: "<x/>", expected: "1,234.50"),
+            XSLTSpec(name: "concat", stylesheet: textSheet("<xsl:value-of select=\"concat(/r/a,'-',/r/b)\"/>"), source: "<r><a>x</a><b>y</b></r>", expected: "x-y"),
+            XSLTSpec(name: "apply-templates", stylesheet: multiTemplate, source: "<r><i>a</i><i>b</i></r>", expected: "[a][b]"),
+            XSLTSpec(name: "call-template-param", stylesheet: calling, source: "<x/>", expected: "hi world"),
+        ]
+        return try specs.map { spec in
+            try PureXML.Validation.ConformanceCase(
+                name: spec.name,
+                actual: PureXML.XSLT.transform(stylesheet: spec.stylesheet, source: spec.source),
+                expected: spec.expected,
+            )
+        }
+    }
+
     @Test("The C14N conformance corpus passes with no located failures")
     func test_corpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: canonicalCorpus())
@@ -160,6 +221,12 @@ struct ConformanceCorpusTests {
     @Test("The RELAX NG pattern conformance corpus passes with no located failures")
     func test_relaxNGCorpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: relaxNGCorpus())
+        #expect(failures.isEmpty, "\(failures.map(\.reason))")
+    }
+
+    @Test("The XSLT transformation conformance corpus passes with no located failures")
+    func test_xsltCorpusConforms() throws {
+        let failures = try PureXML.Validation.Conformance.failures(in: xsltCorpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
 
