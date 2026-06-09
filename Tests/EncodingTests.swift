@@ -107,6 +107,13 @@ struct EncodingTests {
         try #expect(decoded("ISO-8859-5", [0xF0]) == "\u{2116}") // №
     }
 
+    @Test("Decodes Windows-1254: CP1252 punctuation plus the Turkish letters")
+    func test_windows1254() throws {
+        try #expect(decoded("windows-1254", [0x80]) == "\u{20AC}") // € (from CP1252 high range)
+        try #expect(decoded("windows-1254", [0xDE]) == "\u{015E}") // Ş
+        try #expect(decoded("windows-1254", [0xE9]) == "\u{E9}") // é, unchanged
+    }
+
     private func byteSource(_ bytes: [UInt8]) -> () -> UInt8? {
         var index = 0
         return {
