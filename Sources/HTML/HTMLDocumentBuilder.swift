@@ -37,9 +37,9 @@ final class HTMLDocument {
     typealias Node = PureXML.Model.Node
     typealias Attribute = PureXML.Model.Attribute
 
-    /// Elements that belong in the head.
+    /// Elements that belong in the head (`template` is excluded: it nests in body).
     private static let headElements: Set<String> = [
-        "base", "basefont", "bgsound", "link", "meta", "title", "style", "script", "noscript", "noframes", "template",
+        "base", "basefont", "bgsound", "link", "meta", "title", "style", "script", "noscript", "noframes",
     ]
 
     private var mode: InsertionMode = .initial

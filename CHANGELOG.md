@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The HTML document builder's body is now constructed as a live mutable `TreeNode` tree with a single open-elements stack (the HTML5 model), attaching nodes to their parent as they open rather than accumulating children on close (#83, internal). Behavior is unchanged; this is the foundation the adoption agency algorithm needs to reparent already-built subtrees.
 - DTD attribute validation is now decomposed into five named, independently composable `Validation` rules (#101): `DTD.requiredAttributes`, `fixedAttributeValues`, `enumeratedAttributeValues`, `tokenizedAttributeTypes`, and `notationAttributes`, replacing the single `attributeDeclarations` rule. Each is removable by identity and isolation-tested one constraint at a time, honoring the validation-framework idiom. Behavior is unchanged. (XSD content validation stays one recursive rule by a documented scope decision, since its constraints are interdependent through type resolution; Schematron already exposes its rules as composable `Validation<Node, Void>` values.)
 
+### Fixed
+
+- A `<template>` element's flow content is now kept nested inside it (`<template><div>x</div></template>`) instead of being split out into the body (#83). `template` is built as body flow content rather than routed to the head.
+
 ### Added
 
 - HTML5 frameset documents (#83, stage 8): a `<frameset>` after the head now produces a frameset document whose `frameset` element replaces the body (`<html><head></head><frameset>...`), with nested framesets and `<noframes>` handled, and `<frame>` is now a void element (it no longer wrongly nests). An ordinary document still produces a body.

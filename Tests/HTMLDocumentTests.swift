@@ -82,4 +82,9 @@ struct HTMLDocumentTests {
     func test_noFosterInCell() {
         #expect(document("<table><tr><td><b>x</b></td></tr></table>") == bodyDocument("<table><tbody><tr><td><b>x</b></td></tr></tbody></table>"))
     }
+
+    @Test("A template's content nests inside it")
+    func test_templateContent() {
+        #expect(document("<template><div>x</div></template>") == bodyDocument("<template><div>x</div></template>"))
+    }
 }
