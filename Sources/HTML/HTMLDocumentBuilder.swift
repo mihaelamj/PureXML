@@ -227,10 +227,26 @@ final class HTMLDocument {
     /// or an input/keygen/textarea.
     private static let closesSelect: Set<String> = ["select", "input", "keygen", "textarea"]
 
+    /// Table-structural tags that close a select which is inside a table (the "in
+    /// select in table" rule).
+    private static let closesSelectInTable: Set<String> = ["caption", "table", "tbody", "tfoot", "thead", "tr", "td", "th"]
+
+    /// The open-stack index of a `<select>` that an opening table tag should close
+    /// (a select inside a table), or nil when there is none.
+    private func selectInTableToClose(for name: String) -> Int? {
+        guard Self.closesSelectInTable.contains(name),
+              let selectIndex = openBody.lastIndex(where: { tagName($0) == "select" }), selectIndex >= 1,
+              openBody[..<selectIndex].contains(where: { tagName($0) == "table" }) else { return nil }
+        return selectIndex
+    }
+
     private func bodyOpen(_ name: String, _ attributes: [(String, String)], selfClosing: Bool) {
         if Self.closesSelect.contains(name), let selectIndex = openBody.lastIndex(where: { tagName($0) == "select" }), selectIndex >= 1 {
             openBody.removeLast(openBody.count - selectIndex)
             if name == "select" { return } // a nested select just closes the open one
+        }
+        if let selectIndex = selectInTableToClose(for: name) {
+            openBody.removeLast(openBody.count - selectIndex)
         }
         if let closes = PureXML.HTML.Elements.impliedClose[name] {
             while let top = openBody.last, top !== bodyRoot, closes.contains(tagName(top)) {
