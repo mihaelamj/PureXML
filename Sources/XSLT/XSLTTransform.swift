@@ -17,10 +17,33 @@ public extension PureXML.XSLT {
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         if sheet.output.method == "text" { return textValue(of: result) }
-        let body = sheet.output.method == "html"
-            ? PureXML.HTML.serialize(result)
-            : PureXML.serialize(result, options: options.applying(sheet.output))
+        let body: String
+        if sheet.output.method == "html" {
+            body = PureXML.HTML.serialize(result)
+        } else {
+            let prepared = withCDATASections(result, sheet.output.cdataSectionElements)
+            body = PureXML.serialize(prepared, options: options.applying(sheet.output))
+        }
         return doctype(for: result, sheet.output) + body
+    }
+
+    /// Returns `node` with the text children of any element named in `names`
+    /// replaced by CDATA nodes, so the serializer emits them as CDATA sections.
+    private static func withCDATASections(_ node: PureXML.Model.Node, _ names: Set<String>) -> PureXML.Model.Node {
+        guard !names.isEmpty else { return node }
+        switch node {
+        case let .document(children):
+            return .document(children.map { withCDATASections($0, names) })
+        case let .element(element):
+            let wrap = names.contains(element.name.localName) || names.contains(element.name.description)
+            let children = element.children.map { child -> PureXML.Model.Node in
+                if wrap, case let .text(value) = child { return .cdata(value) }
+                return withCDATASections(child, names)
+            }
+            return .element(.init(name: element.name, attributes: element.attributes, children: children))
+        default:
+            return node
+        }
     }
 
     /// The `<!DOCTYPE …>` prologue for the result's root element when the output

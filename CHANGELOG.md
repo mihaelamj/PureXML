@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:output cdata-section-elements` (#82). The text content of the named result elements is emitted in `<![CDATA[…]]>` sections instead of escaped, leaving nested elements and other elements unaffected.
 - XSLT `xsl:output` `doctype-public`/`doctype-system` (#82). When either is set, a `<!DOCTYPE>` for the result's root element (PUBLIC when both are given, SYSTEM otherwise) is emitted before the serialized output, for XML and HTML methods.
 - XSLT `key()` over a node-set second argument (#82). `key(name, node-set)` (including `key('k', .)`) now unions the matches for every node's string value and de-duplicates, rather than using only the first node's string value.
 - XSLT `method="html"` output (#82). An `xsl:output method="html"` result is now serialized by the HTML rules (void elements like `<br>` emitted without a self-closing slash, raw-text elements like `<script>`/`<style>` left unescaped) instead of as XML.
