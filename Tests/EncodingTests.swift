@@ -163,6 +163,13 @@ struct EncodingTests {
         try #expect(decoded("EUC-KR", [0xC7, 0xD1, 0xB0, 0xA1, 0x41]) == "\u{D55C}\u{AC00}A")
     }
 
+    @Test("Decodes GBK/GB2312: Chinese characters, ASCII, and the 0x80 euro")
+    func test_gbk() throws {
+        // 中 (0xD6D0), 文 (0xCEC4), A (0x41), 0x80 = euro.
+        try #expect(decoded("GBK", [0xD6, 0xD0, 0xCE, 0xC4, 0x41, 0x80]) == "\u{4E2D}\u{6587}A\u{20AC}")
+        try #expect(decoded("gb2312", [0xD6, 0xD0]) == "\u{4E2D}") // GB2312 alias
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
