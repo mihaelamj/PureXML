@@ -73,7 +73,7 @@ public extension PureXML.Schema {
                 return [.init(reason: "the document has no root element", at: [])]
             }
             guard let declaration = elements[root.name.localName] else {
-                return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [])]
+                return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [.element(root.name.description)])]
             }
             // A schema with a target namespace declares its global elements in that
             // namespace; the root must be in it.

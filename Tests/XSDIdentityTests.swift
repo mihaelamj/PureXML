@@ -76,7 +76,10 @@ struct XSDIdentityTests {
         let valid = "<orders><product code=\"A\"/><product code=\"B\"/><line product=\"A\"/></orders>"
         let dangling = "<orders><product code=\"A\"/><line product=\"Z\"/></orders>"
         #expect(try validate(xsd, valid).isEmpty)
-        #expect(try !validate(xsd, dangling).isEmpty)
+        // The dangling keyref is located at the offending <line>, not <orders>.
+        let failure = try #require(validate(xsd, dangling).first)
+        #expect(failure.codingPath.map(\.stringValue) == ["orders", "line"])
+        #expect(String(describing: failure).hasSuffix("at path: orders/line"))
     }
 
     @Test("Identity-constraint errors are located at the constraining element")
@@ -94,9 +97,11 @@ struct XSDIdentityTests {
           </xs:element>
         </xs:schema>
         """
+        // The error locates the actual offending element (the duplicate item[2]),
+        // not just the element that declares the key.
         let errors = try validate(xsd, "<list><item id=\"1\"/><item id=\"1\"/></list>")
         let failure = try #require(errors.first)
-        #expect(failure.codingPath.map(\.stringValue) == ["list"])
-        #expect(String(describing: failure).hasSuffix("at path: list"))
+        #expect(failure.codingPath.map(\.stringValue) == ["list", "item"])
+        #expect(String(describing: failure).hasSuffix("at path: list/item[2]"))
     }
 }

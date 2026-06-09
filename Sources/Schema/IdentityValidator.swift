@@ -62,6 +62,33 @@ extension PureXML.Schema {
             }
         }
 
+        /// The coding-path steps from the constraint-bearing `container` down to a
+        /// selected `target`, so an identity error locates the actual offending
+        /// element rather than the element that merely declares the constraint.
+        /// Returns an empty path if `target` is not a descendant of `container`.
+        private func steps(from container: PureXML.Model.TreeNode, to target: PureXML.Model.TreeNode) -> [PureXML.Validation.PathKey] {
+            var chain: [PureXML.Model.TreeNode] = []
+            var current = target
+            while current !== container {
+                guard let parent = current.parent else { return [] }
+                chain.append(current)
+                current = parent
+            }
+            var steps: [PureXML.Validation.PathKey] = []
+            var parent = container
+            for node in chain.reversed() {
+                let name = node.name?.description ?? ""
+                let siblings = parent.children.filter { $0.kind == .element && ($0.name?.description ?? "") == name }
+                if siblings.count > 1, let index = siblings.firstIndex(where: { $0 === node }) {
+                    steps.append(.element(name, index: index + 1))
+                } else {
+                    steps.append(.element(name))
+                }
+                parent = node
+            }
+            return steps
+        }
+
         private func isNonRef(_ constraint: IdentityConstraint) -> Bool {
             if case .keyref = constraint.kind { return false }
             return true
@@ -80,12 +107,12 @@ extension PureXML.Schema {
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
-                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: path))
+                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: path + steps(from: node, to: target)))
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if seen.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: path))
+                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: path + steps(from: node, to: target)))
                 } else {
                     seen.append(tuple)
                 }
@@ -107,7 +134,7 @@ extension PureXML.Schema {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: path))
+                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: path + steps(from: node, to: target)))
                 }
             }
         }
