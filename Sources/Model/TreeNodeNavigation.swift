@@ -55,9 +55,11 @@ public extension PureXML.Model.TreeNode {
         switch kind {
         case .text, .cdata:
             value
-        case .element, .document:
+        case .element, .document, .entityReference:
             children.reduce(into: "") { $0 += $1.stringValue }
-        case .comment, .processingInstruction:
+        case .namespace:
+            value
+        case .comment, .processingInstruction, .doctype:
             ""
         }
     }

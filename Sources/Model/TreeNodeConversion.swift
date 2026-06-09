@@ -27,21 +27,44 @@ public extension PureXML.Model.TreeNode {
     var node: PureXML.Model.Node {
         switch kind {
         case .document:
-            .document(children.map(\.node))
+            .document(projectedChildren)
         case .element:
             .element(PureXML.Model.Element(
                 name: name ?? PureXML.Model.QualifiedName(""),
                 attributes: attributes,
-                children: children.map(\.node),
+                children: projectedChildren,
             ))
         case .text:
             .text(value)
+        case .entityReference:
+            .text(stringValue)
         case .cdata:
             .cdata(value)
         case .comment:
             .comment(value)
         case .processingInstruction:
             .processingInstruction(target: name?.description ?? "", data: value)
+        case .doctype, .namespace:
+            // DOM-structural kinds with no place in the content value model; they
+            // are dropped from a parent's projection (see projectedChildren), so a
+            // direct call here yields empty text only as a defensive fallback.
+            .text("")
+        }
+    }
+
+    /// The value-`Node` children of this subtree: doctype and namespace nodes are
+    /// dropped (they carry no content), and an entity-reference node is spliced
+    /// open into its replacement nodes, so the projection is a pure content tree.
+    private var projectedChildren: [PureXML.Model.Node] {
+        children.flatMap { child -> [PureXML.Model.Node] in
+            switch child.kind {
+            case .doctype, .namespace:
+                []
+            case .entityReference:
+                child.projectedChildren
+            default:
+                [child.node]
+            }
         }
     }
 }
