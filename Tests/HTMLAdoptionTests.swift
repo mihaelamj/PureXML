@@ -20,6 +20,14 @@ struct HTMLAdoptionTests {
         #expect(body("<b><i></b>X</i>") == "<b><i></i></b><i>X</i>")
     }
 
+    @Test("The fragment parser also reconstructs active formatting elements (#109)")
+    func test_fragmentReconstruction() {
+        // HTML.parse (fragment) now agrees with the document parser on
+        // active-formatting reconstruction, not just the simple overlap case.
+        #expect(PureXML.HTML.serialize(PureXML.HTML.parse("<b><i></b>X</i>")) == "<b><i></i></b><i>X</i>")
+        #expect(PureXML.HTML.serialize(PureXML.HTML.parse("<p>1<b>2<i>3</b>4</i>5</p>")) == "<p>1<b>2<i>3</i></b><i>4</i>5</p>")
+    }
+
     @Test("A block inside a formatting element triggers the furthest-block path")
     func test_furthestBlock() {
         #expect(body("<b>1<p>2</b>3</p>") == "<b>1</b><p><b>2</b>3</p>")

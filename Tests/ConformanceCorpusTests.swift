@@ -200,18 +200,9 @@ struct ConformanceCorpusTests {
         }
     }
 
-    /// The serialized body content of a full HTML5 document parse, the spec's
-    /// complete tree-construction path (the fragment `HTML.parse` does not yet
-    /// reconstruct active formatting elements; see #109).
-    private func htmlBody(_ html: String) -> String {
-        let full = PureXML.HTML.serialize(PureXML.HTML.parseDocument(html))
-        let wrapper = "<html><head></head><body>"
-        guard full.hasPrefix(wrapper), full.hasSuffix("</body></html>") else { return full }
-        return String(full.dropFirst(wrapper.count).dropLast("</body></html>".count))
-    }
-
-    /// HTML5 tree-construction conformance: the parsed-then-serialized document
-    /// body, against the normalized form the HTML5 parsing algorithm prescribes.
+    /// HTML5 tree-construction conformance: the parsed-then-serialized fragment,
+    /// against the normalized form the HTML5 parsing algorithm prescribes. The
+    /// fragment parser now reconstructs active formatting elements (#109 fixed).
     private func htmlCorpus() -> [PureXML.Validation.ConformanceCase] {
         let specs = [
             Spec(name: "void-elements", input: "<p>a<br>b<img src=\"x\">c</p>", expected: "<p>a<br>b<img src=\"x\">c</p>"),
@@ -226,7 +217,7 @@ struct ConformanceCorpusTests {
         return specs.map { spec in
             PureXML.Validation.ConformanceCase(
                 name: spec.name,
-                actual: htmlBody(spec.input),
+                actual: PureXML.HTML.serialize(PureXML.HTML.parse(spec.input)),
                 expected: spec.expected,
             )
         }

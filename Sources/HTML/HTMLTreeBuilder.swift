@@ -11,11 +11,18 @@ extension PureXML.HTML {
     /// closed implicitly when a conflicting tag opens, and an unmatched end tag is
     /// ignored. The result is a ``PureXML/Model/Node`` document.
     enum TreeBuilder {
+        /// The formatting elements that, when closed out of order, are reconstructed
+        /// for the content that follows (the HTML5 active-formatting list).
+        private static let formatting: Set<String> = [
+            "a", "b", "big", "code", "em", "font", "i", "nobr", "s", "small", "strike", "strong", "tt", "u",
+        ]
+
         static func build(_ tokens: [Token]) -> PureXML.Model.Node {
             var stack: [HTMLFrame] = []
             var roots: [PureXML.Model.Node] = []
+            var pending: [HTMLFrame] = []
             for token in tokens {
-                apply(token, stack: &stack, roots: &roots)
+                apply(token, stack: &stack, roots: &roots, pending: &pending)
             }
             while !stack.isEmpty {
                 pop(&stack, &roots)
@@ -23,19 +30,31 @@ extension PureXML.HTML {
             return .document(roots)
         }
 
-        private static func apply(_ token: Token, stack: inout [HTMLFrame], roots: inout [PureXML.Model.Node]) {
+        private static func apply(_ token: Token, stack: inout [HTMLFrame], roots: inout [PureXML.Model.Node], pending: inout [HTMLFrame]) {
             switch token {
             case let .startTag(name, attributes, selfClosing):
+                reconstruct(&stack, &pending)
                 openElement(name, attributes, selfClosing: selfClosing, &stack, &roots)
             case let .endTag(name):
-                closeElement(name, &stack, &roots)
+                closeElement(name, &stack, &roots, &pending)
             case let .text(value):
+                reconstruct(&stack, &pending)
                 attach(.text(value), &stack, &roots)
             case let .comment(value):
                 attach(.comment(value), &stack, &roots)
             case .doctype:
                 break
             }
+        }
+
+        /// Re-opens any formatting elements closed out of order, so content after
+        /// them is wrapped again (the HTML5 reconstruct-active-formatting step).
+        private static func reconstruct(_ stack: inout [HTMLFrame], _ pending: inout [HTMLFrame]) {
+            guard !pending.isEmpty else { return }
+            for frame in pending {
+                stack.append(HTMLFrame(name: frame.name, attributes: frame.attributes))
+            }
+            pending.removeAll()
         }
 
         private static func openElement(
@@ -55,8 +74,13 @@ extension PureXML.HTML {
             }
         }
 
-        private static func closeElement(_ name: String, _ stack: inout [HTMLFrame], _ roots: inout [PureXML.Model.Node]) {
+        private static func closeElement(_ name: String, _ stack: inout [HTMLFrame], _ roots: inout [PureXML.Model.Node], _ pending: inout [HTMLFrame]) {
             guard let index = stack.lastIndex(where: { $0.name == name }) else { return }
+            // Formatting elements strictly above the target are implicitly closed;
+            // remember them so they reconstruct for the following content.
+            for frame in stack[(index + 1)...] where formatting.contains(frame.name) {
+                pending.append(HTMLFrame(name: frame.name, attributes: frame.attributes))
+            }
             while stack.count > index {
                 pop(&stack, &roots)
             }
