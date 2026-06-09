@@ -131,9 +131,14 @@ extension PureXML.XSLT {
                     return .nodeSet(matched.map { .tree($0) })
                 }
                 .adding("document") { arguments, _ in
-                    guard let uri = arguments.first?.string, let text = loader(uri),
-                          let parsed = try? PureXML.parseTree(text) else { return .nodeSet([]) }
-                    return .nodeSet([.tree(parsed)])
+                    // A string or a node-set of URI references, each optionally with
+                    // a `#fragment` selecting a subset of the loaded document.
+                    let references: [String] = if let nodes = arguments.first?.nodes {
+                        nodes.compactMap(\.treeNode).map(\.stringValue)
+                    } else {
+                        [arguments.first?.string ?? ""]
+                    }
+                    return .nodeSet(references.flatMap { documentReference($0, loader) })
                 }
                 .adding("generate-id") { arguments, context in
                     // No argument uses the context node; an explicit empty node-set
@@ -146,6 +151,27 @@ extension PureXML.XSLT {
                 .adding("element-available") { arguments, _ in .boolean(instructionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("function-available") { arguments, _ in .boolean(functionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("unparsed-entity-uri") { _, _ in .string("") }
+        }
+
+        /// Loads one `document()` reference: the whole document, or, when the
+        /// reference has a `#fragment`, the nodes its XPointer selects.
+        private static func documentReference(_ reference: String, _ loader: (String) -> String?) -> [PureXML.XPath.Node] {
+            let path: String
+            let fragment: String?
+            if let hash = reference.firstIndex(of: "#") {
+                path = String(reference[..<hash])
+                fragment = String(reference[reference.index(after: hash)...])
+            } else {
+                path = reference
+                fragment = nil
+            }
+            guard let text = loader(path), let parsed = try? PureXML.parse(text) else { return [] }
+            guard let fragment, !fragment.isEmpty else { return [.tree(PureXML.Model.TreeNode(parsed))] }
+            let selections = (try? PureXML.XPointer.evaluate(fragment, over: parsed)) ?? []
+            return selections.compactMap { selection in
+                guard case let .node(node) = selection else { return nil }
+                return .tree(PureXML.Model.TreeNode(node))
+            }
         }
 
         private static func localPart(_ name: String) -> String {
