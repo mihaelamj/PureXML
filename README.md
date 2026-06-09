@@ -77,9 +77,9 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Epic71["#71 Beyond-parity libxml2 audit"]:::epic
-  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101"]:::done
+  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 tree construction #83"]:::done
   Epic74["#74 Parser-breadth sub-epic: standalone/decl #95, XML 1.1 #96, reader #98, recovery #100 done; encodings #97 #99 open"]:::epic
-  Open["Open: HTML5 #83 #84, encoding tables #97 #99"]:::todo
+  Open["Open (deferred to data vendoring): HTML named-entity table #84, encoding tables #97 #99"]:::todo
   Epic71 --> AuditDone
   AuditDone --> Epic74
   Epic74 --> Open
