@@ -105,6 +105,40 @@ struct ConformanceCorpusTests {
         }
     }
 
+    private struct RelaxNGSpec {
+        let name: String
+        let schema: String
+        let xml: String
+        let valid: Bool
+    }
+
+    /// RELAX NG pattern conformance: an instance is validated against a compact
+    /// schema, and the verdict is checked against the pattern's semantics.
+    private func relaxNGCorpus() throws -> [PureXML.Validation.ConformanceCase] {
+        let specs = [
+            RelaxNGSpec(name: "text-ok", schema: "start = element a { text }", xml: "<a>hi</a>", valid: true),
+            RelaxNGSpec(name: "text-rejects-child", schema: "start = element a { text }", xml: "<a><b/></a>", valid: false),
+            RelaxNGSpec(name: "optional-present", schema: "start = element a { element b { text }? }", xml: "<a><b>x</b></a>", valid: true),
+            RelaxNGSpec(name: "optional-absent", schema: "start = element a { element b { text }? }", xml: "<a></a>", valid: true),
+            RelaxNGSpec(name: "oneOrMore-fail", schema: "start = element a { element b { text }+ }", xml: "<a></a>", valid: false),
+            RelaxNGSpec(name: "choice-ok", schema: "start = element a { element b { text } | element c { text } }", xml: "<a><c>y</c></a>", valid: true),
+            RelaxNGSpec(name: "group-order-fail", schema: "start = element a { element b { text }, element c { text } }", xml: "<a><c>y</c><b>x</b></a>", valid: false),
+            RelaxNGSpec(name: "attribute-required", schema: "start = element a { attribute id { text } }", xml: "<a></a>", valid: false),
+            RelaxNGSpec(name: "attribute-ok", schema: "start = element a { attribute id { text } }", xml: "<a id='1'></a>", valid: true),
+            RelaxNGSpec(name: "interleave-order-independent", schema: "start = element a { element b { text } & element c { text } }", xml: "<a><c>y</c><b>x</b></a>", valid: true),
+            RelaxNGSpec(name: "empty-ok", schema: "start = element a { empty }", xml: "<a></a>", valid: true),
+            RelaxNGSpec(name: "empty-rejects-text", schema: "start = element a { empty }", xml: "<a>x</a>", valid: false),
+        ]
+        return try specs.map { spec in
+            let conforms = try PureXML.Schema.RelaxNG(compact: spec.schema).validate(spec.xml)
+            return PureXML.Validation.ConformanceCase(
+                name: spec.name,
+                actual: conforms ? "valid" : "invalid",
+                expected: spec.valid ? "valid" : "invalid",
+            )
+        }
+    }
+
     @Test("The C14N conformance corpus passes with no located failures")
     func test_corpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: canonicalCorpus())
@@ -120,6 +154,12 @@ struct ConformanceCorpusTests {
     @Test("The XSD datatype/facet conformance corpus passes with no located failures")
     func test_datatypeCorpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: datatypeCorpus())
+        #expect(failures.isEmpty, "\(failures.map(\.reason))")
+    }
+
+    @Test("The RELAX NG pattern conformance corpus passes with no located failures")
+    func test_relaxNGCorpusConforms() throws {
+        let failures = try PureXML.Validation.Conformance.failures(in: relaxNGCorpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
 
