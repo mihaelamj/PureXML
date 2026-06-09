@@ -55,10 +55,19 @@ extension PureXML.XPath {
         }
 
         func call(_ name: String, _ arguments: [Value], _ context: EvaluationContext) throws -> Value {
-            guard let implementation = table[name] else {
-                throw QueryError.unknownFunction(name)
+            if let implementation = table[name] {
+                return try implementation(arguments, context)
             }
-            return try implementation(arguments, context)
+            // A prefixed name may be an EXSLT extension function: resolve the prefix
+            // to its namespace URI and dispatch by namespace.
+            if let colon = name.firstIndex(of: ":") {
+                let prefix = String(name[..<colon])
+                let local = String(name[name.index(after: colon)...])
+                if let uri = context.namespaces[prefix], let implementation = EXSLT.implementation(uri: uri, local: local) {
+                    return try implementation(arguments, context)
+                }
+            }
+            throw QueryError.unknownFunction(name)
         }
     }
 }
