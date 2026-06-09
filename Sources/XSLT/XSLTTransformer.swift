@@ -110,8 +110,6 @@ extension PureXML.XSLT {
             }
         }
 
-        // MARK: Instantiation
-
         fileprivate func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
@@ -131,7 +129,9 @@ extension PureXML.XSLT {
 
         private func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
             if let select { return value(select, context) ?? .string("") }
-            return .string(Self.text(of: instantiate(body, context)))
+            // A body variable is a result-tree fragment: a queryable document node.
+            let children = instantiate(body, context).compactMap(Self.nodeOf).map(PureXML.Model.TreeNode.init)
+            return .nodeSet([.tree(PureXML.Model.TreeNode.document(children: children))])
         }
 
         fileprivate func value(_ expression: String, _ context: XSLTContext) -> PureXML.XPath.Value? {

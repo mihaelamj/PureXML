@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT result-tree fragments usable as node-sets (#82). An `xsl:variable` with a body now binds a queryable document fragment instead of a plain string, so `count($rtf/*)`, `$rtf/child`, and `xsl:for-each select="$rtf/..."` work; it still has its concatenated text as a string value.
 - XSLT `xsl:output cdata-section-elements` (#82). The text content of the named result elements is emitted in `<![CDATA[…]]>` sections instead of escaped, leaving nested elements and other elements unaffected.
 - XSLT `xsl:output` `doctype-public`/`doctype-system` (#82). When either is set, a `<!DOCTYPE>` for the result's root element (PUBLIC when both are given, SYSTEM otherwise) is emitted before the serialized output, for XML and HTML methods.
 - XSLT `key()` over a node-set second argument (#82). `key(name, node-set)` (including `key('k', .)`) now unions the matches for every node's string value and de-duplicates, rather than using only the first node's string value.
