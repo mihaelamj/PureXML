@@ -48,6 +48,7 @@ extension PureXML.HTML {
             "dd": ["dt", "dd"],
             "p": ["p"],
             "option": ["option"],
+            "optgroup": ["option", "optgroup"],
             "tr": ["tr", "td", "th"],
             "td": ["td", "th"],
             "th": ["td", "th"],

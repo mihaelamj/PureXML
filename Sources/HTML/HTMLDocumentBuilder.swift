@@ -223,7 +223,15 @@ final class HTMLDocument {
         node.name?.localName.lowercased() ?? ""
     }
 
+    /// Tags that close an open `<select>` (the "in select" rule): a nested select,
+    /// or an input/keygen/textarea.
+    private static let closesSelect: Set<String> = ["select", "input", "keygen", "textarea"]
+
     private func bodyOpen(_ name: String, _ attributes: [(String, String)], selfClosing: Bool) {
+        if Self.closesSelect.contains(name), let selectIndex = openBody.lastIndex(where: { tagName($0) == "select" }), selectIndex >= 1 {
+            openBody.removeLast(openBody.count - selectIndex)
+            if name == "select" { return } // a nested select just closes the open one
+        }
         if let closes = PureXML.HTML.Elements.impliedClose[name] {
             while let top = openBody.last, top !== bodyRoot, closes.contains(tagName(top)) {
                 openBody.removeLast()
