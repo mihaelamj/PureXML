@@ -36,8 +36,26 @@ extension PureXML.Parsing {
             case .utf16LittleEndian: return nextUTF16(bigEndian: false)
             case .utf32BigEndian: return nextUTF32(bigEndian: true)
             case .utf32LittleEndian: return nextUTF32(bigEndian: false)
+            case .shiftJIS: return nextShiftJIS()
             default: return nextUTF8()
             }
+        }
+
+        /// Streams one Shift-JIS character: a single byte (ASCII or half-width
+        /// katakana) or a lead+trail two-byte sequence resolved through JIS X 0208.
+        private mutating func nextShiftJIS() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if let single = PureXML.Parsing.ByteDecoder.ShiftJIS.singleByteScalar(lead) { return Character(single) }
+            guard PureXML.Parsing.ByteDecoder.ShiftJIS.isLead(lead) else { return Self.replacement }
+            guard let trail = nextByte() else {
+                finished = true
+                return Self.replacement
+            }
+            guard let scalar = PureXML.Parsing.ByteDecoder.ShiftJIS.twoByteScalar(lead: lead, trail: trail) else { return Self.replacement }
+            return Character(scalar)
         }
 
         private mutating func nextUTF32(bigEndian: Bool) -> Character? {

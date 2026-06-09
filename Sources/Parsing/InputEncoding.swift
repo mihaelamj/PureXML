@@ -31,6 +31,7 @@ public extension PureXML.Parsing {
         case windows1258
         case koi8r
         case koi8u
+        case shiftJIS
         case latinCyrillic // ISO-8859-5
         case latin5 // ISO-8859-9 (Turkish)
         case latin9 // ISO-8859-15

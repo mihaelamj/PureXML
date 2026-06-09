@@ -13,6 +13,9 @@ extension PureXML.Parsing {
                 encoding = declared
             }
             let body = bytes.dropFirst(bomLength)
+            if encoding == .shiftJIS {
+                return ShiftJIS.decode(body)
+            }
             if let map = Self.singleByteMap(encoding) {
                 return String(String.UnicodeScalarView(body.map(map)))
             }
@@ -141,6 +144,8 @@ extension PureXML.Parsing {
             "windows-1258": .windows1258, "cp1258": .windows1258,
             "koi8-r": .koi8r, "koi8r": .koi8r,
             "koi8-u": .koi8u, "koi8u": .koi8u,
+            "shift_jis": .shiftJIS, "shift-jis": .shiftJIS, "sjis": .shiftJIS, "x-sjis": .shiftJIS,
+            "ms_kanji": .shiftJIS, "windows-31j": .shiftJIS, "csshiftjis": .shiftJIS,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,
