@@ -45,8 +45,13 @@ private final class HTMLDocument {
     private var bodyAttributes: [Attribute] = []
     private var headStack: [DocFrame] = []
     private var headChildren: [Node] = []
-    private var bodyStack: [DocFrame] = []
-    private var bodyChildren: [Node] = []
+    /// The body is built as a live mutable tree (the HTML5 model): nodes are
+    /// attached to their parent as soon as they open, and `openBody` is the stack
+    /// of currently-open elements into that tree, with the body element at the
+    /// bottom. This lets the adoption agency reparent already-built subtrees, which
+    /// a pop-on-close model cannot.
+    private let bodyRoot = PureXML.Model.TreeNode.element("body")
+    private lazy var openBody: [PureXML.Model.TreeNode] = [bodyRoot]
 
     func build(_ tokens: [Token]) -> Node {
         for token in tokens {
@@ -55,11 +60,10 @@ private final class HTMLDocument {
         while !headStack.isEmpty {
             pop(&headStack, &headChildren)
         }
-        while !bodyStack.isEmpty {
-            pop(&bodyStack, &bodyChildren)
-        }
+        // Open body elements are already attached to the live tree, so no closing
+        // pass is needed: the body's children are read straight off bodyRoot.
         let head = PureXML.Model.Element(name: .init("head"), attributes: headAttributes, children: headChildren)
-        let body = PureXML.Model.Element(name: .init("body"), attributes: bodyAttributes, children: bodyChildren)
+        let body = PureXML.Model.Element(name: .init("body"), attributes: bodyAttributes, children: bodyRoot.children.map(\.node))
         let html = PureXML.Model.Element(
             name: .init("html"),
             attributes: htmlAttributes,
@@ -155,16 +159,77 @@ private final class HTMLDocument {
     private func processInBody(_ token: Token) {
         switch token {
         case let .startTag(name, attributes, selfClosing):
-            open(name, attributes, selfClosing: selfClosing, &bodyStack, &bodyChildren)
+            bodyOpen(name, attributes, selfClosing: selfClosing)
         case let .endTag(name) where name != "body" && name != "html":
-            close(name, &bodyStack, &bodyChildren)
+            bodyClose(name)
         case let .text(value):
-            attach(.text(value), &bodyStack, &bodyChildren)
+            bodyInsert(.text(value))
         case let .comment(value):
-            attach(.comment(value), &bodyStack, &bodyChildren)
+            bodyInsert(.comment(value))
         default:
             break
         }
+    }
+
+    // MARK: Body building (live mutable tree)
+
+    /// The lowercased tag name of an open element, for case-insensitive stack
+    /// matching (an SVG element's canonical camel case folds back to the token).
+    private func tagName(_ node: PureXML.Model.TreeNode) -> String {
+        node.name?.localName.lowercased() ?? ""
+    }
+
+    private func bodyOpen(_ name: String, _ attributes: [(String, String)], selfClosing: Bool) {
+        if let closes = PureXML.HTML.Elements.impliedClose[name] {
+            while let top = openBody.last, top !== bodyRoot, closes.contains(tagName(top)) {
+                openBody.removeLast()
+            }
+        }
+        bodyEnsureTableContext(for: name)
+        let namespace = bodyForeignNamespace(for: name)
+        let element = PureXML.Model.TreeNode.element(qualifiedName(name, namespace), attributes: modelAttributes(attributes))
+        openBody.last?.append(element)
+        if !(PureXML.HTML.Elements.void.contains(name) || selfClosing) {
+            openBody.append(element)
+        }
+    }
+
+    private func bodyClose(_ name: String) {
+        guard let index = openBody.lastIndex(where: { tagName($0) == name }), index >= 1 else { return }
+        openBody.removeLast(openBody.count - index)
+    }
+
+    private func bodyInsert(_ node: PureXML.Model.TreeNode) {
+        openBody.last?.append(node)
+    }
+
+    /// The table-construction implied insertions, against the live body stack.
+    private func bodyEnsureTableContext(for name: String) {
+        let structural: Set = ["table", "tbody", "thead", "tfoot", "tr"]
+        guard let context = openBody.reversed().first(where: { structural.contains(tagName($0)) }).map(tagName) else { return }
+        switch name {
+        case "tr" where context == "table":
+            bodyPushImplied("tbody")
+        case "td", "th":
+            if context == "table" { bodyPushImplied("tbody") }
+            if context == "table" || ["tbody", "thead", "tfoot"].contains(context) { bodyPushImplied("tr") }
+        default:
+            break
+        }
+    }
+
+    private func bodyPushImplied(_ name: String) {
+        let element = PureXML.Model.TreeNode.element(name)
+        openBody.last?.append(element)
+        openBody.append(element)
+    }
+
+    /// The foreign-content namespace for a body element: SVG/MathML on entry, or
+    /// the nearest open foreign ancestor's namespace inside one.
+    private func bodyForeignNamespace(for name: String) -> String? {
+        if name == "svg" { return ForeignNamespace.svg }
+        if name == "math" { return ForeignNamespace.mathml }
+        return openBody.reversed().compactMap { $0.name?.namespaceURI }.first
     }
 
     // MARK: Insertion primitives
