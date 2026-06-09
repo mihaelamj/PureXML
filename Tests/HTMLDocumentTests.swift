@@ -67,4 +67,19 @@ struct HTMLDocumentTests {
     func test_consecutiveRows() {
         #expect(document("<table><tr><td>a</td><tr><td>b</td></table>") == bodyDocument("<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>"))
     }
+
+    @Test("A stray element inside a table is foster-parented before it")
+    func test_fosterElement() {
+        #expect(document("<table><b>x</table>") == bodyDocument("<b>x</b><table></table>"))
+    }
+
+    @Test("Stray text inside a table is foster-parented before it")
+    func test_fosterText() {
+        #expect(document("<table>text<tr><td>c</td></tr></table>") == bodyDocument("text<table><tbody><tr><td>c</td></tr></tbody></table>"))
+    }
+
+    @Test("Well-formed cell content is not foster-parented")
+    func test_noFosterInCell() {
+        #expect(document("<table><tr><td><b>x</b></td></tr></table>") == bodyDocument("<table><tbody><tr><td><b>x</b></td></tr></tbody></table>"))
+    }
 }

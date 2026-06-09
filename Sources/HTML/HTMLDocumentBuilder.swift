@@ -172,7 +172,7 @@ final class HTMLDocument {
             bodyClose(name)
         case let .text(value):
             reconstructActiveFormatting()
-            bodyInsert(.text(value))
+            placeText(.text(value))
         case let .comment(value):
             bodyInsert(.comment(value))
         default:
@@ -204,7 +204,7 @@ final class HTMLDocument {
         bodyEnsureTableContext(for: name)
         let namespace = bodyForeignNamespace(for: name)
         let element = PureXML.Model.TreeNode.element(qualifiedName(name, namespace), attributes: adjustedAttributes(modelAttributes(attributes), namespace: namespace))
-        openBody.last?.append(element)
+        placeElement(element, name: name)
         if !(PureXML.HTML.Elements.void.contains(name) || selfClosing) {
             openBody.append(element)
         }
