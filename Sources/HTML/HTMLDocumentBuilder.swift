@@ -24,6 +24,8 @@ private enum InsertionMode {
     case inHead
     case afterHead
     case inBody
+    case inFrameset
+    case afterFrameset
 }
 
 /// Builds a full HTML document from tokens by driving the HTML5 insertion modes,
@@ -53,9 +55,10 @@ final class HTMLDocument {
     /// a pop-on-close model cannot.
     let bodyRoot = PureXML.Model.TreeNode.element("body")
     lazy var openBody: [PureXML.Model.TreeNode] = [bodyRoot]
-    /// The active formatting elements (the HTML5 list), with nil entries acting as
-    /// scope markers. Drives reconstruction and the adoption agency.
+    /// The active formatting elements (HTML5 list); nil entries are scope markers.
     var activeFormatting: [PureXML.Model.TreeNode?] = []
+    /// A frameset document's `frameset` stack; when non-empty its root is the body.
+    private var framesetStack: [PureXML.Model.TreeNode] = []
 
     func build(_ tokens: [Token]) -> Node {
         for token in tokens {
@@ -67,11 +70,15 @@ final class HTMLDocument {
         // Open body elements are already attached to the live tree, so no closing
         // pass is needed: the body's children are read straight off bodyRoot.
         let head = PureXML.Model.Element(name: .init("head"), attributes: headAttributes, children: headChildren)
-        let body = PureXML.Model.Element(name: .init("body"), attributes: bodyAttributes, children: bodyRoot.children.map(\.node))
+        let secondChild: Node = if let frameset = framesetStack.first {
+            frameset.node
+        } else {
+            .element(PureXML.Model.Element(name: .init("body"), attributes: bodyAttributes, children: bodyRoot.children.map(\.node)))
+        }
         let html = PureXML.Model.Element(
             name: .init("html"),
             attributes: htmlAttributes,
-            children: [.element(head), .element(body)],
+            children: [.element(head), secondChild],
         )
         return .document([.element(html)])
     }
@@ -84,10 +91,10 @@ final class HTMLDocument {
         case .inHead: processInHead(token)
         case .afterHead: processAfterHead(token)
         case .inBody: processInBody(token)
+        case .inFrameset: processInFrameset(token)
+        case .afterFrameset: break
         }
     }
-
-    // MARK: Document-structure modes
 
     private func processInitial(_ token: Token) {
         if case .doctype = token { return }
@@ -145,6 +152,11 @@ final class HTMLDocument {
     }
 
     private func processAfterHead(_ token: Token) {
+        if case let .startTag(name, attributes, _) = token, name == "frameset" {
+            framesetStack = [PureXML.Model.TreeNode.element("frameset", attributes: modelAttributes(attributes))]
+            mode = .inFrameset
+            return
+        }
         if case let .startTag(name, attributes, _) = token, name == "body" {
             bodyAttributes = modelAttributes(attributes)
             mode = .inBody
@@ -180,17 +192,32 @@ final class HTMLDocument {
         }
     }
 
-    /// After opening a start tag, records it on the active-formatting list when it
-    /// is a formatting element (so misnesting can be recovered later).
+    /// Records a just-opened formatting element on the active-formatting list.
     private func noteOpenedFormatting(_ name: String, selfClosing: Bool) {
         guard isFormatting(name), !selfClosing, !PureXML.HTML.Elements.void.contains(name), let opened = openBody.last else { return }
         activeFormatting.append(opened)
     }
 
-    // MARK: Body building (live mutable tree)
+    private func processInFrameset(_ token: Token) {
+        switch token {
+        case let .startTag(name, attributes, _) where name == "frameset":
+            let element = PureXML.Model.TreeNode.element("frameset", attributes: modelAttributes(attributes))
+            framesetStack.last?.append(element)
+            framesetStack.append(element)
+        case let .startTag(name, attributes, _) where name == "frame":
+            framesetStack.last?.append(PureXML.Model.TreeNode.element("frame", attributes: modelAttributes(attributes)))
+        case let .startTag(name, attributes, _) where name == "noframes":
+            framesetStack.last?.append(PureXML.Model.TreeNode.element("noframes", attributes: modelAttributes(attributes)))
+        case let .endTag(name) where name == "frameset":
+            if framesetStack.count > 1 { framesetStack.removeLast() } else { mode = .afterFrameset }
+        case let .comment(value):
+            framesetStack.last?.append(.comment(value))
+        default:
+            break
+        }
+    }
 
-    /// The lowercased tag name of an open element, for case-insensitive stack
-    /// matching (an SVG element's canonical camel case folds back to the token).
+    /// The lowercased tag name of an open element, for case-insensitive matching.
     func tagName(_ node: PureXML.Model.TreeNode) -> String {
         node.name?.localName.lowercased() ?? ""
     }
@@ -219,7 +246,6 @@ final class HTMLDocument {
         openBody.last?.append(node)
     }
 
-    /// The table-construction implied insertions, against the live body stack.
     private func bodyEnsureTableContext(for name: String) {
         let structural: Set = ["table", "tbody", "thead", "tfoot", "tr"]
         guard let context = openBody.reversed().first(where: { structural.contains(tagName($0)) }).map(tagName) else { return }
@@ -240,8 +266,7 @@ final class HTMLDocument {
         openBody.append(element)
     }
 
-    /// Restores SVG attribute names to their canonical camel case (`viewBox`, not
-    /// the tokenizer's `viewbox`) for elements in the SVG namespace.
+    /// Restores SVG attribute names to their canonical camel case.
     private func adjustedAttributes(_ attributes: [Attribute], namespace: String?) -> [Attribute] {
         guard namespace == ForeignNamespace.svg else { return attributes }
         return attributes.map { attribute in
@@ -251,9 +276,7 @@ final class HTMLDocument {
     }
 
     /// The foreign-content namespace for a body element: SVG/MathML on entry, the
-    /// nearest open foreign ancestor's namespace inside one, or HTML (nil) when
-    /// that ancestor is an HTML integration point (`foreignObject`/`desc`/`title`),
-    /// whose content is parsed as ordinary HTML.
+    /// nearest open foreign ancestor's, or HTML (nil) inside an integration point.
     private func bodyForeignNamespace(for name: String) -> String? {
         if name == "svg" { return ForeignNamespace.svg }
         if name == "math" { return ForeignNamespace.mathml }
@@ -265,13 +288,12 @@ final class HTMLDocument {
         return nil
     }
 
-    /// The SVG elements that are HTML integration points: their content is HTML.
+    /// The SVG HTML integration points: their content is parsed as HTML.
     private static let svgIntegrationPoints: Set<String> = ["foreignobject", "desc", "title"]
 }
 
-/// The head's open-element stack still uses the pop-on-close `DocFrame` model (it
-/// needs no adoption agency); these primitives drive it, kept in an extension so
-/// the class body stays within its size budget.
+/// The head's open-element stack uses the pop-on-close `DocFrame` model; these
+/// primitives drive it, in an extension to keep the class body within budget.
 extension HTMLDocument {
     private func open(
         _ name: String,
@@ -304,10 +326,8 @@ extension HTMLDocument {
         return stack.reversed().first { $0.namespace != nil }?.namespace
     }
 
-    /// A qualified name carrying its foreign-content namespace URI, so an SVG or
-    /// MathML element is distinguishable from same-named HTML. SVG element names
-    /// are restored to their canonical camel case (`foreignObject`, not the
-    /// tokenizer's lowercased `foreignobject`).
+    /// A qualified name carrying its foreign-content namespace, with SVG element
+    /// names restored to their canonical camel case.
     private func qualifiedName(_ name: String, _ namespace: String?) -> PureXML.Model.QualifiedName {
         let local = namespace == ForeignNamespace.svg ? (PureXML.HTML.ForeignNames.svgElements[name] ?? name) : name
         return PureXML.Model.QualifiedName(prefix: nil, localName: local, namespaceURI: namespace)
