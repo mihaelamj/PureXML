@@ -16,6 +16,11 @@ public extension PureXML.Validation {
         private let rules: [Validation<PureXML.Model.Element, DTDSchema>]
         private var stack: [StreamingDTDFrame] = []
         private var collected: [ValidationError] = []
+        // Document-scoped ID/IDREF state, bounded to the identifier values, not
+        // the tree. IDREFs may point forward, so they resolve at finish().
+        private var idCounts: [String: Int] = [:]
+        private var idDuplicatePath: [String: [PathKey]] = [:]
+        private var pendingReferences: [StreamingIDReference] = []
 
         public init(schema: DTDSchema, strict: Bool = false) {
             self.schema = schema
@@ -47,9 +52,30 @@ public extension PureXML.Validation {
             }
         }
 
-        /// The errors found so far. Call after the last event for the full set.
+        /// The per-element errors found so far (content models and attributes).
+        /// Document-scoped ID/IDREF errors are added by ``finish()``.
         public var errors: [ValidationError] {
             collected
+        }
+
+        /// The complete error set, including the document-scoped ID/IDREF checks
+        /// that can only be resolved once every element has been seen. Call after
+        /// the last event.
+        public mutating func finish() -> [ValidationError] {
+            var result = collected
+            for (value, count) in idCounts where count > 1 {
+                result.append(ValidationError(
+                    reason: "duplicate ID '\(value)' (declared \(count) times)",
+                    at: idDuplicatePath[value] ?? [],
+                ))
+            }
+            for reference in pendingReferences where idCounts[reference.value] == nil {
+                result.append(ValidationError(
+                    reason: "IDREF '\(reference.value)' on <\(reference.element)> matches no ID",
+                    at: reference.path,
+                ))
+            }
+            return result
         }
 
         // MARK: Internals
@@ -75,6 +101,34 @@ public extension PureXML.Validation {
                 + (frame.hasText ? [.text("x")] : [])
             let element = PureXML.Model.Element(name: frame.name, attributes: frame.attributes, children: children)
             collected += rules.flatMap { $0.apply(to: element, at: frame.path, in: schema) }
+            collectIdentifiers(frame)
+        }
+
+        /// Records the closing element's ID and IDREF attribute values, so the
+        /// document-scoped ID/IDREF integrity check can run at ``finish()``. A
+        /// duplicate ID is located at its repeat occurrence; an IDREF at the
+        /// element that carries it.
+        private mutating func collectIdentifiers(_ frame: StreamingDTDFrame) {
+            let name = frame.name.description
+            guard let declarations = schema.attributes[name] else { return }
+            for declaration in declarations {
+                guard let value = frame.attributes.first(where: {
+                    $0.name.description == declaration.name || $0.name.localName == declaration.name
+                })?.value else { continue }
+                switch declaration.type {
+                case .id:
+                    idCounts[value, default: 0] += 1
+                    if idCounts[value] == 2 { idDuplicatePath[value] = frame.path }
+                case .idReference:
+                    pendingReferences.append(StreamingIDReference(value: value, element: name, path: frame.path))
+                case .idReferences:
+                    for token in value.split(whereSeparator: { $0.isWhitespace }) {
+                        pendingReferences.append(StreamingIDReference(value: String(token), element: name, path: frame.path))
+                    }
+                case .cdata, .enumeration, .notation, .nmToken, .nmTokens, .entity, .entities:
+                    break
+                }
+            }
         }
     }
 }
@@ -94,8 +148,16 @@ public extension PureXML {
         while let event = try reader.next() {
             validator.consume(event)
         }
-        return validator.errors
+        return validator.finish()
     }
+}
+
+/// A pending IDREF awaiting resolution at the end of the stream: the referenced
+/// value, the element that carries it, and that element's coding path.
+private struct StreamingIDReference {
+    let value: String
+    let element: String
+    let path: [PureXML.Validation.PathKey]
 }
 
 /// One open element while streaming: its name and attributes, the coding path to

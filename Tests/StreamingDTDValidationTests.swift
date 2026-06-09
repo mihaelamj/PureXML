@@ -33,15 +33,31 @@ struct StreamingDTDValidationTests {
         #expect(errors.contains { $0.reason.contains("id") })
     }
 
+    @Test("A duplicate ID is reported and a forward IDREF resolves at finish")
+    func test_idAndIdref() throws {
+        let dtd = try schema(
+            "<!ELEMENT root (a*)><!ELEMENT a EMPTY><!ATTLIST a id ID #IMPLIED ref IDREF #IMPLIED>",
+        )
+        // A duplicate ID.
+        let dupes = try PureXML.validate(streaming: "<root><a id=\"x\"/><a id=\"x\"/></root>", dtd: dtd)
+        #expect(dupes.contains { $0.reason.contains("duplicate ID 'x'") })
+        // A forward IDREF (the id appears after the ref) resolves with no error.
+        #expect(try PureXML.validate(streaming: "<root><a ref=\"y\"/><a id=\"y\"/></root>", dtd: dtd).isEmpty)
+        // A dangling IDREF is reported.
+        let dangling = try PureXML.validate(streaming: "<root><a ref=\"z\"/></root>", dtd: dtd)
+        #expect(dangling.contains { $0.reason.contains("IDREF 'z'") })
+    }
+
     @Test("Streaming validation agrees with tree validation on the same document")
     func test_matchesTreeValidation() throws {
+        let internalSubset = "<!ELEMENT list (item+)><!ELEMENT item (#PCDATA)><!ATTLIST item id ID #IMPLIED>"
         let doc = """
-        <!DOCTYPE list [<!ELEMENT list (item+)><!ELEMENT item (#PCDATA)>]>
-        <list><item>a</item><stray/><item>b</item></list>
+        <!DOCTYPE list [\(internalSubset)]>
+        <list><item id="d">a</item><stray/><item id="d">b</item></list>
         """
         let tree = try PureXML.validateAgainstInternalDTD(doc)
-        let dtd = try schema("<!ELEMENT list (item+)><!ELEMENT item (#PCDATA)>")
-        let body = "<list><item>a</item><stray/><item>b</item></list>"
+        let dtd = try schema(internalSubset)
+        let body = "<list><item id=\"d\">a</item><stray/><item id=\"d\">b</item></list>"
         let streamed = try PureXML.validate(streaming: body, dtd: dtd)
         // Same problems surface (the reasons match; the streamed path always indexes).
         #expect(streamed.map(\.reason).sorted() == tree.map(\.reason).sorted())
