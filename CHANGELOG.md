@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- DTD attribute validation is now decomposed into five named, independently composable `Validation` rules (#101): `DTD.requiredAttributes`, `fixedAttributeValues`, `enumeratedAttributeValues`, `tokenizedAttributeTypes`, and `notationAttributes`, replacing the single `attributeDeclarations` rule. Each is removable by identity and isolation-tested one constraint at a time, honoring the validation-framework idiom. Behavior is unchanged. (XSD content validation stays one recursive rule by a documented scope decision, since its constraints are interdependent through type resolution; Schematron already exposes its rules as composable `Validation<Node, Void>` values.)
+
 ### Added
 
 - XInclude range inclusion (#87), completing the XInclude audit. An `xi:include` whose `xpointer` selects a range (`xpointer(range(...))`, `range-to`, or `string-range`) now includes that range's content: when no node-selecting scheme matches, the processor falls back to the XPointer range model and substitutes each range's spanned nodes (or the matched text for a `string-range`).
