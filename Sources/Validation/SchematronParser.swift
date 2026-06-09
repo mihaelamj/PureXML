@@ -20,7 +20,21 @@ extension PureXML.Validation {
                 defaultPhase: attribute(schema, "defaultPhase"),
                 lets: ruleLets(schema),
                 diagnostics: diagnostics(root),
+                keys: keys(root),
             )
+        }
+
+        /// The `xsl:key` declarations (matched by local name `key`, so the XSLT
+        /// namespace is not required) that back the `key()` function.
+        private static func keys(_ root: PureXML.Model.TreeNode) throws -> [SchematronKey] {
+            try descendants(root, localName: "key").compactMap { node in
+                guard let name = attribute(node, "name"), let match = attribute(node, "match") else { return nil }
+                return try SchematronKey(
+                    name: name,
+                    match: PureXML.XPath.Query(contextExpression(match)),
+                    use: PureXML.XPath.Query(attribute(node, "use") ?? "."),
+                )
+            }
         }
 
         /// Builds the concrete patterns: an `abstract="true"` pattern is a template

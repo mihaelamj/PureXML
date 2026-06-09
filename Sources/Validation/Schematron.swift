@@ -1,3 +1,10 @@
+/// A node-keyed function-table factory, so `current()`, `key()`, and `document()`
+/// are available in every Schematron test, let, and message expression. File scope
+/// and private.
+private typealias Functions = (PureXML.Model.TreeNode) -> PureXML.XPath.FunctionTable
+/// An `xsl:key` index: key name to value to the matched nodes. File scope and private.
+private typealias KeyIndex = [String: [String: [PureXML.Model.TreeNode]]]
+
 public extension PureXML.Validation {
     /// Rule-based assertion validation (the libxml2 `schematron.h` model).
     ///
@@ -26,9 +33,9 @@ public extension PureXML.Validation {
         /// are errors and reports are warnings. With `phase` (or the schema's
         /// `defaultPhase`), only the patterns that phase activates run; nil or
         /// `#ALL` runs every pattern.
-        public func validate(_ xml: String, phase: String? = nil) throws -> [ValidationError] {
+        public func validate(_ xml: String, phase: String? = nil, documentLoader: @escaping (String) -> String? = { _ in nil }) throws -> [ValidationError] {
             let node = try PureXML.parse(xml)
-            let validation = Self.rule(activePatterns(phase: phase), schemaLets: schema.lets, diagnostics: schema.diagnostics)
+            let validation = Self.rule(activePatterns(phase: phase), schemaLets: schema.lets, diagnostics: schema.diagnostics, keys: schema.keys, loader: documentLoader)
             return Validator<Void>.blank.validating(validation).errors(for: node, in: ())
         }
 
@@ -49,16 +56,50 @@ public extension PureXML.Validation {
             _ patterns: [SchematronPattern],
             schemaLets: [SchematronLet],
             diagnostics: [String: [SchematronMessagePart]],
+            keys: [SchematronKey] = [],
+            loader: @escaping (String) -> String? = { _ in nil },
         ) -> Validation<PureXML.Model.Node, Void> {
             .init(
                 description: "Document satisfies the Schematron schema",
                 check: { context in
                     let root = PureXML.Model.TreeNode(context.subject)
-                    let base = bindings(schemaLets, at: root, base: [:])
-                    return evaluate(patterns, over: root, base: base, diagnostics: diagnostics)
+                    let keyIndex = keyIndex(keys, root)
+                    let functions: Functions = { node in functionTable(at: node, keyIndex: keyIndex, loader: loader) }
+                    let base = bindings(schemaLets, at: root, base: [:], functions)
+                    return evaluate(patterns, over: root, base: base, diagnostics: diagnostics, functions)
                 },
                 when: { $0.codingPath.isEmpty },
             )
+        }
+
+        /// Indexes every `xsl:key`-matched node by its `use` value, so `key()` can
+        /// resolve a name and value to nodes.
+        private static func keyIndex(_ keys: [SchematronKey], _ root: PureXML.Model.TreeNode) -> KeyIndex {
+            var index: KeyIndex = [:]
+            for key in keys {
+                for node in key.match.nodes(over: root) {
+                    let value = (try? key.use.value(at: node).string) ?? ""
+                    index[key.name, default: [:]][value, default: []].append(node)
+                }
+            }
+            return index
+        }
+
+        /// The XSLT-style functions for a context node: `current`, `key` (over the
+        /// prebuilt index), and `document` (through the injected loader).
+        private static func functionTable(at node: PureXML.Model.TreeNode, keyIndex: KeyIndex, loader: @escaping (String) -> String?) -> PureXML.XPath.FunctionTable {
+            PureXML.XPath.FunctionTable()
+                .adding("current") { _, _ in .nodeSet([.tree(node)]) }
+                .adding("key") { arguments, _ in
+                    let name = arguments.first?.string ?? ""
+                    let value = arguments.count > 1 ? arguments[1].string : ""
+                    return .nodeSet((keyIndex[name]?[value] ?? []).map { .tree($0) })
+                }
+                .adding("document") { arguments, _ in
+                    guard let uri = arguments.first?.string, let text = loader(uri),
+                          let parsed = try? PureXML.parse(text) else { return .nodeSet([]) }
+                    return .nodeSet([.tree(PureXML.Model.TreeNode(parsed))])
+                }
         }
 
         private static func evaluate(
@@ -66,8 +107,9 @@ public extension PureXML.Validation {
             over root: PureXML.Model.TreeNode,
             base: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
+            _ functions: Functions,
         ) -> [ValidationError] {
-            patterns.flatMap { evaluate($0, over: root, base: base, diagnostics: diagnostics) }
+            patterns.flatMap { evaluate($0, over: root, base: base, diagnostics: diagnostics, functions) }
         }
 
         private static func evaluate(
@@ -75,15 +117,16 @@ public extension PureXML.Validation {
             over root: PureXML.Model.TreeNode,
             base: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
+            _ functions: Functions,
         ) -> [ValidationError] {
             // Pattern-level lets extend the schema-level base, evaluated at the root.
-            let patternBase = bindings(pattern.lets, at: root, base: base)
+            let patternBase = bindings(pattern.lets, at: root, base: base, functions)
             var errors: [ValidationError] = []
             var claimed: Set<ObjectIdentifier> = []
             for rule in pattern.rules {
                 for node in rule.context.nodes(over: root) where claimed.insert(ObjectIdentifier(node)).inserted {
-                    let variables = bindings(rule.lets, at: node, base: patternBase)
-                    errors += apply(rule.assertions, at: node, variables: variables, diagnostics: diagnostics)
+                    let variables = bindings(rule.lets, at: node, base: patternBase, functions)
+                    errors += apply(rule.assertions, at: node, variables: variables, diagnostics: diagnostics, functions)
                 }
             }
             return errors
@@ -92,10 +135,15 @@ public extension PureXML.Validation {
         /// Evaluates `<let>` bindings over `base` at `node`, in order, so a later
         /// binding can reference an earlier one (or a wider-scope one) through
         /// `$name`.
-        private static func bindings(_ lets: [SchematronLet], at node: PureXML.Model.TreeNode, base: [String: PureXML.XPath.Value]) -> [String: PureXML.XPath.Value] {
+        private static func bindings(
+            _ lets: [SchematronLet],
+            at node: PureXML.Model.TreeNode,
+            base: [String: PureXML.XPath.Value],
+            _ functions: Functions,
+        ) -> [String: PureXML.XPath.Value] {
             var variables = base
             for binding in lets {
-                if let value = try? binding.value.value(at: node, variables: variables) {
+                if let value = try? binding.value.value(at: node, position: 1, size: 1, variables: variables, functions: functions(node)) {
                     variables[binding.name] = value
                 }
             }
@@ -107,14 +155,15 @@ public extension PureXML.Validation {
             at node: PureXML.Model.TreeNode,
             variables: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
+            _ functions: Functions,
         ) -> [ValidationError] {
             let path = codingPath(of: node)
             var errors: [ValidationError] = []
             for assertion in assertions {
-                let holds = (try? assertion.test.value(at: node, variables: variables).boolean) ?? false
+                let holds = (try? assertion.test.value(at: node, position: 1, size: 1, variables: variables, functions: functions(node)).boolean) ?? false
                 let flagged = assertion.isReport ? holds : !holds
                 guard flagged else { continue }
-                let reason = reason(assertion, at: node, variables: variables, diagnostics: diagnostics)
+                let reason = reason(assertion, at: node, variables: variables, diagnostics: diagnostics, functions)
                 errors.append(ValidationError(reason: reason, at: path, severity: assertion.isReport ? .warning : .error))
             }
             return errors
@@ -127,11 +176,12 @@ public extension PureXML.Validation {
             at node: PureXML.Model.TreeNode,
             variables: [String: PureXML.XPath.Value],
             diagnostics: [String: [SchematronMessagePart]],
+            _ functions: Functions,
         ) -> String {
-            var text = render(assertion.message, at: node, variables: variables)
+            var text = render(assertion.message, at: node, variables: variables, functions)
             for id in assertion.diagnostics {
                 guard let parts = diagnostics[id] else { continue }
-                let rendered = render(parts, at: node, variables: variables)
+                let rendered = render(parts, at: node, variables: variables, functions)
                 if !rendered.isEmpty { text += " " + rendered }
             }
             return text
@@ -145,11 +195,12 @@ public extension PureXML.Validation {
             _ parts: [SchematronMessagePart],
             at node: PureXML.Model.TreeNode,
             variables: [String: PureXML.XPath.Value],
+            _ functions: Functions,
         ) -> String {
             let joined = parts.map { part -> String in
                 switch part {
                 case let .text(text): text
-                case let .valueOf(query): (try? query.value(at: node, variables: variables).string) ?? ""
+                case let .valueOf(query): (try? query.value(at: node, position: 1, size: 1, variables: variables, functions: functions(node)).string) ?? ""
                 case .name: node.name?.description ?? ""
                 }
             }.joined()

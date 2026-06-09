@@ -27,6 +27,15 @@ extension PureXML.Validation {
         let value: PureXML.XPath.Query
     }
 
+    /// An `xsl:key` declaration (the XSLT query binding): its name, the compiled
+    /// match selecting indexed nodes, and the `use` expression giving each node's
+    /// key value, so the `key()` function can look nodes up by value.
+    struct SchematronKey {
+        let name: String
+        let match: PureXML.XPath.Query
+        let use: PureXML.XPath.Query
+    }
+
     /// One `<rule>`: a compiled context that selects the nodes the rule fires on,
     /// its `<let>` variable bindings, and its assertions.
     struct SchematronRule {
@@ -56,5 +65,7 @@ extension PureXML.Validation {
         /// `<diagnostic id=>` message templates, keyed by id, referenced from an
         /// assertion's `diagnostics=` attribute.
         let diagnostics: [String: [SchematronMessagePart]]
+        /// `xsl:key` declarations backing the `key()` function in tests.
+        let keys: [SchematronKey]
     }
 }
