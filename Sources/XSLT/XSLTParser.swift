@@ -106,9 +106,7 @@ extension PureXML.XSLT {
             return top
         }
 
-        /// Compiles a stylesheet element, recursively folding in `xsl:include`
-        /// (same import precedence) and `xsl:import` (one lower) resolved through
-        /// `loader`.
+        /// Compiles a stylesheet element, folding in `xsl:include`/`xsl:import`.
         private static func compile(_ top: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
             var parts = Parts()
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
@@ -167,6 +165,8 @@ extension PureXML.XSLT {
                 encoding: XSLTNode.attribute(node, "encoding"),
                 version: XSLTNode.attribute(node, "version"),
                 standalone: XSLTNode.attribute(node, "standalone").map { $0 == "yes" },
+                doctypePublic: XSLTNode.attribute(node, "doctype-public"),
+                doctypeSystem: XSLTNode.attribute(node, "doctype-system"),
             )
         }
 
