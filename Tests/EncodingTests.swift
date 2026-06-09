@@ -192,6 +192,22 @@ struct EncodingTests {
         try #expect(decoded("csbig5", [0x88, 0x62]) == "\u{00CA}\u{0304}")
     }
 
+    @Test("Decodes ISO-2022-JP: ASCII, JIS X 0201 Roman and katakana, and JIS X 0208")
+    func test_iso2022jp() throws {
+        let esc: UInt8 = 0x1B
+        // JIS X 0201 Roman: 0x5C is the yen sign, 0x7E the overline.
+        try #expect(decoded("ISO-2022-JP", [esc, 0x28, 0x4A, 0x5C, 0x7E, esc, 0x28, 0x42]) == "\u{00A5}\u{203E}")
+        // JIS X 0201 katakana: 0x31 -> U+FF71 (ｱ).
+        try #expect(decoded("iso-2022-jp", [esc, 0x28, 0x49, 0x31, esc, 0x28, 0x42]) == "\u{FF71}")
+        // JIS X 0208: 0x46 0x7C shares pointer 3569 with EUC-JP 0xC6 0xFC, the kanji 日.
+        let kanji = try decoded("ISO-2022-JP", [esc, 0x24, 0x42, 0x46, 0x7C, esc, 0x28, 0x42])
+        let viaEUCJP = try decoded("EUC-JP", [0xC6, 0xFC])
+        #expect(kanji == viaEUCJP)
+        #expect(kanji == "\u{65E5}")
+        // ASCII passes through, and mode resets across an escape.
+        try #expect(decoded("ISO-2022-JP", [0x48, 0x69]) == "Hi")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А

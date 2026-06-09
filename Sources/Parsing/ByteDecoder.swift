@@ -37,6 +37,7 @@ extension PureXML.Parsing {
             case .gbk: GBK.decode(body)
             case .gb18030: GB18030.decode(body)
             case .big5: Big5.decode(body)
+            case .iso2022jp: ISO2022JP.decode(body)
             default: nil
             }
         }
@@ -164,6 +165,7 @@ extension PureXML.Parsing {
             "gbk": .gbk, "gb2312": .gbk, "gb_2312-80": .gbk, "csgb2312": .gbk, "x-gbk": .gbk, "chinese": .gbk,
             "gb18030": .gb18030, "gb-18030": .gb18030, "csgb18030": .gb18030,
             "big5": .big5, "big5-hkscs": .big5, "cn-big5": .big5, "csbig5": .big5, "x-x-big5": .big5,
+            "iso-2022-jp": .iso2022jp, "csiso2022jp": .iso2022jp,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,

@@ -37,6 +37,7 @@ public extension PureXML.Parsing {
         case gbk
         case gb18030
         case big5
+        case iso2022jp
         case latinCyrillic // ISO-8859-5
         case latin5 // ISO-8859-9 (Turkish)
         case latin9 // ISO-8859-15
