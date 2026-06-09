@@ -145,6 +145,12 @@ struct EncodingTests {
         try #expect(decoded("koi8-u", [0xA4]) == "\u{0454}") // є (KOI8-U specific)
     }
 
+    @Test("Decodes Shift-JIS: kanji, ASCII, and half-width katakana")
+    func test_shiftJIS() throws {
+        // 日 (0x93FA), 本 (0x967B), A (0x41), half-width katakana ｱ (0xB1).
+        try #expect(decoded("Shift_JIS", [0x93, 0xFA, 0x96, 0x7B, 0x41, 0xB1]) == "\u{65E5}\u{672C}A\u{FF71}")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
