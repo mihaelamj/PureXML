@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Single-byte legacy encodings (#97, partial): the byte decoder gains a table-based single-byte path and three encodings expressible exactly (so transcription-error-free): ISO-8859-15 (Latin-9, euro), ISO-8859-9 (Latin-5, Turkish), and ISO-8859-5 (Latin/Cyrillic). They are selected by the XML declaration's `encoding` name, for both the whole-buffer and streaming decoders. The remaining legacy encodings are data drop-ins into the same path.
+- Single-byte legacy encodings (#97, partial): the byte decoder gains a table-based single-byte path and four encodings expressible exactly (so transcription-error-free): ISO-8859-15 (Latin-9, euro), ISO-8859-9 (Latin-5, Turkish), ISO-8859-5 (Latin/Cyrillic), and Windows-1254 (Turkish, composed from Windows-1252). They are selected by the XML declaration's `encoding` name, for both the whole-buffer and streaming decoders. The remaining legacy encodings are data drop-ins into the same path.
 
 ### Fixed
 

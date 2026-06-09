@@ -31,6 +31,7 @@ extension PureXML.Parsing {
             switch encoding {
             case .latin1: { Unicode.Scalar($0) }
             case .windows1252: windows1252Scalar
+            case .windows1254: SingleByte.windows1254
             case .latinCyrillic: SingleByte.iso8859_5
             case .latin5: SingleByte.iso8859_9
             case .latin9: SingleByte.iso8859_15
@@ -98,6 +99,7 @@ extension PureXML.Parsing {
             "utf-8": .utf8, "utf8": .utf8, "us-ascii": .utf8, "ascii": .utf8,
             "iso-8859-1": .latin1, "latin1": .latin1, "latin-1": .latin1, "l1": .latin1,
             "windows-1252": .windows1252, "cp1252": .windows1252, "cp-1252": .windows1252,
+            "windows-1254": .windows1254, "cp1254": .windows1254,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,

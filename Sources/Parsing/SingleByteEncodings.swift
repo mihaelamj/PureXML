@@ -35,6 +35,20 @@ extension PureXML.Parsing.ByteDecoder {
             }
         }
 
+        /// Windows-1254 (Turkish): Windows-1252 with the same six Turkish letters
+        /// as ISO-8859-9 (the only differences fall in the Latin-1 upper half).
+        static func windows1254(_ byte: UInt8) -> Unicode.Scalar {
+            switch byte {
+            case 0xD0: "\u{011E}" // Ğ
+            case 0xDD: "\u{0130}" // İ
+            case 0xDE: "\u{015E}" // Ş
+            case 0xF0: "\u{011F}" // ğ
+            case 0xFD: "\u{0131}" // ı
+            case 0xFE: "\u{015F}" // ş
+            default: PureXML.Parsing.ByteDecoder.windows1252Scalar(byte)
+            }
+        }
+
         /// ISO-8859-5 (Latin/Cyrillic): the Cyrillic alphabet laid out as a
         /// contiguous block from `0xB0`, with a handful of named exceptions.
         static func iso8859_5(_ byte: UInt8) -> Unicode.Scalar {
