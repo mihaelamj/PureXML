@@ -12,7 +12,7 @@ public extension PureXML.Parsing {
             case .utf8, .utf16BigEndian, .utf16LittleEndian, .utf32BigEndian, .utf32LittleEndian:
                 true
             default:
-                ByteDecoder.singleByteMap(encoding) != nil
+                supportsCJK(encoding) || ByteDecoder.singleByteMap(encoding) != nil
             }
         }
 
@@ -26,7 +26,7 @@ public extension PureXML.Parsing {
             case .utf16LittleEndian: utf16(string, bigEndian: false)
             case .utf32BigEndian: utf32(string, bigEndian: true)
             case .utf32LittleEndian: utf32(string, bigEndian: false)
-            default: singleByte(string, encoding: encoding)
+            default: cjkEncode(string, as: encoding) ?? singleByte(string, encoding: encoding)
             }
         }
 
@@ -116,6 +116,8 @@ public extension PureXML.Parsing {
             .windows1253: "windows-1253", .windows1254: "windows-1254", .windows1255: "windows-1255",
             .windows1256: "windows-1256", .windows1257: "windows-1257", .windows1258: "windows-1258",
             .koi8r: "KOI8-R", .koi8u: "KOI8-U",
+            .shiftJIS: "Shift_JIS", .eucJP: "EUC-JP", .eucKR: "EUC-KR",
+            .gbk: "GBK", .gb18030: "GB18030", .big5: "Big5",
         ]
     }
 }
