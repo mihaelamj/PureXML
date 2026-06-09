@@ -13,14 +13,8 @@ extension PureXML.Parsing {
                 encoding = declared
             }
             let body = bytes.dropFirst(bomLength)
-            if encoding == .shiftJIS {
-                return ShiftJIS.decode(body)
-            }
-            if encoding == .eucJP {
-                return EUCJP.decode(body)
-            }
-            if encoding == .eucKR {
-                return EUCKR.decode(body)
+            if let cjk = multiByteDecode(encoding, body) {
+                return cjk
             }
             if let map = Self.singleByteMap(encoding) {
                 return String(String.UnicodeScalarView(body.map(map)))
@@ -31,6 +25,17 @@ extension PureXML.Parsing {
             case .utf32BigEndian: return try decodeUTF32(body, bigEndian: true)
             case .utf32LittleEndian: return try decodeUTF32(body, bigEndian: false)
             default: return String(decoding: body, as: UTF8.self)
+            }
+        }
+
+        /// Decodes the multi-byte CJK encodings, or nil for any other encoding.
+        private static func multiByteDecode(_ encoding: InputEncoding, _ body: ArraySlice<UInt8>) -> String? {
+            switch encoding {
+            case .shiftJIS: ShiftJIS.decode(body)
+            case .eucJP: EUCJP.decode(body)
+            case .eucKR: EUCKR.decode(body)
+            case .gbk: GBK.decode(body)
+            default: nil
             }
         }
 
@@ -154,6 +159,7 @@ extension PureXML.Parsing {
             "ms_kanji": .shiftJIS, "windows-31j": .shiftJIS, "csshiftjis": .shiftJIS,
             "euc-jp": .eucJP, "eucjp": .eucJP, "x-euc-jp": .eucJP, "cseucpkdfmtjapanese": .eucJP,
             "euc-kr": .eucKR, "euckr": .eucKR, "cp949": .eucKR, "uhc": .eucKR, "ks_c_5601-1987": .eucKR, "korean": .eucKR,
+            "gbk": .gbk, "gb2312": .gbk, "gb_2312-80": .gbk, "csgb2312": .gbk, "x-gbk": .gbk, "chinese": .gbk,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,

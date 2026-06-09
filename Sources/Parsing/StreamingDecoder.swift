@@ -45,8 +45,24 @@ extension PureXML.Parsing {
             case .shiftJIS: nextShiftJIS()
             case .eucJP: nextEUCJP()
             case .eucKR: nextEUCKR()
+            case .gbk: nextGBK()
             default: nextUTF8()
             }
+        }
+
+        /// Streams one GBK character: ASCII, `0x80` (euro), or a lead+trail.
+        private mutating func nextGBK() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if lead <= 0x7F { return Character(Unicode.Scalar(lead)) }
+            if lead == 0x80 { return "\u{20AC}" }
+            guard (0x81 ... 0xFE).contains(lead) else { return Self.replacement }
+            guard let trail = nextByte() else { finished = true
+                return Self.replacement
+            }
+            return PureXML.Parsing.ByteDecoder.GBK.twoByteScalar(lead: lead, trail: trail).map(Character.init) ?? Self.replacement
         }
 
         /// Streams one EUC-KR character: ASCII, or a lead+trail through CP949.
