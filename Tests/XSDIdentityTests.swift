@@ -76,13 +76,13 @@ struct XSDIdentityTests {
         let valid = "<orders><product code=\"A\"/><product code=\"B\"/><line product=\"A\"/></orders>"
         let dangling = "<orders><product code=\"A\"/><line product=\"Z\"/></orders>"
         #expect(try validate(xsd, valid).isEmpty)
-        // The dangling keyref is located at the offending <line>, not <orders>.
+        // The dangling keyref is located at the offending field @product.
         let failure = try #require(validate(xsd, dangling).first)
-        #expect(failure.codingPath.map(\.stringValue) == ["orders", "line"])
-        #expect(String(describing: failure).hasSuffix("at path: orders/line"))
+        #expect(failure.codingPath.map(\.stringValue) == ["orders", "line", "@product"])
+        #expect(String(describing: failure).hasSuffix("at path: orders/line/@product"))
     }
 
-    @Test("Identity-constraint errors are located at the constraining element")
+    @Test("Identity-constraint errors are located at the offending field")
     func test_identityErrorsCarryPath() throws {
         let xsd = """
         \(head)
@@ -97,12 +97,12 @@ struct XSDIdentityTests {
           </xs:element>
         </xs:schema>
         """
-        // The error locates the actual offending element (the duplicate item[2]),
+        // The error locates the offending field (the duplicate item[2]'s @id),
         // not just the element that declares the key.
         let errors = try validate(xsd, "<list><item id=\"1\"/><item id=\"1\"/></list>")
         let failure = try #require(errors.first)
-        #expect(failure.codingPath.map(\.stringValue) == ["list", "item"])
-        #expect(String(describing: failure).hasSuffix("at path: list/item[2]"))
+        #expect(failure.codingPath.map(\.stringValue) == ["list", "item", "@id"])
+        #expect(String(describing: failure).hasSuffix("at path: list/item[2]/@id"))
     }
 
     @Test("A nested selector locates the offender at full depth with an intermediate index")
@@ -127,7 +127,55 @@ struct XSDIdentityTests {
         // list/group[2]/item: a grandchild, with the index on the intermediate group.
         let xml = "<list><group><item id=\"1\"/></group><group><item id=\"1\"/></group></list>"
         let failure = try #require(validate(xsd, xml).first)
-        #expect(failure.codingPath.map(\.stringValue) == ["list", "group", "item"])
-        #expect(String(describing: failure).hasSuffix("at path: list/group[2]/item"))
+        #expect(failure.codingPath.map(\.stringValue) == ["list", "group", "item", "@id"])
+        #expect(String(describing: failure).hasSuffix("at path: list/group[2]/item/@id"))
+    }
+
+    @Test("A keyref resolves against a key declared on an ancestor (cross-scope)")
+    func test_keyrefCrossScope() throws {
+        // pk is declared on <catalog>; the keyref is declared on the deeper
+        // <orders>, so resolution must find the ancestor's key in scope.
+        let xsd = """
+        \(head)
+          <xs:element name="catalog">
+            <xs:complexType><xs:sequence>
+              <xs:element name="products"><xs:complexType><xs:sequence>
+                <xs:element name="product" maxOccurs="unbounded"><xs:complexType><xs:attribute name="code" type="xs:string"/></xs:complexType></xs:element>
+              </xs:sequence></xs:complexType></xs:element>
+              <xs:element name="orders"><xs:complexType><xs:sequence>
+                <xs:element name="line" maxOccurs="unbounded"><xs:complexType><xs:attribute name="ref" type="xs:string"/></xs:complexType></xs:element>
+              </xs:sequence></xs:complexType>
+                <xs:keyref name="kr" refer="pk"><xs:selector xpath="line"/><xs:field xpath="@ref"/></xs:keyref>
+              </xs:element>
+            </xs:sequence></xs:complexType>
+            <xs:key name="pk"><xs:selector xpath="products/product"/><xs:field xpath="@code"/></xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let valid = "<catalog><products><product code=\"A\"/></products><orders><line ref=\"A\"/></orders></catalog>"
+        let dangling = "<catalog><products><product code=\"A\"/></products><orders><line ref=\"Z\"/></orders></catalog>"
+        #expect(try validate(xsd, valid).isEmpty)
+        #expect(try validate(xsd, dangling).contains { $0.reason.contains("no matching key 'pk'") })
+    }
+
+    @Test("A child-element field locates the error at that child")
+    func test_childElementField() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="item" maxOccurs="unbounded">
+                  <xs:complexType><xs:sequence><xs:element name="code" type="xs:string"/></xs:sequence></xs:complexType>
+                </xs:element>
+              </xs:sequence>
+            </xs:complexType>
+            <xs:key name="k"><xs:selector xpath="item"/><xs:field xpath="code"/></xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let xml = "<list><item><code>x</code></item><item><code>x</code></item></list>"
+        let failure = try #require(validate(xsd, xml).first)
+        #expect(String(describing: failure).hasSuffix("at path: list/item[2]/code"))
     }
 }

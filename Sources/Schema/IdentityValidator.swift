@@ -89,6 +89,24 @@ extension PureXML.Schema {
             return steps
         }
 
+        /// The coding-path step from a `target` down to the single field a
+        /// constraint names, so an error locates the offending value (`@id`, a
+        /// child element) rather than just the target. Empty for a multi-field
+        /// constraint or a complex field path, in which case the error stays on the
+        /// target.
+        private func fieldStep(_ fields: [String], at target: PureXML.Model.TreeNode) -> [PureXML.Validation.PathKey] {
+            guard fields.count == 1 else { return [] }
+            let field = fields[0]
+            if field.hasPrefix("@"), !field.dropFirst().contains(where: { $0 == "/" || $0 == "[" }) {
+                return [.attribute(String(field.dropFirst()))]
+            }
+            let isSimpleName = !field.contains(where: { "/@[(".contains($0) })
+            if isSimpleName, let child = select(field, at: target).first, child.kind == .element {
+                return steps(from: target, to: child)
+            }
+            return []
+        }
+
         private func isNonRef(_ constraint: IdentityConstraint) -> Bool {
             if case .keyref = constraint.kind { return false }
             return true
@@ -106,13 +124,14 @@ extension PureXML.Schema {
             var seen: [[String?]] = []
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
+                let targetPath = path + steps(from: node, to: target)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
-                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: path + steps(from: node, to: target)))
+                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: targetPath + fieldStep(constraint.fields, at: target)))
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if seen.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: path + steps(from: node, to: target)))
+                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: targetPath + fieldStep(constraint.fields, at: target)))
                 } else {
                     seen.append(tuple)
                 }
@@ -134,7 +153,8 @@ extension PureXML.Schema {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: path + steps(from: node, to: target)))
+                    let targetPath = path + steps(from: node, to: target)
+                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: targetPath + fieldStep(constraint.fields, at: target)))
                 }
             }
         }
