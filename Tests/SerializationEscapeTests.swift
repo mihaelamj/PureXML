@@ -35,4 +35,22 @@ struct SerializationEscapeTests {
         let element = PureXML.Model.Element("a", children: [.text("café")])
         #expect(serialize(.element(element), PureXML.Emitting.Options(prettyPrint: false)) == "<a>café</a>")
     }
+
+    @Test("textEscaping .standard leaves a carriage return verbatim")
+    func test_standardKeepsCarriageReturn() {
+        let element = PureXML.Model.Element("a", children: [.text("x\ry")])
+        #expect(serialize(.element(element), PureXML.Emitting.Options(prettyPrint: false)) == "<a>x\ry</a>")
+    }
+
+    @Test("textEscaping .roundTrip escapes a carriage return so it survives a parse")
+    func test_roundTripEscapesCarriageReturn() throws {
+        let element = PureXML.Model.Element("a", children: [.text("x\ry")])
+        let options = PureXML.Emitting.Options(prettyPrint: false, textEscaping: .roundTrip)
+        let serialized = serialize(.element(element), options)
+        #expect(serialized == "<a>x&#xD;y</a>")
+        // The escaped form survives end-of-line normalization; the verbatim form does not.
+        #expect(try PureXML.parse(serialized) == .document([.element(element)]))
+        let lossy = serialize(.element(element), PureXML.Emitting.Options(prettyPrint: false))
+        #expect(try PureXML.parse(lossy) == .document([.element(.init("a", children: [.text("x\ny")]))]))
+    }
 }

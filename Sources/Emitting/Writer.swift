@@ -77,7 +77,7 @@ public extension PureXML.Emitting {
         /// Writes escaped character data into the current element.
         public mutating func writeString(_ text: String) {
             closeStartTag()
-            output += Escaping.text(text, asciiOnly: options.asciiOnly)
+            output += Escaping.text(text, asciiOnly: options.asciiOnly, escapeCarriageReturn: options.textEscaping.escapesCarriageReturn)
             setTopContent(.text)
         }
 
@@ -85,7 +85,11 @@ public extension PureXML.Emitting {
         /// `cdataAsText` is set.
         public mutating func writeCData(_ text: String) {
             closeStartTag()
-            output += options.cdataAsText ? Escaping.text(text, asciiOnly: options.asciiOnly) : "<![CDATA[\(text)]]>"
+            if options.cdataAsText {
+                output += Escaping.text(text, asciiOnly: options.asciiOnly, escapeCarriageReturn: options.textEscaping.escapesCarriageReturn)
+            } else {
+                output += "<![CDATA[\(text)]]>"
+            }
             setTopContent(.text)
         }
 

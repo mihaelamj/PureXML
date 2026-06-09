@@ -65,10 +65,10 @@ public extension PureXML.Emitting {
             case let .element(element):
                 write(element, depth: depth, formatted: formatted, output: &output, stack: &stack)
             case let .text(value):
-                output += Escaping.text(value, asciiOnly: options.asciiOnly)
+                output += Escaping.text(value, asciiOnly: options.asciiOnly, escapeCarriageReturn: options.textEscaping.escapesCarriageReturn)
             case let .cdata(value):
                 output += options.cdataAsText
-                    ? Escaping.text(value, asciiOnly: options.asciiOnly)
+                    ? Escaping.text(value, asciiOnly: options.asciiOnly, escapeCarriageReturn: options.textEscaping.escapesCarriageReturn)
                     : "<![CDATA[\(value)]]>"
             case let .comment(value):
                 output += "<!--\(value)-->"
