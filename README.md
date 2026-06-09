@@ -86,13 +86,13 @@ flowchart TB
   Epic74 --> Done
   Epic105["#105 remaining libxml2 parity frontier"]:::epic
   OutEnc["#106 output encodings: complete"]:::done
-  StreamVal["#107 streaming validation"]:::todo
-  MoreEnc["#108 ISO-2022-JP, EUC-TW"]:::todo
+  StreamVal["#107 streaming validation: DTD and RELAX NG done; XSD remains"]:::todo
+  MoreEnc["#108 encodings: ISO-2022-JP done; EUC-TW remains"]:::todo
   Depth["Tier 2 conformance corpora; Tier 3 EXSLT, DTD PE depth, C14N 1.1; frontier #104"]:::todo
   Epic105 --> OutEnc
-  Epic105 --> StreamVal
-  Epic105 --> MoreEnc
-  Epic105 --> Depth
+  OutEnc --> StreamVal
+  StreamVal --> MoreEnc
+  MoreEnc --> Depth
 ```
 
 ## Status
