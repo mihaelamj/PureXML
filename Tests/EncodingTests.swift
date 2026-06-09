@@ -157,6 +157,12 @@ struct EncodingTests {
         try #expect(decoded("EUC-JP", [0xC6, 0xFC, 0xCB, 0xDC, 0x41, 0x8E, 0xB1]) == "\u{65E5}\u{672C}A\u{FF71}")
     }
 
+    @Test("Decodes EUC-KR (CP949): Hangul syllables")
+    func test_eucKR() throws {
+        // 한 (0xC7D1), 가 (0xB0A1), A (0x41).
+        try #expect(decoded("EUC-KR", [0xC7, 0xD1, 0xB0, 0xA1, 0x41]) == "\u{D55C}\u{AC00}A")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А

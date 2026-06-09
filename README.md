@@ -89,7 +89,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **761 tests in 117 suites** (`swift test`).
+currently runs **762 tests in 117 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
