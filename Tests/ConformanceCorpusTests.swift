@@ -63,6 +63,48 @@ struct ConformanceCorpusTests {
         }
     }
 
+    private struct DatatypeSpec {
+        let name: String
+        let base: String
+        let facets: String
+        let value: String
+        let valid: Bool
+    }
+
+    /// XSD datatype and facet conformance: an instance is validated against an
+    /// element whose simple type restricts `base` with `facets`, and the verdict
+    /// (valid / invalid) is checked against the specification.
+    private func datatypeCorpus() throws -> [PureXML.Validation.ConformanceCase] {
+        let specs = [
+            DatatypeSpec(name: "integer-valid", base: "xs:integer", facets: "", value: "42", valid: true),
+            DatatypeSpec(name: "integer-rejects-decimal", base: "xs:integer", facets: "", value: "4.2", valid: false),
+            DatatypeSpec(name: "minInclusive-ok", base: "xs:int", facets: "<xs:minInclusive value=\"0\"/>", value: "5", valid: true),
+            DatatypeSpec(name: "minInclusive-fail", base: "xs:int", facets: "<xs:minInclusive value=\"0\"/>", value: "-1", valid: false),
+            DatatypeSpec(name: "maxInclusive-fail", base: "xs:int", facets: "<xs:maxInclusive value=\"10\"/>", value: "11", valid: false),
+            DatatypeSpec(name: "length-ok", base: "xs:string", facets: "<xs:length value=\"3\"/>", value: "abc", valid: true),
+            DatatypeSpec(name: "length-fail", base: "xs:string", facets: "<xs:length value=\"3\"/>", value: "ab", valid: false),
+            DatatypeSpec(name: "pattern-ok", base: "xs:string", facets: "<xs:pattern value=\"[a-z]+\"/>", value: "abc", valid: true),
+            DatatypeSpec(name: "pattern-fail", base: "xs:string", facets: "<xs:pattern value=\"[a-z]+\"/>", value: "ab1", valid: false),
+            DatatypeSpec(name: "enumeration-ok", base: "xs:string", facets: "<xs:enumeration value=\"red\"/><xs:enumeration value=\"green\"/>", value: "red", valid: true),
+            DatatypeSpec(name: "enumeration-fail", base: "xs:string", facets: "<xs:enumeration value=\"red\"/><xs:enumeration value=\"green\"/>", value: "blue", valid: false),
+            DatatypeSpec(name: "boolean-ok", base: "xs:boolean", facets: "", value: "true", valid: true),
+            DatatypeSpec(name: "boolean-fail", base: "xs:boolean", facets: "", value: "yes", valid: false),
+        ]
+        return try specs.map { spec in
+            let xsd = """
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+              <xs:element name="v"><xs:simpleType><xs:restriction base="\(spec.base)">\(spec.facets)</xs:restriction></xs:simpleType></xs:element>
+            </xs:schema>
+            """
+            let errors = try PureXML.Schema.Document(xsd).validate("<v>\(spec.value)</v>")
+            return PureXML.Validation.ConformanceCase(
+                name: spec.name,
+                actual: errors.isEmpty ? "valid" : "invalid",
+                expected: spec.valid ? "valid" : "invalid",
+            )
+        }
+    }
+
     @Test("The C14N conformance corpus passes with no located failures")
     func test_corpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: canonicalCorpus())
@@ -72,6 +114,12 @@ struct ConformanceCorpusTests {
     @Test("The XPath core-function conformance corpus passes with no located failures")
     func test_xpathCorpusConforms() throws {
         let failures = try PureXML.Validation.Conformance.failures(in: xpathCorpus())
+        #expect(failures.isEmpty, "\(failures.map(\.reason))")
+    }
+
+    @Test("The XSD datatype/facet conformance corpus passes with no located failures")
+    func test_datatypeCorpusConforms() throws {
+        let failures = try PureXML.Validation.Conformance.failures(in: datatypeCorpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
 
