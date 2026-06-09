@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `xsl:namespace-alias` (#81), completing the XSLT top-level-element audit. A
+  literal result element (and its attributes) in a stylesheet namespace bound by
+  `stylesheet-prefix` is rewritten on output to the namespace and prefix bound by
+  `result-prefix` (`#default` supported), so a stylesheet can emit literal `xsl:`
+  elements. Folded across `xsl:include`/`xsl:import`.
 - XSLT `xsl:decimal-format` (#81). `format-number` now honors named and default
   decimal formats: the decimal separator, grouping separator, percent, minus
   sign, zero-digit (so non-Latin digit sets render), NaN, and infinity symbols

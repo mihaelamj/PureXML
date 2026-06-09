@@ -12,6 +12,7 @@ private struct Parts {
     var preserveSpace: Set<String> = []
     var attributeSets: [String: PureXML.XSLT.AttributeSet] = [:]
     var decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:]
+    var namespaceAliases: [String: PureXML.XSLT.NamespaceAlias] = [:]
 
     var stylesheet: PureXML.XSLT.Stylesheet {
         PureXML.XSLT.Stylesheet(
@@ -23,6 +24,7 @@ private struct Parts {
             preserveSpace: preserveSpace,
             attributeSets: attributeSets,
             decimalFormats: decimalFormats,
+            namespaceAliases: namespaceAliases,
         )
     }
 
@@ -36,6 +38,7 @@ private struct Parts {
         preserveSpace.formUnion(sub.preserveSpace)
         attributeSets.merge(sub.attributeSets) { mine, _ in mine }
         decimalFormats.merge(sub.decimalFormats) { mine, _ in mine }
+        namespaceAliases.merge(sub.namespaceAliases) { mine, _ in mine }
         globals = isImport ? sub.globals + globals : globals + sub.globals
         output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
     }
@@ -135,6 +138,7 @@ extension PureXML.XSLT {
             case "preserve-space": parts.preserveSpace.formUnion(elementNames(child))
             case "attribute-set": addAttributeSet(child, into: &parts)
             case "decimal-format": parts.decimalFormats[XSLTNode.attribute(child, "name") ?? ""] = decimalFormat(child)
+            case "namespace-alias": addNamespaceAlias(child, into: &parts)
             default: return false
             }
             return true
@@ -327,52 +331,39 @@ extension PureXML.XSLT {
                 )
             }
         }
-
-        // MARK: Attribute value templates
-
-        static func valueTemplate(_ string: String) -> ValueTemplate {
-            var parts: [ValuePart] = []
-            var literal = ""
-            let characters = Array(string)
-            var index = 0
-            while index < characters.count {
-                let character = characters[index]
-                if character == "{", index + 1 < characters.count, characters[index + 1] == "{" {
-                    literal.append("{")
-                    index += 2
-                    continue
-                }
-                if character == "}", index + 1 < characters.count, characters[index + 1] == "}" {
-                    literal.append("}")
-                    index += 2
-                    continue
-                }
-                if character == "{" {
-                    if !literal.isEmpty { parts.append(.literal(literal))
-                        literal = ""
-                    }
-                    index += 1
-                    var expression = ""
-                    while index < characters.count, characters[index] != "}" {
-                        expression.append(characters[index])
-                        index += 1
-                    }
-                    index += 1
-                    parts.append(.expression(expression))
-                    continue
-                }
-                literal.append(character)
-                index += 1
-            }
-            if !literal.isEmpty { parts.append(.literal(literal)) }
-            return parts
-        }
     }
 }
 
 /// Top-level declaration helpers for ``XSLTParser``, kept in an extension so the
 /// parser enum stays within the type-body length budget.
 private extension PureXML.XSLT.XSLTParser {
+    /// Records an `xsl:namespace-alias`: the namespace bound to `stylesheet-prefix`
+    /// is rewritten to the one bound to `result-prefix` (with that prefix) on output.
+    static func addNamespaceAlias(_ child: Tree, into parts: inout Parts) {
+        let stylePrefix = XSLTNode.attribute(child, "stylesheet-prefix") ?? "#default"
+        let resultPrefix = XSLTNode.attribute(child, "result-prefix") ?? "#default"
+        let key = resolvePrefix(stylePrefix, at: child) ?? ""
+        parts.namespaceAliases[key] = PureXML.XSLT.NamespaceAlias(
+            uri: resolvePrefix(resultPrefix, at: child),
+            prefix: resultPrefix == "#default" ? nil : resultPrefix,
+        )
+    }
+
+    /// Resolves a namespace prefix (or `#default`) to its URI from the `xmlns`
+    /// declarations in scope at `node`, walking up to the stylesheet element.
+    static func resolvePrefix(_ prefix: String, at node: Tree) -> String? {
+        var current: Tree? = node
+        while let element = current {
+            for attribute in element.attributes {
+                let isDefault = prefix == "#default" && attribute.name.prefix == nil && attribute.name.localName == "xmlns"
+                let isPrefixed = attribute.name.prefix == "xmlns" && attribute.name.localName == prefix
+                if isDefault || isPrefixed { return attribute.value }
+            }
+            current = element.parent
+        }
+        return nil
+    }
+
     static func addAttributeSet(_ child: Tree, into parts: inout Parts) {
         guard let name = XSLTNode.attribute(child, "name") else { return }
         parts.attributeSets[name] = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
