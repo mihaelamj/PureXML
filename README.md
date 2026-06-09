@@ -67,8 +67,9 @@ and external resolution is opt-in through an injected resolver so XXE stays clos
 
 The original epics, the documented-subset parity work (#61), the validation
 framework and recovering reader (#92), and the editor-integration layer (#94)
-are all shipped (summarized above). The remaining work is the depth gaps versus
-libxml2 a read-only conformance audit surfaced (#71):
+are all shipped (summarized above). The beyond-parity libxml2 conformance audit
+(#71) and its parser-breadth sub-epic (#74) are now **complete**: every depth gap
+the audit surfaced is closed in main.
 
 ```mermaid
 flowchart TB
@@ -76,13 +77,11 @@ flowchart TB
   classDef review fill:#fff7d6,stroke:#ffcc00,color:#111827
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
-  Epic71["#71 Beyond-parity libxml2 audit"]:::epic
-  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 tree construction #83, single-byte encodings #97, HTML entities #84"]:::done
-  Epic74["#74 Parser-breadth sub-epic: standalone/decl #95, XML 1.1 #96, reader #98, recovery #100, single-byte encodings #97 done; CJK encodings #99 open"]:::epic
-  Open["Open: CJK multi-byte encodings #99"]:::todo
-  Epic71 --> AuditDone
-  AuditDone --> Epic74
-  Epic74 --> Open
+  Epic71["#71 beyond-parity libxml2 audit: complete"]:::epic
+  Epic74["#74 parser-breadth sub-epic: complete"]:::epic
+  Done["All children closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 tree construction #83, HTML entities #84, single-byte encodings #97, CJK encodings #99"]:::done
+  Epic71 --> Done
+  Epic74 --> Done
 ```
 
 ## Status
