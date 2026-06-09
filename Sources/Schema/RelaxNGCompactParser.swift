@@ -192,14 +192,28 @@ extension RNCParser {
 
     private func parseParticle() -> Pattern {
         let primary = parsePrimary()
+        let particle: Pattern
         switch peek() {
         case .symbol("?"): advance()
-            return .choice(primary, .empty)
+            particle = .choice(primary, .empty)
         case .symbol("*"): advance()
-            return .choice(.oneOrMore(primary), .empty)
+            particle = .choice(.oneOrMore(primary), .empty)
         case .symbol("+"): advance()
-            return .oneOrMore(primary)
-        default: return primary
+            particle = .oneOrMore(primary)
+        default: particle = primary
+        }
+        skipFollowAnnotations()
+        return particle
+    }
+
+    /// Skips `>>` follow-annotations after a pattern: each is a foreign element
+    /// name with optional `[ … ]` content, carrying no schema semantics.
+    private func skipFollowAnnotations() {
+        while peek() == .symbol(">"), peek(1) == .symbol(">") {
+            advance()
+            advance()
+            if case .word = peek() { advance() }
+            skipAnnotation()
         }
     }
 
