@@ -85,17 +85,17 @@ extension PureXML.HTML.Tokenizer {
     private static func decodeNamed(_ characters: [Character], at start: Int) -> (String, Int)? {
         var cursor = start + 1
         var name = ""
-        // The longest name in the table is short; cap the scan accordingly.
-        while cursor < characters.count, characters[cursor].isLetter || characters[cursor].isNumber, name.count < 12 {
+        // The longest reference name is 31 characters; cap the scan a little above.
+        while cursor < characters.count, characters[cursor].isLetter || characters[cursor].isNumber, name.count < 32 {
             name.append(characters[cursor])
             cursor += 1
         }
         // Longest match wins: shrink the candidate until it names an entity.
         while !name.isEmpty {
-            if let character = namedEntities[name] {
+            if let replacement = namedEntities[name] {
                 let end = start + 1 + name.count
                 let semicolon = end < characters.count && characters[end] == ";"
-                return (String(character), name.count + 1 + (semicolon ? 1 : 0))
+                return (replacement, name.count + 1 + (semicolon ? 1 : 0))
             }
             name.removeLast()
         }

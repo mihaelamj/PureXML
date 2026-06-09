@@ -61,4 +61,12 @@ struct HTMLTokenizerTests {
         #expect(text("<p>&hearts;&diams;&spades;</p>") == "\u{2665}\u{2666}\u{2660}") // suits
         #expect(text("<p>&copy &reg</p>") == "\u{A9} \u{AE}") // semicolon-less
     }
+
+    @Test("The full WHATWG reference set decodes astral and multi-codepoint names")
+    func test_fullEntitySet() {
+        #expect(PureXML.HTML.Tokenizer.namedEntities.count == 2125)
+        #expect(text("<p>&fopf;</p>") == "\u{1D557}") // astral double-struck f
+        #expect(text("<p>&NotEqualTilde;</p>") == "\u{2242}\u{0338}") // two codepoints
+        #expect(text("<p>&CounterClockwiseContourIntegral;</p>") == "\u{2233}") // 31-char name
+    }
 }
