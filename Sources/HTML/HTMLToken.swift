@@ -35,6 +35,11 @@ extension PureXML.HTML {
         /// end tag, not parsed as markup.
         static let rawText: Set<String> = ["script", "style", "textarea", "title"]
 
+        /// RCDATA elements: like raw-text, but character references in their
+        /// content are decoded (`title`, `textarea`). The remaining raw-text
+        /// elements (`script`, `style`) take their content with no decoding.
+        static let rcdata: Set<String> = ["textarea", "title"]
+
         /// For an opening tag (key), the set of currently-open elements it
         /// implicitly closes first (the common optional-end-tag rules).
         static let impliedClose: [String: Set<String>] = [
