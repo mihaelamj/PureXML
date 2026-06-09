@@ -64,7 +64,20 @@ extension PureXML.Parsing.ByteDecoder {
             }
         }
 
-        private static func scalar(_ value: UInt32) -> Unicode.Scalar {
+        /// ISO-8859-2 (Latin-2, Central European). Vendored from the authoritative
+        /// Unicode mapping file.
+        static func iso8859_2(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin2Upper)
+        }
+
+        /// Maps a byte through a 96-entry upper-half table (`0xA0`-`0xFF`); bytes
+        /// below `0xA0` are ASCII or C1 controls (identity). Used by the encodings
+        /// whose upper half is vendored from the Unicode mapping files.
+        static func upperHalf(_ byte: UInt8, _ table: [UInt16]) -> Unicode.Scalar {
+            byte >= 0xA0 ? scalar(UInt32(table[Int(byte) - 0xA0])) : Unicode.Scalar(byte)
+        }
+
+        static func scalar(_ value: UInt32) -> Unicode.Scalar {
             Unicode.Scalar(value) ?? "\u{FFFD}"
         }
     }
