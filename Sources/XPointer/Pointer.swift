@@ -4,6 +4,7 @@
 private enum PointerPart {
     case expression(String)
     case namespace(prefix: String, uri: String)
+    case range(PureXML.XPointer.RangeForm)
 }
 
 /// Scans an XPointer into its scheme parts, each already translated to an XPath
@@ -73,9 +74,11 @@ private struct PointerScanner {
 
     private func translate(scheme: String, data: String) throws -> PointerPart {
         switch scheme {
-        case "xpointer", "xpath1": .expression(data)
-        case "element": .expression(Self.elementToXPath(data))
-        case "xmlns": try Self.namespaceBinding(data)
+        case "xpointer", "xpath1":
+            if let form = PureXML.XPointer.RangeForm.parse(data) { return .range(form) }
+            return .expression(data)
+        case "element": return .expression(Self.elementToXPath(data))
+        case "xmlns": return try Self.namespaceBinding(data)
         default: throw XPointerError.unknownScheme(scheme)
         }
     }
@@ -172,6 +175,31 @@ public extension PureXML.XPointer {
                     guard let query = try? PureXML.XPath.Query(xpath) else { continue }
                     let result = query.evaluate(over: node, namespaces: namespaces)
                     if !result.isEmpty { return result }
+                case .range:
+                    continue
+                }
+            }
+            return []
+        }
+
+        /// Evaluates the pointer's range parts (`range()`, `range-to()`,
+        /// `string-range()`), returning the first part's non-empty ranges in
+        /// document order, or an empty list. An `xmlns()` part binds a prefix for
+        /// the range parts that follow it. Use this for the XPointer range model
+        /// (and XInclude range inclusion); ``evaluate(over:)`` covers the
+        /// node-selecting schemes.
+        public func evaluateRanges(over node: PureXML.Model.Node) -> [PureXML.XPointer.Range] {
+            let root = PureXML.Model.TreeNode(node)
+            var namespaces: [String: String] = [:]
+            for part in parts {
+                switch part {
+                case let .namespace(prefix, uri):
+                    namespaces[prefix] = uri
+                case let .range(form):
+                    let ranges = form.ranges(over: root, namespaces: namespaces)
+                    if !ranges.isEmpty { return ranges }
+                case .expression:
+                    continue
                 }
             }
             return []
@@ -181,5 +209,10 @@ public extension PureXML.XPointer {
     /// Compiles and evaluates an XPointer over a node in one step.
     static func evaluate(_ pointer: String, over node: PureXML.Model.Node) throws -> [PureXML.XPath.Selection] {
         try Pointer(pointer).evaluate(over: node)
+    }
+
+    /// Compiles and evaluates an XPointer's range parts over a node in one step.
+    static func evaluateRanges(_ pointer: String, over node: PureXML.Model.Node) throws -> [Range] {
+        try Pointer(pointer).evaluateRanges(over: node)
     }
 }
