@@ -100,6 +100,14 @@ struct EncodingTests {
         try #expect(decoded("ISO-8859-9", [0xE9]) == "\u{E9}") // é, unchanged from Latin-1
     }
 
+    @Test("Decodes ISO-8859-2 (Latin-2) from the vendored table")
+    func test_iso8859_2() throws {
+        try #expect(decoded("ISO-8859-2", [0xA1]) == "\u{0104}") // Ą
+        try #expect(decoded("ISO-8859-2", [0xE8]) == "\u{010D}") // č
+        try #expect(decoded("ISO-8859-2", [0xE9]) == "\u{E9}") // é
+        try #expect(decoded("ISO-8859-2", [0xFF]) == "\u{02D9}") // ˙
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
