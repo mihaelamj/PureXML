@@ -104,4 +104,30 @@ struct XSDIdentityTests {
         #expect(failure.codingPath.map(\.stringValue) == ["list", "item"])
         #expect(String(describing: failure).hasSuffix("at path: list/item[2]"))
     }
+
+    @Test("A nested selector locates the offender at full depth with an intermediate index")
+    func test_identityErrorDeepPath() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="group" maxOccurs="unbounded">
+                  <xs:complexType>
+                    <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+                  </xs:complexType>
+                </xs:element>
+              </xs:sequence>
+            </xs:complexType>
+            <xs:key name="k"><xs:selector xpath="group/item"/><xs:field xpath="@id"/></xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        // The duplicate id "1" appears in the second group, so the offender is
+        // list/group[2]/item: a grandchild, with the index on the intermediate group.
+        let xml = "<list><group><item id=\"1\"/></group><group><item id=\"1\"/></group></list>"
+        let failure = try #require(validate(xsd, xml).first)
+        #expect(failure.codingPath.map(\.stringValue) == ["list", "group", "item"])
+        #expect(String(describing: failure).hasSuffix("at path: list/group[2]/item"))
+    }
 }
