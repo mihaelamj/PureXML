@@ -108,6 +108,19 @@ struct EncodingTests {
         try #expect(decoded("ISO-8859-2", [0xFF]) == "\u{02D9}") // ˙
     }
 
+    @Test("Decodes the vendored ISO-8859 Latin and Greek tables")
+    func test_vendoredTables() throws {
+        try #expect(decoded("ISO-8859-3", [0xA1]) == "\u{0126}") // Ħ
+        try #expect(decoded("ISO-8859-3", [0xC6]) == "\u{0108}") // Ĉ
+        try #expect(decoded("ISO-8859-4", [0xA1]) == "\u{0104}") // Ą
+        try #expect(decoded("ISO-8859-4", [0xC0]) == "\u{0100}") // Ā
+        try #expect(decoded("ISO-8859-7", [0xC1]) == "\u{0391}") // Α
+        try #expect(decoded("ISO-8859-7", [0xE1]) == "\u{03B1}") // α
+        try #expect(decoded("ISO-8859-7", [0xA4]) == "\u{20AC}") // €
+        try #expect(decoded("ISO-8859-13", [0xA8]) == "\u{00D8}") // Ø
+        try #expect(decoded("ISO-8859-13", [0xC0]) == "\u{0104}") // Ą
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А

@@ -28,17 +28,22 @@ extension PureXML.Parsing {
         /// The byte-to-scalar mapping for a single-byte encoding, or nil for the
         /// Unicode transformation formats.
         static func singleByteMap(_ encoding: InputEncoding) -> ((UInt8) -> Unicode.Scalar)? {
-            switch encoding {
-            case .latin1: { Unicode.Scalar($0) }
-            case .windows1252: windows1252Scalar
-            case .windows1254: SingleByte.windows1254
-            case .latin2: SingleByte.iso8859_2
-            case .latinCyrillic: SingleByte.iso8859_5
-            case .latin5: SingleByte.iso8859_9
-            case .latin9: SingleByte.iso8859_15
-            default: nil
-            }
+            singleByteMaps[encoding]
         }
+
+        private static let singleByteMaps: [InputEncoding: @Sendable (UInt8) -> Unicode.Scalar] = [
+            .latin1: { Unicode.Scalar($0) },
+            .windows1252: windows1252Scalar,
+            .windows1254: SingleByte.windows1254,
+            .latin2: SingleByte.iso8859_2,
+            .latin3: SingleByte.iso8859_3,
+            .latin4: SingleByte.iso8859_4,
+            .greek: SingleByte.iso8859_7,
+            .latin7: SingleByte.iso8859_13,
+            .latinCyrillic: SingleByte.iso8859_5,
+            .latin5: SingleByte.iso8859_9,
+            .latin9: SingleByte.iso8859_15,
+        ]
 
         private static func decodeUTF16(_ bytes: ArraySlice<UInt8>, bigEndian: Bool) throws -> String {
             guard bytes.count.isMultiple(of: 2) else {
@@ -102,6 +107,10 @@ extension PureXML.Parsing {
             "windows-1252": .windows1252, "cp1252": .windows1252, "cp-1252": .windows1252,
             "windows-1254": .windows1254, "cp1254": .windows1254,
             "iso-8859-2": .latin2, "iso8859-2": .latin2, "latin2": .latin2, "latin-2": .latin2, "l2": .latin2,
+            "iso-8859-3": .latin3, "iso8859-3": .latin3, "latin3": .latin3, "latin-3": .latin3, "l3": .latin3,
+            "iso-8859-4": .latin4, "iso8859-4": .latin4, "latin4": .latin4, "latin-4": .latin4, "l4": .latin4,
+            "iso-8859-7": .greek, "iso8859-7": .greek, "greek": .greek,
+            "iso-8859-13": .latin7, "iso8859-13": .latin7, "latin7": .latin7, "latin-7": .latin7, "l7": .latin7,
             "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
             "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
             "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,
