@@ -43,7 +43,7 @@ flowchart TB
   Parity["Parity completion shipped: #61 (XSLT keys/output, XSD union/import/identity, RELAX NG compact, HTML5 doc structure, C14N 2.0 trim)"]:::done
   Validator["Validation framework + recovering reader shipped: #92 (one located severity-aware ValidationError, never-crash read)"]:::done
   Editor["Editor integration shipped: #94 (source spans, unified lint, schema completions, structured quick-fixes)"]:::done
-  Conformance["Conformance push shipped: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89"]:::done
+  Conformance["Conformance push shipped: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82"]:::done
   LDone --> LReview
   LReview --> LEpic
   LEpic --> LTodo
