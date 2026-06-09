@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `document()` fragments and base-URI resolution (#82), completing the XSLT function/output audit. A `#fragment` selects a subset of the loaded document via XPointer, a node-set first argument unions the documents named by each node, and a relative URI is resolved against a caller-supplied `baseURI` (also applied to `xsl:include`/`xsl:import`).
 - XSLT result-tree fragments usable as node-sets (#82). An `xsl:variable` with a body now binds a queryable document fragment instead of a plain string, so `count($rtf/*)`, `$rtf/child`, and `xsl:for-each select="$rtf/..."` work; it still has its concatenated text as a string value.
 - XSLT `xsl:output cdata-section-elements` (#82). The text content of the named result elements is emitted in `<![CDATA[…]]>` sections instead of escaped, leaving nested elements and other elements unaffected.
 - XSLT `xsl:output` `doctype-public`/`doctype-system` (#82). When either is set, a `<!DOCTYPE>` for the result's root element (PUBLIC when both are given, SYSTEM otherwise) is emitted before the serialized output, for XML and HTML methods.

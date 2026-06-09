@@ -9,7 +9,9 @@ public extension PureXML.XSLT {
         source: String,
         options: PureXML.Emitting.Options = .compact,
         documentLoader: @escaping (String) -> String? = { _ in nil },
+        baseURI: String = "",
     ) throws -> String {
+        let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source)
         Whitespace.strip(root, stylesheet: sheet)
@@ -46,6 +48,14 @@ public extension PureXML.XSLT {
         }
     }
 
+    /// Wraps `loader` so a relative URI (from `document()`, `xsl:include`, or
+    /// `xsl:import`) is resolved against `baseURI` before loading. An empty base
+    /// leaves URIs as written.
+    private static func resolvingLoader(_ loader: @escaping (String) -> String?, baseURI: String) -> (String) -> String? {
+        guard !baseURI.isEmpty else { return loader }
+        return { reference in loader(PureXML.XInclude.URIReference.resolve(reference, against: baseURI)) }
+    }
+
     /// The `<!DOCTYPE …>` prologue for the result's root element when the output
     /// declares `doctype-system` (optionally with `doctype-public`), else empty.
     private static func doctype(for result: PureXML.Model.Node, _ output: Output) -> String {
@@ -67,7 +77,9 @@ public extension PureXML.XSLT {
         stylesheet: String,
         source: String,
         documentLoader: @escaping (String) -> String? = { _ in nil },
+        baseURI: String = "",
     ) throws -> PureXML.Model.Node {
+        let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source)
         Whitespace.strip(root, stylesheet: sheet)
