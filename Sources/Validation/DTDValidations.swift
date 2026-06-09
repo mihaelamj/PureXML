@@ -14,7 +14,9 @@ public extension PureXML.Validation {
         /// be declared.
         static func validator(strict: Bool) -> Validator<DTDSchema> {
             var validator = Validator<DTDSchema>.blank
-                .validating(contentModel, attributeDeclarations)
+                .validating(contentModel)
+                .validating(requiredAttributes, fixedAttributeValues, enumeratedAttributeValues)
+                .validating(tokenizedAttributeTypes, notationAttributes)
                 .validating(identifierIntegrity)
             if strict { validator = validator.validating(undeclaredElement) }
             return validator
@@ -29,16 +31,64 @@ public extension PureXML.Validation {
             }
         }
 
-        /// Each element's attributes satisfy their `<!ATTLIST>` declarations
-        /// (required presence, `#FIXED` value, and enumerations).
-        static var attributeDeclarations: Validation<DTDElement, DTDSchema> {
-            .init(description: "Element attributes satisfy their DTD declarations") { context in
+        /// Every `#REQUIRED` attribute declared for an element is present.
+        static var requiredAttributes: Validation<DTDElement, DTDSchema> {
+            attributeRule("Required DTD attributes are present") { declaration, element, path in
+                requiredViolation(declaration, on: element, at: path)
+            }
+        }
+
+        /// Every `#FIXED` attribute, when present, holds its fixed value.
+        static var fixedAttributeValues: Validation<DTDElement, DTDSchema> {
+            attributeRule("#FIXED DTD attributes hold their fixed value") { declaration, element, path in
+                fixedViolation(declaration, on: element, at: path)
+            }
+        }
+
+        /// Every enumerated attribute, when present, holds a value from its list.
+        static var enumeratedAttributeValues: Validation<DTDElement, DTDSchema> {
+            attributeRule("Enumerated DTD attributes hold a listed value") { declaration, element, path in
+                enumerationViolation(declaration, on: element, at: path)
+            }
+        }
+
+        /// Every tokenized attribute (`NMTOKEN(S)`, `ENTITY`/`ENTITIES`), when
+        /// present, matches its declared lexical form.
+        static var tokenizedAttributeTypes: Validation<DTDElement, DTDSchema> {
+            .init(description: "Tokenized DTD attributes match their declared type") { context in
                 let element = context.subject
-                guard let declarations = context.document.attributes[element.name.description] else { return [] }
                 let schema = context.document
-                return declarations.flatMap { declaration in
-                    attributeViolations(declaration, on: element, schema: schema, at: context.codingPath)
+                return (schema.attributes[element.name.description] ?? []).compactMap { declaration in
+                    attributeValue(of: declaration, on: element).flatMap { value in
+                        tokenizedTypeError(declaration, value: value, on: element.name.description, entities: schema.unparsedEntities, at: context.codingPath)
+                    }
                 }
+            }
+        }
+
+        /// Every `NOTATION` attribute, when present, names a declared, listed
+        /// notation.
+        static var notationAttributes: Validation<DTDElement, DTDSchema> {
+            .init(description: "NOTATION DTD attributes name a declared notation") { context in
+                let element = context.subject
+                let schema = context.document
+                return (schema.attributes[element.name.description] ?? []).compactMap { declaration in
+                    attributeValue(of: declaration, on: element).flatMap { value in
+                        notationError(declaration, value: value, on: element.name.description, notations: schema.notations, at: context.codingPath)
+                    }
+                }
+            }
+        }
+
+        /// Builds a per-declaration attribute rule: the `check` is applied to each
+        /// `<!ATTLIST>` declaration for the element, gathering one failure each.
+        private static func attributeRule(
+            _ description: String,
+            _ check: @escaping (PureXML.Validation.AttributeDeclaration, DTDElement, DTDPath) -> DTDFailure?,
+        ) -> Validation<DTDElement, DTDSchema> {
+            .init(description: description) { context in
+                let element = context.subject
+                return (context.document.attributes[element.name.description] ?? []).compactMap { check($0, element, context.codingPath) }
             }
         }
 

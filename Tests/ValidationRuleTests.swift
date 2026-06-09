@@ -45,15 +45,56 @@ struct ValidationRuleTests {
         #expect(path(errors[0]) == ["r"])
     }
 
-    @Test("DTD.attributeDeclarations reports a missing required attribute")
-    func test_attributeDeclarations() throws {
+    @Test("DTD.requiredAttributes reports a missing required attribute in isolation")
+    func test_requiredAttributes() throws {
         let (node, schema) = try dtd("<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r id CDATA #REQUIRED>]><r/>")
         let errors = PureXML.Validation.Validator<DTDSchema>.blank
-            .validating(PureXML.Validation.DTD.attributeDeclarations)
+            .validating(PureXML.Validation.DTD.requiredAttributes)
             .errors(for: node, in: schema)
         #expect(errors.count == 1)
         #expect(errors.first?.reason == "required attribute 'id' is missing on <r>")
         #expect(path(errors[0]) == ["r"])
+    }
+
+    @Test("DTD.fixedAttributeValues isolates the #FIXED constraint")
+    func test_fixedAttributeValues() throws {
+        // A missing required attribute is invisible to the fixed-value rule alone.
+        let (node, schema) = try dtd("<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r v CDATA #FIXED \"1\" id CDATA #REQUIRED>]><r v=\"2\"/>")
+        let errors = PureXML.Validation.Validator<DTDSchema>.blank
+            .validating(PureXML.Validation.DTD.fixedAttributeValues)
+            .errors(for: node, in: schema)
+        #expect(errors.count == 1)
+        #expect(errors.first?.reason == "attribute 'v' on <r> is #FIXED and must be \"1\"")
+    }
+
+    @Test("DTD.enumeratedAttributeValues isolates the enumeration constraint")
+    func test_enumeratedAttributeValues() throws {
+        let (node, schema) = try dtd("<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r k (a|b) #IMPLIED>]><r k=\"z\"/>")
+        let errors = PureXML.Validation.Validator<DTDSchema>.blank
+            .validating(PureXML.Validation.DTD.enumeratedAttributeValues)
+            .errors(for: node, in: schema)
+        #expect(errors.count == 1)
+        #expect(errors.first?.reason == "attribute 'k' on <r> has a value outside its enumeration")
+    }
+
+    @Test("DTD.tokenizedAttributeTypes isolates the NMTOKEN constraint")
+    func test_tokenizedAttributeTypes() throws {
+        let (node, schema) = try dtd("<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r t NMTOKEN #IMPLIED>]><r t=\"a b\"/>")
+        let errors = PureXML.Validation.Validator<DTDSchema>.blank
+            .validating(PureXML.Validation.DTD.tokenizedAttributeTypes)
+            .errors(for: node, in: schema)
+        #expect(errors.count == 1)
+        #expect(errors.first?.reason.contains("NMTOKEN") == true)
+    }
+
+    @Test("DTD.notationAttributes isolates the NOTATION constraint")
+    func test_notationAttributes() throws {
+        let (node, schema) = try dtd("<!DOCTYPE r [<!ELEMENT r EMPTY><!ATTLIST r kind NOTATION (bmp) #IMPLIED>]><r kind=\"bmp\"/>")
+        let errors = PureXML.Validation.Validator<DTDSchema>.blank
+            .validating(PureXML.Validation.DTD.notationAttributes)
+            .errors(for: node, in: schema)
+        #expect(errors.count == 1)
+        #expect(errors.first?.reason.contains("undeclared notation") == true)
     }
 
     @Test("DTD.undeclaredElement uses the single-error Bool form (Failed to satisfy)")

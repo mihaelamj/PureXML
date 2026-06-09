@@ -75,35 +75,34 @@ extension PureXML.Validation.DTD {
 
     // MARK: Attributes
 
-    static func attributeViolations(
-        _ declaration: PureXML.Validation.AttributeDeclaration,
-        on element: DTDElement,
-        schema: PureXML.Validation.DTDSchema,
-        at path: DTDPath,
-    ) -> [DTDFailure] {
-        let name = element.name.description
-        let value = element.attributes.first {
+    /// The value supplied for a declaration's attribute on an element, or nil when
+    /// it is absent.
+    static func attributeValue(of declaration: PureXML.Validation.AttributeDeclaration, on element: DTDElement) -> String? {
+        element.attributes.first {
             $0.name.description == declaration.name || $0.name.localName == declaration.name
         }?.value
-        guard let value else {
-            return declaration.defaultDecl == .required
-                ? [DTDFailure(reason: "required attribute '\(declaration.name)' is missing on <\(name)>", at: path)]
-                : []
-        }
-        var result: [DTDFailure] = []
-        if case let .fixed(fixedValue) = declaration.defaultDecl, value != fixedValue {
-            result.append(DTDFailure(reason: "attribute '\(declaration.name)' on <\(name)> is #FIXED and must be \"\(fixedValue)\"", at: path))
-        }
-        if case let .enumeration(allowed) = declaration.type, !allowed.contains(value) {
-            result.append(DTDFailure(reason: "attribute '\(declaration.name)' on <\(name)> has a value outside its enumeration", at: path))
-        }
-        if let tokenError = tokenizedTypeError(declaration, value: value, on: name, entities: schema.unparsedEntities, at: path) {
-            result.append(tokenError)
-        }
-        if let notationError = notationError(declaration, value: value, on: name, notations: schema.notations, at: path) {
-            result.append(notationError)
-        }
-        return result
+    }
+
+    /// The error when a `#REQUIRED` attribute is absent.
+    static func requiredViolation(_ declaration: PureXML.Validation.AttributeDeclaration, on element: DTDElement, at path: DTDPath) -> DTDFailure? {
+        guard declaration.defaultDecl == .required, attributeValue(of: declaration, on: element) == nil else { return nil }
+        return DTDFailure(reason: "required attribute '\(declaration.name)' is missing on <\(element.name.description)>", at: path)
+    }
+
+    /// The error when a `#FIXED` attribute is present with a value other than the
+    /// fixed one.
+    static func fixedViolation(_ declaration: PureXML.Validation.AttributeDeclaration, on element: DTDElement, at path: DTDPath) -> DTDFailure? {
+        guard case let .fixed(fixedValue) = declaration.defaultDecl,
+              let value = attributeValue(of: declaration, on: element), value != fixedValue else { return nil }
+        return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element.name.description)> is #FIXED and must be \"\(fixedValue)\"", at: path)
+    }
+
+    /// The error when an enumerated attribute is present with a value outside its
+    /// list.
+    static func enumerationViolation(_ declaration: PureXML.Validation.AttributeDeclaration, on element: DTDElement, at path: DTDPath) -> DTDFailure? {
+        guard case let .enumeration(allowed) = declaration.type,
+              let value = attributeValue(of: declaration, on: element), !allowed.contains(value) else { return nil }
+        return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element.name.description)> has a value outside its enumeration", at: path)
     }
 
     /// The error when a `NOTATION` attribute value is not one of the names its
