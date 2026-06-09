@@ -29,4 +29,10 @@ struct HTMLSelectTests {
     func test_inputClosesSelect() {
         #expect(body("<select><option>a<input></select>") == "<select><option>a</option></select><input>")
     }
+
+    @Test("A table cell closes a select that is inside a table")
+    func test_selectInTable() {
+        let expected = "<table><tbody><tr><td>x<select><option>a</option></select></td><td>y</td></tr></tbody></table>"
+        #expect(body("<table><tr><td>x<select><option>a<td>y</table>") == expected)
+    }
 }
