@@ -77,9 +77,9 @@ flowchart TB
   classDef epic fill:#f2e5ff,stroke:#af52de,color:#111827
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Epic71["#71 Beyond-parity libxml2 audit"]:::epic
-  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90"]:::done
+  AuditDone["Closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91"]:::done
   Epic74["#74 Parser-breadth sub-epic: standalone/decl #95, XML 1.1 #96, reader #98, recovery #100 done; encodings #97 #99 open"]:::epic
-  Partial["Partial in main: XInclude #87, XPath/XPointer #88, serialization #91"]:::todo
+  Partial["Partial in main: XInclude #87, XPath/XPointer #88"]:::todo
   Open["Open: HTML5 #83 #84, C14N #85, encoding tables #97 #99, validator decomposition #101"]:::todo
   Epic71 --> AuditDone
   AuditDone --> Epic74
@@ -91,7 +91,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **673 tests in 107 suites** (`swift test`).
+currently runs **675 tests in 107 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 

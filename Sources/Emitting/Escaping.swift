@@ -5,13 +5,14 @@ extension PureXML.Emitting {
     /// quote and the whitespace characters as numeric references (matching
     /// libxml2), so attributes survive attribute-value normalization.
     enum Escaping {
-        static func text(_ value: String, asciiOnly: Bool = false) -> String {
+        static func text(_ value: String, asciiOnly: Bool = false, escapeCarriageReturn: Bool = false) -> String {
             var result = ""
             for character in value {
                 switch character {
                 case "&": result += "&amp;"
                 case "<": result += "&lt;"
                 case ">": result += "&gt;"
+                case "\r" where escapeCarriageReturn: result += "&#xD;"
                 default: result += plain(character, asciiOnly: asciiOnly)
                 }
             }

@@ -12,6 +12,21 @@ public extension PureXML.Emitting {
         }
     }
 
+    /// How much to escape in text content beyond the markup-significant
+    /// characters `&`, `<`, and `>`.
+    enum TextEscaping: Equatable, Hashable, Sendable {
+        /// Escape only `&`, `<`, and `>` (the safe default).
+        case standard
+        /// Additionally escape a carriage return as `&#xD;`, so it survives the
+        /// parser's end-of-line normalization (which folds a literal `\r` or
+        /// `\r\n` to `\n`) and the text round-trips byte for byte.
+        case roundTrip
+
+        var escapesCarriageReturn: Bool {
+            self == .roundTrip
+        }
+    }
+
     struct Options: Equatable, Hashable, Sendable {
         /// Whether to indent nested elements onto their own lines.
         public var prettyPrint: Bool
@@ -27,6 +42,10 @@ public extension PureXML.Emitting {
         /// Whether to emit a CDATA section's content as escaped text rather than as
         /// a `<![CDATA[ ... ]]>` section.
         public var cdataAsText: Bool
+        /// How much to escape in text content beyond `&`, `<`, and `>`. The default
+        /// is the minimal-safe set; ``TextEscaping/roundTrip`` also escapes a
+        /// carriage return so it is preserved across a parse.
+        public var textEscaping: TextEscaping
         /// Whether to escape every non-ASCII character as a numeric character
         /// reference, so the output is pure ASCII (libxml2's character-reference
         /// encoding).
@@ -48,6 +67,7 @@ public extension PureXML.Emitting {
             lineEnding: String = "\n",
             selfCloseEmptyElements: Bool = true,
             cdataAsText: Bool = false,
+            textEscaping: TextEscaping = .standard,
             asciiOnly: Bool = false,
             includeXMLDeclaration: Bool = false,
             xmlVersion: String = "1.0",
@@ -60,6 +80,7 @@ public extension PureXML.Emitting {
             self.lineEnding = lineEnding
             self.selfCloseEmptyElements = selfCloseEmptyElements
             self.cdataAsText = cdataAsText
+            self.textEscaping = textEscaping
             self.asciiOnly = asciiOnly
             self.includeXMLDeclaration = includeXMLDeclaration
             self.xmlVersion = xmlVersion
