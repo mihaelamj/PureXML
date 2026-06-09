@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Single-byte legacy encodings (#97, partial): the byte decoder gains a table-based single-byte path and the full ISO-8859 family (ISO-8859-2 through 16, excluding the Thai part 11) plus Windows-1254, selected by the XML declaration's `encoding` name for both the whole-buffer and streaming decoders. The table-based encodings are vendored verbatim from the authoritative `unicode.org` mapping files; ISO-8859-5/9/15 are derived exactly; Windows-1254 composes from Windows-1252. The remaining encodings (Windows code pages, KOI8) are data drop-ins into the same path.
+- Single-byte legacy encodings (#97, partial): the byte decoder gains a table-based single-byte path and a broad set of legacy encodings, selected by the XML declaration's `encoding` name for both the whole-buffer and streaming decoders: the full ISO-8859 family (parts 2 through 16), Windows-1250/1251/1253/1254/1257, and KOI8-R. The table-based encodings are vendored verbatim from the authoritative `unicode.org` mapping files; ISO-8859-5/9/15 are derived exactly; Windows-1254 composes from Windows-1252. A few Windows pages (1255/1256/1258) and KOI8-U remain as data drop-ins into the same path.
 
 ### Fixed
 

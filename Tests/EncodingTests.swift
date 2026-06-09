@@ -126,6 +126,20 @@ struct EncodingTests {
         try #expect(decoded("ISO-8859-16", [0xAA]) == "\u{0218}") // Ș
     }
 
+    @Test("Decodes the Windows code pages, KOI8-R, and Thai from vendored tables")
+    func test_windowsAndKoi8() throws {
+        try #expect(decoded("ISO-8859-11", [0xA1]) == "\u{0E01}") // ก
+        try #expect(decoded("windows-1250", [0x8A]) == "\u{0160}") // Š
+        try #expect(decoded("windows-1250", [0xC8]) == "\u{010C}") // Č
+        try #expect(decoded("windows-1251", [0xC0]) == "\u{0410}") // А
+        try #expect(decoded("windows-1251", [0x88]) == "\u{20AC}") // €
+        try #expect(decoded("windows-1253", [0xC1]) == "\u{0391}") // Α
+        try #expect(decoded("windows-1257", [0xA8]) == "\u{00D8}") // Ø
+        try #expect(decoded("koi8-r", [0xE1]) == "\u{0410}") // А
+        try #expect(decoded("koi8-r", [0xC1]) == "\u{0430}") // а
+        try #expect(decoded("koi8-r", [0xA3]) == "\u{0451}") // ё
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
