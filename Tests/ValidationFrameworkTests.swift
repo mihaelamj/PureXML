@@ -63,6 +63,16 @@ struct ValidationFrameworkTests {
         #expect((fail || fail)(context(sample)).count == 2)
     }
 
+    @Test("The Bool forms of && and || combine predicates")
+    func test_andOrBool() {
+        let yes: (Context) -> Bool = { _ in true }
+        let nope: (Context) -> Bool = { _ in false }
+        #expect((yes && yes)(context(sample)))
+        #expect(!(yes && nope)(context(sample)))
+        #expect((yes || nope)(context(sample)))
+        #expect(!(nope || nope)(context(sample)))
+    }
+
     @Test("take digs to a value and runs logic")
     func test_take() {
         let check: (Context) -> Bool = take(\Element.attributes) { $0.count == 1 }
