@@ -16,11 +16,27 @@ public extension PureXML.XSLT {
         public var value: ValueTemplate
     }
 
+    /// Which case sorts first among strings equal apart from case.
+    enum CaseOrder: Sendable {
+        case upperFirst
+        case lowerFirst
+    }
+
     /// A sort specification for `apply-templates`/`for-each`.
     struct Sort: Sendable {
         public var select: String
         public var descending: Bool
         public var numeric: Bool
+        /// `case-order`: when set, the comparison is case-insensitive and this
+        /// breaks ties; when nil, the comparison is the default codepoint order.
+        public var caseOrder: CaseOrder?
+
+        public init(select: String, descending: Bool, numeric: Bool, caseOrder: CaseOrder? = nil) {
+            self.select = select
+            self.descending = descending
+            self.numeric = numeric
+            self.caseOrder = caseOrder
+        }
     }
 
     /// One instruction of a template body (a sequence constructor item).

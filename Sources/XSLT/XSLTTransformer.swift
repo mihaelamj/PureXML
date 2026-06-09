@@ -180,8 +180,6 @@ extension PureXML.XSLT {
 }
 
 extension PureXML.XSLT.Transformer {
-    // MARK: Instruction evaluation
-
     fileprivate func evaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
         simpleEvaluate(instruction, context) ?? structuralEvaluate(instruction, context)
     }
@@ -386,6 +384,8 @@ extension PureXML.XSLT.Transformer {
             let leftNumber = PureXML.XPath.Value.parseNumber(left)
             let rightNumber = PureXML.XPath.Value.parseNumber(right)
             order = leftNumber == rightNumber ? 0 : (leftNumber < rightNumber ? -1 : 1)
+        } else if let caseOrder = sort.caseOrder {
+            order = Self.caseInsensitiveCompare(left, right, caseOrder)
         } else {
             order = left == right ? 0 : (left < right ? -1 : 1)
         }
