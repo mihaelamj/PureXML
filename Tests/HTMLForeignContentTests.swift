@@ -65,4 +65,18 @@ struct HTMLForeignContentTests {
         #expect(find("clippath", in: "<clippath></clippath>")?.name.namespaceURI == nil)
         #expect(find("clipPath", in: "<clippath></clippath>") == nil)
     }
+
+    @Test("SVG attribute names are restored to their canonical camel case")
+    func test_svgAttributeCase() {
+        let rect = find("rect", in: "<svg><rect viewbox=\"0 0 1 1\" width=\"1\"></rect></svg>")
+        #expect(rect?.attributes.contains { $0.name.description == "viewBox" } == true)
+        #expect(rect?.attributes.contains { $0.name.description == "width" } == true)
+        #expect(rect?.attributes.contains { $0.name.description == "viewbox" } == false)
+    }
+
+    @Test("HTML attribute names are not case-adjusted")
+    func test_htmlAttributeNotAdjusted() {
+        let element = find("p", in: "<p viewbox=\"x\"></p>")
+        #expect(element?.attributes.contains { $0.name.description == "viewbox" } == true)
+    }
 }
