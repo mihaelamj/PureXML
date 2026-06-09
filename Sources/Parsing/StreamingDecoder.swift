@@ -12,9 +12,10 @@ extension PureXML.Parsing {
         private var encoding: InputEncoding?
         private var prefix: [UInt8] = []
         private var prefixIndex = 0
-        private var finished = false
+        var finished = false
+        var iso2022jpMode: ISO2022JPMode = .ascii
 
-        private static let replacement: Character = "\u{FFFD}"
+        static let replacement: Character = "\u{FFFD}"
 
         init(pullingBytes pull: @escaping () -> UInt8?) {
             self.pull = pull
@@ -55,6 +56,7 @@ extension PureXML.Parsing {
             case .gbk: nextGBK()
             case .gb18030: nextGB18030()
             case .big5: nextBig5()
+            case .iso2022jp: nextISO2022JP()
             default: nextUTF8()
             }
         }
@@ -201,11 +203,23 @@ extension PureXML.Parsing {
                 prefix.append(byte)
             }
             let detected = InputEncoding.detectWithBOM(prefix)
-            encoding = detected.encoding
             prefixIndex = detected.bomLength
+            encoding = detected.encoding
+            // With no byte-order mark and an ASCII-compatible default, the XML
+            // declaration may name another encoding (the libxml2 behavior). Buffer
+            // through the declaration and honor it; the ASCII declaration bytes
+            // decode identically under the chosen encoding when replayed.
+            if detected.bomLength == 0, detected.encoding == .utf8 {
+                while prefix.count < 256, !prefix.contains(0x3E), let byte = pull() {
+                    prefix.append(byte)
+                }
+                if let declared = PureXML.Parsing.ByteDecoder.declaredEncoding(in: prefix) {
+                    encoding = declared
+                }
+            }
         }
 
-        private mutating func nextByte() -> UInt8? {
+        mutating func nextByte() -> UInt8? {
             if prefixIndex < prefix.count {
                 let byte = prefix[prefixIndex]
                 prefixIndex += 1

@@ -44,6 +44,31 @@ struct EncodingTests {
         #expect(rootText(littleEndianNode) == "héllo")
     }
 
+    @Test("Streaming honors the declared encoding and agrees with whole-buffer decode")
+    func test_streamingDeclaredEncoding() throws {
+        func doc(_ encoding: String, _ content: [UInt8]) -> [UInt8] {
+            Array("<?xml version=\"1.0\" encoding=\"\(encoding)\"?><r>".utf8) + content + Array("</r>".utf8)
+        }
+        // Single-byte, CJK, and the stateful ISO-2022-JP, none detectable from
+        // bytes alone, so each exercises declaration-driven streaming.
+        struct Case { let encoding: String
+            let content: [UInt8]
+            let expected: String
+        }
+        let cases = [
+            Case(encoding: "ISO-8859-1", content: [0xE9], expected: "\u{00E9}"), // é
+            Case(encoding: "Shift_JIS", content: [0xB1], expected: "\u{FF71}"), // ｱ half-width katakana
+            Case(encoding: "ISO-2022-JP", content: [0x1B, 0x28, 0x49, 0x31, 0x1B, 0x28, 0x42], expected: "\u{FF71}"), // ｱ via escape
+        ]
+        for testCase in cases {
+            let bytes = doc(testCase.encoding, testCase.content)
+            let whole = try rootText(PureXML.parse(bytes: bytes))
+            let streamed = try rootText(PureXML.parse(pullingBytes: byteSource(bytes)))
+            #expect(whole == testCase.expected, "whole-buffer wrong for \(testCase.encoding)")
+            #expect(streamed == whole, "streaming disagreed with whole-buffer for \(testCase.encoding)")
+        }
+    }
+
     @Test("Odd-length UTF-16 input is rejected as malformed")
     func test_malformedUTF16() {
         #expect(throws: PureXML.Parsing.ParseError.malformedEncoding) {

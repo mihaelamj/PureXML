@@ -97,8 +97,8 @@ extension PureXML.Parsing.ByteDecoder {
 }
 
 /// The active character set while decoding ISO-2022-JP, switched by escape
-/// sequences.
-private enum ISO2022JPMode {
+/// sequences. Held by the streaming decoder across reads, so it is module-visible.
+enum ISO2022JPMode {
     case ascii
     case roman
     case katakana
