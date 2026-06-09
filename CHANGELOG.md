@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT functions `generate-id`, `system-property`, `element-available`,
+  `function-available`, and an `unparsed-entity-uri` stub (#82). `generate-id`
+  returns a stable per-node identifier (the context node when no argument is
+  given, the empty string for an empty node-set); `system-property` reports the
+  XSLT version (1.0) and vendor; the `*-available` functions answer against the
+  set of implemented instructions and functions.
 - XSLT `xsl:namespace-alias` (#81), completing the XSLT top-level-element audit. A
   literal result element (and its attributes) in a stylesheet namespace bound by
   `stylesheet-prefix` is rewritten on output to the namespace and prefix bound by
