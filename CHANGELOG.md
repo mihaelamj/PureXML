@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Schematron `key()`, `document()`, and `current()` in tests (#80), completing the Schematron audit. Test, let, and message expressions can now resolve nodes through `xsl:key` declarations, load an external document for cross-document checks (via an injected `documentLoader`), and refer to the rule context node with `current()`.
 - RELAX NG compact `>>` follow-annotations (#79), completing the RNC syntax. A `>>` annotation after a pattern (a foreign element name with optional `[ … ]` content) is skipped, chaining and combining with leading `[ … ]` annotations; both carry no schema semantics. (Namespace declarations inside annotations are already dropped by the annotation skipper.)
 - XSLT `document()` fragments and base-URI resolution (#82), completing the XSLT function/output audit. A `#fragment` selects a subset of the loaded document via XPointer, a node-set first argument unions the documents named by each node, and a relative URI is resolved against a caller-supplied `baseURI` (also applied to `xsl:include`/`xsl:import`).
 - XSLT result-tree fragments usable as node-sets (#82). An `xsl:variable` with a body now binds a queryable document fragment instead of a plain string, so `count($rtf/*)`, `$rtf/child`, and `xsl:for-each select="$rtf/..."` work; it still has its concatenated text as a string value.
