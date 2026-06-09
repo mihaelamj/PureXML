@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- HTML5 select content model (#83, stage 10): a `<select>` now follows the in-select rules. `<optgroup>` closes an open `<option>`, a nested `<select>` closes the open one rather than nesting, and an `<input>`/`<keygen>`/`<textarea>` closes the select and is placed after it.
 - HTML5 frameset documents (#83, stage 8): a `<frameset>` after the head now produces a frameset document whose `frameset` element replaces the body (`<html><head></head><frameset>...`), with nested framesets and `<noframes>` handled, and `<frame>` is now a void element (it no longer wrongly nests). An ordinary document still produces a body.
 - HTML5 integration points (#83, stage 7): HTML content inside an SVG integration point (`foreignObject`, `desc`, `title`) is now parsed in the HTML namespace rather than SVG, so `<svg><foreignObject><div>` puts the `div` (and its descendants) back in HTML; re-entering `<svg>` inside an integration point switches back to the SVG namespace.
 - HTML5 table foster-parenting (#83, stage 6): stray flow content inside a table is now moved out rather than nested in the table structure, matching the HTML standard. A non-table element or character data appearing while a `table`/`tbody`/`thead`/`tfoot`/`tr` is the open node is inserted immediately before the table (`<table><b>x</table>` -> `<b>x</b><table></table>`), while well-formed cell content is untouched.
