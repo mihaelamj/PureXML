@@ -172,12 +172,39 @@ private final class HTMLDocument {
                 pop(&stack, &roots)
             }
         }
+        ensureTableContext(for: name, &stack, &roots)
         let modeled = modelAttributes(attributes)
         if PureXML.HTML.Elements.void.contains(name) || selfClosing {
             attach(.element(PureXML.Model.Element(name: .init(name), attributes: modeled)), &stack, &roots)
         } else {
             stack.append(DocFrame(name: name, attributes: modeled))
         }
+    }
+
+    /// HTML table tree construction: a `<tr>` inside a bare `<table>` gets an
+    /// implied `<tbody>`, and a `<td>`/`<th>` gets an implied `<tr>` (and section),
+    /// so a table written without its section and row wrappers still nests
+    /// correctly. Only fires inside an open table.
+    private func ensureTableContext(for name: String, _ stack: inout [DocFrame], _: inout [Node]) {
+        guard let context = nearestTableContext(stack) else { return }
+        switch name {
+        case "tr" where context == "table":
+            stack.append(DocFrame(name: "tbody", attributes: []))
+        case "td", "th":
+            if context == "table" { stack.append(DocFrame(name: "tbody", attributes: [])) }
+            if context == "table" || ["tbody", "thead", "tfoot"].contains(context) {
+                stack.append(DocFrame(name: "tr", attributes: []))
+            }
+        default:
+            break
+        }
+    }
+
+    /// The nearest open table-structural element (`table`/`tbody`/`thead`/`tfoot`/
+    /// `tr`), or nil when no table is open.
+    private func nearestTableContext(_ stack: [DocFrame]) -> String? {
+        let structural: Set = ["table", "tbody", "thead", "tfoot", "tr"]
+        return stack.reversed().first { structural.contains($0.name) }?.name
     }
 
     private func close(_ name: String, _ stack: inout [DocFrame], _ roots: inout [Node]) {

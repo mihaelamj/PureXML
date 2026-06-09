@@ -40,4 +40,31 @@ struct HTMLDocumentTests {
     func test_htmlAttributes() {
         #expect(document("<html lang=\"en\"><p>x</p></html>") == "<html lang=\"en\"><head></head><body><p>x</p></body></html>")
     }
+
+    // MARK: Table tree construction
+
+    /// Wraps a body fragment in the implied document structure for comparison.
+    private func bodyDocument(_ inner: String) -> String {
+        "<html><head></head><body>\(inner)</body></html>"
+    }
+
+    @Test("A bare table row gets an implied tbody")
+    func test_impliedTbody() {
+        #expect(document("<table><tr><td>x</td></tr></table>") == bodyDocument("<table><tbody><tr><td>x</td></tr></tbody></table>"))
+    }
+
+    @Test("A bare cell gets an implied tbody and row")
+    func test_impliedRowAndSection() {
+        #expect(document("<table><td>x</td></table>") == bodyDocument("<table><tbody><tr><td>x</td></tr></tbody></table>"))
+    }
+
+    @Test("An explicit section is not duplicated")
+    func test_explicitSection() {
+        #expect(document("<table><thead><tr><th>h</th></tr></thead></table>") == bodyDocument("<table><thead><tr><th>h</th></tr></thead></table>"))
+    }
+
+    @Test("Consecutive rows share one implied tbody")
+    func test_consecutiveRows() {
+        #expect(document("<table><tr><td>a</td><tr><td>b</td></table>") == bodyDocument("<table><tbody><tr><td>a</td></tr><tr><td>b</td></tr></tbody></table>"))
+    }
 }
