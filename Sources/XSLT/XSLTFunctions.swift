@@ -122,7 +122,51 @@ extension PureXML.XSLT {
                           let parsed = try? PureXML.parseTree(text) else { return .nodeSet([]) }
                     return .nodeSet([.tree(parsed)])
                 }
+                .adding("generate-id") { arguments, context in
+                    // No argument uses the context node; an explicit empty node-set
+                    // is the empty string, per the XSLT definition.
+                    let node = arguments.isEmpty ? context.node.treeNode : arguments.first?.nodes?.first?.treeNode
+                    guard let node else { return .string("") }
+                    return .string("N\(UInt(bitPattern: ObjectIdentifier(node).hashValue))")
+                }
+                .adding("system-property") { arguments, _ in systemProperty(arguments.first?.string ?? "") }
+                .adding("element-available") { arguments, _ in .boolean(instructionNames.contains(localPart(arguments.first?.string ?? ""))) }
+                .adding("function-available") { arguments, _ in .boolean(functionNames.contains(localPart(arguments.first?.string ?? ""))) }
+                .adding("unparsed-entity-uri") { _, _ in .string("") }
         }
+
+        private static func localPart(_ name: String) -> String {
+            name.split(separator: ":").last.map(String.init) ?? name
+        }
+
+        /// The XSLT system properties: the version is the number 1.0; the vendor
+        /// strings identify this processor. Any other property is the empty string.
+        private static func systemProperty(_ name: String) -> PureXML.XPath.Value {
+            switch localPart(name) {
+            case "version": .number(1.0)
+            case "vendor": .string("PureXML")
+            case "vendor-url": .string("https://github.com/mihaelamj/PureXML")
+            default: .string("")
+            }
+        }
+
+        /// The XSLT instruction elements this processor implements, for
+        /// `element-available`.
+        static let instructionNames: Set<String> = [
+            "value-of", "apply-templates", "apply-imports", "call-template", "for-each", "if", "choose",
+            "when", "otherwise", "element", "attribute", "copy", "copy-of", "text", "number", "comment",
+            "processing-instruction", "variable", "param", "with-param", "sort", "message", "fallback",
+        ]
+
+        /// The XPath and XSLT functions this processor implements, for
+        /// `function-available`.
+        static let functionNames: Set<String> = [
+            "last", "position", "count", "id", "local-name", "namespace-uri", "name", "string", "concat",
+            "starts-with", "contains", "substring-before", "substring-after", "substring", "string-length",
+            "normalize-space", "translate", "boolean", "not", "true", "false", "lang", "number", "sum",
+            "floor", "ceiling", "round", "current", "document", "key", "format-number", "generate-id",
+            "system-property", "element-available", "function-available", "unparsed-entity-uri",
+        ]
 
         /// Builds the `xsl:key` index: each declared key maps every node matching
         /// its pattern to its `use` value.
