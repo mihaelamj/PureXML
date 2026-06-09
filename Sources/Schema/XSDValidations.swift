@@ -79,8 +79,9 @@ public extension PureXML.Validation {
             .init(
                 description: "XSD identity constraints hold",
                 check: { context in
-                    PureXML.Schema.IdentityValidator(constraints: context.document.constraints)
-                        .validate(PureXML.Model.TreeNode(context.subject))
+                    guard case let .element(root) = context.subject else { return [] }
+                    return PureXML.Schema.IdentityValidator(constraints: context.document.constraints)
+                        .validate(PureXML.Model.TreeNode(context.subject), at: [.element(root.name.description)])
                 },
                 when: { $0.codingPath.isEmpty },
             )

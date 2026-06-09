@@ -9,15 +9,19 @@ extension PureXML.Schema {
         /// The constraints declared for each element local name.
         let constraints: [String: [IdentityConstraint]]
 
-        func validate(_ root: PureXML.Model.TreeNode) -> [PureXML.Validation.ValidationError] {
+        func validate(
+            _ root: PureXML.Model.TreeNode,
+            at path: [PureXML.Validation.PathKey] = [],
+        ) -> [PureXML.Validation.ValidationError] {
             guard !constraints.isEmpty else { return [] }
             var issues: [PureXML.Validation.ValidationError] = []
-            walk(root, scopes: [], into: &issues)
+            walk(root, at: path, scopes: [], into: &issues)
             return issues
         }
 
         private func walk(
             _ node: PureXML.Model.TreeNode,
+            at path: [PureXML.Validation.PathKey],
             scopes: [[String: [[String?]]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
@@ -26,16 +30,35 @@ extension PureXML.Schema {
             // Collect key and unique tuples first so a keyref on the same element
             // can resolve against them.
             for constraint in declared {
-                collect(constraint, at: node, frame: &frame, into: &issues)
+                collect(constraint, at: node, path: path, frame: &frame, into: &issues)
             }
             let visible = scopes + [frame]
             for constraint in declared {
-                if case let .keyref(refer) = constraint.kind {
-                    checkKeyref(constraint, refer: refer, at: node, scopes: visible, into: &issues)
+                if case .keyref = constraint.kind {
+                    checkKeyref(constraint, at: node, path: path, scopes: visible, into: &issues)
                 }
             }
-            for child in node.children where child.kind == .element {
-                walk(child, scopes: visible, into: &issues)
+            let elementChildren = node.children.filter { $0.kind == .element }
+            for (child, step) in zip(elementChildren, childSteps(elementChildren)) {
+                walk(child, at: path + [step], scopes: visible, into: &issues)
+            }
+        }
+
+        /// The coding-path step for each element child: its name, with a sibling
+        /// index only when more than one child shares that name. Mirrors the
+        /// complex-type validator's path construction so identity-constraint
+        /// errors and content errors locate consistently.
+        private func childSteps(_ children: [PureXML.Model.TreeNode]) -> [PureXML.Validation.PathKey] {
+            var totals: [String: Int] = [:]
+            for child in children {
+                totals[child.name?.description ?? "", default: 0] += 1
+            }
+            var seen: [String: Int] = [:]
+            return children.map { child in
+                let name = child.name?.description ?? ""
+                let index = (seen[name] ?? 0) + 1
+                seen[name] = index
+                return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
             }
         }
 
@@ -47,6 +70,7 @@ extension PureXML.Schema {
         private func collect(
             _ constraint: IdentityConstraint,
             at node: PureXML.Model.TreeNode,
+            path: [PureXML.Validation.PathKey],
             frame: inout [String: [[String?]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
@@ -56,12 +80,12 @@ extension PureXML.Schema {
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
-                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: []))
+                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: path))
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if seen.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: []))
+                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: path))
                 } else {
                     seen.append(tuple)
                 }
@@ -72,17 +96,18 @@ extension PureXML.Schema {
 
         private func checkKeyref(
             _ constraint: IdentityConstraint,
-            refer: String,
             at node: PureXML.Model.TreeNode,
+            path: [PureXML.Validation.PathKey],
             scopes: [[String: [[String?]]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
+            guard case let .keyref(refer) = constraint.kind else { return }
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: []))
+                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: path))
                 }
             }
         }

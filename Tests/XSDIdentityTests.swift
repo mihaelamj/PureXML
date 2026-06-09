@@ -78,4 +78,25 @@ struct XSDIdentityTests {
         #expect(try validate(xsd, valid).isEmpty)
         #expect(try !validate(xsd, dangling).isEmpty)
     }
+
+    @Test("Identity-constraint errors are located at the constraining element")
+    func test_identityErrorsCarryPath() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+            </xs:complexType>
+            <xs:key name="itemKey">
+              <xs:selector xpath="item"/>
+              <xs:field xpath="@id"/>
+            </xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let errors = try validate(xsd, "<list><item id=\"1\"/><item id=\"1\"/></list>")
+        let failure = try #require(errors.first)
+        #expect(failure.codingPath.map(\.stringValue) == ["list"])
+        #expect(String(describing: failure).hasSuffix("at path: list"))
+    }
 }

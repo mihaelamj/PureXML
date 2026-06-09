@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSD identity-constraint errors (`key`, `keyref`, `unique`) now carry a coding path locating the constraining element, instead of always rendering "at root of document". The `IdentityValidator` walk threads a `[PathKey]` the same way the content-model validator does, so a duplicate-key or dangling-keyref failure reports "... at path: list" rather than an empty path. This brings the identity-constraint rule into line with the validation framework's path-carrying contract, which every other rule already honored.
 - A `<template>` element's flow content is now kept nested inside it (`<template><div>x</div></template>`) instead of being split out into the body (#83). `template` is built as body flow content rather than routed to the head.
 
 ### Added
