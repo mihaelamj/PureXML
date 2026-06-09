@@ -1,7 +1,7 @@
 public extension PureXML.Parsing {
     /// A character encoding PureXML can decode from raw bytes. Covers the
-    /// Unicode transformation formats plus the common single-byte encodings
-    /// (ISO-8859-1 and Windows-1252), toward libxml2 encoding parity.
+    /// Unicode transformation formats plus the single-byte encodings (ISO-8859-1,
+    /// ISO-8859-5/9/15, and Windows-1252), toward libxml2 encoding parity.
     enum InputEncoding: String, Equatable, Sendable {
         case utf8
         case utf16BigEndian
@@ -10,6 +10,9 @@ public extension PureXML.Parsing {
         case utf32LittleEndian
         case latin1
         case windows1252
+        case latinCyrillic // ISO-8859-5
+        case latin5 // ISO-8859-9 (Turkish)
+        case latin9 // ISO-8859-15
 
         /// Detects the encoding from the leading bytes, following the XML sniff
         /// order: a byte-order mark first, then the `<?` byte pattern of the XML
