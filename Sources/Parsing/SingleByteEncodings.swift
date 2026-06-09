@@ -64,10 +64,25 @@ extension PureXML.Parsing.ByteDecoder {
             }
         }
 
-        /// ISO-8859-2 (Latin-2, Central European). Vendored from the authoritative
-        /// Unicode mapping file.
+        /// The table-driven encodings, vendored from the Unicode mapping files.
         static func iso8859_2(_ byte: UInt8) -> Unicode.Scalar {
             upperHalf(byte, latin2Upper)
+        }
+
+        static func iso8859_3(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin3Upper)
+        }
+
+        static func iso8859_4(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin4Upper)
+        }
+
+        static func iso8859_7(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, greekUpper)
+        }
+
+        static func iso8859_13(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin7Upper)
         }
 
         /// Maps a byte through a 96-entry upper-half table (`0xA0`-`0xFF`); bytes
