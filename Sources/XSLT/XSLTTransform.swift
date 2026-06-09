@@ -17,6 +17,7 @@ public extension PureXML.XSLT {
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         if sheet.output.method == "text" { return textValue(of: result) }
+        if sheet.output.method == "html" { return PureXML.HTML.serialize(result) }
         return PureXML.serialize(result, options: options.applying(sheet.output))
     }
 
