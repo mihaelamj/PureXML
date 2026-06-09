@@ -40,8 +40,6 @@ extension PureXML.XSLT {
             return .document(applyTemplates(to: [root], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
-        // MARK: Template matching
-
         fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?, below ceiling: Int = .max) -> Template? {
             stylesheet.templates.enumerated()
                 .filter { $0.element.mode == mode && $0.element.importPrecedence < ceiling && ($0.element.match.map { matches(node, $0) } ?? false) }
@@ -62,8 +60,6 @@ extension PureXML.XSLT {
             }
             return false
         }
-
-        // MARK: apply-templates and built-in rules
 
         fileprivate func applyTemplates(
             to nodes: [PureXML.Model.TreeNode],
@@ -138,8 +134,6 @@ extension PureXML.XSLT {
             return .string(Self.text(of: instantiate(body, context)))
         }
 
-        // MARK: XPath helpers
-
         fileprivate func value(_ expression: String, _ context: XSLTContext) -> PureXML.XPath.Value? {
             guard let query = try? PureXML.XPath.Query(expression) else { return nil }
             return try? query.value(
@@ -162,8 +156,6 @@ extension PureXML.XSLT {
         fileprivate func boolean(_ expression: String, _ context: XSLTContext) -> Bool {
             value(expression, context)?.boolean ?? false
         }
-
-        // MARK: Result helpers
 
         fileprivate static func nodeOf(_ item: ResultItem) -> PureXML.Model.Node? {
             if case let .node(node) = item { return node }
@@ -224,10 +216,23 @@ extension PureXML.XSLT.Transformer {
         return []
     }
 
+    /// Builds a literal result element, rewriting its name and attribute names
+    /// through any `xsl:namespace-alias` in effect.
+    private func literalResult(
+        _ name: PureXML.Model.QualifiedName,
+        _ attributes: [PureXML.XSLT.LiteralAttribute],
+        _ useAttributeSets: [String],
+        _ body: [PureXML.XSLT.Instruction],
+        _ context: XSLTContext,
+    ) -> ResultItem {
+        let aliasedAttributes = attributes.map { PureXML.XSLT.LiteralAttribute(name: aliased($0.name), value: $0.value) }
+        return buildElement(name: aliased(name), literalAttributes: aliasedAttributes, useAttributeSets: useAttributeSets, body: body, context)
+    }
+
     private func structuralEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
         switch instruction {
         case let .literalElement(name, attributes, useAttributeSets, body):
-            [buildElement(name: name, literalAttributes: attributes, useAttributeSets: useAttributeSets, body: body, context)]
+            [literalResult(name, attributes, useAttributeSets, body, context)]
         case let .element(nameTemplate, useAttributeSets, body):
             [buildElement(name: .init(avt(nameTemplate, context)), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
         case let .attribute(nameTemplate, body):
@@ -361,8 +366,6 @@ extension PureXML.XSLT.Transformer {
             }
         }
     }
-
-    // MARK: Sorting
 
     private func sorted(_ nodes: [PureXML.Model.TreeNode], _ sorts: [PureXML.XSLT.Sort]) -> [PureXML.Model.TreeNode] {
         guard !sorts.isEmpty else { return nodes }

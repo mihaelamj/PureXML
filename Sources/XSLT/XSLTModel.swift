@@ -112,6 +112,18 @@ public extension PureXML.XSLT {
         }
     }
 
+    /// An `xsl:namespace-alias` target: the result namespace (and its prefix) that
+    /// a literal result element's stylesheet namespace is rewritten to on output.
+    struct NamespaceAlias: Sendable {
+        public var uri: String?
+        public var prefix: String?
+
+        public init(uri: String?, prefix: String?) {
+            self.uri = uri
+            self.prefix = prefix
+        }
+    }
+
     /// The symbols an `xsl:decimal-format` sets for `format-number`: those used in
     /// the picture (digit places, separators, percent) and in the output. The
     /// defaults are the XSLT standard format.
@@ -194,6 +206,9 @@ public extension PureXML.XSLT {
         /// `xsl:decimal-format` declarations for `format-number`, keyed by name; the
         /// empty key is the default (unnamed) format.
         public var decimalFormats: [String: DecimalFormat]
+        /// `xsl:namespace-alias` rewrites, keyed by the stylesheet namespace URI
+        /// (the empty key is the no-namespace/default case).
+        public var namespaceAliases: [String: NamespaceAlias]
 
         public init(
             templates: [Template],
@@ -204,6 +219,7 @@ public extension PureXML.XSLT {
             preserveSpace: Set<String> = [],
             attributeSets: [String: AttributeSet] = [:],
             decimalFormats: [String: DecimalFormat] = [:],
+            namespaceAliases: [String: NamespaceAlias] = [:],
         ) {
             self.templates = templates
             self.globals = globals
@@ -213,6 +229,7 @@ public extension PureXML.XSLT {
             self.preserveSpace = preserveSpace
             self.attributeSets = attributeSets
             self.decimalFormats = decimalFormats
+            self.namespaceAliases = namespaceAliases
         }
     }
 }
