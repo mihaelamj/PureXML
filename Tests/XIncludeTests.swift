@@ -48,6 +48,22 @@ struct XIncludeTests {
         #expect(result == "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\"><item>two</item></doc>")
     }
 
+    @Test("xi:include with an xpointer range() includes the covering range")
+    func test_includeRange() throws {
+        let xml = "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\">"
+            + "<xi:include href=\"frag.xml\" xpointer=\"xpointer(range(//item[2]))\"/></doc>"
+        let result = try process(xml) { _ in "<list><item>one</item><item>two</item></list>" }
+        #expect(result == "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\"><item>two</item></doc>")
+    }
+
+    @Test("xi:include with a string-range xpointer includes the matched text")
+    func test_includeStringRange() throws {
+        let xml = "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\">"
+            + "<xi:include href=\"frag.xml\" xpointer=\"xpointer(string-range(//item, 'wo'))\"/></doc>"
+        let result = try process(xml) { _ in "<list><item>one</item><item>two</item></list>" }
+        #expect(result == "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\">wo</doc>")
+    }
+
     @Test("href resolves against an xml:base on an ancestor")
     func test_xmlBase() throws {
         let xml = "<doc xmlns:xi=\"http://www.w3.org/2001/XInclude\" xml:base=\"sub/\">"

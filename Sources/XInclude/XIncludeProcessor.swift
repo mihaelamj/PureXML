@@ -67,11 +67,13 @@ private struct XIncludeRun {
     }
 
     private func selectedNodes(from parsed: Node, xpointer: String?) -> [Node] {
-        if let xpointer {
-            let selections = (try? PureXML.XPointer.evaluate(xpointer, over: parsed)) ?? []
-            return selections.map(Self.node)
-        }
-        return [documentElement(of: parsed) ?? parsed]
+        guard let xpointer else { return [documentElement(of: parsed) ?? parsed] }
+        let selections = (try? PureXML.XPointer.evaluate(xpointer, over: parsed)) ?? []
+        if !selections.isEmpty { return selections.map(Self.node) }
+        // No node-selecting scheme matched: fall back to the XPointer range model
+        // (range()/range-to()/string-range()) and include each range's content.
+        let ranges = (try? PureXML.XPointer.evaluateRanges(xpointer, over: parsed)) ?? []
+        return ranges.flatMap(\.nodes)
     }
 
     private func documentElement(of parsed: Node) -> Node? {
