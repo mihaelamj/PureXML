@@ -182,6 +182,16 @@ struct EncodingTests {
         try #expect(decoded("GB18030", [0x95, 0x32, 0x82, 0x36]) == "\u{20000}")
     }
 
+    @Test("Decodes Big5: BMP ideographs, an astral HKSCS pair, and a combining sequence")
+    func test_big5() throws {
+        // 中 (0xA4A4), 文 (0xA4E5), A (0x41).
+        try #expect(decoded("Big5", [0xA4, 0xA4, 0xA4, 0xE5, 0x41]) == "\u{4E2D}\u{6587}A")
+        // An astral HKSCS ideograph (pointer 947 -> U+27267).
+        try #expect(decoded("big5-hkscs", [0x87, 0x45]) == "\u{27267}")
+        // A two-codepoint pointer (1133 -> U+00CA U+0304, the base letter plus a macron).
+        try #expect(decoded("csbig5", [0x88, 0x62]) == "\u{00CA}\u{0304}")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А

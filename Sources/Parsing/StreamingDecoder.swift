@@ -42,11 +42,19 @@ extension PureXML.Parsing {
             case .utf16LittleEndian: nextUTF16(bigEndian: false)
             case .utf32BigEndian: nextUTF32(bigEndian: true)
             case .utf32LittleEndian: nextUTF32(bigEndian: false)
+            default: nextCJK(encoding)
+            }
+        }
+
+        /// Streams one character from a multi-byte CJK encoding.
+        private mutating func nextCJK(_ encoding: InputEncoding) -> Character? {
+            switch encoding {
             case .shiftJIS: nextShiftJIS()
             case .eucJP: nextEUCJP()
             case .eucKR: nextEUCKR()
             case .gbk: nextGBK()
             case .gb18030: nextGB18030()
+            case .big5: nextBig5()
             default: nextUTF8()
             }
         }
@@ -88,6 +96,24 @@ extension PureXML.Parsing {
                 return PureXML.Parsing.ByteDecoder.GB18030.rangeScalar(pointer).map(Character.init) ?? Self.replacement
             }
             return PureXML.Parsing.ByteDecoder.GBK.twoByteScalar(lead: lead, trail: second).map(Character.init) ?? Self.replacement
+        }
+
+        /// Streams one Big5 character: ASCII, or a lead+trail through the index
+        /// (a two-scalar combining sequence stays one grapheme, one `Character`).
+        private mutating func nextBig5() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if lead <= 0x7F { return Character(Unicode.Scalar(lead)) }
+            guard (0x81 ... 0xFE).contains(lead) else { return Self.replacement }
+            guard let trail = nextByte() else { finished = true
+                return Self.replacement
+            }
+            guard let sequence = PureXML.Parsing.ByteDecoder.Big5.mapping(lead: lead, trail: trail) else {
+                return Self.replacement
+            }
+            return Character(String(String.UnicodeScalarView(sequence)))
         }
 
         /// Streams one EUC-KR character: ASCII, or a lead+trail through CP949.
