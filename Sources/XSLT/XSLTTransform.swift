@@ -17,8 +17,26 @@ public extension PureXML.XSLT {
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         if sheet.output.method == "text" { return textValue(of: result) }
-        if sheet.output.method == "html" { return PureXML.HTML.serialize(result) }
-        return PureXML.serialize(result, options: options.applying(sheet.output))
+        let body = sheet.output.method == "html"
+            ? PureXML.HTML.serialize(result)
+            : PureXML.serialize(result, options: options.applying(sheet.output))
+        return doctype(for: result, sheet.output) + body
+    }
+
+    /// The `<!DOCTYPE …>` prologue for the result's root element when the output
+    /// declares `doctype-system` (optionally with `doctype-public`), else empty.
+    private static func doctype(for result: PureXML.Model.Node, _ output: Output) -> String {
+        guard let system = output.doctypeSystem, let name = rootName(of: result) else { return "" }
+        let external = output.doctypePublic.map { "PUBLIC \"\($0)\" \"\(system)\"" } ?? "SYSTEM \"\(system)\""
+        return "<!DOCTYPE \(name) \(external)>\n"
+    }
+
+    private static func rootName(of node: PureXML.Model.Node) -> String? {
+        switch node {
+        case let .element(element): element.name.description
+        case let .document(children): children.compactMap(\.element).first?.name.description
+        default: nil
+        }
     }
 
     /// Transforms `source` with `stylesheet`, returning the result tree.

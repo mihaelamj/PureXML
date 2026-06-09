@@ -98,6 +98,10 @@ public extension PureXML.XSLT {
         public var encoding: String?
         public var version: String?
         public var standalone: Bool?
+        /// The `doctype-public` / `doctype-system` identifiers: when either is set,
+        /// a `<!DOCTYPE>` for the result's root element is emitted before it.
+        public var doctypePublic: String?
+        public var doctypeSystem: String?
 
         public init(
             method: String? = nil,
@@ -106,6 +110,8 @@ public extension PureXML.XSLT {
             encoding: String? = nil,
             version: String? = nil,
             standalone: Bool? = nil,
+            doctypePublic: String? = nil,
+            doctypeSystem: String? = nil,
         ) {
             self.method = method
             self.indent = indent
@@ -113,6 +119,8 @@ public extension PureXML.XSLT {
             self.encoding = encoding
             self.version = version
             self.standalone = standalone
+            self.doctypePublic = doctypePublic
+            self.doctypeSystem = doctypeSystem
         }
 
         /// This output's settings with `other`'s non-nil settings layered over them.
@@ -124,6 +132,8 @@ public extension PureXML.XSLT {
                 encoding: other.encoding ?? encoding,
                 version: other.version ?? version,
                 standalone: other.standalone ?? standalone,
+                doctypePublic: other.doctypePublic ?? doctypePublic,
+                doctypeSystem: other.doctypeSystem ?? doctypeSystem,
             )
         }
     }
