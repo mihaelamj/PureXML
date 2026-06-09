@@ -49,4 +49,20 @@ struct HTMLForeignContentTests {
         #expect(find("rect", in: html)?.name.namespaceURI == svg)
         #expect(find("p", in: html)?.name.namespaceURI == nil)
     }
+
+    @Test("SVG element names are restored to their canonical camel case")
+    func test_svgNameCaseAdjustment() {
+        let html = "<svg><foreignObject></foreignObject><lineargradient></lineargradient></svg>"
+        #expect(find("foreignObject", in: html)?.name.namespaceURI == svg)
+        #expect(find("linearGradient", in: html)?.name.namespaceURI == svg)
+        // The lowercased forms the tokenizer produced are not what landed in the tree.
+        #expect(find("foreignobject", in: html) == nil)
+    }
+
+    @Test("A same-named HTML element keeps its lowercased name")
+    func test_htmlNameNotAdjusted() {
+        // Outside SVG, no case adjustment applies.
+        #expect(find("clippath", in: "<clippath></clippath>")?.name.namespaceURI == nil)
+        #expect(find("clipPath", in: "<clippath></clippath>") == nil)
+    }
 }

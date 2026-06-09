@@ -201,9 +201,12 @@ private final class HTMLDocument {
     }
 
     /// A qualified name carrying its foreign-content namespace URI, so an SVG or
-    /// MathML element is distinguishable from same-named HTML.
+    /// MathML element is distinguishable from same-named HTML. SVG element names
+    /// are restored to their canonical camel case (`foreignObject`, not the
+    /// tokenizer's lowercased `foreignobject`).
     private func qualifiedName(_ name: String, _ namespace: String?) -> PureXML.Model.QualifiedName {
-        PureXML.Model.QualifiedName(prefix: nil, localName: name, namespaceURI: namespace)
+        let local = namespace == ForeignNamespace.svg ? (PureXML.HTML.ForeignNames.svgElements[name] ?? name) : name
+        return PureXML.Model.QualifiedName(prefix: nil, localName: local, namespaceURI: namespace)
     }
 
     /// HTML table tree construction: a `<tr>` inside a bare `<table>` gets an
