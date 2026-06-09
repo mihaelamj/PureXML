@@ -28,6 +28,20 @@ public extension PureXML.Schema {
             return RelaxNGEngine(defines: defines).matches(start: start, root: .element(root))
         }
 
+        /// Whether `xml` is valid against the schema, validated while it is pulled
+        /// event by event (the libxml2 `xmlTextReader` model) rather than over a
+        /// built tree. The Brzozowski derivative is itself incremental, so only the
+        /// residual pattern and a light per-element whitespace frame are retained.
+        public func validate(streaming xml: String, limits: PureXML.Parsing.Limits = .default) throws -> Bool {
+            let engine = RelaxNGEngine(defines: defines)
+            var state = engine.streamingStart(start)
+            var reader = PureXML.Parsing.EventReader(xml, limits: limits)
+            while let event = try reader.next() {
+                engine.streamingConsume(event, into: &state)
+            }
+            return engine.streamingValid(state)
+        }
+
         /// Every way `xml` fails the schema, as located errors with recovery hints,
         /// so an editor can show all of a faulty document's problems at once rather
         /// than only the first. An empty array means the document is valid.

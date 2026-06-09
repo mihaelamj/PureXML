@@ -263,3 +263,72 @@ extension PureXML.Schema.RelaxNGEngine {
         return counts
     }
 }
+
+/// One open element while streaming a RELAX NG derivative: whether it has had an
+/// element child yet, and the text buffered since the last structural event. The
+/// `after`-threaded pattern is the validation stack; this frame only carries the
+/// bookkeeping `childrenDeriv` needs to treat ignorable whitespace correctly.
+private struct RelaxNGStreamFrame {
+    var hadElementChild = false
+    var pendingText = ""
+}
+
+public extension PureXML.Schema {
+    /// The residual derivative plus per-element whitespace bookkeeping carried
+    /// across the events of a streamed RELAX NG validation.
+    struct RelaxNGStreamingState {
+        var current: PureXML.Schema.Pattern
+        fileprivate var frames: [RelaxNGStreamFrame]
+    }
+}
+
+extension PureXML.Schema.RelaxNGEngine {
+    /// The initial streaming state for a start pattern, with a document-level frame.
+    func streamingStart(_ start: PureXML.Schema.Pattern) -> PureXML.Schema.RelaxNGStreamingState {
+        PureXML.Schema.RelaxNGStreamingState(current: start, frames: [RelaxNGStreamFrame()])
+    }
+
+    /// Derives the state by one parse event, the streaming form of `childDeriv`.
+    /// Text is buffered and applied at structural boundaries so ignorable
+    /// whitespace is treated exactly as the tree walk's `childrenDeriv` does.
+    func streamingConsume(_ event: PureXML.Parsing.Event, into state: inout PureXML.Schema.RelaxNGStreamingState) {
+        switch event {
+        case let .startElement(name, attributes):
+            flushText(&state, closing: false)
+            if !state.frames.isEmpty { state.frames[state.frames.count - 1].hadElementChild = true }
+            let opened = startTagOpenDeriv(state.current, name)
+            let attributed = attributes
+                .filter { !Self.isNamespaceDeclaration($0) }
+                .reduce(opened) { attributeDeriv($0, $1) }
+            state.current = startTagCloseDeriv(attributed)
+            state.frames.append(RelaxNGStreamFrame())
+        case let .characters(text), let .cdata(text):
+            if !state.frames.isEmpty { state.frames[state.frames.count - 1].pendingText += text }
+        case .endElement:
+            flushText(&state, closing: true)
+            state.current = endTagDeriv(state.current)
+            if !state.frames.isEmpty { state.frames.removeLast() }
+        case .comment, .processingInstruction:
+            break
+        }
+    }
+
+    /// Whether the streamed document satisfied the schema (the residual is nullable).
+    func streamingValid(_ state: PureXML.Schema.RelaxNGStreamingState) -> Bool {
+        nullable(state.current)
+    }
+
+    private func flushText(_ state: inout PureXML.Schema.RelaxNGStreamingState, closing: Bool) {
+        guard let index = state.frames.indices.last else { return }
+        let text = state.frames[index].pendingText
+        guard !text.isEmpty else { return }
+        state.frames[index].pendingText = ""
+        if !Self.isWhitespace(text) {
+            state.current = textDeriv(state.current, text)
+        } else if closing, !state.frames[index].hadElementChild {
+            // A lone whitespace text child is optional, the `childrenDeriv` rule.
+            state.current = choice(state.current, textDeriv(state.current, text))
+        }
+        // Whitespace among element siblings is ignorable and skipped.
+    }
+}
