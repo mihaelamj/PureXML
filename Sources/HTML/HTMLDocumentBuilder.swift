@@ -28,8 +28,9 @@ private enum InsertionMode {
 
 /// Builds a full HTML document from tokens by driving the HTML5 insertion modes,
 /// materializing the implied `html`/`head`/`body` and routing head-only elements
-/// into the head. File-scope and private.
-private final class HTMLDocument {
+/// into the head. The adoption agency lives in a sibling file, so this type is
+/// internal (its members stay private except the live-body state it shares).
+final class HTMLDocument {
     typealias Token = PureXML.HTML.Token
     typealias Node = PureXML.Model.Node
     typealias Attribute = PureXML.Model.Attribute
@@ -50,8 +51,11 @@ private final class HTMLDocument {
     /// of currently-open elements into that tree, with the body element at the
     /// bottom. This lets the adoption agency reparent already-built subtrees, which
     /// a pop-on-close model cannot.
-    private let bodyRoot = PureXML.Model.TreeNode.element("body")
-    private lazy var openBody: [PureXML.Model.TreeNode] = [bodyRoot]
+    let bodyRoot = PureXML.Model.TreeNode.element("body")
+    lazy var openBody: [PureXML.Model.TreeNode] = [bodyRoot]
+    /// The active formatting elements (the HTML5 list), with nil entries acting as
+    /// scope markers. Drives reconstruction and the adoption agency.
+    var activeFormatting: [PureXML.Model.TreeNode?] = []
 
     func build(_ tokens: [Token]) -> Node {
         for token in tokens {
@@ -159,10 +163,15 @@ private final class HTMLDocument {
     private func processInBody(_ token: Token) {
         switch token {
         case let .startTag(name, attributes, selfClosing):
+            reconstructActiveFormatting()
             bodyOpen(name, attributes, selfClosing: selfClosing)
+            noteOpenedFormatting(name, selfClosing: selfClosing)
+        case let .endTag(name) where isFormatting(name):
+            adoptionAgency(name)
         case let .endTag(name) where name != "body" && name != "html":
             bodyClose(name)
         case let .text(value):
+            reconstructActiveFormatting()
             bodyInsert(.text(value))
         case let .comment(value):
             bodyInsert(.comment(value))
@@ -171,11 +180,18 @@ private final class HTMLDocument {
         }
     }
 
+    /// After opening a start tag, records it on the active-formatting list when it
+    /// is a formatting element (so misnesting can be recovered later).
+    private func noteOpenedFormatting(_ name: String, selfClosing: Bool) {
+        guard isFormatting(name), !selfClosing, !PureXML.HTML.Elements.void.contains(name), let opened = openBody.last else { return }
+        activeFormatting.append(opened)
+    }
+
     // MARK: Body building (live mutable tree)
 
     /// The lowercased tag name of an open element, for case-insensitive stack
     /// matching (an SVG element's canonical camel case folds back to the token).
-    private func tagName(_ node: PureXML.Model.TreeNode) -> String {
+    func tagName(_ node: PureXML.Model.TreeNode) -> String {
         node.name?.localName.lowercased() ?? ""
     }
 
@@ -194,7 +210,7 @@ private final class HTMLDocument {
         }
     }
 
-    private func bodyClose(_ name: String) {
+    func bodyClose(_ name: String) {
         guard let index = openBody.lastIndex(where: { tagName($0) == name }), index >= 1 else { return }
         openBody.removeLast(openBody.count - index)
     }
