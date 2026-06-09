@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- XSLT `key()` over a node-set second argument (#82). `key(name, node-set)` (including `key('k', .)`) now unions the matches for every node's string value and de-duplicates, rather than using only the first node's string value.
 - XSLT `method="html"` output (#82). An `xsl:output method="html"` result is now serialized by the HTML rules (void elements like `<br>` emitted without a self-closing slash, raw-text elements like `<script>`/`<style>` left unescaped) instead of as XML.
 - XSLT `xsl:sort case-order` (#82). When `case-order="upper-first"`/`"lower-first"` is set, the sort comparison is case-insensitive with the case used only to break ties among otherwise-equal strings; without it the default codepoint order is kept.
 - XSLT functions `generate-id`, `system-property`, `element-available`,

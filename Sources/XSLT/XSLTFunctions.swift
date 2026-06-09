@@ -114,8 +114,21 @@ extension PureXML.XSLT {
                 }
                 .adding("key") { arguments, _ in
                     let name = arguments.first?.string ?? ""
-                    let value = arguments.count > 1 ? arguments[1].string : ""
-                    return .nodeSet((keys[name]?[value] ?? []).map { .tree($0) })
+                    guard arguments.count > 1 else { return .nodeSet([]) }
+                    // A node-set second argument unions the matches for each node's
+                    // string value; any other value is used directly as a string.
+                    let values: [String] = if let nodes = arguments[1].nodes {
+                        nodes.compactMap(\.treeNode).map(\.stringValue)
+                    } else {
+                        [arguments[1].string]
+                    }
+                    var matched: [PureXML.Model.TreeNode] = []
+                    for value in values {
+                        for node in keys[name]?[value] ?? [] where !matched.contains(where: { $0 === node }) {
+                            matched.append(node)
+                        }
+                    }
+                    return .nodeSet(matched.map { .tree($0) })
                 }
                 .adding("document") { arguments, _ in
                     guard let uri = arguments.first?.string, let text = loader(uri),
