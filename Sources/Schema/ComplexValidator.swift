@@ -1,7 +1,7 @@
 /// File-scope aliases for the XSD complex-type validator, kept out of the
 /// namespace to avoid nesting a type two levels deep.
-private typealias XSDFailure = PureXML.Validation.ValidationError
-private typealias XSDPath = [PureXML.Validation.PathKey]
+typealias XSDFailure = PureXML.Validation.ValidationError
+typealias XSDPath = [PureXML.Validation.PathKey]
 private typealias XSDGroup = PureXML.Schema.Group
 private typealias XSDTerm = PureXML.Schema.Term
 private typealias XSDTermLabel = PureXML.Schema.TermLabel
@@ -65,7 +65,7 @@ public extension PureXML.Schema {
         /// The errors from an `xsi:nil="true"` element: rejecting it when the
         /// element is not nillable, or when it carries content. Returns nil when
         /// the element is not nilled.
-        private func nilErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure]? {
+        func nilErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure]? {
             guard Self.isNil(element) else { return nil }
             let name = element.name.localName
             if !nillableElements.contains(name) {
@@ -79,7 +79,7 @@ public extension PureXML.Schema {
 
         /// The error from a `fixed` element value constraint: the element's text
         /// must equal the fixed value.
-        private func elementFixedErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure] {
+        func elementFixedErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure] {
             guard let fixed = elementConstraints[element.name.localName]?.fixedValue else { return [] }
             let text = Self.textContent(element)
             return text == fixed ? [] : [XSDFailure(reason: "element '\(element.name.localName)' is fixed and must be '\(fixed)'", at: path)]
@@ -99,7 +99,7 @@ public extension PureXML.Schema {
 
         // MARK: Attributes
 
-        private func validateAttributes(
+        func validateAttributes(
             _ element: PureXML.Model.Element,
             _ type: ComplexType,
             at path: XSDPath,
@@ -153,7 +153,7 @@ public extension PureXML.Schema {
             }
         }
 
-        private func rejectText(_ element: PureXML.Model.Element, at path: XSDPath, into errors: inout [XSDFailure]) {
+        func rejectText(_ element: PureXML.Model.Element, at path: XSDPath, into errors: inout [XSDFailure]) {
             guard !Self.textContent(element).isEmpty else { return }
             errors.append(XSDFailure(reason: "element must not contain text", at: path))
         }
@@ -279,7 +279,7 @@ public extension PureXML.Schema {
 /// Located content-model diagnostics: pinpoint which child breaks the model and
 /// what was expected there, so an editor shows placed errors with recovery hints
 /// rather than one opaque "content does not match" per element.
-private extension PureXML.Schema.ComplexValidator {
+extension PureXML.Schema.ComplexValidator {
     /// Walks the children through the content automaton, flagging the first child
     /// the follow-set rejects, or the missing content when the sequence ends early.
     func sequenceStructureErrors(_ particle: PureXML.Schema.Particle, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {

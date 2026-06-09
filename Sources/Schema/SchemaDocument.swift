@@ -66,6 +66,33 @@ public extension PureXML.Schema {
             try validate(PureXML.parse(xml))
         }
 
+        /// Validates `xml` against the schema while it is pulled event by event (the
+        /// libxml2 `xmlTextReader` model) rather than over a built tree. Memory is
+        /// bounded to the open-element stack. Content models, attributes, and simple
+        /// content are checked; document-scoped identity constraints (which need the
+        /// whole tree) stay on ``validate(_:)-(String)``.
+        public func validate(streaming xml: String, limits: PureXML.Parsing.Limits = .default) throws -> [PureXML.Validation.ValidationError] {
+            let validator = PureXML.Schema.ComplexValidator(
+                types: types,
+                nillableElements: nillableElements,
+                elementConstraints: elementConstraints,
+                abstractTypes: abstractTypes,
+                typeBlock: typeBlock,
+                typeDerivation: typeDerivation,
+            )
+            var driver = PureXML.Validation.StreamingXSDValidator(
+                validator: validator,
+                rootElements: elements,
+                abstractElements: abstractElements,
+                targetNamespace: targetNamespace,
+            )
+            var reader = PureXML.Parsing.EventReader(xml, limits: limits)
+            while let event = try reader.next() {
+                driver.consume(event)
+            }
+            return driver.finish()
+        }
+
         /// Validates an already-parsed node tree, so a caller can validate the same
         /// (possibly recovered) tree it is editing. See ``validate(_:)-(String)``.
         public func validate(_ node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {

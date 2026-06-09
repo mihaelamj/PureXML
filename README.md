@@ -86,7 +86,7 @@ flowchart TB
   Epic74 --> Done
   Epic105["#105 remaining libxml2 parity frontier"]:::epic
   OutEnc["#106 output encodings: complete"]:::done
-  StreamVal["#107 streaming validation: DTD and RELAX NG done; XSD remains"]:::todo
+  StreamVal["#107 streaming validation: DTD, RELAX NG, XSD"]:::done
   MoreEnc["#108 encodings: ISO-2022-JP done; EUC-TW remains"]:::todo
   Depth["Tier 2 conformance corpora; Tier 3 EXSLT, DTD PE depth, C14N 1.1; frontier #104"]:::todo
   Epic105 --> OutEnc
@@ -99,7 +99,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **786 tests in 120 suites** (`swift test`).
+currently runs **788 tests in 121 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
