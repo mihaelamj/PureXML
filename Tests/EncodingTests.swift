@@ -170,6 +170,18 @@ struct EncodingTests {
         try #expect(decoded("gb2312", [0xD6, 0xD0]) == "\u{4E2D}") // GB2312 alias
     }
 
+    @Test("Decodes GB18030: two-byte pairs plus the four-byte and astral ranges")
+    func test_gb18030() throws {
+        // 中 (0xD6D0) shares the GBK two-byte range; 0x80 = euro.
+        try #expect(decoded("GB18030", [0xD6, 0xD0, 0x80]) == "\u{4E2D}\u{20AC}")
+        // Four-byte sequences: ptr 36 = ¥ (U+00A5), ptr 0 = U+0080.
+        try #expect(decoded("gb18030", [0x81, 0x30, 0x84, 0x36]) == "\u{00A5}")
+        try #expect(decoded("gb-18030", [0x81, 0x30, 0x81, 0x30]) == "\u{0080}")
+        // The astral ranges: ptr 189000 -> U+10000, ptr 254536 -> U+20000.
+        try #expect(decoded("GB18030", [0x90, 0x30, 0x81, 0x30]) == "\u{10000}")
+        try #expect(decoded("GB18030", [0x95, 0x32, 0x82, 0x36]) == "\u{20000}")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А

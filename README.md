@@ -88,7 +88,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **763 tests in 117 suites** (`swift test`).
+currently runs **764 tests in 117 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
@@ -163,7 +163,7 @@ under epic **#71** (and its parser-breadth sub-epic **#74**):
 | XSLT 1.0 breadth | #81 #82 | Missing top-level elements and functions, html output |
 | HTML5 | #83 #84 | Full tree construction, tokenizer states, entity table |
 | C14N | #85 | Node-subset canonicalization, `xml:*` inheritance, 2.0 prefix rewrite |
-| Legacy encodings | #97 #99 | Single-byte and CJK multi-byte to-Unicode tables |
+| Legacy encodings | #97 #99 #102 | Single-byte, CJK multi-byte, and full GB18030 to-Unicode tables |
 | Validator decomposition | #101 | Inner XSD/DTD validators as composable rules |
 | Partial follow-ups | #79 #80 #86 #87 #88 #90 #91 | Remaining bullets on already-advanced areas |
 

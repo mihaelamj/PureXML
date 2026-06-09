@@ -46,6 +46,7 @@ extension PureXML.Parsing {
             case .eucJP: nextEUCJP()
             case .eucKR: nextEUCKR()
             case .gbk: nextGBK()
+            case .gb18030: nextGB18030()
             default: nextUTF8()
             }
         }
@@ -63,6 +64,30 @@ extension PureXML.Parsing {
                 return Self.replacement
             }
             return PureXML.Parsing.ByteDecoder.GBK.twoByteScalar(lead: lead, trail: trail).map(Character.init) ?? Self.replacement
+        }
+
+        /// Streams one GB18030 character: ASCII, `0x80` (euro), a four-byte
+        /// sequence when the lead is followed by a digit, or a two-byte GBK pair.
+        private mutating func nextGB18030() -> Character? {
+            guard let lead = nextByte() else {
+                finished = true
+                return nil
+            }
+            if lead <= 0x7F { return Character(Unicode.Scalar(lead)) }
+            if lead == 0x80 { return "\u{20AC}" }
+            guard (0x81 ... 0xFE).contains(lead) else { return Self.replacement }
+            guard let second = nextByte() else { finished = true
+                return Self.replacement
+            }
+            if (0x30 ... 0x39).contains(second) {
+                guard let third = nextByte(), let fourth = nextByte() else { finished = true
+                    return Self.replacement
+                }
+                guard (0x81 ... 0xFE).contains(third), (0x30 ... 0x39).contains(fourth) else { return Self.replacement }
+                let pointer = PureXML.Parsing.ByteDecoder.GB18030.fourBytePointer(lead, second, third, fourth)
+                return PureXML.Parsing.ByteDecoder.GB18030.rangeScalar(pointer).map(Character.init) ?? Self.replacement
+            }
+            return PureXML.Parsing.ByteDecoder.GBK.twoByteScalar(lead: lead, trail: second).map(Character.init) ?? Self.replacement
         }
 
         /// Streams one EUC-KR character: ASCII, or a lead+trail through CP949.
