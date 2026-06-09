@@ -69,7 +69,9 @@ The original epics, the documented-subset parity work (#61), the validation
 framework and recovering reader (#92), and the editor-integration layer (#94)
 are all shipped (summarized above). The beyond-parity libxml2 conformance audit
 (#71) and its parser-breadth sub-epic (#74) are now **complete**: every depth gap
-the audit surfaced is closed in main.
+the audit surfaced is closed in main. The remaining distance to full libxml2
+parity is tracked under epic **#105**: a few concrete features (output encodings,
+streaming validation, the last encodings) plus conformance-corpus depth.
 
 ```mermaid
 flowchart TB
@@ -79,9 +81,18 @@ flowchart TB
   classDef todo fill:#f2f4f7,stroke:#8e8e93,color:#111827
   Epic71["#71 beyond-parity libxml2 audit: complete"]:::epic
   Epic74["#74 parser-breadth sub-epic: complete"]:::epic
-  Done["All children closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 tree construction #83, HTML entities #84, single-byte encodings #97, CJK encodings #99"]:::done
+  Done["All audit children closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 #83 #84, encodings #97 #99 #102 #103"]:::done
   Epic71 --> Done
   Epic74 --> Done
+  Epic105["#105 remaining libxml2 parity frontier"]:::epic
+  OutEnc["#106 output encodings"]:::todo
+  StreamVal["#107 streaming validation"]:::todo
+  MoreEnc["#108 ISO-2022-JP, EUC-TW"]:::todo
+  Depth["Tier 2 conformance corpora; Tier 3 EXSLT, DTD PE depth, C14N 1.1; frontier #104"]:::todo
+  Epic105 --> OutEnc
+  Epic105 --> StreamVal
+  Epic105 --> MoreEnc
+  Epic105 --> Depth
 ```
 
 ## Status
