@@ -167,6 +167,7 @@ extension PureXML.XSLT {
                 standalone: XSLTNode.attribute(node, "standalone").map { $0 == "yes" },
                 doctypePublic: XSLTNode.attribute(node, "doctype-public"),
                 doctypeSystem: XSLTNode.attribute(node, "doctype-system"),
+                cdataSectionElements: Set((XSLTNode.attribute(node, "cdata-section-elements") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)),
             )
         }
 

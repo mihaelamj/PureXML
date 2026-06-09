@@ -102,6 +102,8 @@ public extension PureXML.XSLT {
         /// a `<!DOCTYPE>` for the result's root element is emitted before it.
         public var doctypePublic: String?
         public var doctypeSystem: String?
+        /// Element names whose text content is emitted in `<![CDATA[…]]>` sections.
+        public var cdataSectionElements: Set<String>
 
         public init(
             method: String? = nil,
@@ -112,6 +114,7 @@ public extension PureXML.XSLT {
             standalone: Bool? = nil,
             doctypePublic: String? = nil,
             doctypeSystem: String? = nil,
+            cdataSectionElements: Set<String> = [],
         ) {
             self.method = method
             self.indent = indent
@@ -121,6 +124,7 @@ public extension PureXML.XSLT {
             self.standalone = standalone
             self.doctypePublic = doctypePublic
             self.doctypeSystem = doctypeSystem
+            self.cdataSectionElements = cdataSectionElements
         }
 
         /// This output's settings with `other`'s non-nil settings layered over them.
@@ -134,6 +138,7 @@ public extension PureXML.XSLT {
                 standalone: other.standalone ?? standalone,
                 doctypePublic: other.doctypePublic ?? doctypePublic,
                 doctypeSystem: other.doctypeSystem ?? doctypeSystem,
+                cdataSectionElements: cdataSectionElements.union(other.cdataSectionElements),
             )
         }
     }
