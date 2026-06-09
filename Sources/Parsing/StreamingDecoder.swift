@@ -57,6 +57,7 @@ extension PureXML.Parsing {
             case .gb18030: nextGB18030()
             case .big5: nextBig5()
             case .iso2022jp: nextISO2022JP()
+            case .eucTW: nextEUCTW()
             default: nextUTF8()
             }
         }

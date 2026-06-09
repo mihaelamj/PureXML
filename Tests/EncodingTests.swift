@@ -233,6 +233,18 @@ struct EncodingTests {
         try #expect(decoded("ISO-2022-JP", [0x48, 0x69]) == "Hi")
     }
 
+    @Test("Decodes EUC-TW (CNS 11643): plane 1 two-byte and four-byte, and plane 2")
+    func test_eucTW() throws {
+        // § (U+00A7) in plane 1, as a two-byte pair and as the four-byte plane-1 form.
+        try #expect(decoded("EUC-TW", [0xA1, 0xF0]) == "\u{00A7}")
+        try #expect(decoded("euc-tw", [0x8E, 0xA1, 0xA1, 0xF0]) == "\u{00A7}")
+        // 万 (U+4E07) in plane 2, four-byte.
+        try #expect(decoded("EUC-TW", [0x8E, 0xA2, 0xA1, 0xA6]) == "\u{4E07}")
+        // Streaming agrees with whole-buffer for the four-byte plane-2 form.
+        let bytes = Array("<?xml version=\"1.0\" encoding=\"EUC-TW\"?><r>".utf8) + [0x8E, 0xA2, 0xA1, 0xA6] + Array("</r>".utf8)
+        try #expect(rootText(PureXML.parse(pullingBytes: byteSource(bytes))) == "\u{4E07}")
+    }
+
     @Test("Decodes ISO-8859-5: the Cyrillic block")
     func test_iso8859_5() throws {
         try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
