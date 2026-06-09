@@ -16,6 +16,11 @@ public extension PureXML.Parsing {
         case latin4 // ISO-8859-4
         case greek // ISO-8859-7
         case latin7 // ISO-8859-13
+        case arabic // ISO-8859-6
+        case hebrew // ISO-8859-8
+        case latin6 // ISO-8859-10
+        case latin8 // ISO-8859-14
+        case latin10 // ISO-8859-16
         case latinCyrillic // ISO-8859-5
         case latin5 // ISO-8859-9 (Turkish)
         case latin9 // ISO-8859-15

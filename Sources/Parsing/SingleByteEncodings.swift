@@ -85,6 +85,26 @@ extension PureXML.Parsing.ByteDecoder {
             upperHalf(byte, latin7Upper)
         }
 
+        static func iso8859_6(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, arabicUpper)
+        }
+
+        static func iso8859_8(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, hebrewUpper)
+        }
+
+        static func iso8859_10(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin6Upper)
+        }
+
+        static func iso8859_14(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin8Upper)
+        }
+
+        static func iso8859_16(_ byte: UInt8) -> Unicode.Scalar {
+            upperHalf(byte, latin10Upper)
+        }
+
         /// Maps a byte through a 96-entry upper-half table (`0xA0`-`0xFF`); bytes
         /// below `0xA0` are ASCII or C1 controls (identity). Used by the encodings
         /// whose upper half is vendored from the Unicode mapping files.

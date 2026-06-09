@@ -119,6 +119,11 @@ struct EncodingTests {
         try #expect(decoded("ISO-8859-7", [0xA4]) == "\u{20AC}") // €
         try #expect(decoded("ISO-8859-13", [0xA8]) == "\u{00D8}") // Ø
         try #expect(decoded("ISO-8859-13", [0xC0]) == "\u{0104}") // Ą
+        try #expect(decoded("ISO-8859-6", [0xC7]) == "\u{0627}") // ا (Arabic alef)
+        try #expect(decoded("ISO-8859-8", [0xE0]) == "\u{05D0}") // א (Hebrew alef)
+        try #expect(decoded("ISO-8859-10", [0xFF]) == "\u{0138}") // ĸ
+        try #expect(decoded("ISO-8859-14", [0xA1]) == "\u{1E02}") // Ḃ
+        try #expect(decoded("ISO-8859-16", [0xAA]) == "\u{0218}") // Ș
     }
 
     @Test("Decodes ISO-8859-5: the Cyrillic block")
