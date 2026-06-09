@@ -79,6 +79,34 @@ struct EncodingTests {
         try #expect(rootText(PureXML.parse(bytes: bytes)) == "\u{20AC}")
     }
 
+    private func decoded(_ encoding: String, _ high: [UInt8]) throws -> String? {
+        var bytes = Array("<?xml version=\"1.0\" encoding=\"\(encoding)\"?><r>".utf8)
+        bytes += high
+        bytes += Array("</r>".utf8)
+        return try rootText(PureXML.parse(bytes: bytes))
+    }
+
+    @Test("Decodes ISO-8859-15: euro and the Latin-9 substitutions")
+    func test_iso8859_15() throws {
+        try #expect(decoded("ISO-8859-15", [0xA4]) == "\u{20AC}") // €
+        try #expect(decoded("ISO-8859-15", [0xBD]) == "\u{0153}") // œ
+        try #expect(decoded("ISO-8859-15", [0xE9]) == "\u{E9}") // é, unchanged from Latin-1
+    }
+
+    @Test("Decodes ISO-8859-9: the Turkish letters")
+    func test_iso8859_9() throws {
+        try #expect(decoded("ISO-8859-9", [0xDD]) == "\u{0130}") // İ
+        try #expect(decoded("ISO-8859-9", [0xFE]) == "\u{015F}") // ş
+        try #expect(decoded("ISO-8859-9", [0xE9]) == "\u{E9}") // é, unchanged from Latin-1
+    }
+
+    @Test("Decodes ISO-8859-5: the Cyrillic block")
+    func test_iso8859_5() throws {
+        try #expect(decoded("ISO-8859-5", [0xB0]) == "\u{0410}") // А
+        try #expect(decoded("ISO-8859-5", [0xE0]) == "\u{0440}") // р
+        try #expect(decoded("ISO-8859-5", [0xF0]) == "\u{2116}") // №
+    }
+
     private func byteSource(_ bytes: [UInt8]) -> () -> UInt8? {
         var index = 0
         return {

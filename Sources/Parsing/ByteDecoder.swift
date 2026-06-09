@@ -13,21 +13,28 @@ extension PureXML.Parsing {
                 encoding = declared
             }
             let body = bytes.dropFirst(bomLength)
+            if let map = Self.singleByteMap(encoding) {
+                return String(String.UnicodeScalarView(body.map(map)))
+            }
             switch encoding {
-            case .utf8:
-                return String(decoding: body, as: UTF8.self)
-            case .utf16BigEndian:
-                return try decodeUTF16(body, bigEndian: true)
-            case .utf16LittleEndian:
-                return try decodeUTF16(body, bigEndian: false)
-            case .utf32BigEndian:
-                return try decodeUTF32(body, bigEndian: true)
-            case .utf32LittleEndian:
-                return try decodeUTF32(body, bigEndian: false)
-            case .latin1:
-                return String(String.UnicodeScalarView(body.map { Unicode.Scalar($0) }))
-            case .windows1252:
-                return String(String.UnicodeScalarView(body.map { Self.windows1252Scalar($0) }))
+            case .utf16BigEndian: return try decodeUTF16(body, bigEndian: true)
+            case .utf16LittleEndian: return try decodeUTF16(body, bigEndian: false)
+            case .utf32BigEndian: return try decodeUTF32(body, bigEndian: true)
+            case .utf32LittleEndian: return try decodeUTF32(body, bigEndian: false)
+            default: return String(decoding: body, as: UTF8.self)
+            }
+        }
+
+        /// The byte-to-scalar mapping for a single-byte encoding, or nil for the
+        /// Unicode transformation formats.
+        static func singleByteMap(_ encoding: InputEncoding) -> ((UInt8) -> Unicode.Scalar)? {
+            switch encoding {
+            case .latin1: { Unicode.Scalar($0) }
+            case .windows1252: windows1252Scalar
+            case .latinCyrillic: SingleByte.iso8859_5
+            case .latin5: SingleByte.iso8859_9
+            case .latin9: SingleByte.iso8859_15
+            default: nil
             }
         }
 
@@ -83,13 +90,18 @@ extension PureXML.Parsing {
                 name.append(scan[index])
                 index += 1
             }
-            switch String(decoding: name, as: UTF8.self).lowercased() {
-            case "utf-8", "utf8", "us-ascii", "ascii": return .utf8
-            case "iso-8859-1", "latin1", "latin-1", "l1": return .latin1
-            case "windows-1252", "cp1252", "cp-1252": return .windows1252
-            default: return nil
-            }
+            return encodingByName[String(decoding: name, as: UTF8.self).lowercased()]
         }
+
+        /// The declared encoding names PureXML recognizes, mapped to their encoding.
+        private static let encodingByName: [String: InputEncoding] = [
+            "utf-8": .utf8, "utf8": .utf8, "us-ascii": .utf8, "ascii": .utf8,
+            "iso-8859-1": .latin1, "latin1": .latin1, "latin-1": .latin1, "l1": .latin1,
+            "windows-1252": .windows1252, "cp1252": .windows1252, "cp-1252": .windows1252,
+            "iso-8859-5": .latinCyrillic, "iso8859-5": .latinCyrillic, "cyrillic": .latinCyrillic,
+            "iso-8859-9": .latin5, "iso8859-9": .latin5, "latin5": .latin5, "latin-5": .latin5, "l5": .latin5,
+            "iso-8859-15": .latin9, "iso8859-15": .latin9, "latin9": .latin9, "latin-9": .latin9, "l9": .latin9,
+        ]
 
         private static func indexOfSubsequence(_ needle: [UInt8], in haystack: [UInt8]) -> Int? {
             guard !needle.isEmpty, haystack.count >= needle.count else { return nil }

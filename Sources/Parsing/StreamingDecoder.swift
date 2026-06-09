@@ -28,21 +28,15 @@ extension PureXML.Parsing {
             guard !finished, let encoding else {
                 return nil
             }
+            if let map = PureXML.Parsing.ByteDecoder.singleByteMap(encoding) {
+                return nextSingleByte(map)
+            }
             switch encoding {
-            case .utf8:
-                return nextUTF8()
-            case .utf16BigEndian:
-                return nextUTF16(bigEndian: true)
-            case .utf16LittleEndian:
-                return nextUTF16(bigEndian: false)
-            case .utf32BigEndian:
-                return nextUTF32(bigEndian: true)
-            case .utf32LittleEndian:
-                return nextUTF32(bigEndian: false)
-            case .latin1:
-                return nextSingleByte { Unicode.Scalar($0) }
-            case .windows1252:
-                return nextSingleByte(PureXML.Parsing.ByteDecoder.windows1252Scalar)
+            case .utf16BigEndian: return nextUTF16(bigEndian: true)
+            case .utf16LittleEndian: return nextUTF16(bigEndian: false)
+            case .utf32BigEndian: return nextUTF32(bigEndian: true)
+            case .utf32LittleEndian: return nextUTF32(bigEndian: false)
+            default: return nextUTF8()
             }
         }
 
