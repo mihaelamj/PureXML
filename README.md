@@ -125,6 +125,27 @@ currently runs **632 tests in 97 suites** (`swift test`).
   library, eval-time namespace bindings) and XPointer (`element()`, `xpointer()`,
   `xpath1()`, `xmlns()`).
 
+### Consumption modes
+
+You choose how the document is consumed; only the tree mode materializes the whole
+document. The input itself never has to be a whole string: every mode below also
+accepts an incremental character or byte source (`pulling:` / `pullingBytes:`), so
+the engine advances step by step with bounded memory and the bytes are pulled on
+demand. The `String` overloads are a convenience for when you already hold the text.
+
+- **Pull cursor (step by step)**: `events(_:)` / `events(pulling:)` returns an
+  `EventReader`; call `next()` to get one `Event` at a time. `TextReader` is the
+  node cursor (the libxml2 `xmlTextReader` model): `read()` advances to the next
+  node, you inspect it, `read()` again. Bounded state, no tree.
+- **Push / feed**: `PushParser.feed(_:)`/`finish()` accepts the document in
+  arbitrary chunks (a socket, a generator); `events(feeding:)` exposes the same
+  over an `AsyncSequence`. It retains only the current incomplete token and the
+  open-element stack.
+- **SAX**: `parse(_:sax:)` delivers SAX2-style callbacks, no tree.
+- **Tree**: `parse`/`parseTree` build a `Model.Node` / `TreeNode` tree for
+  random access, mutation, validation, XPath, and XSLT. This mode (like libxml2's
+  DOM) holds the whole document, because those operations need the full structure.
+
 ### Safe defaults
 
 By default the parser rejects `<!DOCTYPE>` and refuses every external reference
