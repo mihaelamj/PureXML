@@ -40,14 +40,15 @@ public extension PureXML.Canonical {
                 return canonicalize(subtree.node)
             }
             let ancestorNamespaces = Self.inScopeNamespaces(above: subtree)
-            let inheritedXML = Self.inheritedXMLAttributes(above: subtree, apex: apex)
+            let mergeBase = options.mergeInheritedBase
+            let inheritedXML = Self.inheritedXMLAttributes(above: subtree, apex: apex, mergeBase: mergeBase)
             var output = ""
             switch options.mode {
             case .inclusive:
-                let augmented = Self.augmentedApex(apex, inheritedXML: inheritedXML, mergingNamespaces: ancestorNamespaces)
+                let augmented = Self.augmentedApex(apex, inheritedXML: inheritedXML, mergingNamespaces: ancestorNamespaces, stripApexBase: mergeBase)
                 emit(augmented, inScope: [:], rendered: [:], output: &output)
             case .exclusive:
-                let augmented = Self.augmentedApex(apex, inheritedXML: inheritedXML, mergingNamespaces: nil)
+                let augmented = Self.augmentedApex(apex, inheritedXML: inheritedXML, mergingNamespaces: nil, stripApexBase: mergeBase)
                 emit(augmented, inScope: ancestorNamespaces, rendered: [:], output: &output)
             }
             return output
@@ -187,8 +188,14 @@ public extension PureXML.Canonical {
             _ apex: PureXML.Model.Element,
             inheritedXML: [PureXML.Model.Attribute],
             mergingNamespaces ancestorNamespaces: [String: String]?,
+            stripApexBase: Bool,
         ) -> PureXML.Model.Element {
-            var attributes = apex.attributes + inheritedXML
+            // Under 1.1, the apex's own xml:base is folded into the merged base in
+            // inheritedXML, so drop the original to avoid emitting it twice.
+            let own = stripApexBase
+                ? apex.attributes.filter { !($0.name.prefix == "xml" && $0.name.localName == "base") }
+                : apex.attributes
+            var attributes = own + inheritedXML
             if let ancestorNamespaces {
                 let declared = Set(apex.attributes.map(\.name.description))
                 for (prefix, uri) in ancestorNamespaces {
@@ -216,8 +223,11 @@ public extension PureXML.Canonical {
 
         /// The `xml:*` attributes in scope from a node's omitted ancestors that the
         /// apex does not already set, nearest ancestor winning.
-        private static func inheritedXMLAttributes(above node: PureXML.Model.TreeNode, apex: PureXML.Model.Element) -> [PureXML.Model.Attribute] {
+        private static func inheritedXMLAttributes(above node: PureXML.Model.TreeNode, apex: PureXML.Model.Element, mergeBase: Bool) -> [PureXML.Model.Attribute] {
             let present = Set(apex.attributes.map(\.name.description))
+            if mergeBase { return inherited11XMLAttributes(above: node, apex: apex, present: present) }
+            // Canonical XML 1.0: the nearest of every in-scope xml:* attribute the
+            // apex does not already set.
             var seen: Set<String> = []
             var result: [PureXML.Model.Attribute] = []
             var current = node.parent

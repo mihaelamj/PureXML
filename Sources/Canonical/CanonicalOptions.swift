@@ -59,6 +59,11 @@ public extension PureXML.Canonical {
         /// The Canonical XML 2.0 `QNameAware` labels: attributes or elements whose
         /// value is a QName, so its prefix is rewritten under sequential rewrite.
         public var qnameAwareLabels: [QNameAwareLabel]
+        /// The Canonical XML 1.1 `xml:base` handling: when canonicalizing a document
+        /// subset, the `xml:base` values of omitted ancestors are merged into the
+        /// apex by RFC 3986 reference resolution (rather than 1.0's nearest-wins),
+        /// and `xml:id` is not inherited. Off by default (1.0 behavior).
+        public var mergeInheritedBase: Bool
 
         public init(
             mode: Mode = .inclusive,
@@ -67,6 +72,7 @@ public extension PureXML.Canonical {
             trimTextNodes: Bool = false,
             prefixRewrite: PrefixRewrite = .retain,
             qnameAwareLabels: [QNameAwareLabel] = [],
+            mergeInheritedBase: Bool = false,
         ) {
             self.mode = mode
             self.includeComments = includeComments
@@ -74,6 +80,7 @@ public extension PureXML.Canonical {
             self.trimTextNodes = trimTextNodes
             self.prefixRewrite = prefixRewrite
             self.qnameAwareLabels = qnameAwareLabels
+            self.mergeInheritedBase = mergeInheritedBase
         }
 
         /// Inclusive C14N without comments.
@@ -82,5 +89,8 @@ public extension PureXML.Canonical {
         public static let exclusive = Options(mode: .exclusive)
         /// Canonical XML 2.0 with text-node trimming enabled.
         public static let canonical2 = Options(mode: .inclusive, trimTextNodes: true)
+        /// Canonical XML 1.1: inclusive, with `xml:base` merging on subset apex
+        /// inheritance and no `xml:id` inheritance.
+        public static let canonical11 = Options(mode: .inclusive, mergeInheritedBase: true)
     }
 }

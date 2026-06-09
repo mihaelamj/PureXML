@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Canonical XML 1.1 (#105, Tier 3): a `Canonical.Options.canonical11` preset and a `mergeInheritedBase` option. When canonicalizing a document subset, the `xml:base` values of the apex's omitted ancestors are merged into the apex by RFC 3986 reference resolution (vs. 1.0's nearest-ancestor rule), the apex's own relative `xml:base` is resolved against that chain, and `xml:id` is no longer inherited; `xml:lang` and `xml:space` still inherit the nearest. A self-contained RFC 3986 resolver (scheme/authority/path parsing, path merging, dot-segment removal) backs the merge.
 - Single-byte legacy encodings (#97): the byte decoder gains a table-based single-byte path and the full set of single-byte legacy encodings, selected by the XML declaration's `encoding` name for both the whole-buffer and streaming decoders: the complete ISO-8859 family (parts 2 through 16), Windows-1250/1251/1253/1254/1255/1256/1257/1258, and KOI8-R/U. Most are vendored verbatim from the authoritative `unicode.org` mapping files; ISO-8859-5/9/15 are derived exactly; Windows-1254 composes from Windows-1252. Multi-byte CJK encodings (#99) are tracked separately.
 
 ### Fixed

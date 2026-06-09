@@ -88,7 +88,7 @@ flowchart TB
   OutEnc["#106 output encodings: complete"]:::done
   StreamVal["#107 streaming validation: DTD, RELAX NG, XSD"]:::done
   MoreEnc["#108 encodings: ISO-2022-JP, EUC-TW"]:::done
-  Depth["Tier 2 conformance corpora; Tier 3 EXSLT, DTD PE depth, C14N 1.1; frontier #104"]:::todo
+  Depth["Tier 2 conformance corpora; Tier 3 EXSLT, DTD PE depth (C14N 1.1 done); frontier #104"]:::todo
   Epic105 --> OutEnc
   OutEnc --> StreamVal
   StreamVal --> MoreEnc
@@ -99,7 +99,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **790 tests in 121 suites** (`swift test`).
+currently runs **795 tests in 122 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
