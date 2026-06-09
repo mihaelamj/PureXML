@@ -50,4 +50,15 @@ struct HTMLTokenizerTests {
         #expect(text("<textarea>\nhello</textarea>") == "hello")
         #expect(text("<textarea>\n\nhello</textarea>") == "\nhello")
     }
+
+    @Test("The HTML4 named entity set decodes across its categories")
+    func test_namedEntitySet() {
+        #expect(text("<p>&frac12;&Aacute;&times;</p>") == "\u{BD}\u{C1}\u{D7}") // Latin-1
+        #expect(text("<p>&OElig;&dagger;&mdash;</p>") == "\u{152}\u{2020}\u{2014}") // special
+        #expect(text("<p>&alpha;&Omega;&pi;</p>") == "\u{3B1}\u{3A9}\u{3C0}") // Greek
+        #expect(text("<p>&forall;&sum;&infin;&ne;</p>") == "\u{2200}\u{2211}\u{221E}\u{2260}") // math
+        #expect(text("<p>&larr;&rarr;&hArr;</p>") == "\u{2190}\u{2192}\u{21D4}") // arrows
+        #expect(text("<p>&hearts;&diams;&spades;</p>") == "\u{2665}\u{2666}\u{2660}") // suits
+        #expect(text("<p>&copy &reg</p>") == "\u{A9} \u{AE}") // semicolon-less
+    }
 }
