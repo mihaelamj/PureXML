@@ -62,9 +62,15 @@ public extension PureXML.Canonical {
         ) {
             switch node {
             case let .document(children):
+                // Top-level comments, PIs, and the document element are
+                // separated from one another by single line feeds.
+                var renderings: [String] = []
                 for child in children {
-                    emit(child, inScope: inScope, rendered: rendered, output: &output)
+                    var rendering = ""
+                    emit(child, inScope: inScope, rendered: rendered, output: &rendering)
+                    if !rendering.isEmpty { renderings.append(rendering) }
                 }
+                output += renderings.joined(separator: "\n")
             case let .element(element):
                 emit(element, inScope: inScope, rendered: rendered, output: &output)
             case let .text(value), let .cdata(value):
@@ -120,7 +126,15 @@ public extension PureXML.Canonical {
         ) -> [(String, String)] {
             switch options.mode {
             case .inclusive:
-                declarations.filter { rendered[$0.0] != $0.1 }
+                declarations.filter { prefix, uri in
+                    guard rendered[prefix] != uri else { return false }
+                    // An empty default declaration is superfluous unless a
+                    // non-empty default namespace was rendered above.
+                    if prefix.isEmpty, uri.isEmpty {
+                        return !(rendered[""] ?? "").isEmpty
+                    }
+                    return true
+                }
             case .exclusive:
                 exclusiveNamespaces(element, inScope: inScope, attributes: attributes, rendered: rendered)
             }
@@ -248,38 +262,6 @@ public extension PureXML.Canonical {
             if name.prefix == nil, name.localName == "xmlns" { return "" }
             if name.prefix == "xmlns" { return name.localName }
             return nil
-        }
-
-        // MARK: Escaping
-
-        private static func escapeText(_ value: String) -> String {
-            var result = ""
-            for character in value {
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case ">": result += "&gt;"
-                case "\r": result += "&#xD;"
-                default: result.append(character)
-                }
-            }
-            return result
-        }
-
-        private static func escapeAttribute(_ value: String) -> String {
-            var result = ""
-            for character in value {
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case "\"": result += "&quot;"
-                case "\t": result += "&#x9;"
-                case "\n": result += "&#xA;"
-                case "\r": result += "&#xD;"
-                default: result.append(character)
-                }
-            }
-            return result
         }
     }
 }
