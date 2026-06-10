@@ -285,8 +285,11 @@ struct DTDScanner {
             throw ParseError.invalidAttributeListDeclaration(mark)
         }
         let body = expandParameterReferences(readUntilClose(&reader))
-        guard PureXML.Parsing.DTDAttListGrammar.isValid(body) else {
+        guard let defaults = PureXML.Parsing.DTDAttListGrammar.defaultValues(body) else {
             throw ParseError.invalidAttributeListDeclaration(mark)
+        }
+        for value in defaults {
+            try validateDefaultValueReferences(value, at: mark)
         }
         let trimmed = body.trimmingXMLWhitespace()
         if let existing = doctype.attributeLists[name] {

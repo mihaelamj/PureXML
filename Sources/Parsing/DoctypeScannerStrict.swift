@@ -40,6 +40,9 @@ extension DTDScanner {
             throw ParseError.invalidEntityDeclaration(mark)
         }
         skip(&reader, until: ">")
+        // The replacement-text well-formedness constraint binds at reference
+        // time (an unreferenced entity may carry a bad value), so the reparse
+        // happens in EntityDecoder when the entity is first included.
         storeEntity(name: name, value: expandParameterReferences(value), isParameter: isParameter)
     }
 
@@ -158,6 +161,51 @@ extension DTDScanner {
             guard valid else {
                 throw ParseError.invalidPublicIdentifier(mark)
             }
+        }
+    }
+
+    /// A default attribute value may reference only general entities that are
+    /// already declared and internal: an undeclared, forward-declared, external,
+    /// or unparsed entity in a default is not well-formed, and the referenced
+    /// chain must not recurse.
+    func validateDefaultValueReferences(_ value: String, at mark: Mark) throws {
+        try walkDefaultReferences(value, visiting: [], at: mark)
+    }
+
+    func walkDefaultReferences(_ value: String, visiting: Set<String>, at mark: Mark) throws {
+        let predefined: Set = ["amp", "lt", "gt", "quot", "apos"]
+        let characters = Array(value)
+        var index = 0
+        while index < characters.count {
+            guard characters[index] == "&" else {
+                index += 1
+                continue
+            }
+            var probe = index + 1
+            if probe < characters.count, characters[probe] == "#" {
+                while probe < characters.count, characters[probe] != ";" {
+                    probe += 1
+                }
+                index = probe + 1
+                continue
+            }
+            var name = ""
+            while probe < characters.count, characters[probe] != ";" {
+                name.append(characters[probe])
+                probe += 1
+            }
+            index = probe + 1
+            guard !predefined.contains(name) else { continue }
+            guard !visiting.contains(name) else {
+                throw ParseError.recursiveEntity(name: name, mark)
+            }
+            guard doctype.unparsedEntities[name] == nil, doctype.externalEntities[name] == nil else {
+                throw ParseError.invalidAttributeListDeclaration(mark)
+            }
+            guard let replacement = doctype.entities[name] else {
+                throw ParseError.undefinedEntity(name: name, mark)
+            }
+            try walkDefaultReferences(replacement, visiting: visiting.union([name]), at: mark)
         }
     }
 }

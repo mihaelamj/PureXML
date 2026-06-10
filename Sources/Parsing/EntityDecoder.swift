@@ -44,6 +44,25 @@ private struct EntityExpander {
         var iterator = raw.startIndex
         while iterator < raw.endIndex {
             let character = raw[iterator]
+            // A CDATA section inside replacement text shields its content from
+            // reference recognition: copy it verbatim through the terminator.
+            if character == "<", raw[iterator...].hasPrefix("<![CDATA[") {
+                let openEnd = raw.index(iterator, offsetBy: 9)
+                var end = raw.endIndex
+                var cursor = openEnd
+                while cursor < raw.endIndex {
+                    if raw[cursor...].hasPrefix("]]>") {
+                        end = raw.index(cursor, offsetBy: 3)
+                        break
+                    }
+                    cursor = raw.index(after: cursor)
+                }
+                for verbatim in raw[iterator ..< end] {
+                    try append(verbatim, counts: counts)
+                }
+                iterator = end
+                continue
+            }
             guard character == "&" else {
                 try append(character, counts: counts)
                 iterator = raw.index(after: iterator)
@@ -72,6 +91,13 @@ private struct EntityExpander {
         }
         guard !visiting.contains(body) else {
             throw PureXML.Parsing.ParseError.recursiveEntity(name: body, mark)
+        }
+        // The replacement-text well-formedness constraint binds here, at the
+        // reference: the included text must reparse as balanced content in
+        // isolation (so '&' alone, an incomplete reference, or tags spanning
+        // the entity boundary are rejected on use, not on declaration).
+        if PureXML.Parsing.EntityReplacementGrammar.violation(inValue: replacement) != nil {
+            throw PureXML.Parsing.ParseError.invalidReference("&\(body);", mark)
         }
         // Expanding a declared entity: every produced character now counts against
         // the amplification budget.

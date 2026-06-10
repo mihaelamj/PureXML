@@ -15,24 +15,22 @@ struct W3CXMLSuiteTests {
         ProcessInfo.processInfo.environment["XMLTS_ROOT"]
     }
 
-    /// Cases this implementation knowingly accepts although the suite marks
-    /// them not-well-formed. Two classes remain: deliberate internal-subset
-    /// extensions this package supports as features (conditional sections and
-    /// parameter-entity references in the internal subset: 063, 107, 160-162),
-    /// and entity replacement-text well-formedness (tags spanning entity
-    /// boundaries, references to external/unparsed entities in attribute
-    /// defaults, charref re-scan semantics), tracked in #120. The baseline is
-    /// exact, so any regression in the cases that DO pass is still caught.
+    /// The six cases this implementation knowingly accepts although the suite
+    /// marks them not-well-formed, all deliberate: 063 and 107 (conditional and
+    /// CDATA sections in the internal subset) and 160-162 (parameter-entity
+    /// references in the internal subset) are extensions this package supports
+    /// as features, and 141 expects the 1998 suite's name-character classes
+    /// where this package implements XML 1.0 Fifth Edition's (U+0E5C is a name
+    /// character there). The baseline is exact, so any regression in the 180
+    /// cases that DO pass is still caught.
     private let knownNotWFDeviations: Set<String> = [
-        "063.xml", "074.xml", "078.xml", "079.xml", "080.xml", "082.xml", "084.xml", "090.xml",
-        "092.xml", "103.xml", "107.xml", "115.xml", "116.xml", "117.xml", "119.xml", "120.xml",
-        "140.xml", "141.xml", "153.xml", "160.xml", "161.xml", "162.xml", "180.xml", "182.xml",
+        "063.xml", "107.xml", "141.xml", "160.xml", "161.xml", "162.xml",
     ]
 
     /// valid/sa/114.xml: a CDATA section inside an entity value must protect
     /// the &foo; reference from expansion; the entity decoder expands it
     /// before the CDATA section is recognized. Same hardening track.
-    private let knownValidDeviations: Set<String> = ["114.xml"]
+    private let knownValidDeviations: Set<String> = []
 
     private func files(in directory: String) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: directory)

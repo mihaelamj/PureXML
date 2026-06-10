@@ -12,19 +12,28 @@ extension PureXML.Parsing {
         ]
 
         static func isValid(_ body: String) -> Bool {
+            defaultValues(body) != nil
+        }
+
+        /// The quoted default values of a valid body, or nil when the body does
+        /// not match the grammar. The values feed the entity-reference checks
+        /// the spec puts on attribute defaults.
+        static func defaultValues(_ body: String) -> [String]? {
+            var defaults: [String] = []
             var scanner = AttListScanner(body)
             while !scanner.isAtEnd {
                 // Each definition starts with required whitespace (the body begins
                 // right after the element name).
-                guard scanner.requiredSpace() else { return false }
-                if scanner.isAtEnd { return true } // trailing whitespace
-                guard scanner.name() else { return false }
-                guard scanner.requiredSpace() else { return false }
-                guard attType(&scanner) else { return false }
-                guard scanner.requiredSpace() else { return false }
-                guard defaultDecl(&scanner) else { return false }
+                guard scanner.requiredSpace() else { return nil }
+                if scanner.isAtEnd { return defaults } // trailing whitespace
+                guard scanner.name() else { return nil }
+                guard scanner.requiredSpace() else { return nil }
+                guard attType(&scanner) else { return nil }
+                guard scanner.requiredSpace() else { return nil }
+                guard let value = defaultDecl(&scanner) else { return nil }
+                if let value { defaults.append(value) }
             }
-            return true
+            return defaults
         }
 
         private static func attType(_ scanner: inout AttListScanner) -> Bool {
@@ -40,14 +49,17 @@ extension PureXML.Parsing {
             return false
         }
 
-        private static func defaultDecl(_ scanner: inout AttListScanner) -> Bool {
+        /// nil = malformed; .some(nil) = #REQUIRED/#IMPLIED; .some(value) = a
+        /// (possibly #FIXED) quoted default.
+        private static func defaultDecl(_ scanner: inout AttListScanner) -> String?? {
             if scanner.consumeLiteral("#REQUIRED") || scanner.consumeLiteral("#IMPLIED") {
-                return true
+                return .some(nil)
             }
             if scanner.consumeLiteral("#FIXED") {
-                guard scanner.requiredSpace() else { return false }
+                guard scanner.requiredSpace() else { return nil }
             }
-            return scanner.quotedValue()
+            guard let value = scanner.quotedValue() else { return nil }
+            return .some(value)
         }
     }
 }
@@ -123,13 +135,15 @@ private struct AttListScanner {
         return true
     }
 
-    mutating func quotedValue() -> Bool {
-        guard let quote = peek(), quote == "\"" || quote == "'" else { return false }
+    mutating func quotedValue() -> String? {
+        guard let quote = peek(), quote == "\"" || quote == "'" else { return nil }
         index += 1
+        var value = ""
         while let next = peek(), next != quote {
+            value.append(next)
             index += 1
         }
-        return consume(quote)
+        return consume(quote) ? value : nil
     }
 
     mutating func consumeLiteral(_ literal: String) -> Bool {
