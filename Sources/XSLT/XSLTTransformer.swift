@@ -54,7 +54,7 @@ extension PureXML.XSLT {
         }
 
         func matches(_ node: PureXML.Model.TreeNode, _ pattern: String) -> Bool {
-            matchCache.nodes(matching: pattern, over: root).contains(ObjectIdentifier(node))
+            matchCache.nodes(matching: pattern, over: root, functions: patternFunctions()).contains(ObjectIdentifier(node))
         }
 
         /// Pattern membership for any XPath node kind.
@@ -63,11 +63,23 @@ extension PureXML.XSLT {
             case let .tree(tree):
                 matches(tree, pattern)
             case let .attribute(owner, attribute):
-                matchCache.attributes(matching: pattern, over: root)
+                matchCache.attributes(matching: pattern, over: root, functions: patternFunctions())
                     .contains(PureXML.XSLT.AttributeIdentity(owner: ObjectIdentifier(owner), name: attribute.name.description))
             case .namespace:
                 false
             }
+        }
+
+        /// The function table match patterns evaluate with (`key()`/`id()`
+        /// patterns), rooted at the document.
+        private func patternFunctions() -> PureXML.XPath.FunctionTable {
+            PureXML.XSLT.Library.table(
+                current: .tree(root),
+                keys: keyIndex,
+                loader: documentLoader,
+                decimalFormats: stylesheet.decimalFormats,
+                documents: documentCache,
+            )
         }
 
         fileprivate func applyTemplates(

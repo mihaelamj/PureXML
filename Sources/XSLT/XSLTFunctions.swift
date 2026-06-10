@@ -200,7 +200,7 @@ extension PureXML.XSLT {
                     // A node-set second argument unions the matches for each node's
                     // string value; any other value is used directly as a string.
                     let values: [String] = if let nodes = arguments[1].nodes {
-                        nodes.compactMap(\.treeNode).map(\.stringValue)
+                        nodes.map(\.stringValue)
                     } else {
                         [arguments[1].string]
                     }
@@ -216,7 +216,7 @@ extension PureXML.XSLT {
                     // A string or a node-set of URI references, each optionally with
                     // a `#fragment` selecting a subset of the loaded document.
                     let references: [String] = if let nodes = arguments.first?.nodes {
-                        nodes.compactMap(\.treeNode).map(\.stringValue)
+                        nodes.map(\.stringValue)
                     } else {
                         [arguments.first?.string ?? ""]
                     }
@@ -252,7 +252,7 @@ extension PureXML.XSLT {
                 fragment = nil
             }
             if cache.trees[path] == nil {
-                guard let text = loader(path), let parsed = try? PureXML.parse(text) else { return [] }
+                guard let text = loader(path), let parsed = try? PureXML.parse(text, limits: .init(allowDoctype: true)) else { return [] }
                 cache.sources[path] = parsed
                 cache.trees[path] = PureXML.Model.TreeNode(parsed)
             }

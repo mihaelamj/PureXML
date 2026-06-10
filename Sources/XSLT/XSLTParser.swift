@@ -92,7 +92,7 @@ extension PureXML.XSLT {
     /// are literal result elements.
     enum XSLTParser {
         static func parse(_ xsl: String, loader: (String) -> String? = { _ in nil }) throws -> Stylesheet {
-            let root = try PureXML.parseTree(xsl)
+            let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true))
             guard let top = stylesheetElement(root) else { throw XSLTError.notAStylesheet }
             return compile(top, loader: loader, precedence: 0)
         }
@@ -150,7 +150,7 @@ extension PureXML.XSLT {
 
         private static func load(_ node: XSLTTree, loader: (String) -> String?, precedence: Int) -> Stylesheet? {
             guard let href = XSLTNode.attribute(node, "href"), let text = loader(href),
-                  let root = try? PureXML.parseTree(text), let top = stylesheetElement(root)
+                  let root = try? PureXML.parseTree(text, limits: .init(allowDoctype: true)), let top = stylesheetElement(root)
             else {
                 return nil
             }

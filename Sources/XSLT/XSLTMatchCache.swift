@@ -19,25 +19,26 @@ extension PureXML.XSLT {
         private var matched: [String: PatternMatches] = [:]
 
         /// The identities of the tree nodes `pattern` selects over `root`.
-        func nodes(matching pattern: String, over root: PureXML.Model.TreeNode) -> Set<ObjectIdentifier> {
-            compute(pattern, root).trees
+        func nodes(matching pattern: String, over root: PureXML.Model.TreeNode, functions: PureXML.XPath.FunctionTable = .init()) -> Set<ObjectIdentifier> {
+            compute(pattern, root, functions).trees
         }
 
         /// The identities of the attribute nodes `pattern` selects over `root`.
-        func attributes(matching pattern: String, over root: PureXML.Model.TreeNode) -> Set<AttributeIdentity> {
-            compute(pattern, root).attributes
+        func attributes(matching pattern: String, over root: PureXML.Model.TreeNode, functions: PureXML.XPath.FunctionTable = .init()) -> Set<AttributeIdentity> {
+            compute(pattern, root, functions).attributes
         }
 
         /// Computed and cached on first use; a branch that fails to compile
-        /// selects nothing.
-        private func compute(_ pattern: String, _ root: PureXML.Model.TreeNode) -> PatternMatches {
+        /// selects nothing. The function table makes `key()` and `id()`
+        /// patterns work.
+        private func compute(_ pattern: String, _ root: PureXML.Model.TreeNode, _ functions: PureXML.XPath.FunctionTable) -> PatternMatches {
             if let cached = matched[pattern] { return cached }
             var result = PatternMatches()
             for branch in pattern.split(separator: "|") {
                 let trimmed = branch.trimmingXMLWhitespace()
-                let path = trimmed.hasPrefix("/") ? trimmed : "//" + trimmed
+                let path = trimmed.hasPrefix("/") || trimmed.hasPrefix("key(") || trimmed.hasPrefix("id(") ? trimmed : "//" + trimmed
                 guard let query = try? PureXML.XPath.Query(path),
-                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: [:], functions: PureXML.XPath.FunctionTable()),
+                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: [:], functions: functions),
                       let selected = value.nodes
                 else { continue }
                 for node in selected {
