@@ -56,6 +56,9 @@ public extension PureXML.Parsing {
         case invalidAttributeListDeclaration(Mark)
         /// A public identifier literal contains a character outside `PubidChar`.
         case invalidPublicIdentifier(Mark)
+        /// A namespace constraint is violated: a malformed qualified name, a
+        /// reserved prefix or namespace name misused, or an illegal binding.
+        case namespaceConstraint(reason: String, Mark)
 
         public var description: String {
             switch self {
@@ -125,6 +128,8 @@ public extension PureXML.Parsing {
                 "malformed <!ENTITY> declaration at \(mark)"
             case let .invalidAttributeListDeclaration(mark):
                 "malformed <!ATTLIST> declaration at \(mark)"
+            case let .namespaceConstraint(reason, mark):
+                "\(reason) at \(mark)"
             case let .invalidPublicIdentifier(mark):
                 "public identifier contains an illegal character at \(mark)"
             case let .malformedDeclaration(mark):

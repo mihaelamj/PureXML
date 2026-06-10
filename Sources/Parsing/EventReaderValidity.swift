@@ -103,4 +103,28 @@ extension PureXML.Parsing.EventReader {
             documentType.validityFindings.append("character-reference whitespace in the element content of <\(current.description)>")
         }
     }
+
+    /// Applies the DTD-declared tokenized normalization to namespace
+    /// declaration values before they bind: an `xmlns:b` declared NMTOKEN in
+    /// the DTD binds its collapsed value, so ' urn:x ' and 'urn:x' are the
+    /// same namespace name (eduni ns 1.0/012).
+    mutating func normalizedBindings(
+        element: PureXML.Model.QualifiedName,
+        attributes: [PureXML.Model.Attribute],
+    ) -> [PureXML.Model.Attribute] {
+        let hasBinding = attributes.contains { $0.name.prefix == "xmlns" || ($0.name.prefix == nil && $0.name.localName == "xmlns") }
+        guard hasBinding,
+              let body = documentType.attributeLists[element.description] ?? documentType.attributeLists[element.localName]
+        else { return attributes }
+        let declarations = PureXML.Validation.AttributeListParser.parse(body)
+        return attributes.map { attribute in
+            let isBinding = attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
+            guard isBinding,
+                  let declaration = declarations.first(where: { $0.name == attribute.name.description })
+            else { return attribute }
+            if case .cdata = declaration.type { return attribute }
+            let collapsed = attribute.value.split(separator: " ").joined(separator: " ")
+            return PureXML.Model.Attribute(name: attribute.name, value: collapsed)
+        }
+    }
 }

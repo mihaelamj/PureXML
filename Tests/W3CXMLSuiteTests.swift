@@ -27,10 +27,10 @@ struct W3CXMLSuiteTests {
         "063.xml", "141.xml", "160.xml", "161.xml", "162.xml",
     ]
 
-    /// valid/sa/114.xml: a CDATA section inside an entity value must protect
-    /// the &foo; reference from expansion; the entity decoder expands it
-    /// before the CDATA section is recognized. Same hardening track.
-    private let knownValidDeviations: Set<String> = []
+    /// valid/sa/012.xml is flagged NAMESPACE='no' by the suite's own
+    /// manifest: it declares an attribute named ':', a pre-namespace XML 1.0
+    /// Name that a namespace-aware parser correctly refuses.
+    private let knownValidDeviations: Set<String> = ["012.xml"]
 
     private func files(in directory: String) throws -> [String] {
         try FileManager.default.contentsOfDirectory(atPath: directory)

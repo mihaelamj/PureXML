@@ -45,6 +45,7 @@ public extension PureXML.Parsing.ParseError {
              let .invalidPublicIdentifier(mark):
             mark
         case let .unexpectedCharacter(_, mark), let .mismatchedEndTag(_, _, mark),
+             let .namespaceConstraint(_, mark),
              let .duplicateAttribute(_, mark), let .invalidReference(_, mark),
              let .undefinedEntity(_, mark), let .recursiveEntity(_, mark),
              let .unexpectedEndTag(_, mark), let .undefinedNamespacePrefix(_, mark),

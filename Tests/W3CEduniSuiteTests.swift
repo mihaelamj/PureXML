@@ -26,21 +26,11 @@ struct W3CEduniSuiteTests {
         ("misc/ht-bh.xml", "misc"),
     ]
 
-    /// not-wf cases this implementation knowingly accepts, two classes:
-    /// the namespace constraints not yet enforced (reserved prefixes and
-    /// namespace names, duplicate expanded-name attributes, NCName rules)
-    /// and encoding-declaration mismatches the byte decoder does not yet
-    /// reject (a declared encoding contradicting the actual bytes or BOM).
-    /// Both classes are tracked as their own issues under #121.
+    /// not-wf cases this implementation knowingly accepts: the encoding-
+    /// declaration mismatches the byte decoder does not yet reject (a
+    /// declared encoding contradicting the actual bytes or BOM), tracked
+    /// as #137.
     private let knownNotWFAccepted: Set<String> = [
-        // Namespace constraints.
-        "namespaces/1.0/009.xml", "namespaces/1.0/010.xml", "namespaces/1.0/011.xml",
-        "namespaces/1.0/012.xml", "namespaces/1.0/014.xml", "namespaces/1.0/015.xml",
-        "namespaces/1.0/016.xml", "namespaces/1.0/029.xml", "namespaces/1.0/030.xml",
-        "namespaces/1.0/031.xml", "namespaces/1.0/032.xml", "namespaces/1.0/033.xml",
-        "namespaces/1.0/036.xml", "namespaces/1.0/042.xml", "namespaces/1.0/043.xml",
-        "namespaces/1.0/044.xml", "namespaces/errata-1e/NE13a.xml", "namespaces/errata-1e/NE13b.xml",
-        // Encoding-declaration mismatches.
         "errata-2e/E38.xml", "errata-2e/E61.xml", "misc/007.xml", "misc/008.xml",
     ]
 
@@ -73,6 +63,7 @@ struct W3CEduniSuiteTests {
         let type: String
         let uri: String
         let editions: String?
+        let namespaceAware: Bool
     }
 
     private func manifest(_ file: String, in eduni: String) throws -> [ManifestCase] {
@@ -89,12 +80,21 @@ struct W3CEduniSuiteTests {
             guard let id = attribute("ID"), let type = attribute("TYPE"), let uri = attribute("URI") else {
                 return nil
             }
-            return ManifestCase(id: id, type: type, uri: uri, editions: attribute("EDITION"))
+            return ManifestCase(
+                id: id,
+                type: type,
+                uri: uri,
+                editions: attribute("EDITION"),
+                namespaceAware: attribute("NAMESPACE") != "no",
+            )
         }
     }
 
-    /// Whether a case applies to the Fifth Edition this package implements.
+    /// Whether a case applies to this implementation: the Fifth Edition, and
+    /// namespace-aware processing (NAMESPACE='no' cases use pre-namespace
+    /// colons in names, which a namespace-aware parser correctly refuses).
     private func appliesToFifthEdition(_ testCase: ManifestCase) -> Bool {
+        guard testCase.namespaceAware else { return false }
         guard let editions = testCase.editions else { return true }
         return editions.split(separator: " ").contains("5")
     }

@@ -119,12 +119,17 @@ extension DTDScanner {
 
     /// Scans a Name strictly: the first character must satisfy NameStartChar
     /// and the rest NameChar, so `-ge` or `.pe` is rejected where the lenient
-    /// continuation-character scan would accept it.
+    /// continuation-character scan would accept it. Entity and notation names
+    /// are NCNames under namespaces, so a colon is also rejected.
     mutating func scanStrictName(_ reader: inout Reader, at mark: Mark) throws -> String {
         guard let first = reader.peek(), first.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isNameStart) else {
             throw ParseError.expectedName(mark)
         }
-        return scanName(&reader)
+        let name = scanName(&reader)
+        guard !name.contains(":") else {
+            throw ParseError.namespaceConstraint(reason: "'\(name)' is not a legal NCName", mark)
+        }
+        return name
     }
 
     /// Removes a leading text declaration from an external entity's resolved

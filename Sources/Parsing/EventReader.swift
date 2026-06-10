@@ -173,7 +173,7 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             reader.consume("<")
             let rawName = try scanName()
-            let rawAttributes = try scanAttributes()
+            let rawAttributes = try normalizedBindings(element: rawName, attributes: scanAttributes())
             let resolved = try namespaces.enterElement(name: rawName, attributes: rawAttributes, at: mark)
             if reader.consume("/>") {
                 namespaces.leaveElement()
@@ -255,6 +255,10 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             reader.consume("<?")
             let target = try scanName()
+            // A PI target is an NCName under namespaces (no colon).
+            if target.description.contains(":") {
+                throw ParseError.namespaceConstraint(reason: "PI target '\(target.description)' is not a legal NCName", mark)
+            }
             // Production 16: the target and the data must be separated by
             // whitespace, so `<?target+++?>` is not well-formed.
             if let next = reader.peek(), !next.isWhitespace, !reader.matches("?>") {

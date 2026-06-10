@@ -158,6 +158,9 @@ struct DTDScanner {
             if target.lowercased() == "xml" {
                 throw ParseError.reservedProcessingInstructionTarget(mark)
             }
+            if target.contains(":") {
+                throw ParseError.namespaceConstraint(reason: "PI target '\(target)' is not a legal NCName", mark)
+            }
             if let next = reader.peek(), !next.isWhitespace, !reader.matches("?>") {
                 throw ParseError.unexpectedCharacter(next, reader.mark)
             }
