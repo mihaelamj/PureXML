@@ -68,10 +68,12 @@ and external resolution is opt-in through an injected resolver so XXE stays clos
 The original epics, the documented-subset parity work (#61), the validation
 framework and recovering reader (#92), and the editor-integration layer (#94)
 are all shipped (summarized above). The beyond-parity libxml2 conformance audit
-(#71) and its parser-breadth sub-epic (#74) are now **complete**: every depth gap
-the audit surfaced is closed in main. The remaining distance to full libxml2
-parity is tracked under epic **#105**: a few concrete features (output encodings,
-streaming validation, the last encodings) plus conformance-corpus depth.
+(#71), its parser-breadth sub-epic (#74), and the parity-frontier epic (#105:
+output encodings, streaming validation, the last encodings, the analysis
+findings, and the first W3C-suite pass) are all **complete**. Feature parity is
+done; the remaining distance is corpus-clean parity, tracked under two epics:
+**#121** (the rest of the W3C xmlconf archive, including the DTD-validity layer)
+and **#122** (the official spec suites for the schema and transform stack).
 
 ```mermaid
 flowchart TB
@@ -84,15 +86,31 @@ flowchart TB
   Done["All audit children closed in main: DTD #72 #73, XSD #75 #76 #77 #78, parsing #95 #96 #98 #100, regex #89, catalog #86, XSLT #81 #82, RELAX NG #79, Schematron #80, DOM #90, serialization #91, C14N #85, XPath/XPointer #88, XInclude #87, validators #101, HTML5 #83 #84, encodings #97 #99 #102 #103"]:::done
   Epic71 --> Done
   Epic74 --> Done
-  Epic105["#105 remaining libxml2 parity frontier"]:::epic
-  OutEnc["#106 output encodings: complete"]:::done
-  StreamVal["#107 streaming validation: DTD, RELAX NG, XSD"]:::done
-  MoreEnc["#108 encodings: ISO-2022-JP, EUC-TW"]:::done
-  Depth["Tier 3 done; analysis findings #109-#119 all fixed incl. Particle Valid Restriction #117; Tier 2 corpora ongoing"]:::todo
-  Epic105 --> OutEnc
-  OutEnc --> StreamVal
-  StreamVal --> MoreEnc
-  MoreEnc --> Depth
+  Epic105["#105 parity frontier: complete (#106 #107 #108 output encodings, streaming validation, last encodings; findings #109-#119; first W3C pass #120)"]:::epic
+  Epic121["#121 xmlconf full archive"]:::epic
+  Oasis["#123 OASIS/NIST section"]:::todo
+  Sun["#124 Sun section: DTD-validity baselines"]:::todo
+  IBM["#125 IBM section: per-production validity depth"]:::todo
+  Japanese["#126 japanese section: encoding declarations"]:::todo
+  Eduni["#127 eduni: errata + namespaces"]:::todo
+  StrictSubset["#128 strict internal-subset profile: xmltest 185/186"]:::todo
+  Epic122["#122 official spec suites"]:::epic
+  XSTS["#129 W3C XSD test suite (XSTS)"]:::todo
+  XSLTTS["#130 OASIS XSLT 1.0 suite (+XPath corpus)"]:::todo
+  RNGTS["#131 RELAX NG spec test suite"]:::todo
+  C14NTS["#132 C14N interop vectors"]:::todo
+  Epic105 --> Epic121
+  Epic105 --> Epic122
+  Epic121 --> Oasis
+  Epic121 --> Sun
+  Epic121 --> IBM
+  Epic121 --> Japanese
+  Epic121 --> Eduni
+  Epic121 --> StrictSubset
+  Epic122 --> XSTS
+  Epic122 --> XSLTTS
+  Epic122 --> RNGTS
+  Epic122 --> C14NTS
 ```
 
 ## Status
