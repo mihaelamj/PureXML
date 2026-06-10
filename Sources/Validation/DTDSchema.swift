@@ -43,7 +43,7 @@ public extension PureXML.Validation {
                 parsedAttributes[name] = AttributeListParser.parse(body)
             }
             attributes = parsedAttributes
-            declarationErrors = Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
+            declarationErrors = documentType.validityFindings + Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
             self.standalone = standalone
             externalElementModels = Set(documentType.elementModels.keys).subtracting(documentType.internalElementModels)
             var external: [String: [AttributeDeclaration]] = [:]

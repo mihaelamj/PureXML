@@ -164,7 +164,9 @@ public extension PureXML.Parsing {
                 }
             }
 
-            guard produced else {
+            // Production 1: a document is prolog, ELEMENT, Misc*; comments and
+            // PIs alone (or a DOCTYPE with no element) are not a document.
+            guard produced, roots.contains(where: { $0.element != nil }) else {
                 throw ParseError.emptyDocument
             }
             return ParsedDocument(node: .document(roots), documentType: reader.documentType, declaration: reader.xmlDeclaration)

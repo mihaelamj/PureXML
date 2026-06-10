@@ -54,4 +54,89 @@ extension DTDScanner {
         }
         return nil
     }
+
+    /// VC: Proper Group/PE Nesting. A parameter entity used in a content model
+    /// must contain balanced parentheses, so a group cannot open in one
+    /// replacement text and close in another. Recorded as a validity finding.
+    mutating func checkGroupNesting(_ rawModel: String, element: String) {
+        guard rawModel.contains("%") else { return }
+        var index = rawModel.startIndex
+        while index < rawModel.endIndex, let percent = rawModel[index...].firstIndex(of: "%") {
+            guard let semicolon = rawModel[percent...].firstIndex(of: ";") else { return }
+            let name = String(rawModel[rawModel.index(after: percent) ..< semicolon])
+            if let replacement = doctype.parameterEntities[name] {
+                let opens = replacement.count(where: { $0 == "(" })
+                let closes = replacement.count(where: { $0 == ")" })
+                if opens != closes {
+                    doctype.validityFindings.append(
+                        "the content model of '\(element)' uses parameter entity '%\(name);' with improper group/PE nesting",
+                    )
+                }
+            }
+            index = rawModel.index(after: semicolon)
+        }
+    }
+
+    /// WFC: No Recursion, checked at declaration: no parsed entity (general or
+    /// parameter) may reference itself directly or indirectly through the
+    /// stored replacement texts.
+    func checkEntityRecursion(at mark: Mark) throws {
+        var visiting: Set<String> = []
+        var cleared: Set<String> = []
+        for key in doctype.entities.keys.sorted() {
+            try walkEntityGraph("ge:" + key, visiting: &visiting, cleared: &cleared, at: mark)
+        }
+        for key in doctype.parameterEntities.keys.sorted() {
+            try walkEntityGraph("pe:" + key, visiting: &visiting, cleared: &cleared, at: mark)
+        }
+    }
+
+    private func walkEntityGraph(_ node: String, visiting: inout Set<String>, cleared: inout Set<String>, at mark: Mark) throws {
+        guard !cleared.contains(node) else { return }
+        guard visiting.insert(node).inserted else {
+            throw ParseError.recursiveEntity(name: String(node.dropFirst(3)), mark)
+        }
+        defer {
+            visiting.remove(node)
+            cleared.insert(node)
+        }
+        let name = String(node.dropFirst(3))
+        let value = node.hasPrefix("ge:") ? doctype.entities[name] : doctype.parameterEntities[name]
+        guard let value else { return }
+        for reference in entityReferences(in: value) {
+            try walkEntityGraph(reference, visiting: &visiting, cleared: &cleared, at: mark)
+        }
+    }
+
+    /// The `ge:`/`pe:`-tagged references in a replacement text, with CDATA
+    /// sections shielded and predefined entities skipped.
+    private func entityReferences(in text: String) -> [String] {
+        let predefined: Set = ["amp", "lt", "gt", "quot", "apos"]
+        var references: [String] = []
+        var index = text.startIndex
+        while index < text.endIndex {
+            if text[index...].hasPrefix("<![CDATA[") {
+                var cursor = text.index(index, offsetBy: 9)
+                while cursor < text.endIndex, !text[cursor...].hasPrefix("]]>") {
+                    cursor = text.index(after: cursor)
+                }
+                index = cursor < text.endIndex ? text.index(cursor, offsetBy: 3) : text.endIndex
+                continue
+            }
+            let character = text[index]
+            guard character == "&" || character == "%" else {
+                index = text.index(after: index)
+                continue
+            }
+            guard let semicolon = text[index...].firstIndex(of: ";") else { return references }
+            let body = String(text[text.index(after: index) ..< semicolon])
+            if character == "&", !body.hasPrefix("#"), !predefined.contains(body) {
+                references.append("ge:" + body)
+            } else if character == "%", !body.isEmpty {
+                references.append("pe:" + body)
+            }
+            index = text.index(after: semicolon)
+        }
+        return references
+    }
 }

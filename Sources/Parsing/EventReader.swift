@@ -125,7 +125,7 @@ public extension PureXML.Parsing {
                     return .processingInstruction(target: instruction.target, data: instruction.data)
                 }
                 if reader.matches("<!DOCTYPE") {
-                    documentType = try DoctypeScanner.scan(&reader, limits: limits, resolver: resolver)
+                    documentType = try DoctypeScanner.scan(&reader, limits: limits, resolver: resolver, standalone: xmlDeclaration?.standalone == true)
                     continue
                 }
                 if reader.matches("</") || reader.matches("<![CDATA[") {

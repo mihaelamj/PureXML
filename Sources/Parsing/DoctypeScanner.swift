@@ -14,12 +14,13 @@ extension PureXML.Parsing {
             _ reader: inout Reader,
             limits: Limits,
             resolver: EntityResolver = .refusing,
+            standalone: Bool = false,
         ) throws -> DocumentType {
             let mark = reader.mark
             guard limits.allowDoctype else {
                 throw ParseError.unsupportedDoctype(mark)
             }
-            var scanner = DTDScanner(limits: limits, resolver: resolver)
+            var scanner = DTDScanner(limits: limits, resolver: resolver, standalone: standalone)
             return try scanner.scan(&reader, at: mark)
         }
     }
@@ -37,19 +38,37 @@ struct DTDScanner {
 
     let limits: PureXML.Parsing.Limits
     let resolver: PureXML.Parsing.EntityResolver
+    /// Whether the document declared standalone='yes', which makes an
+    /// undeclared-entity reference a well-formedness error rather than a
+    /// validity finding (WFC vs VC: Entity Declared).
+    let standalone: Bool
     var doctype = PureXML.Parsing.DocumentType()
     /// True while scanning the external subset, so declarations record their
     /// origin (the standalone validity constraints depend on it).
     var inExternalContext = false
+    /// External parameter entities that were declared but not loaded (the
+    /// resolver refused them): a reference to one is not an undeclared-entity
+    /// error, the processor simply did not read it.
+    var unresolvedParameterEntities: Set<String> = []
     var parameterBudget: Int
     /// Bounds parameter-entity injection recursion (modularized DTDs nest, but
     /// only a little); deeper references are ignored rather than trapping.
     let maxDepth = 40
 
-    init(limits: PureXML.Parsing.Limits, resolver: PureXML.Parsing.EntityResolver) {
+    init(limits: PureXML.Parsing.Limits, resolver: PureXML.Parsing.EntityResolver, standalone: Bool = false) {
         self.limits = limits
         self.resolver = resolver
+        self.standalone = standalone
         parameterBudget = limits.maxEntityExpansion
+    }
+
+    /// Entity Declared is a WFC (throw) when the document is standalone, or
+    /// has neither an external subset nor parameter entities; otherwise it is
+    /// a VC (deferred finding), since the unread external declarations might
+    /// have declared the entity (production 68).
+    var entityDeclaredIsWellFormedness: Bool {
+        if standalone { return true }
+        return doctype.externalSubset == nil && doctype.parameterEntities.isEmpty && unresolvedParameterEntities.isEmpty
     }
 
     mutating func scan(_ reader: inout Reader, at mark: Mark) throws -> PureXML.Parsing.DocumentType {
@@ -68,21 +87,8 @@ struct DTDScanner {
         }
         try loadExternalSubset(at: mark)
         resolveExternalEntities()
+        try checkEntityRecursion(at: mark)
         return doctype
-    }
-
-    /// Folds declared external general entities into the general-entity table by
-    /// asking the resolver for their replacement text. A refused (nil) entity
-    /// stays undeclared, so a reference to it errors and the default refusing
-    /// resolver keeps XXE closed.
-    private mutating func resolveExternalEntities() {
-        for (name, id) in doctype.externalEntities where doctype.entities[name] == nil {
-            if let text = resolver.resolveEntity(name, id) {
-                // An external parsed entity may begin with a text declaration,
-                // which is not part of its replacement text (4.3.1).
-                doctype.entities[name] = strippingTextDeclaration(text)
-            }
-        }
     }
 
     /// Loads the external subset through the resolver, if one is configured and
@@ -164,50 +170,6 @@ struct DTDScanner {
         }
     }
 
-    /// Handles a bare `%name;` between declarations by injecting the parameter
-    /// entity's replacement text and scanning its declarations. Bounded by depth
-    /// and the expansion budget.
-    private mutating func scanParameterReference(_ reader: inout Reader, depth: Int, at mark: Mark) throws {
-        let refMark = reader.mark
-        reader.consume("%")
-        let name = scanName(&reader)
-        // PEReference is '%' Name ';' exactly: no space after '%' (an empty
-        // name) and the semicolon must follow the name directly.
-        guard !name.isEmpty, reader.consume(";") else {
-            throw ParseError.invalidReference("%\(name)", refMark)
-        }
-        guard depth < maxDepth, let replacement = doctype.parameterEntities[name] else {
-            return
-        }
-        guard parameterBudget >= replacement.count else {
-            return
-        }
-        parameterBudget -= replacement.count
-        var sub = Reader(replacement)
-        try scanDeclarations(&sub, depth: depth + 1, terminatedByBracket: false, at: mark)
-    }
-
-    /// Files an external entity declaration by kind: an `NDATA` entity is unparsed
-    /// (recorded with its notation); an external general entity records its
-    /// identifier for the resolver; an external parameter entity is loaded through
-    /// the resolver so its replacement text is available for `%name;` expansion
-    /// (the default refusing resolver loads nothing, keeping XXE closed).
-    mutating func storeExternalEntity(name: String, id: ExternalID, isParameter: Bool, notation: String?) {
-        if let notation, !notation.isEmpty, !isParameter {
-            if doctype.unparsedEntities[name] == nil {
-                doctype.unparsedEntities[name] = PureXML.Parsing.UnparsedEntity(id: id, notation: notation)
-            }
-        } else if isParameter {
-            if doctype.parameterEntities[name] == nil, let text = resolver.resolveExternalSubset(id) {
-                doctype.parameterEntities[name] = expandParameterReferences(strippingTextDeclaration(text))
-            }
-        } else if doctype.externalEntities[name] == nil {
-            doctype.externalEntities[name] = id
-        }
-    }
-
-    /// `<!NOTATION S Name S (ExternalID | PublicID) S? '>'` (production 82):
-    /// the identifier is required and nothing may follow it but whitespace.
     private mutating func scanNotationDeclaration(_ reader: inout Reader) throws {
         let mark = reader.mark
         reader.consume("<!NOTATION")
@@ -258,7 +220,9 @@ struct DTDScanner {
             throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
         }
         reader.skipSpace()
-        let model = expandParameterReferences(readUntilClose(&reader)).trimmingXMLWhitespace()
+        let raw = readUntilClose(&reader)
+        checkGroupNesting(raw, element: name)
+        let model = expandParameterReferences(raw).trimmingXMLWhitespace()
         guard PureXML.Parsing.DTDContentModelGrammar.isValid(model) else {
             throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
         }
@@ -308,28 +272,6 @@ struct DTDScanner {
 }
 
 extension DTDScanner {
-    /// Replaces `%name;` references with their (already-expanded) parameter-entity
-    /// values. Undefined references are left literal. A single forward pass is
-    /// enough because each value was expanded against the entities defined before
-    /// it, so no reference can reach a later definition.
-    func expandParameterReferences(_ raw: String) -> String {
-        guard raw.contains("%") else { return raw }
-        var result = ""
-        var index = raw.startIndex
-        while index < raw.endIndex {
-            let character = raw[index]
-            guard character == "%", let semicolon = raw[index...].firstIndex(of: ";") else {
-                result.append(character)
-                index = raw.index(after: index)
-                continue
-            }
-            let name = String(raw[raw.index(after: index) ..< semicolon])
-            result += doctype.parameterEntities[name] ?? "%\(name);"
-            index = raw.index(after: semicolon)
-        }
-        return result
-    }
-
     private func parseExternalID(_ reader: inout Reader) -> ExternalID? {
         if reader.consume("SYSTEM") {
             reader.skipSpace()

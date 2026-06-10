@@ -93,7 +93,8 @@ extension DTDScanner {
             }
             if character == "&" || character == "%" {
                 var probe = index + 1
-                if character == "&", probe < characters.count, characters[probe] == "#" { probe += 1 }
+                let isCharacterReference = character == "&" && probe < characters.count && characters[probe] == "#"
+                if isCharacterReference { probe += 1 }
                 let bodyStart = probe
                 let stops: Set<Character> = [";", "&", "%"]
                 while probe < characters.count, !stops.contains(characters[probe]), !characters[probe].isWhitespace {
@@ -101,6 +102,14 @@ extension DTDScanner {
                 }
                 guard probe > bodyStart, probe < characters.count, characters[probe] == ";" else {
                     throw ParseError.invalidReference(String(character), mark)
+                }
+                // An entity reference's body must be a Name: '&49;' is neither
+                // a character reference nor a legal entity name (production 68).
+                if !isCharacterReference {
+                    let body = String(characters[bodyStart ..< probe])
+                    guard PureXML.Parsing.XMLCharacter.isValidName(body) else {
+                        throw ParseError.invalidReference(String(character) + body, mark)
+                    }
                 }
                 index = probe
             }
@@ -234,11 +243,11 @@ extension DTDScanner {
     /// already declared and internal: an undeclared, forward-declared, external,
     /// or unparsed entity in a default is not well-formed, and the referenced
     /// chain must not recurse.
-    func validateDefaultValueReferences(_ value: String, at mark: Mark) throws {
+    mutating func validateDefaultValueReferences(_ value: String, at mark: Mark) throws {
         try walkDefaultReferences(value, visiting: [], at: mark)
     }
 
-    func walkDefaultReferences(_ value: String, visiting: Set<String>, at mark: Mark) throws {
+    mutating func walkDefaultReferences(_ value: String, visiting: Set<String>, at mark: Mark) throws {
         let predefined: Set = ["amp", "lt", "gt", "quot", "apos"]
         let characters = Array(value)
         var index = 0
@@ -269,7 +278,12 @@ extension DTDScanner {
                 throw ParseError.invalidAttributeListDeclaration(mark)
             }
             guard let replacement = doctype.entities[name] else {
-                throw ParseError.undefinedEntity(name: name, mark)
+                // VC/WFC: Entity Declared, same split as parameter references.
+                if entityDeclaredIsWellFormedness {
+                    throw ParseError.undefinedEntity(name: name, mark)
+                }
+                doctype.validityFindings.append("entity '&\(name);' in an attribute default is referenced but not declared")
+                return
             }
             try walkDefaultReferences(replacement, visiting: visiting.union([name]), at: mark)
         }

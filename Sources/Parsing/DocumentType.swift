@@ -38,6 +38,12 @@ public extension PureXML.Parsing {
         /// The `<!ATTLIST>` bodies declared in the internal subset only, keyed
         /// by element, so externally-declared attributes are distinguishable.
         public var internalAttributeLists: [String: String] = [:]
+        /// Validity (not well-formedness) findings discovered while scanning
+        /// the DTD: an undeclared entity referenced where the external subset
+        /// might have declared it (VC: Entity Declared) or a content-model
+        /// group split across parameter entities (VC: Proper Group/PE
+        /// Nesting). Reported by the validator at the document root.
+        public var validityFindings: [String] = []
 
         public init(
             entities: [String: String] = [:],
