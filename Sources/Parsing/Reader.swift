@@ -112,11 +112,16 @@ extension PureXML.Parsing {
 
         /// True if the upcoming characters equal `literal`, without consuming.
         mutating func matches(_ literal: String) -> Bool {
-            let target = Array(literal)
-            ensure(target.count)
-            guard buffer.count >= target.count else { return false }
-            for index in target.indices where buffer[index] != target[index] {
-                return false
+            // No per-call Array materialization: literals are short constants
+            // and this runs on every scan decision (the hottest comparison in
+            // the parse profile).
+            let count = literal.count
+            ensure(count)
+            guard buffer.count >= count else { return false }
+            var index = 0
+            for character in literal {
+                if buffer[index] != character { return false }
+                index += 1
             }
             return true
         }

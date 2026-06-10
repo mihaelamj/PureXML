@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Scanner-side validity findings are now located structured values (validation-framework audit follow-up): `DocumentType.validityFindings` carries `ValidityFinding` values (reason plus the declared name they are about) instead of strings, `DTDSchema.declarationErrors` holds ready `ValidationError`s, and every declaration-level finding renders at its declaration's coding path (`x`, `r/@a`) instead of "at root of document", matching the XSD consistency-errors precedent. Finding texts are unchanged.
 
+### Changed
+
+- First measured performance pass (#139): Reader.matches() no longer materializes an Array of the literal per call (it runs on every scan decision and was the hottest comparison in the parse profile); parse time on the 4.2 MB benchmark corpus drops 16 percent (0.49 s to 0.41 s, libxml2 ratio 30x to 26x). The benchmark harness, baseline, profile findings, and the optimization log live in docs/benchmarks.md.
+
 ### Fixed
 
 - Stylesheet composition cycles no longer crash (#130 critic loop): an include or import cycle (a.xsl includes b.xsl includes a.xsl) recursed without bound and killed the host with a stack overflow, a denial of service reachable from stylesheet data. The compile chain now tracks the active load chain by resolved href and drops re-entry, while diamond composition (two units legitimately loading the same sheet) keeps loading both copies with their own import precedences, per 2.6.2. id() also gains a per-document index built on first use instead of re-walking the whole document per call, matching key(). Cycle and diamond regression tests added.
