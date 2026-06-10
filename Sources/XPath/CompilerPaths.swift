@@ -202,8 +202,14 @@ extension PureXML.XPath.Compiler {
             advance()
             return .wildcard
         }
-        let name = parseName()
+        var name = parseName()
         guard !name.isEmpty else { throw QueryError.expectedNodeTest }
+        if name.hasSuffix(":"), peek() == "*" {
+            // The NCName:* form: any name in the prefix's namespace.
+            advance()
+            name += "*"
+            return .name(name)
+        }
         guard peek() == "(" else {
             return .name(name)
         }

@@ -11,9 +11,17 @@ struct Parts {
     var namespaceAliases: [String: PureXML.XSLT.NamespaceAlias] = [:]
 
     var stylesheet: PureXML.XSLT.Stylesheet {
-        PureXML.XSLT.Stylesheet(
+        // Same-name globals resolve by import precedence. Imports fold in
+        // precedence order (earlier imports lower, the unit's own
+        // declarations appended last), so the last same-name entry wins.
+        var seen = Set<String>()
+        let resolvedGlobals: [PureXML.XSLT.Instruction] = globals.reversed().filter { instruction in
+            guard let name = Self.globalName(instruction) else { return true }
+            return seen.insert(name).inserted
+        }.reversed()
+        return PureXML.XSLT.Stylesheet(
             templates: templates,
-            globals: globals,
+            globals: resolvedGlobals,
             keys: keys,
             output: output,
             stripSpace: stripSpace,
@@ -24,19 +32,28 @@ struct Parts {
         )
     }
 
-    /// Folds a sub-stylesheet in: an import has lower precedence, so its globals
-    /// come before and its output is overridden by this stylesheet's.
-    mutating func fold(_ sub: PureXML.XSLT.Stylesheet?, isImport: Bool) {
+    private static func globalName(_ instruction: PureXML.XSLT.Instruction) -> String? {
+        guard case let .variable(name, _, _) = instruction else { return nil }
+        return name
+    }
+
+    /// Folds a sub-stylesheet in. Folds happen in import-precedence order
+    /// (earlier imports first, the unit's own declarations absorbed last),
+    /// so later contributions uniformly take precedence: globals append (the
+    /// stylesheet getter keeps the last same-name entry), attribute-set
+    /// definitions concatenate (later ones expand later and win), and the
+    /// later output settings layer on top.
+    mutating func fold(_ sub: PureXML.XSLT.Stylesheet?, isImport _: Bool) {
         guard let sub else { return }
         templates += sub.templates
         keys += sub.keys
         stripSpace.formUnion(sub.stripSpace)
         preserveSpace.formUnion(sub.preserveSpace)
-        attributeSets.merge(sub.attributeSets) { mine, _ in mine }
-        decimalFormats.merge(sub.decimalFormats) { mine, _ in mine }
-        namespaceAliases.merge(sub.namespaceAliases) { mine, _ in mine }
-        globals = isImport ? sub.globals + globals : globals + sub.globals
-        output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
+        attributeSets.merge(sub.attributeSets) { mine, theirs in mine + theirs }
+        decimalFormats.merge(sub.decimalFormats) { _, theirs in theirs }
+        namespaceAliases.merge(sub.namespaceAliases) { _, theirs in theirs }
+        globals += sub.globals
+        output = output.merged(with: sub.output)
     }
 }
 

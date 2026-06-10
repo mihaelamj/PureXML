@@ -59,10 +59,13 @@ extension PureXML.XSLT {
 
         func run() -> PureXML.Model.Node {
             var variables: [String: PureXML.XPath.Value] = [:]
-            let baseContext = XSLTContext(node: root, position: 1, size: 1, variables: variables)
             for global in stylesheet.globals {
                 if case let .variable(name, select, body) = global {
-                    variables[name] = variableValue(select, body, baseContext)
+                    // Each global evaluates with every previously evaluated
+                    // global in scope (a top-level variable may reference an
+                    // earlier top-level param, directly or via call-template).
+                    let globalContext = XSLTContext(node: root, position: 1, size: 1, variables: variables)
+                    variables[name] = variableValue(select, body, globalContext)
                 }
             }
             let context = XSLTContext(node: root, position: 1, size: 1, variables: variables)

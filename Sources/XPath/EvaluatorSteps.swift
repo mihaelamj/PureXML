@@ -104,6 +104,8 @@ extension PureXML.XPath.Evaluator {
                 let prefix = String(name[..<colon])
                 if let uri = namespaces[prefix] {
                     let local = String(name[name.index(after: colon)...])
+                    // The NCName:* form matches every name in the namespace.
+                    if local == "*" { return (qualified.namespaceURI ?? "") == uri }
                     return qualified.localName == local && (qualified.namespaceURI ?? "") == uri
                 }
             } else {
@@ -111,6 +113,11 @@ extension PureXML.XPath.Evaluator {
                 // an unprefixed name test selects the null namespace.
                 return qualified.localName == name && (qualified.namespaceURI ?? "").isEmpty
             }
+        }
+        if name.hasSuffix(":*"), let colon = name.firstIndex(of: ":") {
+            // Without bindings the prefix-wildcard falls back to the
+            // in-document prefix string, like plain prefixed tests.
+            return qualified.prefix == String(name[..<colon])
         }
         return qualified.description == name || qualified.localName == name
     }
