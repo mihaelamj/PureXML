@@ -244,6 +244,7 @@ struct DTDScanner {
         }
         reader.skipSpace()
         let raw = recoveringDeclarationBody(readUntilClose(&reader), kind: "<!ELEMENT>", name: name)
+        try checkStrictSubsetReferences(raw, at: mark)
         checkGroupNesting(raw, element: name)
         let model = expandParameterReferences(raw).trimmingXMLWhitespace()
         guard PureXML.Parsing.DTDContentModelGrammar.isValid(model) else {
@@ -271,7 +272,9 @@ struct DTDScanner {
         guard !name.isEmpty else {
             throw ParseError.invalidAttributeListDeclaration(mark)
         }
-        let body = expandParameterReferences(recoveringDeclarationBody(readUntilClose(&reader), kind: "<!ATTLIST>", name: name))
+        let rawBody = recoveringDeclarationBody(readUntilClose(&reader), kind: "<!ATTLIST>", name: name)
+        try checkStrictSubsetReferences(rawBody, skippingQuoted: true, at: mark)
+        let body = expandParameterReferences(rawBody)
         guard let defaults = PureXML.Parsing.DTDAttListGrammar.defaultValues(body) else {
             throw ParseError.invalidAttributeListDeclaration(mark)
         }

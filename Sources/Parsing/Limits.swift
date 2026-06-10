@@ -17,6 +17,12 @@ public extension PureXML.Parsing {
         /// on, only internal general entities are honored; external entities are
         /// still refused, and expansion is bounded by ``maxEntityExpansion``.
         public var allowDoctype: Bool
+        /// When true, the internal DTD subset is held to the letter of XML
+        /// 1.0: conditional sections and parameter-entity references inside
+        /// markup declarations are rejected (the spec reserves both for the
+        /// external subset). Off by default; PureXML supports them as
+        /// features.
+        public var strictInternalSubset: Bool
 
         /// The maximum number of characters that internal-entity expansion may
         /// produce across the whole document. The cap (not the literal document
@@ -29,12 +35,14 @@ public extension PureXML.Parsing {
             maxContentLength: Int = 10_000_000,
             allowDoctype: Bool = false,
             maxEntityExpansion: Int = 1_000_000,
+            strictInternalSubset: Bool = false,
         ) {
             self.maxDepth = maxDepth
             self.maxNameLength = maxNameLength
             self.maxContentLength = maxContentLength
             self.allowDoctype = allowDoctype
             self.maxEntityExpansion = maxEntityExpansion
+            self.strictInternalSubset = strictInternalSubset
         }
 
         /// The default limits, matching libxml2's bounded-by-default posture.

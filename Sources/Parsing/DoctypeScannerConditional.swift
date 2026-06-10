@@ -9,6 +9,11 @@ extension DTDScanner {
     /// an IGNORE section's body is discarded. Nested sections are handled by
     /// re-scanning the body, and an unterminated section is not well-formed.
     mutating func scanConditionalSection(_ reader: inout Reader, depth: Int, at mark: Mark) throws {
+        // The spec reserves conditional sections for the external subset;
+        // accepting them internally is a feature the strict profile disables.
+        if limits.strictInternalSubset, !inExternalContext {
+            throw ParseError.malformedDeclaration(reader.mark)
+        }
         reader.consume("<![")
         var keywordRaw = ""
         while let character = reader.peek(), character != "[" {
@@ -138,5 +143,43 @@ extension DTDScanner {
             index = text.index(after: semicolon)
         }
         return references
+    }
+
+    /// Whether the text after a percent sign opens a parameter-entity
+    /// reference: a name-start character with a semicolon somewhere ahead.
+    private func isReferenceStart(_ text: String, after index: String.Index) -> Bool {
+        let nameStart = text.index(after: index)
+        guard nameStart < text.endIndex,
+              text[nameStart].unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isNameStart)
+        else { return false }
+        return text[nameStart...].firstIndex(of: ";") != nil
+    }
+
+    /// Under the strict profile, a parameter-entity reference inside a markup
+    /// declaration in the internal subset is rejected (WFC: PEs in Internal
+    /// Subset); between declarations it stays legal (production 28a DeclSep).
+    /// `skippingQuoted` is set for `<!ATTLIST>` bodies, where a quoted default
+    /// value is an AttValue in which `%` is literal text, not a reference.
+    func checkStrictSubsetReferences(_ text: String, skippingQuoted: Bool = false, at mark: Mark) throws {
+        guard limits.strictInternalSubset, !inExternalContext else { return }
+        var quote: Character?
+        var index = text.startIndex
+        while index < text.endIndex {
+            let character = text[index]
+            if let open = quote {
+                if character == open { quote = nil }
+                index = text.index(after: index)
+                continue
+            }
+            if skippingQuoted, character == "\"" || character == "'" {
+                quote = character
+                index = text.index(after: index)
+                continue
+            }
+            if character == "%", isReferenceStart(text, after: index) {
+                throw ParseError.malformedDeclaration(mark)
+            }
+            index = text.index(after: index)
+        }
     }
 }

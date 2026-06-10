@@ -15,16 +15,16 @@ struct W3CXMLSuiteTests {
         ProcessInfo.processInfo.environment["XMLTS_ROOT"]
     }
 
-    /// The five cases this implementation knowingly accepts although the suite
-    /// marks them not-well-formed, all deliberate: 063 (conditional sections in
-    /// the internal subset) and 160-162 (parameter-entity references in the
-    /// internal subset) are extensions this package supports as features, and
-    /// 141 expects the 1998 suite's name-character classes where this package
-    /// implements XML 1.0 Fifth Edition's (U+0E5C is a name character there).
-    /// The baseline is exact, so any regression in the 181 cases that DO pass
-    /// is still caught.
+    /// The one case this implementation knowingly accepts although the suite
+    /// marks it not-well-formed: 141 expects the 1998 suite's name-character
+    /// classes where this package implements XML 1.0 Fifth Edition's (U+0E5C
+    /// is a name character there). The runner opts into the strict
+    /// internal-subset profile, so the conditional-section and PE-reference
+    /// feature cases (063, 160-162) are rejected as the suite expects. The
+    /// baseline is exact, so any regression in the 185 cases that DO pass is
+    /// still caught.
     private let knownNotWFDeviations: Set<String> = [
-        "063.xml", "141.xml", "160.xml", "161.xml", "162.xml",
+        "141.xml",
     ]
 
     /// valid/sa/012.xml is flagged NAMESPACE='no' by the suite's own
@@ -39,7 +39,7 @@ struct W3CXMLSuiteTests {
     }
 
     private func limits() -> PureXML.Parsing.Limits {
-        PureXML.Parsing.Limits(allowDoctype: true)
+        PureXML.Parsing.Limits(allowDoctype: true, strictInternalSubset: true)
     }
 
     /// Resolves relative SYSTEM identifiers against the case's directory, so the

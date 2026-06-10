@@ -31,6 +31,7 @@ extension DTDScanner {
 
     /// The tail of an internal entity: the literal already read, then `S? '>'`.
     private mutating func scanInternalEntityTail(_ reader: inout Reader, name: String, value: String, isParameter: Bool, at mark: Mark) throws {
+        try checkStrictSubsetReferences(value, at: mark)
         try validateEntityLiteral(value, at: mark)
         reader.skipSpace()
         guard reader.peek() == ">" else {

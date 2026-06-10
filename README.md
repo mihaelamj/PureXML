@@ -93,7 +93,7 @@ flowchart TB
   IBM["#125 IBM section: clean to two documented classes"]:::done
   Japanese["#126 japanese section: complete, zero deviations"]:::done
   Eduni["#127 eduni: runner + exact baselines, four classified deviations"]:::done
-  StrictSubset["#128 strict internal-subset profile: xmltest 185/186"]:::todo
+  StrictSubset["#128 strict internal-subset profile: complete, xmltest 185/186"]:::done
   ScalarLex["#135 scalar-level lexing (grapheme clusters)"]:::todo
   NSConstraints["#136 namespace constraints: complete"]:::done
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
@@ -125,7 +125,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **919 tests in 156 suites** (`swift test`).
+currently runs **922 tests in 157 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
