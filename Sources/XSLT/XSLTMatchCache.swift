@@ -42,7 +42,9 @@ extension PureXML.XSLT {
         /// selects nothing. The function table makes `key()` and `id()`
         /// patterns work; the bindings resolve prefixed name tests by URI.
         private func compute(_ pattern: String, _ root: PureXML.Model.TreeNode, _ functions: PureXML.XPath.FunctionTable, _ namespaces: [String: String]) -> PatternMatches {
-            let key = pattern + "\u{1}" + namespaces.sorted(by: { $0.key < $1.key }).map { $0.key + "=" + $0.value }.joined(separator: ";")
+            var key = pattern + "\u{1}" + namespaces.sorted(by: { $0.key < $1.key }).map { $0.key + "=" + $0.value }.joined(separator: ";")
+            key += "\u{1}\(UInt(bitPattern: ObjectIdentifier(root).hashValue))"
+
             if let cached = matched[key] { return cached }
             var result = PatternMatches()
             for branch in pattern.split(separator: "|") {

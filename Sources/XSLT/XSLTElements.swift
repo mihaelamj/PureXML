@@ -122,6 +122,15 @@ extension PureXML.XSLT.Transformer {
 }
 
 extension PureXML.XSLT.Transformer {
+    /// The topmost ancestor of `node` (its document node).
+    static func documentRoot(of node: PureXML.Model.TreeNode) -> PureXML.Model.TreeNode {
+        var current = node
+        while let parent = current.parent {
+            current = parent
+        }
+        return current
+    }
+
     /// `xsl:number`: an explicit `value` expression rounds per the XSLT 1.0
     /// rules; otherwise the level/count/from machinery numbers the context
     /// node, with patterns matched through the transform's match cache.

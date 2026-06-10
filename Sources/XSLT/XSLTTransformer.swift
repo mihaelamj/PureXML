@@ -57,7 +57,10 @@ extension PureXML.XSLT {
         }
 
         func matches(_ node: PureXML.Model.TreeNode, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
-            matchCache.nodes(matching: pattern, over: root, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
+            // Patterns evaluate over the node's own document, so templates
+            // match nodes loaded through document() too.
+            let documentRoot = Self.documentRoot(of: node)
+            return matchCache.nodes(matching: pattern, over: documentRoot, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
         }
 
         /// Pattern membership for any XPath node kind.
@@ -66,7 +69,7 @@ extension PureXML.XSLT {
             case let .tree(tree):
                 matches(tree, pattern, namespaces)
             case let .attribute(owner, attribute):
-                matchCache.attributes(matching: pattern, over: root, functions: patternFunctions(), namespaces: namespaces)
+                matchCache.attributes(matching: pattern, over: Self.documentRoot(of: owner), functions: patternFunctions(), namespaces: namespaces)
                     .contains(PureXML.XSLT.AttributeIdentity(owner: ObjectIdentifier(owner), name: attribute.name.description))
             case .namespace:
                 false
@@ -211,7 +214,7 @@ extension PureXML.XSLT {
             }
         }
 
-        fileprivate func string(_ expression: String, _ context: XSLTContext) -> String {
+        func string(_ expression: String, _ context: XSLTContext) -> String {
             // Raw-output markers do not survive string extraction (16.4:
             // escaping is disabled only for text written directly to the
             // result tree), so a fragment round-trip re-enables escaping.
@@ -256,7 +259,7 @@ extension PureXML.XSLT.Transformer {
             [.node(.text(raw ? PureXML.XSLT.RawText.marked(string(select, context)) : string(select, context)))]
         case let .applyTemplates(select, mode, sorts, parameters):
             applyTemplates(
-                to: sorted(selectXPathNodes(select ?? "node()", context), sorts),
+                to: sorted(selectXPathNodes(select ?? "node()", context), sorts, context),
                 mode: mode,
                 parameters: parameters,
                 context,
