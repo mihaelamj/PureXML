@@ -37,19 +37,15 @@ extension DTDScanner {
             throw ParseError.invalidEntityDeclaration(mark)
         }
         skip(&reader, until: ">")
-        // Character references in a parameter-entity literal are expanded when
-        // the declaration is parsed (4.4.5; the Appendix D `&#37;zz;` case), so
-        // a stored PE value can itself carry a usable `%name;`. General-entity
-        // values keep their character references; the reference-time decoder
-        // expands them. The replacement-text well-formedness constraint binds
-        // at reference time (an unreferenced entity may carry a bad value), so
-        // the reparse happens in EntityDecoder when the entity is included.
-        var replacement = value
-        if isParameter {
-            guard let expanded = PureXML.Parsing.EntityReplacementGrammar.expandCharacterReferences(value) else {
-                throw ParseError.invalidEntityDeclaration(mark)
-            }
-            replacement = expanded
+        // Character references in an entity literal are expanded when the
+        // declaration is parsed (4.4.5): `&#37;zz;` stores a usable `%zz;`,
+        // `&#60;foo>` stores markup that content splicing reparses, and the
+        // Appendix D double escape `&#38;#38;` stores `&#38;`, which the
+        // content reparse turns into a literal ampersand. The replacement-text
+        // well-formedness constraint still binds at reference time (an
+        // unreferenced entity may carry a bad value).
+        guard let replacement = PureXML.Parsing.EntityReplacementGrammar.expandCharacterReferences(value) else {
+            throw ParseError.invalidEntityDeclaration(mark)
         }
         storeEntity(name: name, value: expandParameterReferences(replacement), isParameter: isParameter)
     }

@@ -117,6 +117,14 @@ extension PureXML.Parsing {
                 advance()
             }
         }
+
+        /// Prepends `text` to the unread stream: used to splice a general
+        /// entity's replacement text into content so it is reparsed as markup
+        /// (4.4.2 Included). Position tracking keeps reporting the source
+        /// document's marks, the libxml2 model for entity boundaries.
+        mutating func inject(_ text: String) {
+            buffer.insert(contentsOf: text, at: 0)
+        }
     }
 }
 

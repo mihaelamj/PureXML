@@ -25,12 +25,8 @@ struct W3CSunSuiteTests {
         "not-wf/not-sa03.xml",
     ]
 
-    /// valid cases this implementation knowingly fails: both need general-
-    /// entity replacement text containing markup to be reparsed into elements
-    /// rather than included as character data (tracked as its own issue).
-    private let knownValidFailures: Set<String> = [
-        "valid/pe03.xml", "valid/ext02.xml",
-    ]
+    /// valid cases this implementation knowingly fails.
+    private let knownValidFailures: Set<String> = []
 
     /// invalid cases where this implementation knowingly reports no validity
     /// error yet, the validity-layer frontier this issue works down: the

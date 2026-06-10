@@ -8,14 +8,13 @@ extension PureXML.Parsing {
     /// incomplete reference), or `<` followed by a non-name character is
     /// rejected at declaration.
     enum EntityReplacementGrammar {
-        /// Expands character references the way entity declaration does, then
-        /// checks the replacement parses as balanced content. Returns nil when
-        /// valid, else a short reason.
+        /// Checks stored replacement text parses as balanced content. Character
+        /// references were already expanded when the declaration was parsed
+        /// (4.4.5), so references remaining in the text (the Appendix D double
+        /// escape) are validated as references, not expanded again. Returns nil
+        /// when valid, else a short reason.
         static func violation(inValue value: String) -> String? {
-            guard let replacement = expandCharacterReferences(value) else {
-                return "incomplete character reference"
-            }
-            return contentViolation(replacement)
+            contentViolation(value)
         }
 
         /// One declaration-time pass over the entity value: `&#...;` becomes its

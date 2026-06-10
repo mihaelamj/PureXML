@@ -135,26 +135,31 @@ public extension PureXML.Parsing {
         }
 
         private mutating func nextInContent() throws -> Event? {
-            guard let lead = reader.peek() else {
-                throw ParseError.unexpectedEndOfInput(reader.mark)
-            }
-            eventStart = reader.mark
-            if reader.matches("</") { return try scanEndTag() }
-            if reader.matches("<!--") { return try scanComment() }
-            if reader.matches("<![CDATA[") { return try scanCDATA() }
-            if reader.matches("<?") {
-                let mark = reader.mark
-                let instruction = try scanProcessingInstruction()
-                if instruction.target.lowercased() == "xml" {
-                    throw ParseError.reservedProcessingInstructionTarget(mark)
+            // Loops because a text scan can end by splicing an entity's
+            // replacement into the reader with no text before it: the next
+            // construct is then read from the spliced replacement.
+            while true {
+                guard let lead = reader.peek() else {
+                    throw ParseError.unexpectedEndOfInput(reader.mark)
                 }
-                return .processingInstruction(target: instruction.target, data: instruction.data)
+                eventStart = reader.mark
+                if reader.matches("</") { return try scanEndTag() }
+                if reader.matches("<!--") { return try scanComment() }
+                if reader.matches("<![CDATA[") { return try scanCDATA() }
+                if reader.matches("<?") {
+                    let mark = reader.mark
+                    let instruction = try scanProcessingInstruction()
+                    if instruction.target.lowercased() == "xml" {
+                        throw ParseError.reservedProcessingInstructionTarget(mark)
+                    }
+                    return .processingInstruction(target: instruction.target, data: instruction.data)
+                }
+                if reader.matches("<!DOCTYPE") {
+                    throw ParseError.unsupportedDoctype(reader.mark)
+                }
+                if lead == "<" { return try scanStartTag() }
+                if let text = try scanText() { return text }
             }
-            if reader.matches("<!DOCTYPE") {
-                throw ParseError.unsupportedDoctype(reader.mark)
-            }
-            if lead == "<" { return try scanStartTag() }
-            return try scanText()
         }
 
         private mutating func scanStartTag() throws -> Event {
@@ -204,7 +209,12 @@ public extension PureXML.Parsing {
             return .endElement(name: top)
         }
 
-        private mutating func scanText() throws -> Event {
+        /// Returns the next text event, or nil after splicing: a reference to
+        /// an entity whose replacement (directly or transitively) contains
+        /// markup is validated, budgeted, and pushed back into the reader so
+        /// it is reparsed as content (4.4.2 Included), elements in replacement
+        /// text become elements in the stream, not character data.
+        private mutating func scanText() throws -> Event? {
             let mark = reader.mark
             var raw = ""
             var length = 0
@@ -219,6 +229,18 @@ public extension PureXML.Parsing {
                 }
                 raw.append(character)
                 reader.advance()
+            }
+            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: documentType.entities) : nil
+            if let split {
+                let replacement = try EntityDecoder.includeForContent(
+                    split.name,
+                    entities: documentType.entities,
+                    budget: &entityBudget,
+                    at: mark,
+                )
+                reader.inject(replacement + split.remainder)
+                let prefix = try EntityDecoder.decode(split.prefix, entities: documentType.entities, budget: &entityBudget, at: mark)
+                return prefix.isEmpty ? nil : .characters(prefix)
             }
             return try .characters(EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark))
         }
