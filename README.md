@@ -87,8 +87,8 @@ flowchart TB
   Epic71 --> Done
   Epic74 --> Done
   Epic105["#105 parity frontier: complete (#106 #107 #108 output encodings, streaming validation, last encodings; findings #109-#119; first W3C pass #120)"]:::epic
-  Epic121["#121 xmlconf full archive"]:::epic
-  Oasis["#123 OASIS/NIST section: complete, zero deviations"]:::done
+  Epic121["#121 xmlconf full archive: complete"]:::epic
+  Oasis["#123 OASIS/NIST: zero deviations"]:::done
   Sun["#124 Sun section: complete, zero deviations"]:::done
   IBM["#125 IBM section: clean to two documented classes"]:::done
   Japanese["#126 japanese section: complete, zero deviations"]:::done
