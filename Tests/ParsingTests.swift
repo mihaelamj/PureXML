@@ -158,6 +158,20 @@ struct ParsingTests {
         #expect(root?.children.first == .text("text"))
         #expect(root?.children.last == .element(.init("c")))
     }
+
+    @Test("A CDATA close in content is rejected when it straddles the bulk-scan boundary")
+    func test_cdataCloseAcrossScanBoundary() throws {
+        // The fast byte path never holds ']' bytes, so the "]]" lands in the
+        // character path and the following '>' must not begin a bulk run
+        // (W3C ibm14n01, caught by the conformance suite).
+        #expect(throws: PureXML.Parsing.ParseError.self) {
+            _ = try PureXML.parse("<s>My name is Snow ]]> Man</s>")
+        }
+        // A lone '>' after plain text stays legal content.
+        let document = try PureXML.parse("<s>a > b</s>")
+        let serialized = PureXML.serialize(document)
+        #expect(serialized.contains("a &gt; b"))
+    }
 }
 
 private extension PureXML.Model.Node {

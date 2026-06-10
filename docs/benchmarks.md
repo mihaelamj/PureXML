@@ -26,6 +26,8 @@ down; the table updates as passes land, never silently.
 |---|---|---|---|---|
 | baseline | - | 0.494 s (30x) | 0.413 s (37x) | 0.061 s (5.5x) |
 | 1 | allocation-free Reader.matches() | 0.414 s (26x) | unchanged | unchanged |
+| 2 | byte-backed Reader (owned UTF-8 storage, pointer-decoded scalars, byte-level literal match/consume) | 0.375 s (23x) | unchanged | unchanged |
+| 3 | bulk content runs (plain-ASCII character data scanned and consumed at the byte level, String built once per run) | 0.335 s (20x) | unchanged | unchanged |
 
 ## Profile findings (first sample, parse path)
 

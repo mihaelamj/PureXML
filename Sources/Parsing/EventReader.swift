@@ -207,7 +207,18 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             var raw = ""
             var length = 0
-            while let character = reader.peek(), character != "<" {
+            while true {
+                // Bulk byte runs first: plain ASCII content (the bulk of any
+                // document) skips the per-character machinery entirely; the
+                // run never spans '<', CR, ']', or invalid bytes, so the
+                // character path below keeps exact error marks.
+                if let run = reader.contentRunBytes() {
+                    length += run.utf8.count
+                    try checkContent(length, mark)
+                    raw += run
+                    continue
+                }
+                guard let character = reader.peek(), character != "<" else { break }
                 length += 1
                 try checkContent(length, mark)
                 if character == ">", raw.hasSuffix("]]") {

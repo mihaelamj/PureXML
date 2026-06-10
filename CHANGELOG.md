@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Byte-backed Reader, performance passes 2 and 3 (#139): String input now copies its UTF-8 once into owned storage (an unsafe pointer encapsulated in a class lifetime, never escaping the parser) and scalars decode straight off the pointer, eliminating the per-character closure chain; ASCII literals match and consume at the byte level; and plain-ASCII character data, the bulk of any document, scans as a single byte run with one String built per run. Cumulative parse time on the 4.2 MB benchmark corpus drops 32 percent (0.49 s to 0.34 s, libxml2 ratio 30x to 20x). The W3C conformance suite caught one boundary in the run scanner (a run starting with '>' could swallow the "]]>" check after the character path consumed "]]"; ibm14n01); the run scanner now leaves a leading '>' to the character path, with the case pinned as a unit regression. All suites (W3C xmlconf, RELAX NG, xalan), Linux, and WASM verified.
 - First measured performance pass (#139): Reader.matches() no longer materializes an Array of the literal per call (it runs on every scan decision and was the hottest comparison in the parse profile); parse time on the 4.2 MB benchmark corpus drops 16 percent (0.49 s to 0.41 s, libxml2 ratio 30x to 26x). The benchmark harness, baseline, profile findings, and the optimization log live in docs/benchmarks.md.
 
 ### Fixed
