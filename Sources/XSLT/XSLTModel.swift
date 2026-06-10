@@ -56,7 +56,7 @@ public extension PureXML.XSLT {
         case choose(whens: [Branch], otherwise: [Instruction])
         /// A literal result element, copied to the output with its attributes and
         /// any `use-attribute-sets`.
-        case literalElement(name: PureXML.Model.QualifiedName, attributes: [LiteralAttribute], useAttributeSets: [String], body: [Instruction])
+        case literalElement(name: PureXML.Model.QualifiedName, attributes: [LiteralAttribute], namespaces: [String: String], useAttributeSets: [String], body: [Instruction])
         /// `xsl:element` whose name is an attribute value template, with any
         /// `use-attribute-sets`.
         case element(name: ValueTemplate, namespace: ValueTemplate?, namespaces: [String: String], useAttributeSets: [String], body: [Instruction])

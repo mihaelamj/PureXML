@@ -31,7 +31,7 @@ struct XSLTCreatedNamesTests {
         </xsl:stylesheet>
         """
         let result = try PureXML.XSLT.transform(stylesheet: style, source: "<x/>")
-        #expect(result == "<out p:a=\"v\" xmlns:p=\"urn:p\"/>")
+        #expect(result == "<out xmlns:p=\"urn:p\" p:a=\"v\"/>")
     }
 
     @Test("xsl:copy applies use-attribute-sets")

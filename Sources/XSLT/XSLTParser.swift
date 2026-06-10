@@ -288,7 +288,13 @@ extension PureXML.XSLT {
             let attributes = node.attributes
                 .filter { $0.name.prefix != "xmlns" && !($0.name.prefix == nil && $0.name.localName == "xmlns") && $0.name.prefix != "xsl" }
                 .map { LiteralAttribute(name: $0.name, value: valueTemplate($0.value)) }
-            return .literalElement(name: name, attributes: attributes, useAttributeSets: useAttributeSets(node), body: body(node))
+            return .literalElement(
+                name: name,
+                attributes: attributes,
+                namespaces: copiedNamespaces(node),
+                useAttributeSets: useAttributeSets(node),
+                body: body(node),
+            )
         }
 
         /// The whitespace-separated names of `[xsl:]use-attribute-sets` on `node`.

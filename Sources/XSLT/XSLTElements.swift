@@ -120,3 +120,29 @@ extension PureXML.XSLT.Transformer {
         return XSLTNumbering.format(numbers, spec.format, grouping)
     }
 }
+
+extension PureXML.XSLT.Transformer {
+    /// A literal result element: aliased name and attributes, the copied
+    /// 7.1.1 namespace declarations, then the shared element builder.
+    func literalResult(_ instruction: PureXML.XSLT.Instruction, _ context: PureXML.XSLT.XSLTContext) -> PureXML.XSLT.ResultItem {
+        guard case let .literalElement(name, attributes, namespaces, useAttributeSets, body) = instruction else {
+            return .node(.text(""))
+        }
+        let aliasedAttributes = attributes.map { PureXML.XSLT.LiteralAttribute(name: aliased($0.name), value: $0.value) }
+        // The copied namespace nodes (7.1.1) travel as xmlns attributes; the
+        // fixup pass reuses them and drops the ones already in scope. An
+        // aliased stylesheet namespace declares its result namespace instead.
+        var declarations: [PureXML.XSLT.LiteralAttribute] = []
+        for (prefix, uri) in namespaces.sorted(by: { $0.key < $1.key }) {
+            let alias = stylesheet.namespaceAliases[uri]
+            let resolvedPrefix = alias?.prefix ?? (prefix.isEmpty ? nil : prefix)
+            let resolvedURI = alias?.uri ?? uri
+            let attributeName = resolvedPrefix.map { "xmlns:" + $0 } ?? "xmlns"
+            declarations.append(PureXML.XSLT.LiteralAttribute(
+                name: PureXML.Model.QualifiedName(attributeName),
+                value: [.literal(resolvedURI)],
+            ))
+        }
+        return buildElement(name: aliased(name), literalAttributes: declarations + aliasedAttributes, useAttributeSets: useAttributeSets, body: body, context)
+    }
+}

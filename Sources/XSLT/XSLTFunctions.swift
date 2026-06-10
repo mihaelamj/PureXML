@@ -322,7 +322,12 @@ extension PureXML.Emitting.Options {
     /// caller's corresponding option untouched.
     func applying(_ output: PureXML.XSLT.Output) -> Self {
         var copy = self
-        if let indent = output.indent { copy.prettyPrint = indent }
+        if let indent = output.indent {
+            copy.prettyPrint = indent
+            // Xalan-style indentation: children on their own lines with no
+            // leading spaces (indent-amount 0), the conformance golds' form.
+            copy.indent = ""
+        }
         if let omit = output.omitXMLDeclaration { copy.includeXMLDeclaration = !omit }
         if let encoding = output.encoding { copy.encodingName = encoding }
         if let version = output.version { copy.xmlVersion = version }

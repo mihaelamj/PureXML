@@ -23,7 +23,7 @@ struct XSLTNamespaceAliasTests {
         #expect(try transform(style, "<x/>") == "<b:thing xmlns:b=\"urn:to\"/>")
     }
 
-    @Test("A non-aliased literal element is untouched")
+    @Test("A non-aliased literal element still copies in-scope declarations")
     func test_notAliased() throws {
         let style = """
         <xsl:stylesheet version="1.0" \(xsl) xmlns:a="urn:from" xmlns:b="urn:to">
@@ -32,7 +32,7 @@ struct XSLTNamespaceAliasTests {
           <xsl:template match="/"><plain/></xsl:template>
         </xsl:stylesheet>
         """
-        #expect(try transform(style, "<x/>") == "<plain/>")
+        #expect(try transform(style, "<x/>") == "<plain xmlns:b=\"urn:to\"/>")
     }
 
     @Test("namespace-alias can produce literal xsl: elements (stylesheet generation)")

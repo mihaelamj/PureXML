@@ -216,23 +216,13 @@ extension PureXML.XSLT.Transformer {
         return []
     }
 
-    /// Builds a literal result element, rewriting its name and attribute names
-    /// through any `xsl:namespace-alias` in effect.
-    private func literalResult(
-        _ name: PureXML.Model.QualifiedName,
-        _ attributes: [PureXML.XSLT.LiteralAttribute],
-        _ useAttributeSets: [String],
-        _ body: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> ResultItem {
-        let aliasedAttributes = attributes.map { PureXML.XSLT.LiteralAttribute(name: aliased($0.name), value: $0.value) }
-        return buildElement(name: aliased(name), literalAttributes: aliasedAttributes, useAttributeSets: useAttributeSets, body: body, context)
-    }
+    // Builds a literal result element, rewriting its name and attribute names
+    // through any `xsl:namespace-alias` in effect.
 
     private func structuralEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
         switch instruction {
-        case let .literalElement(name, attributes, useAttributeSets, body):
-            [literalResult(name, attributes, useAttributeSets, body, context)]
+        case .literalElement:
+            [literalResult(instruction, context)]
         case .element:
             elementInstruction(instruction, context)
         case let .attribute(nameTemplate, namespaceTemplate, namespaces, body):

@@ -95,7 +95,18 @@ enum XSLTNamespaceFixup {
 
     private static func fix(_ element: PureXML.Model.Element, inScope: [String: String], counter: inout Int) -> PureXML.Model.Element {
         var scope = inScope
-        var attributes = element.attributes
+        // A declaration that repeats an inherited binding is dropped: copied
+        // 7.1.1 namespace nodes travel on every literal element and would
+        // otherwise redeclare on each descendant.
+        var attributes = element.attributes.filter { attribute in
+            if attribute.name.prefix == "xmlns" {
+                return inScope[attribute.name.localName] != attribute.value
+            }
+            if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
+                return (inScope[""] ?? "") != attribute.value
+            }
+            return true
+        }
         enterDeclarations(attributes, into: &scope)
         fixElementName(element.name, scope: &scope, attributes: &attributes)
         // Attribute names: a namespaced attribute always needs a prefix.

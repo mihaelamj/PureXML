@@ -37,7 +37,7 @@ struct XSLTParserTests {
     @Test("A literal result element carries its children and apply-templates")
     func test_literalElement() throws {
         let sheet = try PureXML.XSLT.XSLTParser.parse(stylesheet)
-        guard case let .literalElement(name, _, _, body) = sheet.templates[0].body.first else {
+        guard case let .literalElement(name, _, _, _, body) = sheet.templates[0].body.first else {
             Issue.record("expected a literal element")
             return
         }
