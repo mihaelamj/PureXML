@@ -25,6 +25,20 @@ final class RNGCompiler {
     /// The start pattern contributed by an `include`d grammar (4.7), used when
     /// the including grammar declares no start of its own.
     private var includedStart: Pattern?
+    /// Each `grammar` element opens its own define scope; names are mangled
+    /// with the scope identifier so nested grammars do not collide and
+    /// `parentRef` reaches the enclosing grammar's scope.
+    private var scopeStack: [Int] = []
+    private var nextScope = 0
+
+    private func mangled(_ name: String) -> String {
+        "\(scopeStack.last ?? 0)\u{1}\(name)"
+    }
+
+    private func parentMangled(_ name: String) -> String {
+        let parent = scopeStack.count >= 2 ? scopeStack[scopeStack.count - 2] : (scopeStack.last ?? 0)
+        return "\(parent)\u{1}\(name)"
+    }
 
     /// The ns in scope at a schema node: its own/ancestor `ns` attribute, or
     /// the namespace inherited across the document boundary.
@@ -41,13 +55,21 @@ final class RNGCompiler {
     }
 
     private func grammar(_ node: Tree) -> Pattern {
-        for include in RNGNode.children(node, named: "include") {
+        scopeStack.append(nextScope)
+        nextScope += 1
+        let outerIncludedStart = includedStart
+        includedStart = nil
+        defer {
+            scopeStack.removeLast()
+            includedStart = outerIncludedStart
+        }
+        for include in RNGNode.components(node, named: "include") {
             mergeInclude(include)
         }
-        for define in RNGNode.children(node, named: "define") {
+        for define in RNGNode.components(node, named: "define") {
             addDefine(define)
         }
-        let starts = RNGNode.children(node, named: "start")
+        let starts = RNGNode.components(node, named: "start")
         guard let first = starts.first else {
             return includedStart ?? .notAllowed
         }
@@ -73,7 +95,8 @@ final class RNGCompiler {
     /// with `combine="choice"`/`"interleave"` merges with the existing one rather
     /// than replacing it (a plain redefinition still replaces).
     private func addDefine(_ define: Tree) {
-        guard let name = RNGNode.attribute(define, "name") else { return }
+        guard let rawName = RNGNode.attribute(define, "name") else { return }
+        let name = mangled(rawName)
         let pattern = combined(RNGNode.elementChildren(define), .sequence)
         if let method = RNGNode.attribute(define, "combine") {
             defineCombine[name] = method
@@ -105,10 +128,19 @@ final class RNGCompiler {
         if RNGNode.inheritedNS(grammar) == nil {
             fallbackNamespace = effectiveNS(node)
         }
-        for define in RNGNode.children(grammar, named: "define") {
+        // The included grammar's own includes merge first (4.7 is transitive).
+        for nested in RNGNode.components(grammar, named: "include") {
+            mergeInclude(nested)
+        }
+        // A define carried by the include element REPLACES the included
+        // grammar's define of the same name (4.7 override), so those names
+        // are skipped here and added from the include's children below.
+        let overrides = Set(RNGNode.children(node, named: "define").compactMap { RNGNode.attribute($0, "name") })
+        for define in RNGNode.components(grammar, named: "define") {
+            guard let name = RNGNode.attribute(define, "name"), !overrides.contains(name) else { continue }
             addDefine(define)
         }
-        if includedStart == nil, let start = RNGNode.children(grammar, named: "start").first {
+        if includedStart == nil, let start = RNGNode.components(grammar, named: "start").first {
             includedStart = combined(RNGNode.elementChildren(start), .sequence)
         }
         documentBase = outerBase
@@ -134,10 +166,20 @@ final class RNGCompiler {
         case "text": .text
         case "data": dataPattern(node)
         case "value": valuePattern(node)
-        case "ref": .ref(RNGNode.attribute(node, "name") ?? "")
-        case "externalRef": externalRef(node)
         case "element": element(node)
         case "attribute": attribute(node)
+        default: referencePattern(node)
+        }
+    }
+
+    /// The reference-shaped leaves: named refs (scope-mangled), parent refs,
+    /// nested grammars, and external references.
+    private func referencePattern(_ node: Tree) -> Pattern? {
+        switch RNGNode.localName(node) {
+        case "ref": .ref(mangled(RNGNode.attribute(node, "name") ?? ""))
+        case "parentRef": .ref(parentMangled(RNGNode.attribute(node, "name") ?? ""))
+        case "grammar": grammar(node)
+        case "externalRef": externalRef(node)
         default: nil
         }
     }
@@ -174,7 +216,7 @@ final class RNGCompiler {
     /// an unknown datatype, so the value matches nothing.
     private func valuePattern(_ node: Tree) -> Pattern {
         guard let type = valueType(node) else { return .notAllowed }
-        return .value(type, RNGNode.text(node))
+        return .value(type, RNGNode.rawText(node))
     }
 
     /// The datatype of a `<value>`: `token` when untyped, the library-resolved

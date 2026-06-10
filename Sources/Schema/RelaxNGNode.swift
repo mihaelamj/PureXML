@@ -40,6 +40,27 @@ enum RNGNode {
         node.stringValue.trimmingXMLWhitespace()
     }
 
+    /// The untrimmed text of a `<value>`: datatypes with whitespace-preserving
+    /// lexical spaces (built-in `string`) compare it exactly (6.2.9).
+    static func rawText(_ node: RNGTree) -> String {
+        node.stringValue
+    }
+
+    /// Grammar components with `<div>` wrappers flattened (4.11): a div's
+    /// children behave as if they appeared directly in the grammar, while the
+    /// div itself still contributes its ns/datatypeLibrary through the
+    /// ancestor walks.
+    static func grammarComponents(_ node: RNGTree) -> [RNGTree] {
+        elementChildren(node).flatMap { child -> [RNGTree] in
+            localName(child) == "div" ? grammarComponents(child) : [child]
+        }
+    }
+
+    /// The flattened components with a given local name.
+    static func components(_ node: RNGTree, named name: String) -> [RNGTree] {
+        grammarComponents(node).filter { localName($0) == name }
+    }
+
     static func strip(_ qualified: String) -> String {
         qualified.split(separator: ":").last.map(String.init) ?? qualified
     }

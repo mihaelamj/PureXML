@@ -93,7 +93,7 @@ extension PureXML.Schema {
                 type.valueMatches(string, literal: literal) ? .empty : .notAllowed
             case let .data(type): type.validate(string) == nil ? .empty : .notAllowed
             case let .dataExcept(type, except):
-                type.validate(string) == nil && !nullable(valueDeriv(except, string)) ? .empty : .notAllowed
+                type.validate(string) == nil && !nullable(textDeriv(except, string)) ? .empty : .notAllowed
             case let .list(inner): listMatches(inner, string) ? .empty : .notAllowed
             default: .notAllowed
             }
