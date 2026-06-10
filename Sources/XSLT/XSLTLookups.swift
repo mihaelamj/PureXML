@@ -21,28 +21,40 @@ extension PureXML.XSLT.Library {
         while let parent = documentRoot.parent {
             documentRoot = parent
         }
-        guard let declared = documents.idAttributes[ObjectIdentifier(documentRoot)], !declared.isEmpty else {
+        let rootIdentity = ObjectIdentifier(documentRoot)
+        guard let declared = documents.idAttributes[rootIdentity], !declared.isEmpty else {
             return .nodeSet([])
         }
-        var matched: [PureXML.XPath.Node] = []
-        collectIdentified(documentRoot, declared: declared, tokens: tokens, into: &matched)
+        // The index is built once per document, not re-walked per call.
+        let index: [String: PureXML.Model.TreeNode]
+        if let cached = documents.idIndexes[rootIdentity] {
+            index = cached
+        } else {
+            var built: [String: PureXML.Model.TreeNode] = [:]
+            buildIDIndex(documentRoot, declared: declared, into: &built)
+            documents.idIndexes[rootIdentity] = built
+            index = built
+        }
+        let matched = index.filter { tokens.contains($0.key) }.values
+            .map { PureXML.XPath.Node.tree($0) }
+            .sorted(by: PureXML.XPath.Node.precedes)
         return .nodeSet(matched)
     }
 
-    private static func collectIdentified(
+    /// Walks the document once, indexing every DTD-identified element by
+    /// its ID value; the first occurrence in document order wins.
+    private static func buildIDIndex(
         _ node: PureXML.Model.TreeNode,
         declared: [String: Set<String>],
-        tokens: Set<String>,
-        into matched: inout [PureXML.XPath.Node],
+        into index: inout [String: PureXML.Model.TreeNode],
     ) {
-        let idNames = node.name.flatMap { declared[$0.description] } ?? []
-        let identified = node.kind == .element && !idNames.isEmpty
-            && node.attributes.contains { idNames.contains($0.name.description) && tokens.contains($0.value) }
-        if identified {
-            matched.append(.tree(node))
+        if node.kind == .element, let name = node.name?.description, let idNames = declared[name] {
+            for attribute in node.attributes where idNames.contains(attribute.name.description) {
+                if index[attribute.value] == nil { index[attribute.value] = node }
+            }
         }
         for child in node.children {
-            collectIdentified(child, declared: declared, tokens: tokens, into: &matched)
+            buildIDIndex(child, declared: declared, into: &index)
         }
     }
 

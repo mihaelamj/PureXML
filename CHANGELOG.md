@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Scanner-side validity findings are now located structured values (validation-framework audit follow-up): `DocumentType.validityFindings` carries `ValidityFinding` values (reason plus the declared name they are about) instead of strings, `DTDSchema.declarationErrors` holds ready `ValidationError`s, and every declaration-level finding renders at its declaration's coding path (`x`, `r/@a`) instead of "at root of document", matching the XSD consistency-errors precedent. Finding texts are unchanged.
 
+### Fixed
+
+- Stylesheet composition cycles no longer crash (#130 critic loop): an include or import cycle (a.xsl includes b.xsl includes a.xsl) recursed without bound and killed the host with a stack overflow, a denial of service reachable from stylesheet data. The compile chain now tracks the active load chain by resolved href and drops re-entry, while diamond composition (two units legitimately loading the same sheet) keeps loading both copies with their own import precedences, per 2.6.2. id() also gains a per-document index built on first use instead of re-walking the whole document per call, matching key(). Cycle and diamond regression tests added.
+
 ### Added
 
 - Top-level stylesheet parameters (#141), nineteenth xalan burn-down (#130): `PureXML.XSLT.transform` accepts `parameters: [String: String]`, overriding `xsl:param` globals by name (xsl:variable globals are never overridable; the stylesheet records which names are parameters across imports and includes). The conformance runner honors the xalan harness contract, reading `<case>.param` files; en alphabet sorting passes, and the CRLF param files exposed a Swift grapheme gotcha (CRLF is one Character, so splitting on "\n" never splits; the runner splits on newline graphemes). Baseline 128 to 127; Polish/Russian alphabet tailoring stays baselined as the locale class.

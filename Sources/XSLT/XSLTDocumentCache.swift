@@ -33,6 +33,9 @@ extension PureXML.XSLT {
         /// name to the names of its ID-typed attributes. A document with no
         /// entry has no IDs (the XPath id() definition needs the DTD).
         var idAttributes: [ObjectIdentifier: [String: Set<String>]] = [:]
+        /// The id() index per document root, built on first use: ID value to
+        /// its element (the first in document order wins, per ID semantics).
+        var idIndexes: [ObjectIdentifier: [String: PureXML.Model.TreeNode]] = [:]
     }
 
     /// The ID-typed attributes a document type declares, element name to

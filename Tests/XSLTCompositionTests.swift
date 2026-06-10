@@ -203,4 +203,53 @@ struct XSLTCompositionTests {
         #expect(overridden == "<out>supplied-fixed</out>")
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<out>default-fixed</out>")
     }
+
+    @Test("An include or import cycle terminates instead of recursing forever")
+    func test_compositionCycle() throws {
+        let first = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:include href="b.xsl"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out/></xsl:template>
+        </xsl:stylesheet>
+        """
+        let second = """
+        <xsl:stylesheet version="1.0" \(xsl)><xsl:include href="a.xsl"/></xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: first,
+            source: "<x/>",
+            documentLoader: { ["a.xsl": first, "b.xsl": second][$0] },
+        )
+        #expect(result == "<out/>")
+    }
+
+    @Test("A diamond import stays legal: both sides load the shared sheet")
+    func test_diamondImport() throws {
+        let shared = """
+        <xsl:stylesheet version="1.0" \(xsl)><xsl:template match="item">S</xsl:template></xsl:stylesheet>
+        """
+        let left = """
+        <xsl:stylesheet version="1.0" \(xsl)><xsl:import href="shared.xsl"/></xsl:stylesheet>
+        """
+        let right = """
+        <xsl:stylesheet version="1.0" \(xsl)><xsl:import href="shared.xsl"/><xsl:template match="item">R<xsl:apply-imports/></xsl:template></xsl:stylesheet>
+        """
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:import href="left.xsl"/>
+          <xsl:import href="right.xsl"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:apply-templates select="//item"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<r><item/></r>",
+            documentLoader: { ["shared.xsl": shared, "left.xsl": left, "right.xsl": right][$0] },
+        )
+        // right.xsl wins (later import); its apply-imports reaches its own
+        // imported copy of shared.xsl.
+        #expect(result == "<out>RS</out>")
+    }
 }

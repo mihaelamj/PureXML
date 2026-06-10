@@ -59,10 +59,10 @@ extension PureXML.XSLT {
         /// import subtree, the set apply-imports searches. An included
         /// stylesheet's declarations join the including unit at its
         /// precedence; its imports join the including unit's import list.
-        static func compile(_ top: XSLTTree, loader: (String) -> String?, counter: inout Int, base: String = "") -> Stylesheet {
+        static func compile(_ top: XSLTTree, loader: (String) -> String?, counter: inout Int, base: String = "", chain: Set<String> = []) -> Stylesheet {
             var parts = Parts()
             let low = counter
-            var collector = XSLTUnitCollector(counter: counter)
+            var collector = XSLTUnitCollector(counter: counter, chain: chain)
             collectUnit(top, loader: loader, base: base, into: &collector, imports: &parts)
             counter = collector.counter
             let precedence = counter
@@ -88,11 +88,20 @@ extension PureXML.XSLT {
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
                 switch XSLTNode.localName(child) {
                 case "import":
-                    parts.fold(load(child, loader: loader, counter: &collector.counter, base: base), isImport: true)
-                case "include":
-                    if let (tree, resolved) = loadTree(child, loader: loader, base: base) {
+                    let loadedImport = loadTree(child, loader: loader, base: base)
+                    if let (tree, resolved) = loadedImport, !collector.chain.contains(resolved) {
                         collector.retainedRoots.append(tree)
+                        parts.fold(compile(tree, loader: loader, counter: &collector.counter, base: resolved, chain: collector.chain.union([resolved])), isImport: true)
+                    }
+                case "include":
+                    let loadedInclude = loadTree(child, loader: loader, base: base)
+                    if let (tree, resolved) = loadedInclude, !collector.chain.contains(resolved) {
+                        collector.retainedRoots.append(tree)
+                        // The include flattens into this unit: its href joins
+                        // the chain for the nested walk and leaves with it.
+                        collector.chain.insert(resolved)
                         collectUnit(tree, loader: loader, base: resolved, into: &collector, imports: &parts)
+                        collector.chain.remove(resolved)
                     }
                 default:
                     collector.declarations.append((child, base))
@@ -145,11 +154,6 @@ extension PureXML.XSLT {
                 return nil
             }
             return (top, resolved)
-        }
-
-        private static func load(_ node: XSLTTree, loader: (String) -> String?, counter: inout Int, base: String) -> Stylesheet? {
-            guard let (top, resolved) = loadTree(node, loader: loader, base: base) else { return nil }
-            return compile(top, loader: loader, counter: &counter, base: resolved)
         }
 
         private static func parseOutput(_ node: XSLTTree) -> Output {
