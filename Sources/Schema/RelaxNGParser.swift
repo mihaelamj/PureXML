@@ -7,11 +7,29 @@ private enum RNGNode {
     }
 
     static func attribute(_ node: Tree, _ name: String) -> String? {
-        node.attributes.first { $0.name.localName == name }?.value
+        let raw = node.attributes.first { $0.name.localName == name }?.value
+        // Simplification 4.2: the value of name, type, and combine attributes
+        // is whitespace-trimmed.
+        guard let raw, ["name", "type", "combine"].contains(name) else { return raw }
+        return raw.trimmingXMLWhitespace()
     }
 
+    /// The RELAX NG namespace; simplification 4.1 removes foreign-namespace
+    /// elements (annotations such as documentation or comments) before any
+    /// pattern interpretation.
+    static let relaxNGNamespace = "http://relaxng.org/ns/structure/1.0"
+
     static func elementChildren(_ node: Tree) -> [Tree] {
-        node.children.filter { $0.kind == .element }
+        node.children.filter { child in
+            guard child.kind == .element else { return false }
+            // Simplification 4.1: only RELAX NG-namespace elements are schema
+            // content. An element with no namespace counts as schema content
+            // only when the whole document is unqualified (leniency for
+            // namespace-less schemas); under a qualified parent it is foreign.
+            let uri = child.name?.namespaceURI
+            if uri == relaxNGNamespace { return true }
+            return uri == nil && node.name?.namespaceURI == nil
+        }
     }
 
     static func children(_ node: Tree, named name: String) -> [Tree] {
@@ -24,6 +42,39 @@ private enum RNGNode {
 
     static func strip(_ qualified: String) -> String {
         qualified.split(separator: ":").last.map(String.init) ?? qualified
+    }
+
+    /// Resolves `reference` against an optional base URI (RFC 3986), keeping a
+    /// relative base's merged form relative (the same adjustment external
+    /// identifiers use).
+    static func resolveRelative(_ reference: String, against base: String?) -> String {
+        guard let base, !base.isEmpty else { return reference }
+        let merged = PureXML.Canonical.Canonicalizer.resolveURI(reference, against: base)
+        let baseHasScheme = base.split(separator: "/", maxSplits: 1)[0].hasSuffix(":")
+        if !base.hasPrefix("/"), !baseHasScheme, !reference.hasPrefix("/"), merged.hasPrefix("/") {
+            return String(merged.dropFirst())
+        }
+        return merged
+    }
+
+    /// The `href` of an include/externalRef, resolved against the document's
+    /// base and the `xml:base` attributes in scope at the node (4.5).
+    static func resolvedHref(_ node: Tree, documentBase: String?) -> String? {
+        guard let href = attribute(node, "href") else { return nil }
+        var bases: [String] = []
+        var cursor: Tree? = node
+        while let current = cursor {
+            if let base = current.attributes.first(where: { $0.name.prefix == "xml" && $0.name.localName == "base" })?.value {
+                bases.append(base)
+            }
+            cursor = current.parent
+        }
+        if let documentBase { bases.append(documentBase) }
+        var resolved = href
+        for base in bases {
+            resolved = resolveRelative(resolved, against: base)
+        }
+        return resolved
     }
 }
 
@@ -38,6 +89,9 @@ private final class RNGCompiler {
     private(set) var defines: [String: Pattern] = [:]
     private let loader: (String) -> String?
     private var visited: Set<String> = []
+    /// The URI of the document currently being compiled (nil for the top
+    /// level): hrefs inside a loaded document resolve against it.
+    private var documentBase: String?
 
     init(loader: @escaping (String) -> String?) {
         self.loader = loader
@@ -78,16 +132,20 @@ private final class RNGCompiler {
     /// Merges an `include`d grammar: its `define`s first, then the `include`'s own
     /// nested `define`s, which override or (with `combine`) merge with them.
     private func mergeInclude(_ node: Tree) {
-        guard let href = RNGNode.attribute(node, "href"), !visited.contains(href),
+        guard let href = RNGNode.resolvedHref(node, documentBase: documentBase), !visited.contains(href),
               let text = loader(href), let root = try? PureXML.parseTree(text),
               let grammar = RNGNode.elementChildren(root).first
         else {
             return
         }
         visited.insert(href)
+        let outerBase = documentBase
+        documentBase = href
+        defer { documentBase = outerBase }
         for define in RNGNode.children(grammar, named: "define") {
             addDefine(define)
         }
+        documentBase = outerBase
         for define in RNGNode.children(node, named: "define") {
             addDefine(define)
         }
@@ -180,13 +238,16 @@ private final class RNGCompiler {
     /// Resolves an `externalRef` to the referenced schema's pattern, merging any
     /// grammar `define`s it carries into this compiler's table.
     private func externalRef(_ node: Tree) -> Pattern {
-        guard let href = RNGNode.attribute(node, "href"), !visited.contains(href),
+        guard let href = RNGNode.resolvedHref(node, documentBase: documentBase), !visited.contains(href),
               let text = loader(href), let root = try? PureXML.parseTree(text),
               let top = RNGNode.elementChildren(root).first
         else {
             return .notAllowed
         }
         visited.insert(href)
+        let outerBase = documentBase
+        documentBase = href
+        defer { documentBase = outerBase }
         return topLevel(top)
     }
 
