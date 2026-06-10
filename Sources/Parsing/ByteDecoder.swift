@@ -24,7 +24,27 @@ extension PureXML.Parsing {
             case .utf16LittleEndian: return try decodeUTF16(body, bigEndian: false)
             case .utf32BigEndian: return try decodeUTF32(body, bigEndian: true)
             case .utf32LittleEndian: return try decodeUTF32(body, bigEndian: false)
-            default: return String(decoding: body, as: UTF8.self)
+            default:
+                // Strict UTF-8: malformed sequences (overlongs, surrogate halves,
+                // truncated tails) are not well-formed input, not replaceable.
+                guard let decoded = validatedUTF8(body) else {
+                    throw PureXML.Parsing.ParseError.malformedEncoding
+                }
+                return decoded
+            }
+        }
+
+        /// Decodes UTF-8 strictly, returning nil on any malformed sequence.
+        private static func validatedUTF8(_ bytes: ArraySlice<UInt8>) -> String? {
+            var decoder = Unicode.UTF8()
+            var iterator = bytes.makeIterator()
+            var scalars = String.UnicodeScalarView()
+            while true {
+                switch decoder.decode(&iterator) {
+                case let .scalarValue(scalar): scalars.append(scalar)
+                case .emptyInput: return String(scalars)
+                case .error: return nil
+                }
             }
         }
 

@@ -16,22 +16,17 @@ struct W3CXMLSuiteTests {
     }
 
     /// Cases this implementation knowingly accepts although the suite marks
-    /// them not-well-formed. Two classes, tracked for later hardening: the
-    /// internal-subset scanner is deliberately lenient about DTD grammar
-    /// details (declaration syntax, conditional sections, parameter-entity
-    /// placement), and entity replacement text is not yet checked for
-    /// standalone well-formedness (tags spanning entity boundaries, partial
-    /// markup in values). The baseline below is exact, so any regression in
-    /// the cases that DO pass is still caught.
+    /// them not-well-formed. Two classes remain: deliberate internal-subset
+    /// extensions this package supports as features (conditional sections and
+    /// parameter-entity references in the internal subset: 063, 107, 160-162),
+    /// and entity replacement-text well-formedness (tags spanning entity
+    /// boundaries, references to external/unparsed entities in attribute
+    /// defaults, charref re-scan semantics), tracked in #120. The baseline is
+    /// exact, so any regression in the cases that DO pass is still caught.
     private let knownNotWFDeviations: Set<String> = [
-        "054.xml", "057.xml", "058.xml", "059.xml", "060.xml", "061.xml", "062.xml", "063.xml",
-        "064.xml", "065.xml", "066.xml", "067.xml", "068.xml", "069.xml", "074.xml", "078.xml",
-        "079.xml", "080.xml", "082.xml", "084.xml", "085.xml", "086.xml", "087.xml", "089.xml",
-        "090.xml", "091.xml", "092.xml", "096.xml", "101.xml", "102.xml", "103.xml", "107.xml",
-        "113.xml", "114.xml", "115.xml", "116.xml", "117.xml", "119.xml", "120.xml", "121.xml",
-        "140.xml", "141.xml", "149.xml", "153.xml", "158.xml", "160.xml", "161.xml", "162.xml",
-        "165.xml", "168.xml", "169.xml", "170.xml", "173.xml", "174.xml", "175.xml", "180.xml",
-        "182.xml",
+        "063.xml", "074.xml", "078.xml", "079.xml", "080.xml", "082.xml", "084.xml", "090.xml",
+        "092.xml", "103.xml", "107.xml", "115.xml", "116.xml", "117.xml", "119.xml", "120.xml",
+        "140.xml", "141.xml", "153.xml", "160.xml", "161.xml", "162.xml", "180.xml", "182.xml",
     ]
 
     /// valid/sa/114.xml: a CDATA section inside an entity value must protect

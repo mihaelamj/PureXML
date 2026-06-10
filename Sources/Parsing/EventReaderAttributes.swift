@@ -48,6 +48,9 @@ extension PureXML.Parsing.EventReader {
             if character == "<" {
                 throw PureXML.Parsing.ParseError.rawLessThanInAttribute(reader.mark)
             }
+            guard character.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isChar) else {
+                throw PureXML.Parsing.ParseError.invalidCharacter(reader.mark)
+            }
             raw.append(character)
             reader.advance()
         }

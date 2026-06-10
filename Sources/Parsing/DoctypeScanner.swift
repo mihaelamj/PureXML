@@ -26,9 +26,10 @@ extension PureXML.Parsing {
 }
 
 /// The mutable state of one DTD scan: the document type being built and the
-/// remaining parameter-entity expansion budget. File-scope and private: an
-/// internal detail of ``PureXML/Parsing/DoctypeScanner``.
-private struct DTDScanner {
+/// remaining parameter-entity expansion budget. An internal detail of
+/// ``PureXML/Parsing/DoctypeScanner``; the strict declaration grammar lives in
+/// DoctypeScannerStrict.swift.
+struct DTDScanner {
     typealias Reader = PureXML.Parsing.Reader
     typealias Mark = PureXML.Parsing.Mark
     typealias ParseError = PureXML.Parsing.ParseError
@@ -53,7 +54,7 @@ private struct DTDScanner {
         reader.skipSpace()
         _ = scanName(&reader)
         reader.skipSpace()
-        doctype.externalSubset = parseExternalID(&reader)
+        doctype.externalSubset = try parseStrictExternalID(&reader, requireSystem: true, at: mark)
         reader.skipSpace()
         if reader.consume("[") {
             try scanDeclarations(&reader, depth: 0, terminatedByBracket: true, at: mark)
@@ -161,16 +162,23 @@ private struct DTDScanner {
 
     private mutating func scanMarkupDeclaration(_ reader: inout Reader) throws {
         if reader.matches("<!ENTITY") {
-            scanEntityDeclaration(&reader)
+            try scanEntityDeclaration(&reader)
         } else if reader.matches("<!ELEMENT") {
             try scanElementDeclaration(&reader)
         } else if reader.matches("<!ATTLIST") {
-            scanAttributeListDeclaration(&reader)
+            try scanAttributeListDeclaration(&reader)
         } else if reader.matches("<!NOTATION") {
-            scanNotationDeclaration(&reader)
+            try scanNotationDeclaration(&reader)
         } else if reader.matches("<!--") {
             skip(&reader, until: "-->")
         } else if reader.matches("<?") {
+            // The reserved target 'xml' may not appear as a PI in the subset.
+            let mark = reader.mark
+            reader.consume("<?")
+            let target = scanName(&reader)
+            if target.lowercased() == "xml" {
+                throw ParseError.reservedProcessingInstructionTarget(mark)
+            }
             skip(&reader, until: "?>")
         } else if reader.matches("<!") {
             skip(&reader, until: ">")
@@ -197,34 +205,12 @@ private struct DTDScanner {
         try scanDeclarations(&sub, depth: depth + 1, terminatedByBracket: false, at: mark)
     }
 
-    private mutating func scanEntityDeclaration(_ reader: inout Reader) {
-        reader.consume("<!ENTITY")
-        reader.skipSpace()
-        let isParameter = reader.consume("%")
-        if isParameter {
-            reader.skipSpace()
-        }
-        let name = scanName(&reader)
-        reader.skipSpace()
-        if let value = scanLiteral(&reader) {
-            skip(&reader, until: ">")
-            storeEntity(name: name, value: expandParameterReferences(value), isParameter: isParameter)
-            return
-        }
-        let id = parseExternalID(&reader)
-        reader.skipSpace()
-        let notation = reader.consume("NDATA") ? notationName(&reader) : nil
-        skip(&reader, until: ">")
-        guard let id, !name.isEmpty else { return }
-        storeExternalEntity(name: name, id: id, isParameter: isParameter, notation: notation)
-    }
-
     /// Files an external entity declaration by kind: an `NDATA` entity is unparsed
     /// (recorded with its notation); an external general entity records its
     /// identifier for the resolver; an external parameter entity is loaded through
     /// the resolver so its replacement text is available for `%name;` expansion
     /// (the default refusing resolver loads nothing, keeping XXE closed).
-    private mutating func storeExternalEntity(name: String, id: ExternalID, isParameter: Bool, notation: String?) {
+    mutating func storeExternalEntity(name: String, id: ExternalID, isParameter: Bool, notation: String?) {
         if let notation, !notation.isEmpty, !isParameter {
             if doctype.unparsedEntities[name] == nil {
                 doctype.unparsedEntities[name] = PureXML.Parsing.UnparsedEntity(id: id, notation: notation)
@@ -238,24 +224,25 @@ private struct DTDScanner {
         }
     }
 
-    private mutating func notationName(_ reader: inout Reader) -> String {
+    mutating func notationName(_ reader: inout Reader) -> String {
         reader.skipSpace()
         return scanName(&reader)
     }
 
-    private mutating func scanNotationDeclaration(_ reader: inout Reader) {
+    private mutating func scanNotationDeclaration(_ reader: inout Reader) throws {
+        let mark = reader.mark
         reader.consume("<!NOTATION")
         reader.skipSpace()
         let name = scanName(&reader)
         reader.skipSpace()
-        let id = parseExternalID(&reader)
+        let id = try parseStrictExternalID(&reader, requireSystem: false, at: mark)
         skip(&reader, until: ">")
         if !name.isEmpty, let id, doctype.notations[name] == nil {
             doctype.notations[name] = id
         }
     }
 
-    private mutating func storeEntity(name: String, value: String, isParameter: Bool) {
+    mutating func storeEntity(name: String, value: String, isParameter: Bool) {
         guard !name.isEmpty else { return }
         if isParameter {
             if doctype.parameterEntities[name] == nil {
@@ -286,12 +273,21 @@ private struct DTDScanner {
         doctype.elementModels[name] = model
     }
 
-    private mutating func scanAttributeListDeclaration(_ reader: inout Reader) {
+    private mutating func scanAttributeListDeclaration(_ reader: inout Reader) throws {
+        let mark = reader.mark
         reader.consume("<!ATTLIST")
+        guard reader.peek()?.isWhitespace == true else {
+            throw ParseError.invalidAttributeListDeclaration(mark)
+        }
         reader.skipSpace()
         let name = scanName(&reader)
+        guard !name.isEmpty else {
+            throw ParseError.invalidAttributeListDeclaration(mark)
+        }
         let body = expandParameterReferences(readUntilClose(&reader))
-        guard !name.isEmpty else { return }
+        guard PureXML.Parsing.DTDAttListGrammar.isValid(body) else {
+            throw ParseError.invalidAttributeListDeclaration(mark)
+        }
         let trimmed = body.trimmingXMLWhitespace()
         if let existing = doctype.attributeLists[name] {
             doctype.attributeLists[name] = "\(existing) \(trimmed)"
@@ -306,7 +302,7 @@ extension DTDScanner {
     /// values. Undefined references are left literal. A single forward pass is
     /// enough because each value was expanded against the entities defined before
     /// it, so no reference can reach a later definition.
-    private func expandParameterReferences(_ raw: String) -> String {
+    func expandParameterReferences(_ raw: String) -> String {
         guard raw.contains("%") else { return raw }
         var result = ""
         var index = raw.startIndex
@@ -340,7 +336,7 @@ extension DTDScanner {
         return nil
     }
 
-    private func scanLiteral(_ reader: inout Reader) -> String? {
+    func scanLiteral(_ reader: inout Reader) -> String? {
         guard let quote = reader.peek(), quote == "\"" || quote == "'" else { return nil }
         reader.advance()
         var value = ""
@@ -362,7 +358,7 @@ extension DTDScanner {
         return text
     }
 
-    private func scanName(_ reader: inout Reader) -> String {
+    func scanName(_ reader: inout Reader) -> String {
         var name = ""
         while let character = reader.peek(), character.isXMLNameContinuation {
             name.append(character)
@@ -371,7 +367,7 @@ extension DTDScanner {
         return name
     }
 
-    private func skip(_ reader: inout Reader, until terminator: String) {
+    func skip(_ reader: inout Reader, until terminator: String) {
         while reader.peek() != nil, !reader.matches(terminator) {
             reader.advance()
         }

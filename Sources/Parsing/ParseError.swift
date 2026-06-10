@@ -50,6 +50,12 @@ public extension PureXML.Parsing {
         case reservedProcessingInstructionTarget(Mark)
         /// An `<!ELEMENT>` content model does not match the XML 1.0 grammar.
         case invalidContentModel(element: String, Mark)
+        /// An `<!ENTITY>` declaration does not match the XML 1.0 grammar.
+        case invalidEntityDeclaration(Mark)
+        /// An `<!ATTLIST>` declaration does not match the XML 1.0 grammar.
+        case invalidAttributeListDeclaration(Mark)
+        /// A public identifier literal contains a character outside `PubidChar`.
+        case invalidPublicIdentifier(Mark)
 
         public var description: String {
             switch self {
@@ -115,6 +121,12 @@ public extension PureXML.Parsing {
                 "the processing-instruction target 'xml' is reserved at \(mark)"
             case let .invalidContentModel(element, mark):
                 "the content model of <!ELEMENT \(element)> is malformed at \(mark)"
+            case let .invalidEntityDeclaration(mark):
+                "malformed <!ENTITY> declaration at \(mark)"
+            case let .invalidAttributeListDeclaration(mark):
+                "malformed <!ATTLIST> declaration at \(mark)"
+            case let .invalidPublicIdentifier(mark):
+                "public identifier contains an illegal character at \(mark)"
             case let .malformedDeclaration(mark):
                 "malformed XML declaration at \(mark)"
             }

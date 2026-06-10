@@ -26,8 +26,12 @@ public extension PureXML.Parsing {
             var declaration = XMLDeclaration()
             for pair in pairs {
                 switch pair.name {
-                case "version": declaration.version = pair.value
-                case "encoding": declaration.encoding = pair.value
+                case "version":
+                    guard isValidVersion(pair.value) else { return nil }
+                    declaration.version = pair.value
+                case "encoding":
+                    guard isValidEncodingName(pair.value) else { return nil }
+                    declaration.encoding = pair.value
                 case "standalone":
                     guard let flag = standaloneFlag(pair.value) else { return nil }
                     declaration.standalone = flag
@@ -47,6 +51,21 @@ public extension PureXML.Parsing {
                 last = position
             }
             return true
+        }
+
+        /// `VersionNum ::= '1.' [0-9]+`, exactly (no surrounding whitespace).
+        private static func isValidVersion(_ value: String) -> Bool {
+            guard value.hasPrefix("1.") else { return false }
+            let digits = value.dropFirst(2)
+            return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
+        }
+
+        /// `EncName ::= [A-Za-z] ([A-Za-z0-9._] | '-')*`.
+        private static func isValidEncodingName(_ value: String) -> Bool {
+            guard let first = value.first, first.isASCII, first.isLetter else { return false }
+            return value.dropFirst().allSatisfy { character in
+                character.isASCII && (character.isLetter || character.isNumber || character == "." || character == "_" || character == "-")
+            }
         }
 
         private static func standaloneFlag(_ value: String) -> Bool? {

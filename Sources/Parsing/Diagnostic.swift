@@ -40,7 +40,9 @@ public extension PureXML.Parsing.ParseError {
              let .junkAfterDocumentElement(mark), let .unsupportedDoctype(mark), let .malformedDeclaration(mark),
              let .doubleHyphenInComment(mark), let .rawLessThanInAttribute(mark),
              let .cdataCloseInContent(mark), let .missingSpaceBeforeAttribute(mark),
-             let .invalidCharacter(mark), let .reservedProcessingInstructionTarget(mark):
+             let .invalidCharacter(mark), let .reservedProcessingInstructionTarget(mark),
+             let .invalidEntityDeclaration(mark), let .invalidAttributeListDeclaration(mark),
+             let .invalidPublicIdentifier(mark):
             mark
         case let .unexpectedCharacter(_, mark), let .mismatchedEndTag(_, _, mark),
              let .duplicateAttribute(_, mark), let .invalidReference(_, mark),

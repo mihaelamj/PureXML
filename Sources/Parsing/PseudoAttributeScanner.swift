@@ -27,7 +27,10 @@ extension PureXML.Parsing.XMLDeclaration {
                 skipSpace()
                 guard let value = scanQuoted() else { return nil }
                 pairs.append(PseudoAttribute(name: name, value: value))
+                // Pseudo-attributes must be separated by whitespace.
+                let before = index
                 skipSpace()
+                if index == before, index < chars.count { return nil }
             }
             return pairs
         }
