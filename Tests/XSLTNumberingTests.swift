@@ -72,4 +72,13 @@ struct XSLTNumberingTests {
         let zero = try transform("<xsl:number value=\"0\" format=\"(I) \"/>", source: "<doc><mark/></doc>")
         #expect(zero == "<out>0 </out>")
     }
+
+    @Test("A value beyond 2^53 renders as a plain number without trapping")
+    func test_hugeValue() throws {
+        let result = try transform(
+            "<xsl:number value=\"99999999999999999999 * 99999999999999999999\"/>",
+            source: "<doc><mark/></doc>",
+        )
+        #expect(result == "<out>1" + String(repeating: "0", count: 40) + " </out>")
+    }
 }

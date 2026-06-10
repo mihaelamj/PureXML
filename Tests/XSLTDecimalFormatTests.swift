@@ -90,4 +90,19 @@ struct XSLTDecimalFormatTests {
     func test_fractionExact() throws {
         #expect(try transform(formatNumber("format-number(87504.4812, '000,000.000###')"), "<x/>") == "087,504.4812")
     }
+
+    @Test("Values beyond 2^53 format without trapping, digits exact")
+    func test_hugeValues() throws {
+        let huge = "99999999999999999999 * 99999999999999999999"
+        #expect(try transform(formatNumber("format-number(\(huge), '0')"), "<x/>")
+            == "1" + String(repeating: "0", count: 40))
+        #expect(try transform(formatNumber("format-number(\(huge), '#,##0')"), "<x/>")
+            == "10," + Array(repeating: "000", count: 13).joined(separator: ","))
+    }
+
+    @Test("A fraction picture beyond Double precision clamps to 18 places and pads")
+    func test_absurdFractionPicture() throws {
+        let result = try transform(formatNumber("format-number(0.5, '0.0000000000000000000000000')"), "<x/>")
+        #expect(result == "0.5" + String(repeating: "0", count: 24))
+    }
 }

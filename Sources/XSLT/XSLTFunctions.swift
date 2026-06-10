@@ -111,12 +111,16 @@ extension PureXML.XSLT {
         private static func render(_ value: Double, _ layout: NumberLayout, _ symbols: DecimalFormat) -> String {
             // One scaled rounding, then pure integer digit extraction: repeated
             // float multiplication would re-introduce representation error
-            // (0.4812 must render 4812, not 481199...).
+            // (0.4812 must render 4812, not 481199...). The scaled product must
+            // stay under 2^53 for exact integer extraction, so the picture's
+            // fraction places are clamped to 15 and padded back to the
+            // requested minimum.
+            let places = Swift.min(layout.maxFraction, 15)
             var scale = 1.0
-            for _ in 0 ..< layout.maxFraction {
+            for _ in 0 ..< places {
                 scale *= 10
             }
-            let (integerDigits, allFractionDigits) = digits(value, scale: scale, places: layout.maxFraction)
+            let (integerDigits, allFractionDigits) = digits(value, scale: scale, places: places)
             var paddedInteger = integerDigits
             while paddedInteger.count < Swift.max(1, layout.minInteger) {
                 paddedInteger = "0" + paddedInteger
@@ -128,17 +132,24 @@ extension PureXML.XSLT {
             while fractionDigits.count > layout.minFraction, fractionDigits.hasSuffix("0") {
                 fractionDigits.removeLast()
             }
+            while fractionDigits.count < layout.minFraction {
+                fractionDigits += "0"
+            }
             let fractionText = digitsToSymbols(fractionDigits, symbols)
             return fractionText.isEmpty ? integerText : integerText + String(symbols.decimalSeparator) + fractionText
         }
 
         /// The integer and fraction digit strings of `value` carried to
         /// `places` fraction digits, via a single scaled rounding when the
-        /// magnitude fits an Int exactly.
+        /// magnitude fits an Int exactly. Beyond 2^53 a Double holds no
+        /// fraction anyway, so the integer digits come from the exponent
+        /// expander and the fraction is zeros: no Double-to-Int conversion
+        /// here may trap, whatever the value or the picture.
         private static func digits(_ value: Double, scale: Double, places: Int) -> (String, String) {
             let scaled = (value * scale).rounded()
-            guard scaled < 9_007_199_254_740_992 else { // 2^53: beyond it Double has no fraction anyway
-                return (String(Int(value)), String(repeating: "0", count: places))
+            guard scaled.isFinite, scaled < 9_007_199_254_740_992, scale < 9_007_199_254_740_992 else {
+                let integer = PureXML.XPath.Value.format(value.rounded(.towardZero))
+                return (integer, String(repeating: "0", count: places))
             }
             let total = Int(scaled)
             let divisor = Int(scale)

@@ -12,7 +12,7 @@ extension PureXML.XSLT.Transformer {
         // context (its position and size in the selection, the caller's
         // variables and bindings), so position()-based keys work.
         let keyed = nodes.enumerated().map { offset, xnode -> SortEntry in
-            guard let owner = Self.ownerNode(xnode) else { return SortEntry(offset: offset, node: xnode, keys: []) }
+            guard let owner = Self.ownerNode(xnode) else { return SortEntry(offset: offset, node: xnode, keys: sorts.map { _ in "" }) }
             var keyContext = XSLTContext(
                 node: owner,
                 current: xnode.treeNode == nil ? xnode : nil,
