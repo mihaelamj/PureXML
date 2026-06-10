@@ -85,20 +85,17 @@ public extension PureXML.Validation {
             _ document: Document,
             _ errors: inout [ValidationError],
         ) {
-            var totals: [String: Int] = [:]
-            for child in children {
-                if case let .element(element) = child { totals[element.name.description, default: 0] += 1 }
+            let elementNames = children.compactMap { child -> String? in
+                guard case let .element(element) = child else { return nil }
+                return element.name.description
             }
-            var seen: [String: Int] = [:]
+            var steps = PathKey.steps(forChildNames: elementNames).makeIterator()
             for child in children {
-                guard case let .element(element) = child else {
+                guard case .element = child else {
                     walk(child, path: path, document, &errors)
                     continue
                 }
-                let name = element.name.description
-                let index = (seen[name] ?? 0) + 1
-                seen[name] = index
-                let step: PathKey = (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
+                let step = steps.next() ?? .element("")
                 walk(child, path: path + [step], document, &errors)
             }
         }

@@ -43,6 +43,24 @@ public extension PureXML.Validation {
                 key.intValue.map { "\(key.stringValue)[\($0)]" } ?? key.stringValue
             }.joined(separator: "/")
         }
+
+        /// One element step per child name, carrying a one-based sibling index
+        /// only when more than one child shares that name (the `xmlGetNodePath`
+        /// convention). The one shared path construction behind the validator
+        /// walk, the XSD content validator, and the identity validator, so
+        /// located errors can never disagree on a path.
+        static func steps(forChildNames names: [String]) -> [PathKey] {
+            var totals: [String: Int] = [:]
+            for name in names {
+                totals[name, default: 0] += 1
+            }
+            var seen: [String: Int] = [:]
+            return names.map { name in
+                let index = (seen[name] ?? 0) + 1
+                seen[name] = index
+                return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
+            }
+        }
     }
 
     /// The read-only bundle every check receives: the whole `Document` (the

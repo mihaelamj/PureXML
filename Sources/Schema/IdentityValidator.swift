@@ -90,17 +90,7 @@ extension PureXML.Schema {
         /// complex-type validator's path construction so identity-constraint
         /// errors and content errors locate consistently.
         private func childSteps(_ children: [PureXML.Model.TreeNode]) -> [PureXML.Validation.PathKey] {
-            var totals: [String: Int] = [:]
-            for child in children {
-                totals[child.name?.description ?? "", default: 0] += 1
-            }
-            var seen: [String: Int] = [:]
-            return children.map { child in
-                let name = child.name?.description ?? ""
-                let index = (seen[name] ?? 0) + 1
-                seen[name] = index
-                return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
-            }
+            PureXML.Validation.PathKey.steps(forChildNames: children.map { $0.name?.description ?? "" })
         }
 
         /// The coding-path steps from the constraint-bearing `container` down to a

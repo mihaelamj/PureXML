@@ -11,17 +11,7 @@ extension PureXML.Schema.ComplexValidator {
     /// The coding-path step for each child: its name, with a sibling index only
     /// when more than one child shares that name.
     static func childSteps(_ children: [PureXML.Model.Element]) -> [PureXML.Validation.PathKey] {
-        var totals: [String: Int] = [:]
-        for child in children {
-            totals[child.name.description, default: 0] += 1
-        }
-        var seen: [String: Int] = [:]
-        return children.map { child in
-            let name = child.name.description
-            let index = (seen[name] ?? 0) + 1
-            seen[name] = index
-            return (totals[name] ?? 0) > 1 ? .element(name, index: index) : .element(name)
-        }
+        PureXML.Validation.PathKey.steps(forChildNames: children.map(\.name.description))
     }
 
     /// Validates an `all` group order-independently: every child matches a
