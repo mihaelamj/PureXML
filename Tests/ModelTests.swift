@@ -18,6 +18,16 @@ struct ModelTests {
         #expect(name.localName == "element")
     }
 
+    @Test("A malformed colon placement does not split; the name stays unprefixed")
+    func test_qualifiedNameMalformedColons() {
+        for raw in [":local", "prefix:", "::"] {
+            let name = PureXML.Model.QualifiedName(raw)
+            #expect(name.prefix == nil, "'\(raw)' must not yield a prefix")
+            #expect(name.localName == raw, "'\(raw)' is kept whole")
+            #expect(name.description == raw)
+        }
+    }
+
     @Test("Element text concatenates text and CDATA children")
     func test_elementTextConcatenates() {
         let element = PureXML.Model.Element(

@@ -152,6 +152,14 @@ public extension PureXML {
     /// Parses an XML document into a mutable, parent-aware ``Model/TreeNode`` for
     /// in-place editing (insert, remove, replace, copy, and upward navigation).
     /// Serialize the result back with `serialize(tree.node)`.
+    ///
+    /// Ownership: a node holds its children strongly and its parent weakly, so
+    /// keep a reference to this returned tree (or a node's `ownerDocument`) while
+    /// using any node inside it; once the tree is released, a separately held
+    /// child's ancestry is gone. `TreeNode` is a mutable reference type with no
+    /// internal synchronization: confine a tree to one thread or actor, and
+    /// convert to the immutable, `Sendable` ``Model/Node`` (via `tree.node`) to
+    /// cross concurrency boundaries.
     static func parseTree(
         _ xml: String,
         limits: Parsing.Limits = .default,
@@ -178,6 +186,11 @@ public extension PureXML {
     /// ``Parsing/Diagnostic``s. The editor entry point: never throws, recovers in
     /// place, and lets a located validation finding be mapped to a source range
     /// via ``Model/TreeNode/node(at:)`` and the node's `sourceRange`.
+    ///
+    /// Ownership and threading: the same contract as ``parseTree(_:limits:resolver:)``,
+    /// hold the returned tree while using any node inside it (parents are weak),
+    /// confine it to one thread or actor, and cross concurrency boundaries with
+    /// the immutable `tree.node` instead.
     static func readTree(
         _ xml: String,
         limits: Parsing.Limits = .default,

@@ -23,7 +23,10 @@ public extension PureXML.Model {
             QualifiedName(prefix: prefix, localName: localName, namespaceURI: namespaceURI)
         }
 
-        /// Parses a raw `prefix:local` or bare `local` name.
+        /// Parses a raw `prefix:local` or bare `local` name. A malformed colon
+        /// placement (`:local`, `prefix:`, `::`) does not split: the whole string
+        /// is kept as an unprefixed local name rather than inventing an empty
+        /// prefix or local part.
         public init(_ raw: String) {
             namespaceURI = nil
             if let colon = raw.firstIndex(of: ":") {

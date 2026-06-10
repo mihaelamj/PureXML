@@ -34,6 +34,14 @@ public extension PureXML.Model {
     /// Build one from a parsed ``Node`` with ``init(_:)`` and convert back with
     /// ``node`` to serialize. A node has exactly one parent: attaching a node that
     /// already has one detaches it first, so the tree can never become a DAG.
+    ///
+    /// Ownership: because parents are weak, keep a reference to the tree's root
+    /// (or a node's ``ownerDocument``) while using any node inside it; a child
+    /// held on its own loses its ancestry the moment the rest of the tree is
+    /// released. Concurrency: `TreeNode` is deliberately not `Sendable`; it has
+    /// no internal synchronization, so confine a tree to one thread or actor and
+    /// cross concurrency boundaries with the immutable, `Sendable` ``Node``
+    /// projection (``node``) instead.
     final class TreeNode {
         /// The node kind. Fixed for a node's lifetime; change kind by replacing
         /// the node.
