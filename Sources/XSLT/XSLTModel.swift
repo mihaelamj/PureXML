@@ -258,6 +258,9 @@ public extension PureXML.XSLT {
         /// `xsl:decimal-format` declarations for `format-number`, keyed by name; the
         /// empty key is the default (unnamed) format.
         public var decimalFormats: [String: DecimalFormat]
+        /// The names of top-level xsl:param globals (overridable by
+        /// caller-supplied parameter values; xsl:variable globals are not).
+        public var parameterNames: Set<String> = []
         /// Whether the stylesheet mentions `disable-output-escaping` anywhere,
         /// so the serializer only post-processes raw-text markers when the
         /// feature can actually be in play (a source document that happens to

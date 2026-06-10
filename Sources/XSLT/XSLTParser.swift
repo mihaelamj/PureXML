@@ -105,7 +105,7 @@ extension PureXML.XSLT {
         private static func absorbDeclaration(_ child: XSLTTree, into parts: inout Parts, precedence: Int, low: Int) -> Bool {
             switch XSLTNode.localName(child) {
             case "template": parts.templates.append(template(child, precedence: precedence, low: low))
-            case "variable", "param": parts.globals.append(variable(child))
+            case "variable", "param": addGlobal(child, into: &parts)
             case "key": parts.keys.append(key(child))
             case "output": parts.output = parts.output.merged(with: parseOutput(child))
             case "strip-space": parts.stripSpace.formUnion(elementNames(child))
@@ -116,6 +116,15 @@ extension PureXML.XSLT {
             default: return false
             }
             return true
+        }
+
+        /// A top-level xsl:variable or xsl:param; param names are recorded
+        /// so caller-supplied values can override their defaults.
+        private static func addGlobal(_ child: XSLTTree, into parts: inout Parts) {
+            parts.globals.append(variable(child))
+            if XSLTNode.localName(child) == "param", let name = XSLTNode.attribute(child, "name") {
+                parts.parameterNames.insert(name)
+            }
         }
 
         /// The whitespace-separated element name tests of an `xsl:strip-space` or

@@ -184,4 +184,23 @@ struct XSLTCompositionTests {
         """
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<r><e a=\"1\"/></r>") == "distinct")
     }
+
+    @Test("Caller-supplied parameters override xsl:param defaults, not xsl:variable")
+    func test_topLevelParameters() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:param name="p" select="'default'"/>
+          <xsl:variable name="v" select="'fixed'"/>
+          <xsl:template match="/"><out><xsl:value-of select="$p"/>-<xsl:value-of select="$v"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let overridden = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<x/>",
+            parameters: ["p": "supplied", "v": "ignored"],
+        )
+        #expect(overridden == "<out>supplied-fixed</out>")
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<out>default-fixed</out>")
+    }
 }

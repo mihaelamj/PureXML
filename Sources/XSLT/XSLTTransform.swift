@@ -10,6 +10,7 @@ public extension PureXML.XSLT {
         options: PureXML.Emitting.Options = .compact,
         documentLoader: @escaping (String) -> String? = { _ in nil },
         baseURI: String = "",
+        parameters: [String: String] = [:],
     ) throws -> String {
         let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
@@ -21,7 +22,7 @@ public extension PureXML.XSLT {
         let root = PureXML.Model.TreeNode(parsed.node)
         let idAttributes = PureXML.XSLT.declaredIDAttributes(parsed.documentType)
         Whitespace.strip(root, stylesheet: sheet)
-        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader, idAttributes: idAttributes)
+        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader, idAttributes: idAttributes, parameters: parameters)
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         let method = sheet.output.method ?? defaultMethod(for: result)

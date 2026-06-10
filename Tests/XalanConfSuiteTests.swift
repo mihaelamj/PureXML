@@ -91,11 +91,33 @@ struct XalanConfSuiteTests {
         }
         let actual: String
         do {
-            actual = try PureXML.XSLT.transform(stylesheet: stylesheet, source: source, documentLoader: loader)
+            actual = try PureXML.XSLT.transform(
+                stylesheet: stylesheet,
+                source: source,
+                documentLoader: loader,
+                parameters: harnessParameters(directory + "/" + name + ".param"),
+            )
         } catch {
             return "transform threw: \(error)"
         }
         return Self.equivalent(actual: actual, gold: gold) ? nil : "output differs from gold"
+    }
+
+    /// The xalan harness contract: a `<case>.param` file supplies top-level
+    /// parameters as `name=value` lines (comments and blanks ignored, values
+    /// cut at whitespace).
+    private func harnessParameters(_ path: String) -> [String: String] {
+        guard let text = try? String(contentsOfFile: path, encoding: .utf8) else { return [:] }
+        var parameters: [String: String] = [:]
+        // CRLF is one Character in Swift: split on any newline grapheme.
+        for line in text.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty, !trimmed.hasPrefix("#"), let equals = trimmed.firstIndex(of: "=") else { continue }
+            let name = String(trimmed[..<equals])
+            let value = trimmed[trimmed.index(after: equals)...].split(whereSeparator: \.isWhitespace).first.map(String.init) ?? ""
+            parameters[name] = value
+        }
+        return parameters
     }
 
     /// Gold comparison: canonical XML when both sides parse (indentation is

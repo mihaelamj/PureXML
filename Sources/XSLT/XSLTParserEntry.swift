@@ -5,6 +5,7 @@ struct Parts {
     var keys: [PureXML.XSLT.Key] = []
     var output = PureXML.XSLT.Output()
     var stripSpace: Set<String> = []
+    var parameterNames: Set<String> = []
     var preserveSpace: Set<String> = []
     var attributeSets: [String: [PureXML.XSLT.AttributeSet]] = [:]
     var decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:]
@@ -19,7 +20,7 @@ struct Parts {
             guard let name = Self.globalName(instruction) else { return true }
             return seen.insert(name).inserted
         }.reversed()
-        return PureXML.XSLT.Stylesheet(
+        var sheet = PureXML.XSLT.Stylesheet(
             templates: templates,
             globals: resolvedGlobals,
             keys: keys,
@@ -30,6 +31,8 @@ struct Parts {
             decimalFormats: decimalFormats,
             namespaceAliases: namespaceAliases,
         )
+        sheet.parameterNames = parameterNames
+        return sheet
     }
 
     private static func globalName(_ instruction: PureXML.XSLT.Instruction) -> String? {
@@ -48,6 +51,7 @@ struct Parts {
         templates += sub.templates
         keys += sub.keys
         stripSpace.formUnion(sub.stripSpace)
+        parameterNames.formUnion(sub.parameterNames)
         preserveSpace.formUnion(sub.preserveSpace)
         attributeSets.merge(sub.attributeSets) { mine, theirs in mine + theirs }
         decimalFormats.merge(sub.decimalFormats) { _, theirs in theirs }

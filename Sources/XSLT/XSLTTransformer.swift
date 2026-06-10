@@ -24,12 +24,18 @@ extension PureXML.XSLT {
             termination.message
         }
 
+        /// Caller-supplied top-level parameter values, overriding xsl:param
+        /// defaults by name.
+        let parameters: [String: String]
+
         init(
             stylesheet: Stylesheet,
             root: PureXML.Model.TreeNode,
             documentLoader: @escaping (String) -> String? = { _ in nil },
             idAttributes: [String: Set<String>] = [:],
+            parameters: [String: String] = [:],
         ) {
+            self.parameters = parameters
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
@@ -69,6 +75,11 @@ extension PureXML.XSLT {
             var variables: [String: PureXML.XPath.Value] = [:]
             for global in stylesheet.globals {
                 if case let .variable(name, select, body) = global {
+                    // A caller-supplied value overrides an xsl:param default.
+                    if stylesheet.parameterNames.contains(name), let supplied = parameters[name] {
+                        variables[name] = .string(supplied)
+                        continue
+                    }
                     // Each global evaluates with every previously evaluated
                     // global in scope (a top-level variable may reference an
                     // earlier top-level param, directly or via call-template).
