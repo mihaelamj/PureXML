@@ -102,8 +102,8 @@ public extension PureXML.Validation {
         }
 
         /// In strict mode, every attribute is declared (VC: Attribute Value
-        /// Type). Namespace declarations are exempt: they are bindings, not
-        /// attributes, in the namespace-aware model.
+        /// Type), including namespace declarations: a DTD-valid namespaced
+        /// document declares its xmlns attributes.
         static var undeclaredAttributes: Validation<DTDElement, DTDSchema> {
             .init(description: "Every attribute is declared in the DTD") { context in
                 let element = context.subject
@@ -111,7 +111,6 @@ public extension PureXML.Validation {
                 return element.attributes
                     .filter { attribute in
                         let name = attribute.name.description
-                        guard name != "xmlns", !name.hasPrefix("xmlns:") else { return false }
                         return !declarations.contains { $0.name == name || $0.name == attribute.name.localName }
                     }
                     .map { DTDFailure(reason: "attribute '\($0.name.description)' on <\(element.name.description)> is not declared", at: context.codingPath) }

@@ -127,11 +127,14 @@ struct EntityResolverTests {
     }
 
     @Test("The external subset is not fetched without a resolver")
-    func test_externalSubsetNotFetchedByDefault() {
+    func test_externalSubsetNotFetchedByDefault() throws {
         let xml = "<!DOCTYPE r SYSTEM \"urn:dtd\"><r>&fromdtd;</r>"
-        #expect(throws: PureXML.Parsing.ParseError.self) {
-            _ = try PureXML.parse(xml, limits: dtdAllowed)
-        }
+        // Nothing external is fetched. Per production 68 the undeclared
+        // reference is a validity (not well-formedness) issue when an unread
+        // external subset might have declared it, so the reference stays
+        // literal in the text.
+        let node = try PureXML.parse(xml, limits: dtdAllowed)
+        #expect(text(of: node) == "&fromdtd;")
     }
 
     // MARK: Helpers

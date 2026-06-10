@@ -46,11 +46,30 @@ extension PureXML.Validation.DTDSchema {
                     findings.append("NOTATION attribute '\(declaration.name)' on '\(element)' lists undeclared notation '\(name)'")
                 }
             }
+            // Errata E2: tokens in an enumerated or NOTATION list must be
+            // distinct.
+            if let duplicate = duplicateToken(declaration.type) {
+                findings.append("attribute '\(declaration.name)' on '\(element)' repeats the token '\(duplicate)'")
+            }
             if let problem = defaultProblem(declaration) {
                 findings.append("attribute '\(declaration.name)' on '\(element)' \(problem)")
             }
         }
         return findings
+    }
+
+    /// The first repeated token of an enumerated or NOTATION type, or nil.
+    private static func duplicateToken(_ type: PureXML.Validation.AttributeType) -> String? {
+        let tokens: [String]
+        switch type {
+        case let .enumeration(allowed), let .notation(allowed): tokens = allowed
+        default: return nil
+        }
+        var seen: Set<String> = []
+        for token in tokens where !seen.insert(token).inserted {
+            return token
+        }
+        return nil
     }
 
     /// The first repeated name in a `(#PCDATA|a|b)` mixed model, or nil.

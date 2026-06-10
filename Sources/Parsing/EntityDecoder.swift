@@ -24,6 +24,26 @@ extension PureXML.Parsing {
             budget = expander.budget
             return expander.result
         }
+
+        /// Decodes like ``decode(_:entities:budget:at:)`` but treats an
+        /// undeclared entity as a validity finding instead of a fatal error
+        /// (production 68: with an external subset or parameter entities in
+        /// play, Entity Declared is a VC): the reference is kept literally and
+        /// its name appended to `undeclared`.
+        static func decodeLenient(
+            _ raw: String,
+            entities: [String: String],
+            budget: inout Int,
+            at mark: Mark,
+            undeclared: inout [String],
+        ) throws -> String {
+            guard raw.contains("&") else { return raw }
+            var expander = EntityExpander(entities: entities, mark: mark, budget: budget, undeclared: [])
+            try expander.expand(raw, visiting: [], counts: false)
+            budget = expander.budget
+            undeclared += expander.undeclared ?? []
+            return expander.result
+        }
     }
 }
 
@@ -154,6 +174,9 @@ private struct EntityExpander {
     let entities: [String: String]
     let mark: PureXML.Parsing.Mark
     var budget: Int
+    /// When non-nil, an undeclared entity is recorded here and kept literal
+    /// instead of throwing.
+    var undeclared: [String]?
     var result = ""
 
     mutating func expand(_ raw: String, visiting: Set<String>, counts: Bool) throws {
@@ -203,6 +226,11 @@ private struct EntityExpander {
             return
         }
         guard let replacement = entities[body] else {
+            if undeclared != nil {
+                undeclared?.append(body)
+                result += "&\(body);"
+                return
+            }
             throw PureXML.Parsing.ParseError.undefinedEntity(name: body, mark)
         }
         guard !visiting.contains(body) else {

@@ -51,12 +51,15 @@ extension PureXML.Parsing.EventReader {
             guard character.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isChar) else {
                 throw PureXML.Parsing.ParseError.invalidCharacter(reader.mark)
             }
-            raw.append(character)
+            // 3.3.3: a literal whitespace character in an attribute value
+            // normalizes to a space; this happens before reference decoding,
+            // so whitespace that arrives via a character reference survives.
+            raw.append(character.isXMLWhitespace ? " " : character)
             reader.advance()
         }
         guard reader.consume(String(quote)) else {
             throw PureXML.Parsing.ParseError.unexpectedEndOfInput(reader.mark)
         }
-        return try PureXML.Parsing.EntityDecoder.decode(raw, entities: referencableEntities, budget: &entityBudget, at: mark)
+        return try decodeReferences(raw, at: mark)
     }
 }

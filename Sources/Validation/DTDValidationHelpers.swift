@@ -6,7 +6,8 @@ extension PureXML.Validation.DTD {
         let content = childContent(of: element)
         switch model {
         case .empty:
-            return content.names.isEmpty && !content.hasText && !content.hasCDATA
+            // EMPTY admits nothing, not even whitespace (errata E15).
+            return content.names.isEmpty && !content.hasText && !content.hasCDATA && !content.hasWhitespaceText
                 ? []
                 : [DTDFailure(reason: "element <\(name)> is declared EMPTY but has content", at: path)]
         case .any:
@@ -63,6 +64,9 @@ extension PureXML.Validation.DTD {
     struct ChildContent {
         var names: [String] = []
         var hasText = false
+        /// Whitespace-only text, which is ignorable in element content but
+        /// still content for an EMPTY element.
+        var hasWhitespaceText = false
         /// Present CDATA sections, which count as character data in element
         /// content even when empty or whitespace-only.
         var hasCDATA = false
@@ -75,7 +79,11 @@ extension PureXML.Validation.DTD {
             case let .element(inner):
                 content.names.append(inner.name.description)
             case let .text(value):
-                if value.contains(where: { !$0.isWhitespace }) { content.hasText = true }
+                if value.contains(where: { !$0.isWhitespace }) {
+                    content.hasText = true
+                } else if !value.isEmpty {
+                    content.hasWhitespaceText = true
+                }
             case .cdata:
                 content.hasCDATA = true
             default:
@@ -99,10 +107,13 @@ extension PureXML.Validation.DTD {
         return raw.map { normalize($0, for: declaration.type) }
     }
 
-    /// The 3.3.3 tokenized normalization. CDATA values pass through untouched.
+    /// The 3.3.3 tokenized normalization: sequences of SPACE characters
+    /// collapse and outer spaces strip. Only #x20 counts; whitespace that
+    /// arrived through a character reference is data, not separation. CDATA
+    /// values pass through untouched.
     static func normalize(_ value: String, for type: PureXML.Validation.AttributeType) -> String {
         if case .cdata = type { return value }
-        return value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return value.split(separator: " ").joined(separator: " ")
     }
 
     /// The error when a `#REQUIRED` attribute is absent.
@@ -161,17 +172,18 @@ extension PureXML.Validation.DTD {
         let isNmtoken = PureXML.Parsing.XMLCharacter.isNmtoken
         let isName = PureXML.Parsing.XMLCharacter.isValidName
         let isEntity = { (token: String) in isName(token) && entities.contains(token) }
-        let tokens = value.split(whereSeparator: \.isWhitespace).map(String.init)
+        let tokens = value.split(separator: " ").map(String.init)
         let valid: Bool
         switch declaration.type {
         case .nmToken: valid = isNmtoken(value)
         case .nmTokens: valid = !tokens.isEmpty && tokens.allSatisfy(isNmtoken)
         case .entity: valid = isEntity(value)
         case .entities: valid = !tokens.isEmpty && tokens.allSatisfy(isEntity)
-        // The ID family must be lexical Names (VC: ID, IDREF); uniqueness and
-        // resolution are checked by the whole-tree integrity rule.
-        case .id, .idReference: valid = isName(value)
-        case .idReferences: valid = !tokens.isEmpty && tokens.allSatisfy(isName)
+        // The ID family must be lexical Names (VC: ID, IDREF), and NCNames
+        // under namespace validation (no colon); uniqueness and resolution
+        // are checked by the whole-tree integrity rule.
+        case .id, .idReference: valid = isName(value) && !value.contains(":")
+        case .idReferences: valid = !tokens.isEmpty && tokens.allSatisfy { isName($0) && !$0.contains(":") }
         case .cdata, .enumeration, .notation: return nil
         }
         guard !valid else { return nil }
@@ -245,7 +257,7 @@ extension PureXML.Validation.DTD {
             case .idReference:
                 references.append((value, name))
             case .idReferences:
-                for token in value.split(whereSeparator: { $0.isWhitespace }) {
+                for token in value.split(separator: " ") {
                     references.append((String(token), name))
                 }
             case .cdata, .enumeration, .notation, .nmToken, .nmTokens, .entity, .entities:

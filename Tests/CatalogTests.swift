@@ -67,9 +67,11 @@ struct CatalogTests {
     func test_noLoaderRefuses() throws {
         let resolver = try resolver().entityResolver { _ in nil }
         let xml = "<!DOCTYPE r SYSTEM \"http://example.com/note.dtd\"><r>&greeting;</r>"
-        #expect(throws: PureXML.Parsing.ParseError.self) {
-            _ = try PureXML.parse(xml, limits: .init(allowDoctype: true), resolver: resolver)
-        }
+        // Nothing is fetched; the reference the unread DTD might have
+        // declared stays literal (production 68 makes it a validity issue,
+        // not a well-formedness error).
+        let node = try PureXML.parse(xml, limits: .init(allowDoctype: true), resolver: resolver)
+        #expect(stringValue(node) == "&greeting;")
     }
 
     private func stringValue(_ node: PureXML.Model.Node) -> String {

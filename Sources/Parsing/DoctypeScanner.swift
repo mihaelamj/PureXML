@@ -220,7 +220,7 @@ struct DTDScanner {
             throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
         }
         reader.skipSpace()
-        let raw = readUntilClose(&reader)
+        let raw = recoveringDeclarationBody(readUntilClose(&reader), kind: "<!ELEMENT>", name: name)
         checkGroupNesting(raw, element: name)
         let model = expandParameterReferences(raw).trimmingXMLWhitespace()
         guard PureXML.Parsing.DTDContentModelGrammar.isValid(model) else {
@@ -248,7 +248,7 @@ struct DTDScanner {
         guard !name.isEmpty else {
             throw ParseError.invalidAttributeListDeclaration(mark)
         }
-        let body = expandParameterReferences(readUntilClose(&reader))
+        let body = expandParameterReferences(recoveringDeclarationBody(readUntilClose(&reader), kind: "<!ATTLIST>", name: name))
         guard let defaults = PureXML.Parsing.DTDAttListGrammar.defaultValues(body) else {
             throw ParseError.invalidAttributeListDeclaration(mark)
         }
@@ -300,14 +300,29 @@ extension DTDScanner {
         return value
     }
 
-    private func readUntilClose(_ reader: inout Reader) -> String {
+    /// Reads to the declaration's closing `>`. `closed` is false when the
+    /// input ended first, which can still be legal if a parameter-entity
+    /// replacement supplies the `>` (VC: Proper Declaration/PE Nesting).
+    private func readUntilClose(_ reader: inout Reader) -> (text: String, closed: Bool) {
         var text = ""
         while let character = reader.peek(), character != ">" {
             text.append(character)
             reader.advance()
         }
-        reader.consume(">")
-        return text
+        return (text, reader.consume(">"))
+    }
+
+    /// When a declaration's `>` came from a parameter-entity replacement (the
+    /// source ended first), records the VC: Proper Declaration/PE Nesting
+    /// finding and truncates the expanded body at that `>`.
+    mutating func recoveringDeclarationBody(_ read: (text: String, closed: Bool), kind: String, name: String) -> String {
+        guard !read.closed else { return read.text }
+        let expanded = expandParameterReferences(read.text)
+        guard let close = expanded.firstIndex(of: ">") else { return read.text }
+        doctype.validityFindings.append(
+            "the \(kind) declaration for '\(name)' is completed inside a parameter-entity replacement (VC: Proper Declaration/PE Nesting)",
+        )
+        return String(expanded[..<close])
     }
 
     func scanName(_ reader: inout Reader) -> String {

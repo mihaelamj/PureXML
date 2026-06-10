@@ -19,7 +19,7 @@ public extension PureXML.Parsing {
         var namespaces = NamespaceContext()
         /// The DTD information extracted so far (entities, element models,
         /// attribute lists, parameter entities, and external identifiers).
-        private(set) var documentType = DocumentType()
+        var documentType = DocumentType()
         /// The parsed XML declaration `<?xml ... ?>`, when the document opens with
         /// one; nil otherwise.
         var xmlDeclaration: XMLDeclaration?
@@ -91,15 +91,6 @@ public extension PureXML.Parsing {
             }
         }
 
-        /// The entity table visible to references. A standalone document must
-        /// not reference an entity declared outside its internal subset (WFC:
-        /// Entity Declared, 2.9), so external declarations are hidden and such
-        /// a reference reports as undeclared.
-        var referencableEntities: [String: String] {
-            guard xmlDeclaration?.standalone == true else { return documentType.entities }
-            return documentType.entities.filter { documentType.internalEntities.contains($0.key) }
-        }
-
         private mutating func nextAtTopLevel() throws -> Event? {
             while true {
                 reader.skipSpace()
@@ -153,10 +144,14 @@ public extension PureXML.Parsing {
                 }
                 eventStart = reader.mark
                 if reader.matches("</") { return try scanEndTag() }
-                if reader.matches("<!--") { return try scanComment() }
+                if reader.matches("<!--") {
+                    recordEmptyElementContent("a comment")
+                    return try scanComment()
+                }
                 if reader.matches("<![CDATA[") { return try scanCDATA() }
                 if reader.matches("<?") {
                     let mark = reader.mark
+                    recordEmptyElementContent("a processing instruction")
                     let instruction = try scanProcessingInstruction()
                     if instruction.target.lowercased() == "xml" {
                         throw ParseError.reservedProcessingInstructionTarget(mark)
@@ -239,20 +234,21 @@ public extension PureXML.Parsing {
                 raw.append(character)
                 reader.advance()
             }
-            let entities = referencableEntities
-            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: entities) : nil
+            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: referencableEntities) : nil
             if let split {
                 let replacement = try EntityDecoder.includeForContent(
                     split.name,
-                    entities: entities,
+                    entities: referencableEntities,
                     budget: &entityBudget,
                     at: mark,
                 )
                 reader.inject(replacement + split.remainder)
-                let prefix = try EntityDecoder.decode(split.prefix, entities: entities, budget: &entityBudget, at: mark)
+                let prefix = try decodeReferences(split.prefix, at: mark)
                 return prefix.isEmpty ? nil : .characters(prefix)
             }
-            return try .characters(EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark))
+            let decoded = try decodeReferences(raw, at: mark)
+            recordReferenceContentFindings(raw: raw, decoded: decoded)
+            return .characters(decoded)
         }
 
         private mutating func scanProcessingInstruction() throws -> (target: String, data: String) {
