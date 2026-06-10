@@ -47,9 +47,32 @@ extension PureXML.XSLT.Transformer {
         } else if let caseOrder = sort.caseOrder {
             order = caseInsensitiveCompare(left, right, caseOrder)
         } else {
-            order = left == right ? 0 : (left < right ? -1 : 1)
+            order = collate(left, right)
         }
         return sort.descending ? -order : order
+    }
+
+    /// Text sort order: spaces are ignorable at the primary level (Java
+    /// Collator semantics, which the conformance golds encode); when the
+    /// space-stripped strings tie, the string whose first space comes later
+    /// (or that has none) sorts first.
+    static func collate(_ left: String, _ right: String) -> Int {
+        let strippedLeft = left.filter { $0 != " " }
+        let strippedRight = right.filter { $0 != " " }
+        if strippedLeft != strippedRight {
+            return strippedLeft < strippedRight ? -1 : 1
+        }
+        let leftSpaces = spacePositions(left)
+        let rightSpaces = spacePositions(right)
+        if leftSpaces == rightSpaces { return 0 }
+        for (leftIndex, rightIndex) in zip(leftSpaces, rightSpaces) where leftIndex != rightIndex {
+            return leftIndex > rightIndex ? -1 : 1
+        }
+        return leftSpaces.count < rightSpaces.count ? -1 : 1
+    }
+
+    private static func spacePositions(_ text: String) -> [Int] {
+        text.enumerated().compactMap { $1 == " " ? $0 : nil }
     }
 
     func forEach(

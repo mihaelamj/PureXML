@@ -113,7 +113,6 @@ sort/sort-alphabet-english
 sort/sort-alphabet-polish
 sort/sort-alphabet-russian
 sort/sort02
-sort/sort08
 sort/sort10
 sort/sort14
 sort/sort27
