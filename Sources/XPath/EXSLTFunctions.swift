@@ -63,7 +63,7 @@ extension PureXML.XPath {
             guard !target.isNaN else { return [] }
             return nodes
                 .filter { PureXML.XPath.Value.parseNumber($0.stringValue) == target }
-                .sorted(by: Node.precedes)
+                .sortedByDocumentOrder()
         }
 
         // MARK: sets
@@ -84,7 +84,7 @@ extension PureXML.XPath {
             guard let nodes = value?.nodes else { return [] }
             var seen: Set<String> = []
             var result: [Node] = []
-            for node in nodes.sorted(by: Node.precedes) where seen.insert(node.stringValue).inserted {
+            for node in nodes.sortedByDocumentOrder() where seen.insert(node.stringValue).inserted {
                 result.append(node)
             }
             return result
@@ -93,13 +93,13 @@ extension PureXML.XPath {
         private static func difference(_ arguments: [Value]) -> [Node] {
             let first = arguments.first?.nodes ?? []
             let second = Set(arguments.count > 1 ? arguments[1].nodes ?? [] : [])
-            return first.filter { !second.contains($0) }.sorted(by: Node.precedes)
+            return first.filter { !second.contains($0) }.sortedByDocumentOrder()
         }
 
         private static func intersection(_ arguments: [Value]) -> [Node] {
             let first = arguments.first?.nodes ?? []
             let second = Set(arguments.count > 1 ? arguments[1].nodes ?? [] : [])
-            return first.filter { second.contains($0) }.sorted(by: Node.precedes)
+            return first.filter { second.contains($0) }.sortedByDocumentOrder()
         }
 
         private static func hasSameNode(_ arguments: [Value]) -> Bool {
@@ -111,12 +111,17 @@ extension PureXML.XPath {
         /// (or follow) the first node, in document order, of the second set.
         private static func relative(_ arguments: [Value], leading: Bool) -> [Node] {
             let first = arguments.first?.nodes ?? []
-            guard let pivot = (arguments.count > 1 ? arguments[1].nodes ?? [] : []).min(by: Node.precedes) else {
+            guard let pivot = (arguments.count > 1 ? arguments[1].nodes ?? [] : []).firstInDocumentOrder() else {
                 return []
             }
+            // Decorate once: each node's order key is computed a single time and
+            // reused for both the pivot comparison and the final sort.
+            let pivotKey = pivot.documentOrder
             return first
-                .filter { leading ? Node.precedes($0, pivot) : Node.precedes(pivot, $0) }
-                .sorted(by: Node.precedes)
+                .map { (node: $0, key: $0.documentOrder) }
+                .filter { leading ? Node.ordered($0.key, before: pivotKey) : Node.ordered(pivotKey, before: $0.key) }
+                .sorted { Node.ordered($0.key, before: $1.key) }
+                .map(\.node)
         }
     }
 }

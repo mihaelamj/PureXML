@@ -30,7 +30,7 @@ extension PureXML.XPath {
 
         private static func target(_ arguments: [Value], _ context: EvaluationContext) -> Node? {
             if arguments.isEmpty { return context.node }
-            return arguments.first?.nodes?.min(by: Node.precedes)
+            return arguments.first?.nodes?.firstInDocumentOrder()
         }
 
         private static func identified(_ argument: Value?, _ context: EvaluationContext) -> [Node] {

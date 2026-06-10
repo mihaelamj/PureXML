@@ -162,7 +162,7 @@ extension PureXML.XPath {
             for node in nodes where seen.insert(node).inserted {
                 unique.append(node)
             }
-            return unique.sorted(by: Node.precedes)
+            return unique.sortedByDocumentOrder()
         }
 
         private static func root(of node: Node) -> Node {

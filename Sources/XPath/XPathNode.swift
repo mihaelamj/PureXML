@@ -118,14 +118,38 @@ public extension PureXML.XPath {
             return path.reversed()
         }
 
-        /// Whether `lhs` precedes `rhs` in document order.
+        /// Whether `lhs` precedes `rhs` in document order. Each call recomputes
+        /// both order keys; for sorts and minimums over node-sets, prefer
+        /// ``Swift/Sequence/sortedByDocumentOrder()`` and
+        /// ``Swift/Sequence/firstInDocumentOrder()``, which compute each key once.
         static func precedes(_ lhs: Node, _ rhs: Node) -> Bool {
-            let left = lhs.documentOrder
-            let right = rhs.documentOrder
+            ordered(lhs.documentOrder, before: rhs.documentOrder)
+        }
+
+        /// Lexicographic compare of two document-order keys.
+        static func ordered(_ left: [Int], before right: [Int]) -> Bool {
             for (one, two) in zip(left, right) where one != two {
                 return one < two
             }
             return left.count < right.count
         }
+    }
+}
+
+extension Sequence<PureXML.XPath.Node> {
+    /// The nodes sorted into document order, computing each node's order key once
+    /// (decorate-sort-undecorate) rather than recomputing the root path on every
+    /// comparison, which turns an O(n log n x depth) sort into O(n log n).
+    func sortedByDocumentOrder() -> [PureXML.XPath.Node] {
+        map { (node: $0, key: $0.documentOrder) }
+            .sorted { PureXML.XPath.Node.ordered($0.key, before: $1.key) }
+            .map(\.node)
+    }
+
+    /// The first node in document order, computing each node's order key once.
+    func firstInDocumentOrder() -> PureXML.XPath.Node? {
+        map { (node: $0, key: $0.documentOrder) }
+            .min { PureXML.XPath.Node.ordered($0.key, before: $1.key) }?
+            .node
     }
 }

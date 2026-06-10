@@ -37,7 +37,7 @@ public extension PureXML.XPath {
         public var string: String {
             switch self {
             case let .nodeSet(nodes):
-                guard let first = nodes.min(by: Node.precedes) else { return "" }
+                guard let first = nodes.firstInDocumentOrder() else { return "" }
                 return first.stringValue
             case let .boolean(value): return value ? "true" : "false"
             case let .number(value): return Self.format(value)
