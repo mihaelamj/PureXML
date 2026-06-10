@@ -94,6 +94,10 @@ flowchart TB
   Japanese["#126 japanese section: complete, zero deviations"]:::done
   Eduni["#127 eduni: runner + exact baselines, four classified deviations"]:::done
   StrictSubset["#128 strict internal-subset profile: xmltest 185/186"]:::todo
+  ScalarLex["#135 scalar-level lexing (grapheme clusters)"]:::todo
+  NSConstraints["#136 namespace constraints"]:::todo
+  EncodingMismatch["#137 encoding-declaration mismatches"]:::todo
+  BaseURI["#138 per-entity base URIs"]:::todo
   Epic122["#122 official spec suites"]:::epic
   XSTS["#129 W3C XSD test suite (XSTS)"]:::todo
   XSLTTS["#130 OASIS XSLT 1.0 suite (+XPath corpus)"]:::todo
@@ -107,6 +111,10 @@ flowchart TB
   Epic121 --> Japanese
   Epic121 --> Eduni
   Epic121 --> StrictSubset
+  Epic121 --> ScalarLex
+  Epic121 --> NSConstraints
+  Epic121 --> EncodingMismatch
+  Epic121 --> BaseURI
   Epic122 --> XSTS
   Epic122 --> XSLTTS
   Epic122 --> RNGTS
