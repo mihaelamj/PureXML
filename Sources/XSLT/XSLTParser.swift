@@ -1,48 +1,8 @@
 typealias XSLTTree = PureXML.Model.TreeNode
 
-/// The accumulating declarations of a stylesheet as its top-level elements are
-/// compiled, plus the folding of an included or imported sub-stylesheet. File
-/// scope and private.
-private struct Parts {
-    var templates: [PureXML.XSLT.Template] = []
-    var globals: [PureXML.XSLT.Instruction] = []
-    var keys: [PureXML.XSLT.Key] = []
-    var output = PureXML.XSLT.Output()
-    var stripSpace: Set<String> = []
-    var preserveSpace: Set<String> = []
-    var attributeSets: [String: PureXML.XSLT.AttributeSet] = [:]
-    var decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:]
-    var namespaceAliases: [String: PureXML.XSLT.NamespaceAlias] = [:]
-
-    var stylesheet: PureXML.XSLT.Stylesheet {
-        PureXML.XSLT.Stylesheet(
-            templates: templates,
-            globals: globals,
-            keys: keys,
-            output: output,
-            stripSpace: stripSpace,
-            preserveSpace: preserveSpace,
-            attributeSets: attributeSets,
-            decimalFormats: decimalFormats,
-            namespaceAliases: namespaceAliases,
-        )
-    }
-
-    /// Folds a sub-stylesheet in: an import has lower precedence, so its globals
-    /// come before and its output is overridden by this stylesheet's.
-    mutating func fold(_ sub: PureXML.XSLT.Stylesheet?, isImport: Bool) {
-        guard let sub else { return }
-        templates += sub.templates
-        keys += sub.keys
-        stripSpace.formUnion(sub.stripSpace)
-        preserveSpace.formUnion(sub.preserveSpace)
-        attributeSets.merge(sub.attributeSets) { mine, _ in mine }
-        decimalFormats.merge(sub.decimalFormats) { mine, _ in mine }
-        namespaceAliases.merge(sub.namespaceAliases) { mine, _ in mine }
-        globals = isImport ? sub.globals + globals : globals + sub.globals
-        output = isImport ? sub.output.merged(with: output) : output.merged(with: sub.output)
-    }
-}
+// The accumulating declarations of a stylesheet as its top-level elements are
+// compiled, plus the folding of an included or imported sub-stylesheet. File
+// scope and private.
 
 /// XSLTTree helpers for the XSLT parser. File-scope and private.
 enum XSLTNode {
@@ -91,23 +51,8 @@ extension PureXML.XSLT {
     /// vocabulary is recognized by namespace or the `xsl` prefix; other elements
     /// are literal result elements.
     enum XSLTParser {
-        static func parse(_ xsl: String, loader: (String) -> String? = { _ in nil }) throws -> Stylesheet {
-            let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true))
-            guard let top = stylesheetElement(root) else { throw XSLTError.notAStylesheet }
-            return compile(top, loader: loader, precedence: 0)
-        }
-
-        private static func stylesheetElement(_ root: XSLTTree) -> XSLTTree? {
-            guard let top = XSLTNode.elementChildren(root).first, XSLTNode.isXSL(top),
-                  XSLTNode.localName(top) == "stylesheet" || XSLTNode.localName(top) == "transform"
-            else {
-                return nil
-            }
-            return top
-        }
-
         /// Compiles a stylesheet element, folding in `xsl:include`/`xsl:import`.
-        private static func compile(_ top: XSLTTree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
+        static func compile(_ top: XSLTTree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
             var parts = Parts()
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
                 absorb(child, into: &parts, loader: loader, precedence: precedence)
@@ -227,7 +172,7 @@ extension PureXML.XSLT {
             node.children.compactMap(instruction)
         }
 
-        private static func instruction(_ node: XSLTTree) -> Instruction? {
+        static func instruction(_ node: XSLTTree) -> Instruction? {
             switch node.kind {
             case .text, .cdata:
                 let value = node.value

@@ -30,7 +30,20 @@ public extension PureXML.XSLT {
             if sheet.output.omitXMLDeclaration == nil { emitOptions.includeXMLDeclaration = true }
             body = PureXML.serialize(prepared, options: emitOptions)
         }
-        return doctype(for: result, sheet.output) + RawText.resolve(body)
+        // The XML declaration stays first; the doctype follows it.
+        let resolved = RawText.resolve(body)
+        let documentType = doctype(for: result, sheet.output, method: method)
+        guard !documentType.isEmpty else { return resolved }
+        if resolved.hasPrefix("<?xml "), let end = rangeOf("?>", in: resolved[...]) {
+            var prolog = String(resolved[..<end.upperBound])
+            var rest = String(resolved[end.upperBound...])
+            if rest.hasPrefix("\n") {
+                prolog += "\n"
+                rest.removeFirst()
+            }
+            return prolog + documentType + rest
+        }
+        return documentType + resolved
     }
 
     /// The default output method (16.1): html when the first element of the
@@ -94,14 +107,49 @@ public extension PureXML.XSLT {
             return .document(children.map { withCDATASections($0, names) })
         case let .element(element):
             let wrap = names.contains(element.name.localName) || names.contains(element.name.description)
-            let children = element.children.map { child -> PureXML.Model.Node in
-                if wrap, case let .text(value) = child { return .cdata(value) }
-                return withCDATASections(child, names)
+            let children = element.children.flatMap { child -> [PureXML.Model.Node] in
+                if wrap, case let .text(value) = child { return cdataNodes(value) }
+                return [withCDATASections(child, names)]
             }
             return .element(.init(name: element.name, attributes: element.attributes, children: children))
         default:
             return node
         }
+    }
+
+    /// Text as CDATA nodes, with any "]]>" split across section boundaries
+    /// ("]]" ends one section, ">" starts the next) so no section contains
+    /// the terminator.
+    private static func cdataNodes(_ text: String) -> [PureXML.Model.Node] {
+        var parts: [String] = []
+        var remainder = text[...]
+        while let range = rangeOf("]]>", in: remainder) {
+            parts.append(String(remainder[..<range.lowerBound]))
+            remainder = remainder[range.upperBound...]
+        }
+        parts.append(String(remainder))
+        guard parts.count > 1 else { return [.cdata(text)] }
+        return parts.enumerated().map { offset, part in
+            let lead = offset > 0 ? ">" : ""
+            let trail = offset < parts.count - 1 ? "]]" : ""
+            return .cdata(lead + part + trail)
+        }
+    }
+
+    /// The first occurrence of `needle` in `haystack` (a Foundation-free
+    /// substring search).
+    private static func rangeOf(_ needle: String, in haystack: Substring) -> Range<String.Index>? {
+        guard !needle.isEmpty else { return nil }
+        var start = haystack.startIndex
+        while let first = haystack[start...].firstIndex(of: needle.first ?? " ") {
+            let end = haystack.index(first, offsetBy: needle.count, limitedBy: haystack.endIndex)
+            if haystack[first...].hasPrefix(needle), let end {
+                return first ..< end
+            }
+            start = haystack.index(after: first)
+            if start >= haystack.endIndex { break }
+        }
+        return nil
     }
 
     /// Wraps `loader` so a relative URI (from `document()`, `xsl:include`, or
@@ -114,10 +162,19 @@ public extension PureXML.XSLT {
 
     /// The `<!DOCTYPE …>` prologue for the result's root element when the output
     /// declares `doctype-system` (optionally with `doctype-public`), else empty.
-    private static func doctype(for result: PureXML.Model.Node, _ output: Output) -> String {
-        guard let system = output.doctypeSystem, let name = rootName(of: result) else { return "" }
-        let external = output.doctypePublic.map { "PUBLIC \"\($0)\" \"\(system)\"" } ?? "SYSTEM \"\(system)\""
-        return "<!DOCTYPE \(name) \(external)>\n"
+    private static func doctype(for result: PureXML.Model.Node, _ output: Output, method: String) -> String {
+        guard let name = rootName(of: result) else { return "" }
+        if let system = output.doctypeSystem {
+            let external = output.doctypePublic.map { "PUBLIC \"\($0)\" \"\(system)\"" } ?? "SYSTEM \"\(system)\""
+            return "<!DOCTYPE \(name) \(external)>\n"
+        }
+        // Without a system identifier only the html method emits a doctype
+        // (16.1: the xml method requires doctype-system; 16.2 allows
+        // public-only for html).
+        if method == "html", let publicID = output.doctypePublic {
+            return "<!DOCTYPE \(name) PUBLIC \"\(publicID)\">\n"
+        }
+        return ""
     }
 
     private static func rootName(of node: PureXML.Model.Node) -> String? {
