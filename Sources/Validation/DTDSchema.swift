@@ -11,10 +11,19 @@ public extension PureXML.Validation {
         /// The names of declared unparsed (`NDATA`) entities, against which an
         /// `ENTITY`/`ENTITIES` attribute value is checked.
         let unparsedEntities: Set<String>
+        /// The `<!DOCTYPE name ...>` name the root element must match
+        /// (VC: Root Element Type).
+        let doctypeName: String?
+        /// Validity findings about the declarations themselves (duplicate
+        /// element types, repeated mixed-content names, multiple ID attributes,
+        /// undeclared notations in NOTATION lists, illegal attribute defaults),
+        /// reported once per validation at the document root.
+        let declarationErrors: [String]
 
         init(_ documentType: PureXML.Parsing.DocumentType) {
             notations = Set(documentType.notations.keys)
             unparsedEntities = Set(documentType.unparsedEntities.keys)
+            doctypeName = documentType.name
             var parsedModels: [String: ContentModel] = [:]
             for (name, model) in documentType.elementModels {
                 parsedModels[name] = ContentModelParser.parse(model)
@@ -26,6 +35,7 @@ public extension PureXML.Validation {
                 parsedAttributes[name] = AttributeListParser.parse(body)
             }
             attributes = parsedAttributes
+            declarationErrors = Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
         }
 
         /// Whether the schema declares any elements or attributes.

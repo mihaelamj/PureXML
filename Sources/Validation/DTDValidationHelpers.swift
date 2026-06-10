@@ -6,7 +6,7 @@ extension PureXML.Validation.DTD {
         let content = childContent(of: element)
         switch model {
         case .empty:
-            return content.names.isEmpty && !content.hasText
+            return content.names.isEmpty && !content.hasText && !content.hasCDATA
                 ? []
                 : [DTDFailure(reason: "element <\(name)> is declared EMPTY but has content", at: path)]
         case .any:
@@ -27,11 +27,13 @@ extension PureXML.Validation.DTD {
     private static func childrenViolations(
         name: String,
         particle: PureXML.Validation.Particle,
-        content: (names: [String], hasText: Bool),
+        content: ChildContent,
         at path: DTDPath,
     ) -> [DTDFailure] {
         var result: [DTDFailure] = []
-        if content.hasText {
+        if content.hasText || content.hasCDATA {
+            // A CDATA section is character data in element content even when
+            // empty or whitespace-only.
             result.append(DTDFailure(reason: "element <\(name)> has element content but contains character data", at: path))
         }
         guard !PureXML.Validation.ContentModelMatcher.matchesChildren(particle, content.names) else { return result }
@@ -57,20 +59,30 @@ extension PureXML.Validation.DTD {
         return names.filter { seen.insert($0).inserted }
     }
 
-    private static func childContent(of element: DTDElement) -> (names: [String], hasText: Bool) {
+    /// One element's immediate content, summarized for model matching.
+    struct ChildContent {
         var names: [String] = []
         var hasText = false
+        /// Present CDATA sections, which count as character data in element
+        /// content even when empty or whitespace-only.
+        var hasCDATA = false
+    }
+
+    private static func childContent(of element: DTDElement) -> ChildContent {
+        var content = ChildContent()
         for child in element.children {
             switch child {
             case let .element(inner):
-                names.append(inner.name.description)
-            case let .text(value), let .cdata(value):
-                if value.contains(where: { !$0.isWhitespace }) { hasText = true }
+                content.names.append(inner.name.description)
+            case let .text(value):
+                if value.contains(where: { !$0.isWhitespace }) { content.hasText = true }
+            case .cdata:
+                content.hasCDATA = true
             default:
                 break
             }
         }
-        return (names, hasText)
+        return content
     }
 
     // MARK: Attributes
@@ -147,7 +159,8 @@ extension PureXML.Validation.DTD {
         at path: DTDPath,
     ) -> DTDFailure? {
         let isNmtoken = PureXML.Parsing.XMLCharacter.isNmtoken
-        let isEntity = { (token: String) in PureXML.Parsing.XMLCharacter.isValidName(token) && entities.contains(token) }
+        let isName = PureXML.Parsing.XMLCharacter.isValidName
+        let isEntity = { (token: String) in isName(token) && entities.contains(token) }
         let tokens = value.split(whereSeparator: \.isWhitespace).map(String.init)
         let valid: Bool
         switch declaration.type {
@@ -155,7 +168,11 @@ extension PureXML.Validation.DTD {
         case .nmTokens: valid = !tokens.isEmpty && tokens.allSatisfy(isNmtoken)
         case .entity: valid = isEntity(value)
         case .entities: valid = !tokens.isEmpty && tokens.allSatisfy(isEntity)
-        case .cdata, .enumeration, .notation, .id, .idReference, .idReferences: return nil
+        // The ID family must be lexical Names (VC: ID, IDREF); uniqueness and
+        // resolution are checked by the whole-tree integrity rule.
+        case .id, .idReference: valid = isName(value)
+        case .idReferences: valid = !tokens.isEmpty && tokens.allSatisfy(isName)
+        case .cdata, .enumeration, .notation: return nil
         }
         guard !valid else { return nil }
         return DTDFailure(reason: "attribute '\(declaration.name)' on <\(element)> is not a valid \(typeName(declaration.type))", at: path)
@@ -167,6 +184,9 @@ extension PureXML.Validation.DTD {
         case .nmTokens: "NMTOKENS"
         case .entity: "ENTITY"
         case .entities: "ENTITIES"
+        case .id: "ID"
+        case .idReference: "IDREF"
+        case .idReferences: "IDREFS"
         default: "value"
         }
     }

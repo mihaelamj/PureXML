@@ -52,7 +52,7 @@ struct DTDScanner {
     mutating func scan(_ reader: inout Reader, at mark: Mark) throws -> PureXML.Parsing.DocumentType {
         reader.consume("<!DOCTYPE")
         reader.skipSpace()
-        _ = scanName(&reader)
+        doctype.name = scanName(&reader)
         reader.skipSpace()
         doctype.externalSubset = try parseStrictExternalID(&reader, requireSystem: true, at: mark)
         reader.skipSpace()
@@ -254,7 +254,11 @@ struct DTDScanner {
         guard PureXML.Parsing.DTDContentModelGrammar.isValid(model) else {
             throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
         }
-        guard !name.isEmpty, doctype.elementModels[name] == nil else { return }
+        guard !name.isEmpty else { return }
+        guard doctype.elementModels[name] == nil else {
+            doctype.duplicateElements.insert(name)
+            return
+        }
         doctype.elementModels[name] = model
     }
 

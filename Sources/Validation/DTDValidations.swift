@@ -18,7 +18,8 @@ public extension PureXML.Validation {
                 .validating(requiredAttributes, fixedAttributeValues, enumeratedAttributeValues)
                 .validating(tokenizedAttributeTypes, notationAttributes)
                 .validating(identifierIntegrity)
-            if strict { validator = validator.validating(undeclaredElement) }
+                .validating(declarationValidity, rootElementType)
+            if strict { validator = validator.validating(undeclaredElement, undeclaredAttributes) }
             return validator
         }
 
@@ -97,6 +98,53 @@ public extension PureXML.Validation {
             .init(description: "Element is declared in the DTD") { context in
                 context.document.models[context.subject.name.description] != nil
             }
+        }
+
+        /// In strict mode, every attribute is declared (VC: Attribute Value
+        /// Type). Namespace declarations are exempt: they are bindings, not
+        /// attributes, in the namespace-aware model.
+        static var undeclaredAttributes: Validation<DTDElement, DTDSchema> {
+            .init(description: "Every attribute is declared in the DTD") { context in
+                let element = context.subject
+                let declarations = context.document.attributes[element.name.description] ?? []
+                return element.attributes
+                    .filter { attribute in
+                        let name = attribute.name.description
+                        guard name != "xmlns", !name.hasPrefix("xmlns:") else { return false }
+                        return !declarations.contains { $0.name == name || $0.name == attribute.name.localName }
+                    }
+                    .map { DTDFailure(reason: "attribute '\($0.name.description)' on <\(element.name.description)> is not declared", at: context.codingPath) }
+            }
+        }
+
+        /// The DTD's own declarations are valid (duplicate element types,
+        /// repeated mixed names, multiple IDs, undeclared notations in lists,
+        /// illegal defaults). Reported once, at the document root.
+        static var declarationValidity: Validation<PureXML.Model.Node, DTDSchema> {
+            .init(
+                description: "The DTD declarations satisfy their validity constraints",
+                check: { context in
+                    context.document.declarationErrors.map { DTDFailure(reason: $0, at: context.codingPath) }
+                },
+                when: { $0.codingPath.isEmpty },
+            )
+        }
+
+        /// The root element's type matches the DOCTYPE name (VC: Root Element
+        /// Type). Reported once, at the document root.
+        static var rootElementType: Validation<PureXML.Model.Node, DTDSchema> {
+            .init(
+                description: "The root element matches the DOCTYPE name",
+                check: { context in
+                    guard let expected = context.document.doctypeName,
+                          case let .document(children) = context.subject,
+                          let root = children.compactMap(\.element).first,
+                          root.name.description != expected
+                    else { return [] }
+                    return [DTDFailure(reason: "root element <\(root.name.description)> does not match the DOCTYPE name '\(expected)'", at: context.codingPath)]
+                },
+                when: { $0.codingPath.isEmpty },
+            )
         }
 
         /// ID values are unique and every IDREF resolves. Runs once over the whole

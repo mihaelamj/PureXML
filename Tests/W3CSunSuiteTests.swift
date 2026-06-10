@@ -29,24 +29,15 @@ struct W3CSunSuiteTests {
     private let knownValidFailures: Set<String> = []
 
     /// invalid cases where this implementation knowingly reports no validity
-    /// error yet, the validity-layer frontier this issue works down: the
-    /// standalone VCs (not-sa*), ID/IDREF corners, #REQUIRED enforcement,
-    /// per-type attribute VCs (attr*), the root-element/DOCTYPE name match,
-    /// EMPTY content, and UTF-16 cases.
+    /// error yet: one family, the standalone='yes' validity constraints
+    /// (externally-declared defaults/entities/normalization effects must not
+    /// change the standalone document's infoset), which needs standalone and
+    /// declaration-provenance tracking.
     private let knownInvalidAccepted: Set<String> = [
-        "invalid/dtd01.xml", "invalid/dtd02.xml", "invalid/el01.xml",
-        "invalid/el04.xml", "invalid/el05.xml", "invalid/id01.xml",
-        "invalid/id03.xml", "invalid/id04.xml", "invalid/id05.xml",
         "invalid/not-sa01.xml", "invalid/not-sa02.xml", "invalid/not-sa04.xml",
         "invalid/not-sa05.xml", "invalid/not-sa06.xml", "invalid/not-sa07.xml",
         "invalid/not-sa08.xml", "invalid/not-sa09.xml", "invalid/not-sa10.xml",
         "invalid/not-sa11.xml", "invalid/not-sa12.xml", "invalid/not-sa13.xml",
-        "invalid/not-sa14.xml", "invalid/required01.xml", "invalid/required02.xml",
-        "invalid/root.xml", "invalid/attr04.xml", "invalid/attr09.xml",
-        "invalid/attr10.xml", "invalid/attr11.xml", "invalid/attr12.xml",
-        "invalid/attr13.xml", "invalid/attr14.xml", "invalid/attr15.xml",
-        "invalid/attr16.xml", "invalid/utf16b.xml", "invalid/utf16l.xml",
-        "invalid/empty.xml",
     ]
 
     private struct ManifestCase {
@@ -135,6 +126,7 @@ struct W3CSunSuiteTests {
                 let errors = try PureXML.validateAgainstInternalDTD(
                     source(of: testCase.uri, in: section),
                     limits: limits(),
+                    strict: true,
                     resolver: resolver(directory: directory),
                 )
                 if let first = errors.first {
@@ -161,6 +153,7 @@ struct W3CSunSuiteTests {
                 let errors = try PureXML.validateAgainstInternalDTD(
                     source(of: testCase.uri, in: section),
                     limits: limits(),
+                    strict: true,
                     resolver: resolver(directory: directory),
                 )
                 if errors.isEmpty {

@@ -24,6 +24,12 @@ public extension PureXML.Parsing {
         /// Unparsed general entities (`<!ENTITY name SYSTEM "..." NDATA n>`) keyed by
         /// name. Their content is never parsed; the notation names how to handle it.
         public var unparsedEntities: [String: UnparsedEntity]
+        /// The name in `<!DOCTYPE name ...>`: the root element's required type
+        /// (VC: Root Element Type).
+        public var name: String?
+        /// Element types declared by more than one `<!ELEMENT>` (VC: Unique
+        /// Element Type Declaration); the first declaration stays in effect.
+        public var duplicateElements: Set<String> = []
 
         public init(
             entities: [String: String] = [:],
