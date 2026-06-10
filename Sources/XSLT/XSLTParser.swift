@@ -308,7 +308,11 @@ private extension PureXML.XSLT.XSLTParser {
 
     static func addAttributeSet(_ child: XSLTTree, into parts: inout Parts) {
         guard let name = XSLTNode.attribute(child, "name") else { return }
-        parts.attributeSets[name] = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
+        // Same-name attribute sets merge (7.1.4) as ordered definitions:
+        // each expands its used sets before its own attributes, and a later
+        // definition's attributes override earlier same-named ones.
+        let addition = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
+        parts.attributeSets[name, default: []].append(addition)
     }
 
     /// Reads an `xsl:decimal-format`'s symbol overrides; each unset attribute

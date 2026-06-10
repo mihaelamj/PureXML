@@ -13,7 +13,7 @@ public extension PureXML.XSLT {
     ) throws -> String {
         let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
-        let root = try PureXML.parseTree(source, limits: .init(allowDoctype: true))
+        let root = try PureXML.parseTree(source, limits: .init(allowDoctype: true), resolver: PureXML.XSLT.loaderResolver(documentLoader))
         Whitespace.strip(root, stylesheet: sheet)
         let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader)
         let result = transformer.run()

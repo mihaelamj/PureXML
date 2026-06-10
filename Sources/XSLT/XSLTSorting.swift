@@ -102,4 +102,11 @@ extension PureXML.XSLT.Transformer {
             [.node(.text(uri))]
         }
     }
+
+    func message(_ terminate: Bool, _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
+        if terminate, termination.message == nil {
+            termination.message = Self.text(of: instantiate(body, context))
+        }
+        return []
+    }
 }

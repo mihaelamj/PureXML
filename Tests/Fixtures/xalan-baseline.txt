@@ -1,15 +1,8 @@
 # The xalan-test conf cases this implementation does not yet pass,
 # one category/name per line, exact in both directions: a fixed case
 # must leave this list and a regression shows up as a new failure.
-attribset/attribset10
-attribset/attribset17
-attribset/attribset24
 attribset/attribset27
 attribset/attribset29
-attribset/attribset31
-attribset/attribset32
-attribset/attribset41
-attribset/attribset43
 attribset/attribset44
 attribset/attribset45
 attribset/attribset46
@@ -34,13 +27,7 @@ conflictres/conflictres30
 conflictres/conflictres34
 conflictres/conflictres37
 copy/copy09
-copy/copy19
-copy/copy20
-copy/copy21
-copy/copy22
 copy/copy27
-copy/copy31
-copy/copy36
 copy/copy48
 copy/copy56
 copy/copy58
@@ -109,7 +96,6 @@ output/output26
 output/output32
 output/output33
 output/output34
-output/output35
 output/output37
 output/output40
 output/output48
@@ -159,7 +145,6 @@ sort/sort27
 sort/sort32
 sort/sort33
 sort/sort34
-string/string130
 string/string132
 string/string143
 variable/variable29

@@ -49,7 +49,13 @@ extension PureXML.HTML {
 
         private static func attributeText(_ attribute: PureXML.Model.Attribute) -> String {
             let name = attribute.name.description
-            return attribute.value.isEmpty ? " \(name)" : " \(name)=\"\(escapeAttribute(attribute.value))\""
+            if attribute.value.isEmpty { return " \(name)" }
+            // Boolean attributes minimize when the value repeats the name
+            // (CHECKED="CHECKED" serializes as CHECKED), the html form.
+            if Elements.booleanAttributes.contains(name.lowercased()), attribute.value.lowercased() == name.lowercased() {
+                return " \(name)"
+            }
+            return " \(name)=\"\(escapeAttribute(attribute.value))\""
         }
 
         private static func escapeText(_ value: String) -> String {

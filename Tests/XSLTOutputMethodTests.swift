@@ -122,4 +122,71 @@ struct XSLTOutputMethodTests {
         // ancestor).
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: source) == "<out><f>inner c </f><p>a </p></out>")
     }
+
+    @Test("Same-name attribute sets merge as ordered definitions (7.1.4)")
+    func test_attributeSetMerge() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:attribute-set name="child" use-attribute-sets="alice">
+            <xsl:attribute name="follow">yellowbrickroad</xsl:attribute>
+            <xsl:attribute name="hole">shallow</xsl:attribute>
+          </xsl:attribute-set>
+          <xsl:attribute-set name="child" use-attribute-sets="rabbit">
+            <xsl:attribute name="follow">theleader</xsl:attribute>
+          </xsl:attribute-set>
+          <xsl:attribute-set name="rabbit"><xsl:attribute name="hole">deep</xsl:attribute></xsl:attribute-set>
+          <xsl:attribute-set name="alice"><xsl:attribute name="alice">ondrugs</xsl:attribute></xsl:attribute-set>
+          <xsl:template match="/"><out xsl:use-attribute-sets="child"/></xsl:template>
+        </xsl:stylesheet>
+        """
+        // The later definition expands after the earlier one (its used set
+        // included), so its hole=deep and follow=theleader win.
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>")
+            == "<out alice=\"ondrugs\" follow=\"theleader\" hole=\"deep\"/>")
+    }
+
+    @Test("xsl:copy carries the source element's in-scope namespace nodes (7.5)")
+    func test_copyNamespaceNodes() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="inner"><xsl:copy/></xsl:template>
+          <xsl:template match="/"><out><xsl:apply-templates select="//inner"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<r xmlns:a=\"urn:a\"><inner xmlns:b=\"urn:b\"/></r>"
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: source)
+            == "<out><inner xmlns:a=\"urn:a\" xmlns:b=\"urn:b\"/></out>")
+    }
+
+    @Test("html boolean attributes minimize when the value repeats the name")
+    func test_htmlBooleanAttributes() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="html"/>
+          <xsl:template match="/"><Form><Input Type="checkbox" CHECKED="CHECKED"/><Input Type="text" Value="CHECKED"/></Form></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>")
+            == "<Form><Input Type=\"checkbox\" CHECKED><Input Type=\"text\" Value=\"CHECKED\"></Form>")
+    }
+
+    @Test("Stylesheet and source entities resolve through the document loader")
+    func test_loaderEntityResolution() throws {
+        let style = """
+        <?xml version="1.0"?>
+        <!DOCTYPE xsl:stylesheet SYSTEM "ents.dtd">
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:copy-of select="'a&aelig;b'"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<x/>",
+            documentLoader: { $0 == "ents.dtd" ? "<!ENTITY aelig \"&#230;\">" : nil },
+        )
+        #expect(result == "<out>a\u{E6}b</out>")
+    }
 }

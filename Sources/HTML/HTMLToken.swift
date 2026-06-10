@@ -35,6 +35,13 @@ extension PureXML.HTML {
         /// end tag, not parsed as markup.
         static let rawText: Set<String> = ["script", "style", "textarea", "title"]
 
+        /// Boolean attributes, serialized minimized when their value repeats
+        /// their name (the html output form).
+        static let booleanAttributes: Set<String> = [
+            "checked", "selected", "disabled", "readonly", "multiple", "ismap",
+            "defer", "declare", "noresize", "nowrap", "noshade", "compact",
+        ]
+
         /// RCDATA elements: like raw-text, but character references in their
         /// content are decoded (`title`, `textarea`). The remaining raw-text
         /// elements (`script`, `style`) take their content with no decoding.

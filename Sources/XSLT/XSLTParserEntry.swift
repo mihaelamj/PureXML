@@ -6,7 +6,7 @@ struct Parts {
     var output = PureXML.XSLT.Output()
     var stripSpace: Set<String> = []
     var preserveSpace: Set<String> = []
-    var attributeSets: [String: PureXML.XSLT.AttributeSet] = [:]
+    var attributeSets: [String: [PureXML.XSLT.AttributeSet]] = [:]
     var decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:]
     var namespaceAliases: [String: PureXML.XSLT.NamespaceAlias] = [:]
 
@@ -41,8 +41,8 @@ struct Parts {
 }
 
 extension PureXML.XSLT.XSLTParser {
-    static func parse(_ xsl: String, loader: (String) -> String? = { _ in nil }) throws -> PureXML.XSLT.Stylesheet {
-        let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true))
+    static func parse(_ xsl: String, loader: @escaping (String) -> String? = { _ in nil }) throws -> PureXML.XSLT.Stylesheet {
+        let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true), resolver: PureXML.XSLT.loaderResolver(loader))
         let usesRawText = containsSubstring(xsl, "disable-output-escaping")
         if let top = stylesheetElement(root) {
             var sheet = compile(top, loader: loader, precedence: 0)

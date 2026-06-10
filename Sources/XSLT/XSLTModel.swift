@@ -250,7 +250,7 @@ public extension PureXML.XSLT {
         /// Element name tests that keep their whitespace, overriding `stripSpace`.
         public var preserveSpace: Set<String>
         /// Named `xsl:attribute-set` declarations, keyed by name.
-        public var attributeSets: [String: AttributeSet]
+        public var attributeSets: [String: [AttributeSet]]
         /// `xsl:decimal-format` declarations for `format-number`, keyed by name; the
         /// empty key is the default (unnamed) format.
         public var decimalFormats: [String: DecimalFormat]
@@ -270,7 +270,7 @@ public extension PureXML.XSLT {
             output: Output,
             stripSpace: Set<String> = [],
             preserveSpace: Set<String> = [],
-            attributeSets: [String: AttributeSet] = [:],
+            attributeSets: [String: [AttributeSet]] = [:],
             decimalFormats: [String: DecimalFormat] = [:],
             namespaceAliases: [String: NamespaceAlias] = [:],
         ) {

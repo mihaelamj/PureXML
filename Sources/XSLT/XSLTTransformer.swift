@@ -15,7 +15,7 @@ extension PureXML.XSLT {
         let root: PureXML.Model.TreeNode
         let documentLoader: (String) -> String?
         private let keyIndexes = PureXML.XSLT.KeyIndexCache()
-        private let termination = Termination()
+        let termination = Termination()
         private let matchCache = MatchCache()
         private let documentCache = PureXML.XSLT.DocumentCache()
 
@@ -281,14 +281,8 @@ extension PureXML.XSLT.Transformer {
         }
     }
 
-    /// Instantiates an `xsl:message` body as its text; `terminate` records the
-    /// signal so the transform aborts with it. Produces no result-tree output.
-    private func message(_ terminate: Bool, _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
-        if terminate, termination.message == nil {
-            termination.message = Self.text(of: instantiate(body, context))
-        }
-        return []
-    }
+    // Instantiates an `xsl:message` body as its text; `terminate` records the
+    // signal so the transform aborts with it. Produces no result-tree output.
 
     // Builds a literal result element, rewriting its name and attribute names
     // through any `xsl:namespace-alias` in effect.
@@ -380,10 +374,11 @@ extension PureXML.XSLT.Transformer {
     private func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
         var result: [PureXML.Model.Attribute] = []
         for name in names where !visiting.contains(name) {
-            guard let set = stylesheet.attributeSets[name] else { continue }
-            result += attributeSetAttributes(set.use, context, visiting: visiting.union([name]))
-            for item in instantiate(set.attributes, context) {
-                if case let .attribute(attribute) = item { result.append(attribute) }
+            for definition in stylesheet.attributeSets[name] ?? [] {
+                result += attributeSetAttributes(definition.use, context, visiting: visiting.union([name]))
+                for item in instantiate(definition.attributes, context) {
+                    if case let .attribute(attribute) = item { result.append(attribute) }
+                }
             }
         }
         return result

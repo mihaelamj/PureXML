@@ -108,7 +108,14 @@ extension PureXML.XSLT.Transformer {
         }
         switch context.node.kind {
         case .element:
-            return [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
+            let copied = buildElement(
+                name: context.node.name ?? .init(""),
+                literalAttributes: Self.namespaceDeclarations(inScopeAt: context.node),
+                useAttributeSets: useAttributeSets,
+                body: body,
+                context,
+            )
+            return [copied]
         case .text, .cdata:
             return [.node(.text(context.node.value))]
         case .comment:
@@ -122,6 +129,29 @@ extension PureXML.XSLT.Transformer {
 }
 
 extension PureXML.XSLT.Transformer {
+    /// The source element's in-scope namespace declarations as literal
+    /// xmlns attributes (xsl:copy copies namespace nodes, 7.5); the fixup
+    /// pass drops the ones already in scope in the result.
+    static func namespaceDeclarations(inScopeAt node: PureXML.Model.TreeNode) -> [PureXML.XSLT.LiteralAttribute] {
+        var bindings: [String: String] = [:]
+        var current: PureXML.Model.TreeNode? = node
+        while let candidate = current {
+            for attribute in candidate.attributes {
+                if attribute.name.prefix == "xmlns", bindings[attribute.name.localName] == nil {
+                    bindings[attribute.name.localName] = attribute.value
+                } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns", bindings[""] == nil {
+                    bindings[""] = attribute.value
+                }
+            }
+            current = candidate.parent
+        }
+        return bindings.sorted(by: { $0.key < $1.key }).compactMap { prefix, uri in
+            if prefix.isEmpty, uri.isEmpty { return nil }
+            let name = prefix.isEmpty ? "xmlns" : "xmlns:" + prefix
+            return PureXML.XSLT.LiteralAttribute(name: PureXML.Model.QualifiedName(name), value: [.literal(uri)])
+        }
+    }
+
     /// The topmost ancestor of `node` (its document node).
     static func documentRoot(of node: PureXML.Model.TreeNode) -> PureXML.Model.TreeNode {
         var current = node

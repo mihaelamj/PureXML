@@ -93,12 +93,11 @@ enum XSLTNamespaceFixup {
         }
     }
 
-    private static func fix(_ element: PureXML.Model.Element, inScope: [String: String], counter: inout Int) -> PureXML.Model.Element {
-        var scope = inScope
-        // A declaration that repeats an inherited binding is dropped: copied
-        // 7.1.1 namespace nodes travel on every literal element and would
-        // otherwise redeclare on each descendant.
-        var attributes = element.attributes.filter { attribute in
+    /// Drops declarations that repeat an inherited binding: copied 7.1.1
+    /// namespace nodes travel on every literal element and would otherwise
+    /// redeclare on each descendant.
+    private static func withoutRedundantDeclarations(_ attributes: [PureXML.Model.Attribute], inScope: [String: String]) -> [PureXML.Model.Attribute] {
+        attributes.filter { attribute in
             if attribute.name.prefix == "xmlns" {
                 return inScope[attribute.name.localName] != attribute.value
             }
@@ -107,7 +106,15 @@ enum XSLTNamespaceFixup {
             }
             return true
         }
+    }
+
+    private static func fix(_ element: PureXML.Model.Element, inScope: [String: String], counter: inout Int) -> PureXML.Model.Element {
+        var scope = inScope
+        var attributes = withoutRedundantDeclarations(element.attributes, inScope: inScope)
         enterDeclarations(attributes, into: &scope)
+        // The prefixes this element itself declares: a carried prefix may
+        // shadow an inherited binding, but not one declared locally.
+        var localPrefixes = Set(attributes.filter { $0.name.prefix == "xmlns" }.map(\.name.localName))
         fixElementName(element.name, scope: &scope, attributes: &attributes)
         // Attribute names: a namespaced attribute always needs a prefix.
         for index in attributes.indices {
@@ -119,8 +126,13 @@ enum XSLTNamespaceFixup {
             if let candidate = prefix, scope[candidate] == uri {
                 continue // Already bound correctly.
             }
-            if prefix == nil || scope[prefix ?? ""] != nil {
-                // Generate a fresh prefix when absent or taken by another URI.
+            if let candidate = prefix, !localPrefixes.contains(candidate), element.name.prefix != candidate {
+                // Redeclare the carried prefix locally, shadowing any
+                // inherited binding (the source document's own shape). The
+                // element's own prefix is never shadowed.
+                localPrefixes.insert(candidate)
+            } else if prefix == nil || scope[prefix ?? ""] != nil {
+                // Generate a fresh prefix when absent or taken locally.
                 if let existing = scope.first(where: { $0.value == uri && !$0.key.isEmpty })?.key {
                     prefix = existing
                 } else {
