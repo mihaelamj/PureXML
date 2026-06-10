@@ -179,7 +179,7 @@ extension PureXML.XSLT {
         /// reading the prebuilt `keys` index and the injected `document` loader.
         static func table(
             current: PureXML.XPath.Node,
-            keys: KeyIndex,
+            keys: @escaping (PureXML.Model.TreeNode) -> KeyIndex,
             loader: @escaping (String) -> String?,
             decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
             documents: PureXML.XSLT.DocumentCache,
@@ -194,23 +194,8 @@ extension PureXML.XSLT {
                         decimalFormats[name] ?? PureXML.XSLT.DecimalFormat(),
                     ))
                 }
-                .adding("key") { arguments, _ in
-                    let name = arguments.first?.string ?? ""
-                    guard arguments.count > 1 else { return .nodeSet([]) }
-                    // A node-set second argument unions the matches for each node's
-                    // string value; any other value is used directly as a string.
-                    let values: [String] = if let nodes = arguments[1].nodes {
-                        nodes.map(\.stringValue)
-                    } else {
-                        [arguments[1].string]
-                    }
-                    var matched: [PureXML.Model.TreeNode] = []
-                    for value in values {
-                        for node in keys[name]?[value] ?? [] where !matched.contains(where: { $0 === node }) {
-                            matched.append(node)
-                        }
-                    }
-                    return .nodeSet(matched.map { .tree($0) })
+                .adding("key") { arguments, context in
+                    keyLookup(arguments, context, keys)
                 }
                 .adding("document") { arguments, _ in
                     // A string or a node-set of URI references, each optionally with
@@ -233,6 +218,39 @@ extension PureXML.XSLT {
                 .adding("element-available") { arguments, _ in .boolean(instructionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("function-available") { arguments, _ in .boolean(functionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("unparsed-entity-uri") { _, _ in .string("") }
+        }
+
+        /// The `key()` implementation: the index belongs to the current
+        /// node's document; a node-set second argument unions the matches for
+        /// each member's string value; results come back in document order.
+        private static func keyLookup(
+            _ arguments: [PureXML.XPath.Value],
+            _ context: PureXML.XPath.EvaluationContext,
+            _ keys: (PureXML.Model.TreeNode) -> KeyIndex,
+        ) -> PureXML.XPath.Value {
+            let name = arguments.first?.string ?? ""
+            guard arguments.count > 1 else { return .nodeSet([]) }
+            let values: [String] = if let nodes = arguments[1].nodes {
+                nodes.map(\.stringValue)
+            } else {
+                [arguments[1].string]
+            }
+            let owner: PureXML.Model.TreeNode? = switch context.node {
+            case let .tree(tree): tree
+            case let .attribute(treeOwner, _), let .namespace(treeOwner, _, _): treeOwner
+            }
+            guard var documentRoot = owner else { return .nodeSet([]) }
+            while let parent = documentRoot.parent {
+                documentRoot = parent
+            }
+            let index = keys(documentRoot)
+            var matched: [PureXML.Model.TreeNode] = []
+            for value in values {
+                for node in index[name]?[value] ?? [] where !matched.contains(where: { $0 === node }) {
+                    matched.append(node)
+                }
+            }
+            return .nodeSet(matched.map { PureXML.XPath.Node.tree($0) }.sorted(by: PureXML.XPath.Node.precedes))
         }
 
         /// Loads one `document()` reference: the whole document, or, when the
@@ -307,8 +325,17 @@ extension PureXML.XSLT {
                 guard let matchQuery = try? PureXML.XPath.Query(path),
                       let useQuery = try? PureXML.XPath.Query(key.use) else { continue }
                 for node in matchQuery.nodes(over: root) {
-                    let value = (try? useQuery.value(at: node).string) ?? ""
-                    index[key.name, default: [:]][value, default: []].append(node)
+                    // A node-set use expression indexes the node under every
+                    // member's string value.
+                    let used = try? useQuery.value(at: node)
+                    let values: [String] = if let nodes = used?.nodes {
+                        nodes.map(\.stringValue)
+                    } else {
+                        [used?.string ?? ""]
+                    }
+                    for value in values {
+                        index[key.name, default: [:]][value, default: []].append(node)
+                    }
                 }
             }
             return index

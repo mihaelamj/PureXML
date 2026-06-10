@@ -84,4 +84,22 @@ extension PureXML.XSLT.Transformer {
         }
         return instantiate(otherwise, context)
     }
+
+    func builtInRule(_ xnode: PureXML.XPath.Node, mode: String?, _ context: XSLTContext) -> [ResultItem] {
+        switch xnode {
+        case let .tree(node):
+            switch node.kind {
+            case .element, .document:
+                applyTemplates(to: node.children.map { .tree($0) }, mode: mode, parameters: [], context)
+            case .text, .cdata:
+                [.node(.text(node.value))]
+            default:
+                []
+            }
+        case let .attribute(_, attribute):
+            [.node(.text(attribute.value))]
+        case let .namespace(_, _, uri):
+            [.node(.text(uri))]
+        }
+    }
 }

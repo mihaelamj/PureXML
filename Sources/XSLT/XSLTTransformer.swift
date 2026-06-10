@@ -14,7 +14,7 @@ extension PureXML.XSLT {
         let stylesheet: Stylesheet
         let root: PureXML.Model.TreeNode
         let documentLoader: (String) -> String?
-        private let keyIndex: PureXML.XSLT.KeyIndex
+        private let keyIndexes = PureXML.XSLT.KeyIndexCache()
         private let termination = Termination()
         private let matchCache = MatchCache()
         private let documentCache = PureXML.XSLT.DocumentCache()
@@ -28,7 +28,16 @@ extension PureXML.XSLT {
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
-            keyIndex = PureXML.XSLT.Library.buildKeyIndex(stylesheet: stylesheet, root: root)
+        }
+
+        /// The key index for `documentRoot`, built on first use (keys apply
+        /// per document: the source and each document() load have their own).
+        private func keyIndex(for documentRoot: PureXML.Model.TreeNode) -> PureXML.XSLT.KeyIndex {
+            let identity = ObjectIdentifier(documentRoot)
+            if let cached = keyIndexes.indexes[identity] { return cached }
+            let built = PureXML.XSLT.Library.buildKeyIndex(stylesheet: stylesheet, root: documentRoot)
+            keyIndexes.indexes[identity] = built
+            return built
         }
 
         func run() -> PureXML.Model.Node {
@@ -81,14 +90,14 @@ extension PureXML.XSLT {
         private func patternFunctions() -> PureXML.XPath.FunctionTable {
             PureXML.XSLT.Library.table(
                 current: .tree(root),
-                keys: keyIndex,
+                keys: { keyIndex(for: $0) },
                 loader: documentLoader,
                 decimalFormats: stylesheet.decimalFormats,
                 documents: documentCache,
             )
         }
 
-        fileprivate func applyTemplates(
+        func applyTemplates(
             to nodes: [PureXML.XPath.Node],
             mode: String?,
             parameters: [Binding],
@@ -135,24 +144,6 @@ extension PureXML.XSLT {
             return instantiate(template.body, context)
         }
 
-        private func builtInRule(_ xnode: PureXML.XPath.Node, mode: String?, _ context: XSLTContext) -> [ResultItem] {
-            switch xnode {
-            case let .tree(node):
-                switch node.kind {
-                case .element, .document:
-                    applyTemplates(to: node.children.map { .tree($0) }, mode: mode, parameters: [], context)
-                case .text, .cdata:
-                    [.node(.text(node.value))]
-                default:
-                    []
-                }
-            case let .attribute(_, attribute):
-                [.node(.text(attribute.value))]
-            case let .namespace(_, _, uri):
-                [.node(.text(uri))]
-            }
-        }
-
         func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
@@ -186,7 +177,7 @@ extension PureXML.XSLT {
                 variables: context.variables,
                 functions: PureXML.XSLT.Library.table(
                     current: context.focus,
-                    keys: keyIndex,
+                    keys: { keyIndex(for: $0) },
                     loader: documentLoader,
                     decimalFormats: stylesheet.decimalFormats,
                     documents: documentCache,

@@ -58,9 +58,6 @@ extend/extend01
 extend/extend02
 extend/extend04
 idkey/idkey09
-idkey/idkey12
-idkey/idkey18
-idkey/idkey21
 idkey/idkey30
 idkey/idkey31
 idkey/idkey43
@@ -70,7 +67,6 @@ idkey/idkey47
 idkey/idkey48
 idkey/idkey50
 idkey/idkey53
-idkey/idkey59
 impincl/impincl07
 impincl/impincl08
 impincl/impincl11
@@ -157,7 +153,6 @@ select/select13
 select/select16
 select/select27
 select/select28
-select/select59
 select/select67
 select/select68
 select/select75
