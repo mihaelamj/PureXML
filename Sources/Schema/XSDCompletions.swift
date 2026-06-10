@@ -88,13 +88,12 @@ public extension PureXML.Schema {
         /// Resolves an `ElementType` to its underlying simple or complex type,
         /// following named references.
         static func resolve(_ type: ElementType, types: [String: ElementType]) -> ElementType {
-            var current = type
-            var guardCount = 0
-            while case let .typeReference(name) = current, let next = types[name], guardCount < types.count + 1 {
-                current = next
-                guardCount += 1
+            // Completions are best-effort: an unknown or circular chain keeps the
+            // unresolved reference, which simply offers no completions.
+            if case let .resolved(resolved) = PureXML.Schema.ComplexValidator.resolveReference(type, in: types) {
+                return resolved
             }
-            return current
+            return type
         }
 
         /// The child element declarations of a complex type's content model, keyed

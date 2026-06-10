@@ -35,10 +35,10 @@ public extension PureXML.Schema.ComplexValidator {
         if let overriding = Self.xsiTypeName(element), let resolved = types[overriding] {
             type = resolved
         }
-        var followed = 0
-        while case let .typeReference(name) = type, let resolved = types[name], followed < 64 {
+        // An unknown or circular chain stays a typeReference, which
+        // validateShallow reports as a located error.
+        if case let .resolved(resolved) = resolveReference(type) {
             type = resolved
-            followed += 1
         }
         return type
     }
@@ -74,11 +74,17 @@ public extension PureXML.Schema.ComplexValidator {
             if let nilErrors = nilErrors(element, at: path) { return errors + nilErrors }
             shallowContent(element, complex.content, at: path, into: &errors)
             errors += elementFixedErrors(element, at: path)
-        case let .typeReference(name):
-            guard let resolved = types[name] else {
+        case .typeReference:
+            // The shared resolver also guards a circular chain, which would
+            // otherwise recurse here without terminating.
+            switch resolveReference(type) {
+            case let .unknown(name):
                 return [XSDFailure(reason: "unknown type '\(name)'", at: path)]
+            case let .circular(name):
+                return [XSDFailure(reason: "circular type reference '\(name)'", at: path)]
+            case let .resolved(resolved):
+                return validateShallow(element, as: resolved, at: path)
             }
-            return validateShallow(element, as: resolved, at: path)
         }
         return errors
     }

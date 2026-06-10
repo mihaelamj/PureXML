@@ -145,3 +145,39 @@ extension PureXML.Schema.ComplexValidator {
         !textContent(element).isEmpty || element.children.contains { if case .element = $0 { true } else { false } }
     }
 }
+
+public extension PureXML.Schema {
+    /// The outcome of following a `typeReference` chain: the underlying simple or
+    /// complex type, or the failure to report (an unknown name, or a circular
+    /// chain that can never resolve).
+    enum TypeResolution {
+        case resolved(ElementType)
+        case unknown(String)
+        case circular(String)
+    }
+}
+
+extension PureXML.Schema.ComplexValidator {
+    /// Follows a `typeReference` chain through `types` with cycle detection, the
+    /// one shared resolver behind the tree validator, the streaming validator, and
+    /// completions, so unknown names and circular chains are reported identically
+    /// everywhere instead of being silently truncated.
+    static func resolveReference(
+        _ type: PureXML.Schema.ElementType,
+        in types: [String: PureXML.Schema.ElementType],
+    ) -> PureXML.Schema.TypeResolution {
+        var current = type
+        var visited: Set<String> = []
+        while case let .typeReference(name) = current {
+            guard visited.insert(name).inserted else { return .circular(name) }
+            guard let next = types[name] else { return .unknown(name) }
+            current = next
+        }
+        return .resolved(current)
+    }
+
+    /// The instance resolver over this validator's type table.
+    func resolveReference(_ type: PureXML.Schema.ElementType) -> PureXML.Schema.TypeResolution {
+        Self.resolveReference(type, in: types)
+    }
+}

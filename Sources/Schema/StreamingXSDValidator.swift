@@ -62,6 +62,14 @@ public extension PureXML.Validation {
                 stack[stack.count - 1].childElements.append(PureXML.Model.Element(name: name))
             }
             let probe = PureXML.Model.Element(name: name, attributes: attributes)
+            // An xsi:type naming an undeclared type is an error here too, so the
+            // streaming and tree validators report the same problem.
+            let overriding = PureXML.Schema.ComplexValidator.xsiTypeName(probe)
+            if declared != nil, let overriding, validator.types[overriding] == nil {
+                collected.append(ValidationError(reason: "unknown xsi:type '\(overriding)' on '\(name.localName)'", at: path))
+                stack.append(XSDStreamFrame(name: name, attributes: attributes, effective: nil, path: path))
+                return
+            }
             let effective = declared.map { validator.effectiveType($0, of: probe) }
             stack.append(XSDStreamFrame(name: name, attributes: attributes, effective: effective, path: path))
         }

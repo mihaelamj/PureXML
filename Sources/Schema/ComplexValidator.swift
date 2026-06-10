@@ -246,10 +246,7 @@ public extension PureXML.Schema {
                 errors.append(missing)
                 return
             }
-            var declared = declared
-            if let overriding = Self.xsiTypeName(child), let resolved = types[overriding] {
-                declared = resolved
-            }
+            guard let declared = overriddenType(declared, for: child, at: path, into: &errors) else { return }
             switch declared {
             case let .simple(simple):
                 if let nilErrors = nilErrors(child, at: path) {
@@ -265,11 +262,42 @@ public extension PureXML.Schema {
                 errors += elementFixedErrors(child, at: path)
             case let .complex(complex):
                 errors.append(contentsOf: validate(child, against: complex, at: path))
-            case let .typeReference(name):
-                guard let resolved = types[name] else {
-                    errors.append(XSDFailure(reason: "unknown type '\(name)'", at: path))
-                    return
-                }
+            case .typeReference:
+                validateResolvedReference(declared, child, at: path, into: &errors)
+            }
+        }
+
+        /// The declared type after an `xsi:type` override. An override naming an
+        /// undeclared type appends an error and returns nil, not a silent fallback
+        /// to the declared type.
+        private func overriddenType(
+            _ declared: ElementType,
+            for child: PureXML.Model.Element,
+            at path: XSDPath,
+            into errors: inout [XSDFailure],
+        ) -> ElementType? {
+            guard let overriding = Self.xsiTypeName(child) else { return declared }
+            guard let resolved = types[overriding] else {
+                errors.append(XSDFailure(reason: "unknown xsi:type '\(overriding)' on '\(child.name.localName)'", at: path))
+                return nil
+            }
+            return resolved
+        }
+
+        /// Validates a child against a `typeReference` through the shared resolver,
+        /// reporting an unknown name or a circular chain as a located error.
+        private func validateResolvedReference(
+            _ declared: ElementType,
+            _ child: PureXML.Model.Element,
+            at path: XSDPath,
+            into errors: inout [XSDFailure],
+        ) {
+            switch resolveReference(declared) {
+            case let .unknown(name):
+                errors.append(XSDFailure(reason: "unknown type '\(name)'", at: path))
+            case let .circular(name):
+                errors.append(XSDFailure(reason: "circular type reference '\(name)'", at: path))
+            case let .resolved(resolved):
                 validateChild(child, against: resolved, at: path, into: &errors)
             }
         }
