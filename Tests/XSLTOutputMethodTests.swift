@@ -172,6 +172,63 @@ struct XSLTOutputMethodTests {
             == "<Form><Input Type=\"checkbox\" CHECKED><Input Type=\"text\" Value=\"CHECKED\"></Form>")
     }
 
+    @Test("apply-imports searches only the current stylesheet's own imports (5.6)")
+    func test_applyImportsScope() throws {
+        let leaf = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:template match="item"><leaf/></xsl:template>
+        </xsl:stylesheet>
+        """
+        let sibling = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:template match="item"><sibling><xsl:apply-imports/></sibling></xsl:template>
+        </xsl:stylesheet>
+        """
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:import href="leaf.xsl"/>
+          <xsl:import href="sibling.xsl"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:apply-templates select="//item"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<r><item>x</item></r>",
+            documentLoader: { ["leaf.xsl": leaf, "sibling.xsl": sibling][$0] },
+        )
+        // sibling.xsl wins (later import); its apply-imports has no imports of
+        // its own, so the built-in rule runs, not leaf.xsl's template.
+        #expect(result == "<out><sibling>x</sibling></out>")
+    }
+
+    @Test("Include and import hrefs resolve against the including stylesheet's URI")
+    func test_relativeIncludeChain() throws {
+        let inner = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:template match="item"><deep/></xsl:template>
+        </xsl:stylesheet>
+        """
+        let middle = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:include href="inner.xsl"/>
+        </xsl:stylesheet>
+        """
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:include href="sub/middle.xsl"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:apply-templates select="//item"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<r><item/></r>",
+            documentLoader: { ["sub/middle.xsl": middle, "sub/inner.xsl": inner][$0] },
+        )
+        #expect(result == "<out><deep/></out>")
+    }
+
     @Test("Stylesheet and source entities resolve through the document loader")
     func test_loaderEntityResolution() throws {
         let style = """

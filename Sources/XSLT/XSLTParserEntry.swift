@@ -45,7 +45,8 @@ extension PureXML.XSLT.XSLTParser {
         let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true), resolver: PureXML.XSLT.loaderResolver(loader))
         let usesRawText = containsSubstring(xsl, "disable-output-escaping")
         if let top = stylesheetElement(root) {
-            var sheet = compile(top, loader: loader, precedence: 0)
+            var counter = 0
+            var sheet = compile(top, loader: loader, counter: &counter)
             sheet.usesRawText = usesRawText
             return sheet
         }

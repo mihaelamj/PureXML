@@ -27,6 +27,9 @@ extension PureXML.XSLT {
         /// The import precedence of the template currently being instantiated, so
         /// `apply-imports` considers only templates below it. `.max` outside a template.
         var importPrecedence: Int
+        /// The floor of the current template's stylesheet's import subtree;
+        /// apply-imports searches [importRangeLow, importPrecedence).
+        var importRangeLow: Int = 0
         /// The stylesheet xmlns bindings of the template being instantiated,
         /// so prefixed names in its expressions resolve by URI.
         var namespaces: [String: String] = [:]

@@ -229,6 +229,10 @@ public extension PureXML.XSLT {
         public var mode: String?
         public var priority: Double
         public var importPrecedence: Int
+        /// The lowest precedence inside this template's stylesheet's own
+        /// import subtree: apply-imports considers only templates with
+        /// precedence in [importRangeLow, importPrecedence).
+        public var importRangeLow: Int = 0
         public var parameters: [Binding]
         public var body: [Instruction]
         /// The stylesheet xmlns bindings in scope at the template, for

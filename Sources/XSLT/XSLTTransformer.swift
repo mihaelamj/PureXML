@@ -69,10 +69,11 @@ extension PureXML.XSLT {
             return .document(applyTemplates(to: [.tree(root)], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
-        fileprivate func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max) -> Template? {
+        fileprivate func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max, atLeast floor: Int = .min) -> Template? {
             stylesheet.templates.enumerated()
                 .filter { entry in
                     entry.element.mode == mode && entry.element.importPrecedence < ceiling
+                        && entry.element.importPrecedence >= floor
                         && (entry.element.match.map { matches(node, $0, entry.element.namespaces) } ?? false)
                 }
                 .max { lhs, rhs in
@@ -146,6 +147,7 @@ extension PureXML.XSLT {
         ) -> [ResultItem] {
             var context = context
             context.importPrecedence = template.importPrecedence
+            context.importRangeLow = template.importRangeLow
             context.namespaces = template.namespaces
             for parameter in template.parameters {
                 if let passed = parameters.first(where: { $0.name == parameter.name }) {
@@ -316,7 +318,7 @@ extension PureXML.XSLT.Transformer {
     /// only those below the current template's import precedence, falling back to
     /// the built-in rule when none match.
     private func applyImports(_ context: XSLTContext) -> [ResultItem] {
-        if let template = bestTemplate(for: context.focus, mode: context.mode, below: context.importPrecedence) {
+        if let template = bestTemplate(for: context.focus, mode: context.mode, below: context.importPrecedence, atLeast: context.importRangeLow) {
             return instantiateTemplate(template, context, passing: [], from: context)
         }
         return builtInRule(context.focus, mode: context.mode, context)
