@@ -29,13 +29,11 @@ struct W3CEduniSuiteTests {
     /// not-wf cases this implementation knowingly accepts (none).
     private let knownNotWFAccepted: Set<String> = []
 
-    /// valid cases this implementation knowingly fails, two classes: the
+    /// valid cases this implementation knowingly fails, one class: the
     /// grapheme-cluster lexing limitation (a combining mark directly after an
     /// ASCII delimiter merges into one Swift Character, so scalar-level 5e
-    /// name characters are mis-lexed; its own issue under #121) and E18,
-    /// which needs per-entity base-URI tracking for nested external entities.
+    /// name characters are mis-lexed; #135).
     private let knownValidFailures: Set<String> = [
-        "errata-2e/E18.xml",
         "errata-4e/ibm04v01.xml", "errata-4e/ibm05v03.xml", "errata-4e/ibm07v01.xml",
         "errata-4e/ibm85n107.xml", "errata-4e/ibm85n114.xml", "errata-4e/ibm85n119.xml",
         "errata-4e/ibm85n121.xml", "errata-4e/ibm85n122.xml", "errata-4e/ibm85n136.xml",

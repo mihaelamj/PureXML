@@ -203,7 +203,7 @@ extension DTDScanner {
             guard let systemID = scanLiteral(&reader) else {
                 throw ParseError.invalidEntityDeclaration(mark)
             }
-            return ExternalID(systemID: systemID)
+            return ExternalID(systemID: systemID, base: currentBase)
         }
         if reader.consume("PUBLIC") {
             return try parsePublicID(&reader, requireSystem: requireSystem, at: mark)
@@ -230,7 +230,7 @@ extension DTDScanner {
             guard let systemID = scanLiteral(&reader) else {
                 throw ParseError.invalidEntityDeclaration(mark)
             }
-            return ExternalID(publicID: publicID, systemID: systemID)
+            return ExternalID(publicID: publicID, systemID: systemID, base: currentBase)
         }
         // Notations may carry a public identifier alone.
         var systemID = ""
@@ -238,7 +238,7 @@ extension DTDScanner {
             reader.skipSpace()
             if let literal = scanLiteral(&reader) { systemID = literal }
         }
-        return ExternalID(publicID: publicID, systemID: systemID)
+        return ExternalID(publicID: publicID, systemID: systemID, base: currentBase)
     }
 
     /// `PubidChar ::= #x20 | #xD | #xA | [a-zA-Z0-9] | [-'()+,./:=?;!*#@$_%]`

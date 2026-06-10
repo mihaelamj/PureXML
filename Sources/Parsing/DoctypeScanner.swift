@@ -54,6 +54,12 @@ struct DTDScanner {
     /// resolver refused them): a reference to one is not an undeclared-entity
     /// error, the processor simply did not read it.
     var unresolvedParameterEntities: Set<String> = []
+    /// The URI of the entity whose text is being scanned (nil for the
+    /// document): relative identifiers declared here resolve against it.
+    var currentBase: String?
+    /// Each external parameter entity's own resolved URI, the base for the
+    /// identifiers its replacement declares.
+    var parameterEntityBases: [String: String] = [:]
     var parameterBudget: Int
     /// Bounds parameter-entity injection recursion (modularized DTDs nest, but
     /// only a little); deeper references are ignored rather than trapping.
@@ -112,7 +118,11 @@ struct DTDScanner {
         }
         var sub = Reader(text)
         inExternalContext = true
-        defer { inExternalContext = false }
+        currentBase = id.resolvedSystemID
+        defer {
+            inExternalContext = false
+            currentBase = nil
+        }
         try scanTextDeclaration(&sub, at: mark)
         try scanDeclarations(&sub, depth: 1, terminatedByBracket: false, at: mark)
     }

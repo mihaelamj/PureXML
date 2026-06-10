@@ -9,12 +9,21 @@ extension DTDScanner {
     /// resolver keeps XXE closed.
     mutating func resolveExternalEntities() {
         for (name, id) in doctype.externalEntities where doctype.entities[name] == nil {
-            if let text = resolver.resolveEntity(name, id) {
+            if let text = resolver.resolveEntity(name, baseResolved(id)) {
                 // An external parsed entity may begin with a text declaration,
                 // which is not part of its replacement text (4.3.1).
                 doctype.entities[name] = try? strippingTextDeclaration(text)
             }
         }
+    }
+
+    /// The identifier with its base applied into the system ID, so a resolver
+    /// that only reads `systemID` still sees the resolved path.
+    func baseResolved(_ id: ExternalID) -> ExternalID {
+        var resolved = id
+        resolved.systemID = id.resolvedSystemID
+        resolved.base = nil
+        return resolved
     }
 
     /// Handles a bare `%name;` between declarations by injecting the parameter
@@ -49,6 +58,13 @@ extension DTDScanner {
         }
         parameterBudget -= replacement.count
         var sub = Reader(replacement)
+        // Identifiers declared inside the replacement resolve against the
+        // parameter entity's own URI (per-entity base, RFC 3986).
+        let outerBase = currentBase
+        if let base = parameterEntityBases[name] {
+            currentBase = base
+        }
+        defer { currentBase = outerBase }
         try scanDeclarations(&sub, depth: depth + 1, terminatedByBracket: false, at: mark)
     }
 
@@ -64,9 +80,10 @@ extension DTDScanner {
             }
         } else if isParameter {
             if doctype.parameterEntities[name] == nil {
-                if let text = resolver.resolveExternalSubset(id) {
+                if let text = resolver.resolveExternalSubset(baseResolved(id)) {
                     if let stripped = try? strippingTextDeclaration(text) {
                         doctype.parameterEntities[name] = expandParameterReferences(stripped)
+                        parameterEntityBases[name] = id.resolvedSystemID
                     } else {
                         unresolvedParameterEntities.insert(name)
                     }
