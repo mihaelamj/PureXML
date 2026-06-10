@@ -110,4 +110,44 @@ struct DTDSubsetStrictnessTests {
         #expect(!parses("<!DOCTYPE doc [<!ELEMENT doc EMPTY> junk ]>\n<doc/>"))
         #expect(!parses(externalHost, externalSubset: "<!ELEMENT doc EMPTY> ]]>"))
     }
+
+    @Test("A PI target inside the subset must be separated from its data")
+    func test_subsetPISeparation() {
+        #expect(!parses("<!DOCTYPE doc [<!ELEMENT doc EMPTY><?bad-pi+?>]>\n<doc/>"))
+        #expect(parses("<!DOCTYPE doc [<!ELEMENT doc EMPTY><?good-pi data?>]>\n<doc/>"))
+    }
+
+    @Test("Character references in a PE literal are expanded at declaration (Appendix D)")
+    func test_parameterEntityCharacterReferences() {
+        // The spec's tricky example: %xx; expands to %zz; which declares tricky.
+        let xml = """
+        <!DOCTYPE test [
+        <!ELEMENT test (#PCDATA) >
+        <!ENTITY % xx '&#37;zz;'>
+        <!ENTITY % zz '&#60;!ENTITY tricky "error-prone" >' >
+        %xx;
+        ]>
+        <test>This sample shows a &tricky; method.</test>
+        """
+        let node = try? PureXML.parse(xml, limits: limits())
+        #expect(node != nil)
+    }
+
+    @Test("An external entity's text declaration is not part of its replacement")
+    func test_externalEntityTextDeclaration() {
+        let xml = "<!DOCTYPE root [<!ELEMENT root ANY><!ENTITY outside SYSTEM \"o.ent\">]>\n<root>&outside;</root>"
+        let resolver = PureXML.Parsing.EntityResolver(
+            resolveEntity: { _, _ in "<?xml encoding=\"UTF-8\"?>ok" },
+            resolveExternalSubset: { _ in nil },
+        )
+        let node = try? PureXML.parse(xml, limits: limits(), resolver: resolver)
+        #expect(node != nil)
+        // The declaration must be stripped, not included as text.
+        guard let node, case let .document(children) = node,
+              case let .element(root)? = children.first(where: { $0.element != nil })
+        else { return }
+        #expect(root.children.allSatisfy { child in
+            if case let .text(value) = child { value == "ok" } else { false }
+        })
+    }
 }

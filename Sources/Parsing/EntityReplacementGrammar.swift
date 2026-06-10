@@ -20,7 +20,9 @@ extension PureXML.Parsing {
 
         /// One declaration-time pass over the entity value: `&#...;` becomes its
         /// character; everything else (including `&name;`) is kept verbatim.
-        private static func expandCharacterReferences(_ value: String) -> String? {
+        /// Also used by the DTD scanner to expand parameter-entity literals at
+        /// declaration time (4.4.5).
+        static func expandCharacterReferences(_ value: String) -> String? {
             var result = ""
             let characters = Array(value)
             var index = 0

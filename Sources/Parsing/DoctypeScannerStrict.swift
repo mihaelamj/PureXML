@@ -37,10 +37,21 @@ extension DTDScanner {
             throw ParseError.invalidEntityDeclaration(mark)
         }
         skip(&reader, until: ">")
-        // The replacement-text well-formedness constraint binds at reference
-        // time (an unreferenced entity may carry a bad value), so the reparse
-        // happens in EntityDecoder when the entity is first included.
-        storeEntity(name: name, value: expandParameterReferences(value), isParameter: isParameter)
+        // Character references in a parameter-entity literal are expanded when
+        // the declaration is parsed (4.4.5; the Appendix D `&#37;zz;` case), so
+        // a stored PE value can itself carry a usable `%name;`. General-entity
+        // values keep their character references; the reference-time decoder
+        // expands them. The replacement-text well-formedness constraint binds
+        // at reference time (an unreferenced entity may carry a bad value), so
+        // the reparse happens in EntityDecoder when the entity is included.
+        var replacement = value
+        if isParameter {
+            guard let expanded = PureXML.Parsing.EntityReplacementGrammar.expandCharacterReferences(value) else {
+                throw ParseError.invalidEntityDeclaration(mark)
+            }
+            replacement = expanded
+        }
+        storeEntity(name: name, value: expandParameterReferences(replacement), isParameter: isParameter)
     }
 
     /// The tail of an external entity: the identifier, an optional `S NDATA Name`
@@ -109,6 +120,28 @@ extension DTDScanner {
             throw ParseError.expectedName(mark)
         }
         return scanName(&reader)
+    }
+
+    /// Removes a leading text declaration from an external entity's resolved
+    /// text (4.3.1): the declaration is not part of the replacement text. Text
+    /// without one passes through unchanged, including text whose `<?xml` is
+    /// not actually a text declaration.
+    func strippingTextDeclaration(_ text: String) -> String {
+        guard text.hasPrefix("<?xml") else { return text }
+        // Foundation-free search for the closing '?>'.
+        var close = text.index(text.startIndex, offsetBy: 5)
+        while close < text.endIndex {
+            if text[close] == "?", text.index(after: close) < text.endIndex, text[text.index(after: close)] == ">" {
+                break
+            }
+            close = text.index(after: close)
+        }
+        guard close < text.endIndex else { return text }
+        let declaration = String(text[text.index(text.startIndex, offsetBy: 5) ..< close])
+        guard declaration.first?.isWhitespace == true,
+              PureXML.Parsing.XMLDeclaration.parseTextDeclaration(declaration) != nil
+        else { return text }
+        return String(text[text.index(close, offsetBy: 2)...])
     }
 
     /// Consumes the external subset's optional text declaration

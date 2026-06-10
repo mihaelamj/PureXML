@@ -75,12 +75,22 @@ extension PureXML.Validation.DTD {
 
     // MARK: Attributes
 
-    /// The value supplied for a declaration's attribute on an element, or nil when
-    /// it is absent.
+    /// The value supplied for a declaration's attribute on an element, or nil
+    /// when it is absent, normalized per its declared type: for any non-CDATA
+    /// type, whitespace runs collapse to a single space and leading/trailing
+    /// whitespace is stripped (3.3.3), so ` nonce ` satisfies an enumeration
+    /// listing `nonce` and an IDREF resolves regardless of surrounding space.
     static func attributeValue(of declaration: PureXML.Validation.AttributeDeclaration, on element: DTDElement) -> String? {
-        element.attributes.first {
+        let raw = element.attributes.first {
             $0.name.description == declaration.name || $0.name.localName == declaration.name
         }?.value
+        return raw.map { normalize($0, for: declaration.type) }
+    }
+
+    /// The 3.3.3 tokenized normalization. CDATA values pass through untouched.
+    static func normalize(_ value: String, for type: PureXML.Validation.AttributeType) -> String {
+        if case .cdata = type { return value }
+        return value.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 
     /// The error when a `#REQUIRED` attribute is absent.
@@ -208,9 +218,7 @@ extension PureXML.Validation.DTD {
         let name = element.name.description
         guard let declarations = schema.attributes[name] else { return }
         for declaration in declarations {
-            guard let value = element.attributes.first(where: {
-                $0.name.description == declaration.name || $0.name.localName == declaration.name
-            })?.value else { continue }
+            guard let value = attributeValue(of: declaration, on: element) else { continue }
             switch declaration.type {
             case .id:
                 counts[value, default: 0] += 1

@@ -20,21 +20,16 @@ struct W3CSunSuiteTests {
 
     /// not-wf cases this implementation knowingly accepts, the current
     /// frontier (exact, so any regression is caught): not-sa03 needs the
-    /// standalone='yes' entity-declared WFC; pi needs target/data separation
-    /// inside the DTD subset.
+    /// standalone='yes' entity-declared WFC.
     private let knownNotWFAccepted: Set<String> = [
-        "not-wf/not-sa03.xml", "not-wf/pi.xml",
+        "not-wf/not-sa03.xml",
     ]
 
-    /// valid cases this implementation knowingly fails: the sa/not-sa cases
-    /// need tokenized attribute-value normalization (3.3.3) before validity
-    /// checks; ext01/ext02 need external-entity text declarations (4.3.1);
-    /// pe02 needs character-reference expansion in parameter-entity literals
-    /// at declaration time (4.4.5, Appendix D); pe03 is under investigation.
+    /// valid cases this implementation knowingly fails: both need general-
+    /// entity replacement text containing markup to be reparsed into elements
+    /// rather than included as character data (tracked as its own issue).
     private let knownValidFailures: Set<String> = [
-        "valid/sa02.xml", "valid/sa04.xml", "valid/not-sa02.xml",
-        "valid/not-sa03.xml", "valid/not-sa04.xml", "valid/ext01.xml",
-        "valid/ext02.xml", "valid/pe02.xml", "valid/pe03.xml",
+        "valid/pe03.xml", "valid/ext02.xml",
     ]
 
     /// invalid cases where this implementation knowingly reports no validity
@@ -46,8 +41,10 @@ struct W3CSunSuiteTests {
         "invalid/dtd01.xml", "invalid/dtd02.xml", "invalid/el01.xml",
         "invalid/el04.xml", "invalid/el05.xml", "invalid/id01.xml",
         "invalid/id03.xml", "invalid/id04.xml", "invalid/id05.xml",
-        "invalid/not-sa01.xml", "invalid/not-sa04.xml", "invalid/not-sa08.xml",
-        "invalid/not-sa09.xml", "invalid/not-sa11.xml", "invalid/not-sa13.xml",
+        "invalid/not-sa01.xml", "invalid/not-sa02.xml", "invalid/not-sa04.xml",
+        "invalid/not-sa05.xml", "invalid/not-sa06.xml", "invalid/not-sa07.xml",
+        "invalid/not-sa08.xml", "invalid/not-sa09.xml", "invalid/not-sa10.xml",
+        "invalid/not-sa11.xml", "invalid/not-sa12.xml", "invalid/not-sa13.xml",
         "invalid/not-sa14.xml", "invalid/required01.xml", "invalid/required02.xml",
         "invalid/root.xml", "invalid/attr04.xml", "invalid/attr09.xml",
         "invalid/attr10.xml", "invalid/attr11.xml", "invalid/attr12.xml",
@@ -83,15 +80,18 @@ struct W3CSunSuiteTests {
         PureXML.Parsing.Limits(allowDoctype: true)
     }
 
-    /// Resolves relative SYSTEM identifiers against the case's own directory.
+    /// Resolves relative SYSTEM identifiers against the case's own directory,
+    /// byte-decoding through PureXML's own decoder so UTF-16 entity files work.
     private func resolver(directory: String) -> PureXML.Parsing.EntityResolver {
-        PureXML.Parsing.EntityResolver(
-            resolveEntity: { _, id in
-                (try? String(contentsOfFile: directory + "/" + id.systemID, encoding: .utf8))
-            },
-            resolveExternalSubset: { id in
-                (try? String(contentsOfFile: directory + "/" + id.systemID, encoding: .utf8))
-            },
+        @Sendable func load(_ id: PureXML.Parsing.ExternalID) -> String? {
+            guard let data = try? Data(contentsOf: URL(fileURLWithPath: directory + "/" + id.systemID)) else {
+                return nil
+            }
+            return try? PureXML.Parsing.ByteDecoder.decode([UInt8](data))
+        }
+        return PureXML.Parsing.EntityResolver(
+            resolveEntity: { _, id in load(id) },
+            resolveExternalSubset: { id in load(id) },
         )
     }
 

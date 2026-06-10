@@ -75,7 +75,9 @@ struct DTDScanner {
     private mutating func resolveExternalEntities() {
         for (name, id) in doctype.externalEntities where doctype.entities[name] == nil {
             if let text = resolver.resolveEntity(name, id) {
-                doctype.entities[name] = text
+                // An external parsed entity may begin with a text declaration,
+                // which is not part of its replacement text (4.3.1).
+                doctype.entities[name] = strippingTextDeclaration(text)
             }
         }
     }
@@ -137,12 +139,16 @@ struct DTDScanner {
         } else if reader.matches("<!--") {
             skip(&reader, until: "-->")
         } else if reader.matches("<?") {
-            // The reserved target 'xml' may not appear as a PI in the subset.
+            // The reserved target 'xml' may not appear as a PI in the subset,
+            // and the target must be separated from its data (production 16).
             let mark = reader.mark
             reader.consume("<?")
             let target = scanName(&reader)
             if target.lowercased() == "xml" {
                 throw ParseError.reservedProcessingInstructionTarget(mark)
+            }
+            if let next = reader.peek(), !next.isWhitespace, !reader.matches("?>") {
+                throw ParseError.unexpectedCharacter(next, reader.mark)
             }
             skip(&reader, until: "?>")
         } else {
@@ -188,7 +194,7 @@ struct DTDScanner {
             }
         } else if isParameter {
             if doctype.parameterEntities[name] == nil, let text = resolver.resolveExternalSubset(id) {
-                doctype.parameterEntities[name] = expandParameterReferences(text)
+                doctype.parameterEntities[name] = expandParameterReferences(strippingTextDeclaration(text))
             }
         } else if doctype.externalEntities[name] == nil {
             doctype.externalEntities[name] = id
