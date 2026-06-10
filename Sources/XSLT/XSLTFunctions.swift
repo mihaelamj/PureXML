@@ -101,6 +101,7 @@ extension PureXML.XSLT {
             keys: KeyIndex,
             loader: @escaping (String) -> String?,
             decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
+            documents: PureXML.XSLT.DocumentCache,
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([.tree(current)]) }
@@ -138,7 +139,7 @@ extension PureXML.XSLT {
                     } else {
                         [arguments.first?.string ?? ""]
                     }
-                    return .nodeSet(references.flatMap { documentReference($0, loader) })
+                    return .nodeSet(references.flatMap { documentReference($0, loader, documents) })
                 }
                 .adding("generate-id") { arguments, context in
                     // No argument uses the context node; an explicit empty node-set
@@ -155,7 +156,11 @@ extension PureXML.XSLT {
 
         /// Loads one `document()` reference: the whole document, or, when the
         /// reference has a `#fragment`, the nodes its XPointer selects.
-        private static func documentReference(_ reference: String, _ loader: (String) -> String?) -> [PureXML.XPath.Node] {
+        private static func documentReference(
+            _ reference: String,
+            _ loader: (String) -> String?,
+            _ cache: PureXML.XSLT.DocumentCache,
+        ) -> [PureXML.XPath.Node] {
             let path: String
             let fragment: String?
             if let hash = reference.firstIndex(of: "#") {
@@ -165,8 +170,13 @@ extension PureXML.XSLT {
                 path = reference
                 fragment = nil
             }
-            guard let text = loader(path), let parsed = try? PureXML.parse(text) else { return [] }
-            guard let fragment, !fragment.isEmpty else { return [.tree(PureXML.Model.TreeNode(parsed))] }
+            if cache.trees[path] == nil {
+                guard let text = loader(path), let parsed = try? PureXML.parse(text) else { return [] }
+                cache.sources[path] = parsed
+                cache.trees[path] = PureXML.Model.TreeNode(parsed)
+            }
+            guard let tree = cache.trees[path], let parsed = cache.sources[path] else { return [] }
+            guard let fragment, !fragment.isEmpty else { return [.tree(tree)] }
             let selections = (try? PureXML.XPointer.evaluate(fragment, over: parsed)) ?? []
             return selections.compactMap { selection in
                 guard case let .node(node) = selection else { return nil }
@@ -221,63 +231,6 @@ extension PureXML.XSLT {
                 }
             }
             return index
-        }
-    }
-
-    /// The `xsl:number` numbering machinery: a node's position rendered per a
-    /// format token (`1` arabic, `A`/`a` alphabetic, `I`/`i` roman).
-    enum Numbering {
-        /// The number for `node`: its 1-based position among preceding siblings of
-        /// the same name (or the `count` name), rendered per `format`.
-        static func value(of node: PureXML.Model.TreeNode, count: String?, format: String) -> String {
-            let target = count ?? node.name?.localName
-            var position = 1
-            if let parent = node.parent {
-                for sibling in parent.children {
-                    if sibling === node { break }
-                    if sibling.kind == .element, sibling.name?.localName == target { position += 1 }
-                }
-            }
-            return render(position, format)
-        }
-
-        private static func render(_ number: Int, _ format: String) -> String {
-            switch format.first {
-            case "A": alphabetic(number, base: 65)
-            case "a": alphabetic(number, base: 97)
-            case "I": roman(number).uppercased()
-            case "i": roman(number)
-            default: String(number)
-            }
-        }
-
-        private static func alphabetic(_ number: Int, base: UInt32) -> String {
-            var value = number
-            var result = ""
-            while value > 0 {
-                let remainder = UInt32((value - 1) % 26)
-                if let scalar = Unicode.Scalar(base + remainder) {
-                    result = String(Character(scalar)) + result
-                }
-                value = (value - 1) / 26
-            }
-            return result
-        }
-
-        private static func roman(_ number: Int) -> String {
-            let table: [(Int, String)] = [
-                (1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"),
-                (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i"),
-            ]
-            var value = number
-            var result = ""
-            for (amount, numeral) in table {
-                while value >= amount {
-                    result += numeral
-                    value -= amount
-                }
-            }
-            return result
         }
     }
 }

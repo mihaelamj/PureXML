@@ -71,7 +71,7 @@ public extension PureXML.XSLT {
         /// `xsl:variable` bound for the rest of the sequence constructor.
         case variable(name: String, select: String?, body: [Instruction])
         /// `xsl:number`: a generated sequence number for the context node.
-        case number(count: String?, from: String?, format: String)
+        case number(NumberSpec)
         /// `xsl:comment`: a comment node whose text is the instantiated body.
         case comment(body: [Instruction])
         /// `xsl:processing-instruction` whose target is `name` and whose data is
@@ -153,6 +153,19 @@ public extension PureXML.XSLT {
             self.uri = uri
             self.prefix = prefix
         }
+    }
+
+    /// The attribute bundle of an `xsl:number` instruction: the numbering
+    /// level, the count/from patterns, an explicit value expression, the
+    /// format string, and the digit grouping settings.
+    struct NumberSpec: Sendable {
+        var level: String
+        var count: String?
+        var from: String?
+        var value: String?
+        var format: String
+        var groupingSeparator: String?
+        var groupingSize: Int?
     }
 
     /// The symbols an `xsl:decimal-format` sets for `format-number`: those used in

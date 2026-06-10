@@ -17,6 +17,7 @@ extension PureXML.XSLT {
         private let keyIndex: PureXML.XSLT.KeyIndex
         private let termination = Termination()
         private let matchCache = MatchCache()
+        private let documentCache = PureXML.XSLT.DocumentCache()
 
         /// The `xsl:message terminate="yes"` text, if one fired during `run()`.
         var terminationMessage: String? {
@@ -52,7 +53,7 @@ extension PureXML.XSLT {
                 .element
         }
 
-        private func matches(_ node: PureXML.Model.TreeNode, _ pattern: String) -> Bool {
+        func matches(_ node: PureXML.Model.TreeNode, _ pattern: String) -> Bool {
             matchCache.nodes(matching: pattern, over: root).contains(ObjectIdentifier(node))
         }
 
@@ -129,14 +130,20 @@ extension PureXML.XSLT {
             return .nodeSet([.tree(PureXML.Model.TreeNode.document(children: children))])
         }
 
-        fileprivate func value(_ expression: String, _ context: XSLTContext) -> PureXML.XPath.Value? {
+        func value(_ expression: String, _ context: XSLTContext) -> PureXML.XPath.Value? {
             guard let query = try? PureXML.XPath.Query(expression) else { return nil }
             return try? query.value(
                 at: context.node,
                 position: context.position,
                 size: context.size,
                 variables: context.variables,
-                functions: PureXML.XSLT.Library.table(current: context.node, keys: keyIndex, loader: documentLoader, decimalFormats: stylesheet.decimalFormats),
+                functions: PureXML.XSLT.Library.table(
+                    current: context.node,
+                    keys: keyIndex,
+                    loader: documentLoader,
+                    decimalFormats: stylesheet.decimalFormats,
+                    documents: documentCache,
+                ),
             )
         }
 
@@ -232,8 +239,8 @@ extension PureXML.XSLT.Transformer {
             attributeInstruction(nameTemplate, namespaceTemplate, namespaces, body, context)
         case let .copy(useAttributeSets, body):
             copyInstruction(useAttributeSets, body, context)
-        case let .number(count, _, format):
-            [.node(.text(PureXML.XSLT.Numbering.value(of: context.node, count: count, format: format)))]
+        case .number:
+            [.node(.text(numberInstruction(instruction, context)))]
         case let .comment(body):
             [.node(.comment(Self.text(of: instantiate(body, context))))]
         case let .processingInstruction(name, body):

@@ -97,3 +97,26 @@ extension PureXML.XSLT.Transformer {
         }
     }
 }
+
+extension PureXML.XSLT.Transformer {
+    /// `xsl:number`: an explicit `value` expression rounds per the XSLT 1.0
+    /// rules; otherwise the level/count/from machinery numbers the context
+    /// node, with patterns matched through the transform's match cache.
+    func numberInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> String {
+        guard case let .number(spec) = instruction else { return "" }
+        let grouping = spec.groupingSeparator.flatMap { separator in
+            spec.groupingSize.map { (separator: separator, size: $0) }
+        }
+        if let valueExpression = spec.value {
+            let number = value(valueExpression, context)?.number ?? .nan
+            guard number.isFinite, number.rounded() >= 1 else {
+                return PureXML.XPath.Value.format(number)
+            }
+            return XSLTNumbering.format([Int(number.rounded())], spec.format, grouping)
+        }
+        let numbers = XSLTNumbering.numbers(of: context.node, level: spec.level, count: spec.count, from: spec.from) { node, pattern in
+            matches(node, pattern)
+        }
+        return XSLTNumbering.format(numbers, spec.format, grouping)
+    }
+}

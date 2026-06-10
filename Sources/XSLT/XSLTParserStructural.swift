@@ -23,11 +23,15 @@ extension PureXML.XSLT.XSLTParser {
                 body: body(node),
             )
         case "number":
-            .number(
+            .number(PureXML.XSLT.NumberSpec(
+                level: XSLTNode.attribute(node, "level") ?? "single",
                 count: XSLTNode.attribute(node, "count"),
                 from: XSLTNode.attribute(node, "from"),
+                value: XSLTNode.attribute(node, "value"),
                 format: XSLTNode.attribute(node, "format") ?? "1",
-            )
+                groupingSeparator: XSLTNode.attribute(node, "grouping-separator"),
+                groupingSize: XSLTNode.attribute(node, "grouping-size").flatMap { Int($0) },
+            ))
         case "comment":
             .comment(body: body(node))
         case "processing-instruction":
