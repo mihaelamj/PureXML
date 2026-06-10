@@ -216,6 +216,16 @@ final class RNGCompiler {
     /// an unknown datatype, so the value matches nothing.
     private func valuePattern(_ node: Tree) -> Pattern {
         guard let type = valueType(node) else { return .notAllowed }
+        if type.base == .qName {
+            // The QName value space: resolve the literal's prefix against the
+            // schema's xmlns scope; an unprefixed literal takes the in-scope
+            // ns attribute (6.2.9).
+            let raw = RNGNode.text(node)
+            if let qualified = RNGNode.resolveQName(raw, at: node) {
+                return .valueQName(namespace: qualified.namespace, localName: qualified.localName)
+            }
+            return .valueQName(namespace: effectiveNS(node), localName: raw)
+        }
         return .value(type, RNGNode.rawText(node))
     }
 

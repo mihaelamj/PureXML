@@ -18,20 +18,17 @@ struct RelaxNGSpecSuiteTests {
         ProcessInfo.processInfo.environment["RNG_TS_ROOT"]
     }
 
-    /// The burn-down frontier, by case index in document order (exact, so
-    /// progress and regressions both show). Two classes remain:
-    /// 1. Schema correctness is not validated: every `incorrect` schema
-    ///    compiles (the count is asserted exactly below). Closing it means
-    ///    validating schemas against the RELAX NG grammar and the section
-    ///    4.16-4.18 restrictions before pattern interpretation.
-    /// 2. The QName datatype (cases 378-380): its value space needs prefix
-    ///    resolution in BOTH contexts, the schema's xmlns/ns scope at compile
-    ///    and the instance element's in-scope namespaces at validation, which
-    ///    the derivative engine does not thread yet.
+    /// The burn-down frontier (exact, so progress and regressions both show).
+    /// The instance level is fully clean: every valid instance is accepted
+    /// and every invalid one rejected. One class remains: schema correctness
+    /// is not validated, so every `incorrect` schema compiles (the count is
+    /// asserted exactly below); closing it means validating schemas against
+    /// the RELAX NG grammar and the section 4.16-4.18 restrictions before
+    /// pattern interpretation.
     private let knownIncorrectCompiledCount = 213
     private let knownCorrectRejected: Set<Int> = []
-    private let knownValidRejected: Set<Int> = [379, 380]
-    private let knownInvalidAccepted: Set<Int> = [378, 379]
+    private let knownValidRejected: Set<Int> = []
+    private let knownInvalidAccepted: Set<Int> = []
 
     private struct SpecCase {
         let index: Int

@@ -40,6 +40,10 @@ public extension PureXML.Schema {
         /// pattern must not (4.12).
         case dataExcept(SimpleType, Pattern)
         case value(SimpleType, String)
+        /// A `<value type="QName">`, compiled to its (namespace, local) value
+        /// pair via the schema's xmlns scope; the instance side resolves its
+        /// text against the instance element's in-scope namespaces.
+        case valueQName(namespace: String, localName: String)
         case list(Pattern)
         case ref(String)
         case after(Pattern, Pattern)

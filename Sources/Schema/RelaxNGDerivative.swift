@@ -14,7 +14,34 @@ extension PureXML.Schema {
 
         /// Whether `root` matches `start`.
         func matches(start: PureXML.Schema.Pattern, root: PureXML.Model.Node) -> Bool {
-            nullable(childDeriv(start, root))
+            nullable(childDeriv(start, root, env: Self.rootEnvironment))
+        }
+
+        /// The namespace bindings every instance starts with.
+        static let rootEnvironment: [String: String] = ["xml": "http://www.w3.org/XML/1998/namespace"]
+
+        /// `env` extended with the element's own xmlns declarations.
+        static func extendedEnvironment(_ env: [String: String], with element: PureXML.Model.Element) -> [String: String] {
+            var extended = env
+            for attribute in element.attributes where isNamespaceDeclaration(attribute) {
+                let prefix = attribute.name.prefix == "xmlns" ? attribute.name.localName : ""
+                extended[prefix] = attribute.value
+            }
+            return extended
+        }
+
+        /// Resolves an instance-side QName text against the in-scope bindings:
+        /// a prefix must be bound; an unprefixed name takes the default
+        /// namespace (the xs:QName rules).
+        static func resolveQNameValue(_ raw: String, env: [String: String]) -> (namespace: String, localName: String)? {
+            let trimmed = raw.trimmingXMLWhitespace()
+            guard let colon = trimmed.firstIndex(of: ":") else {
+                return (env[""] ?? "", trimmed)
+            }
+            let prefix = String(trimmed[..<colon])
+            let local = String(trimmed[trimmed.index(after: colon)...])
+            guard let uri = env[prefix], !uri.isEmpty else { return nil }
+            return (uri, local)
         }
 
         // MARK: Simplifying constructors
@@ -70,36 +97,38 @@ extension PureXML.Schema {
 
         // MARK: Text and attribute derivatives
 
-        func textDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String) -> PureXML.Schema.Pattern {
+        func textDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String, env: [String: String] = rootEnvironment) -> PureXML.Schema.Pattern {
             switch pattern {
-            case let .choice(lhs, rhs): return choice(textDeriv(lhs, string), textDeriv(rhs, string))
+            case let .choice(lhs, rhs): return choice(textDeriv(lhs, string, env: env), textDeriv(rhs, string, env: env))
             case let .interleave(lhs, rhs):
-                return choice(interleave(textDeriv(lhs, string), rhs), interleave(lhs, textDeriv(rhs, string)))
+                return choice(interleave(textDeriv(lhs, string, env: env), rhs), interleave(lhs, textDeriv(rhs, string, env: env)))
             case let .group(lhs, rhs):
-                let derived = group(textDeriv(lhs, string), rhs)
-                return nullable(lhs) ? choice(derived, textDeriv(rhs, string)) : derived
-            case let .after(lhs, rhs): return after(textDeriv(lhs, string), rhs)
+                let derived = group(textDeriv(lhs, string, env: env), rhs)
+                return nullable(lhs) ? choice(derived, textDeriv(rhs, string, env: env)) : derived
+            case let .after(lhs, rhs): return after(textDeriv(lhs, string, env: env), rhs)
             case let .oneOrMore(inner):
-                return group(textDeriv(inner, string), choice(.oneOrMore(inner), .empty))
+                return group(textDeriv(inner, string, env: env), choice(.oneOrMore(inner), .empty))
             case .text: return .text
-            case let .ref(name): return textDeriv(resolve(name), string)
-            default: return valueDeriv(pattern, string)
+            case let .ref(name): return textDeriv(resolve(name), string, env: env)
+            default: return valueDeriv(pattern, string, env: env)
             }
         }
 
-        private func valueDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String) -> PureXML.Schema.Pattern {
+        private func valueDeriv(_ pattern: PureXML.Schema.Pattern, _ string: String, env: [String: String]) -> PureXML.Schema.Pattern {
             switch pattern {
             case let .value(type, literal):
                 type.valueMatches(string, literal: literal) ? .empty : .notAllowed
             case let .data(type): type.validate(string) == nil ? .empty : .notAllowed
             case let .dataExcept(type, except):
-                type.validate(string) == nil && !nullable(textDeriv(except, string)) ? .empty : .notAllowed
-            case let .list(inner): listMatches(inner, string) ? .empty : .notAllowed
+                type.validate(string) == nil && !nullable(textDeriv(except, string, env: env)) ? .empty : .notAllowed
+            case let .valueQName(namespace, localName):
+                Self.resolveQNameValue(string, env: env).map { $0 == (namespace, localName) } == true ? .empty : .notAllowed
+            case let .list(inner): listMatches(inner, string, env: env) ? .empty : .notAllowed
             default: .notAllowed
             }
         }
 
-        private func listMatches(_ pattern: PureXML.Schema.Pattern, _ string: String) -> Bool {
+        private func listMatches(_ pattern: PureXML.Schema.Pattern, _ string: String, env _: [String: String]) -> Bool {
             var residual = pattern
             for token in string.split(whereSeparator: \.isWhitespace) {
                 residual = textDeriv(residual, String(token))
@@ -107,26 +136,26 @@ extension PureXML.Schema {
             return nullable(residual)
         }
 
-        func attributeDeriv(_ pattern: PureXML.Schema.Pattern, _ attribute: PureXML.Model.Attribute) -> PureXML.Schema.Pattern {
+        func attributeDeriv(_ pattern: PureXML.Schema.Pattern, _ attribute: PureXML.Model.Attribute, env: [String: String] = rootEnvironment) -> PureXML.Schema.Pattern {
             switch pattern {
-            case let .choice(lhs, rhs): return choice(attributeDeriv(lhs, attribute), attributeDeriv(rhs, attribute))
+            case let .choice(lhs, rhs): return choice(attributeDeriv(lhs, attribute, env: env), attributeDeriv(rhs, attribute, env: env))
             case let .group(lhs, rhs):
-                return choice(group(attributeDeriv(lhs, attribute), rhs), group(lhs, attributeDeriv(rhs, attribute)))
+                return choice(group(attributeDeriv(lhs, attribute, env: env), rhs), group(lhs, attributeDeriv(rhs, attribute, env: env)))
             case let .interleave(lhs, rhs):
-                return choice(interleave(attributeDeriv(lhs, attribute), rhs), interleave(lhs, attributeDeriv(rhs, attribute)))
+                return choice(interleave(attributeDeriv(lhs, attribute, env: env), rhs), interleave(lhs, attributeDeriv(rhs, attribute, env: env)))
             case let .oneOrMore(inner):
-                return group(attributeDeriv(inner, attribute), choice(.oneOrMore(inner), .empty))
-            case let .after(lhs, rhs): return after(attributeDeriv(lhs, attribute), rhs)
+                return group(attributeDeriv(inner, attribute, env: env), choice(.oneOrMore(inner), .empty))
+            case let .after(lhs, rhs): return after(attributeDeriv(lhs, attribute, env: env), rhs)
             case let .attribute(nameClass, content):
-                guard nameClass.contains(attribute.name), valueMatches(content, attribute.value) else { return .notAllowed }
+                guard nameClass.contains(attribute.name), valueMatches(content, attribute.value, env: env) else { return .notAllowed }
                 return .empty
-            case let .ref(name): return attributeDeriv(resolve(name), attribute)
+            case let .ref(name): return attributeDeriv(resolve(name), attribute, env: env)
             default: return .notAllowed
             }
         }
 
-        private func valueMatches(_ content: PureXML.Schema.Pattern, _ value: String) -> Bool {
-            if nullable(textDeriv(content, value)) { return true }
+        private func valueMatches(_ content: PureXML.Schema.Pattern, _ value: String, env: [String: String]) -> Bool {
+            if nullable(textDeriv(content, value, env: env)) { return true }
             // A whitespace-only attribute value also matches a pattern that
             // matches the empty sequence, the same leniency element content
             // gets for ignorable whitespace.
@@ -143,24 +172,25 @@ extension PureXML.Schema {
 extension PureXML.Schema.RelaxNGEngine {
     // MARK: Element derivatives
 
-    func childDeriv(_ pattern: PureXML.Schema.Pattern, _ node: PureXML.Model.Node) -> PureXML.Schema.Pattern {
+    func childDeriv(_ pattern: PureXML.Schema.Pattern, _ node: PureXML.Model.Node, env: [String: String] = rootEnvironment) -> PureXML.Schema.Pattern {
         switch node {
         case let .text(string), let .cdata(string):
-            textDeriv(pattern, string)
+            textDeriv(pattern, string, env: env)
         case let .element(element):
-            processElement(pattern, element)
+            processElement(pattern, element, env: env)
         default:
             pattern
         }
     }
 
-    private func processElement(_ pattern: PureXML.Schema.Pattern, _ element: PureXML.Model.Element) -> PureXML.Schema.Pattern {
+    private func processElement(_ pattern: PureXML.Schema.Pattern, _ element: PureXML.Model.Element, env: [String: String]) -> PureXML.Schema.Pattern {
+        let extended = Self.extendedEnvironment(env, with: element)
         let opened = startTagOpenDeriv(pattern, element.name)
         let attributed = element.attributes
             .filter { !Self.isNamespaceDeclaration($0) }
-            .reduce(opened) { attributeDeriv($0, $1) }
+            .reduce(opened) { attributeDeriv($0, $1, env: extended) }
         let closed = startTagCloseDeriv(attributed)
-        let withChildren = childrenDeriv(closed, element.children)
+        let withChildren = childrenDeriv(closed, element.children, env: extended)
         return endTagDeriv(withChildren)
     }
 
@@ -210,17 +240,17 @@ extension PureXML.Schema.RelaxNGEngine {
         }
     }
 
-    private func childrenDeriv(_ pattern: PureXML.Schema.Pattern, _ children: [PureXML.Model.Node]) -> PureXML.Schema.Pattern {
+    private func childrenDeriv(_ pattern: PureXML.Schema.Pattern, _ children: [PureXML.Model.Node], env: [String: String]) -> PureXML.Schema.Pattern {
         let coalesced = Self.coalesceText(children)
         // Clark's algorithm treats an empty element as optional empty text, so
         // a data/value pattern whose lexical space admits "" matches <e/>.
-        if coalesced.isEmpty { return choice(pattern, textDeriv(pattern, "")) }
+        if coalesced.isEmpty { return choice(pattern, textDeriv(pattern, "", env: env)) }
         if coalesced.count == 1, case let .text(string) = coalesced[0] {
-            let derived = textDeriv(pattern, string)
+            let derived = textDeriv(pattern, string, env: env)
             return Self.isWhitespace(string) ? choice(pattern, derived) : derived
         }
         return coalesced.reduce(pattern) { accumulated, node in
-            Self.isWhitespaceText(node) ? accumulated : childDeriv(accumulated, node)
+            Self.isWhitespaceText(node) ? accumulated : childDeriv(accumulated, node, env: env)
         }
     }
 
@@ -285,6 +315,8 @@ extension PureXML.Schema.RelaxNGEngine {
 private struct RelaxNGStreamFrame {
     var hadElementChild = false
     var pendingText = ""
+    /// The namespace bindings in scope at this element, for QName values.
+    var env: [String: String] = [:]
 }
 
 public extension PureXML.Schema {
@@ -299,7 +331,7 @@ public extension PureXML.Schema {
 extension PureXML.Schema.RelaxNGEngine {
     /// The initial streaming state for a start pattern, with a document-level frame.
     func streamingStart(_ start: PureXML.Schema.Pattern) -> PureXML.Schema.RelaxNGStreamingState {
-        PureXML.Schema.RelaxNGStreamingState(current: start, frames: [RelaxNGStreamFrame()])
+        PureXML.Schema.RelaxNGStreamingState(current: start, frames: [RelaxNGStreamFrame(env: Self.rootEnvironment)])
     }
 
     /// Derives the state by one parse event, the streaming form of `childDeriv`.
@@ -310,12 +342,16 @@ extension PureXML.Schema.RelaxNGEngine {
         case let .startElement(name, attributes):
             flushText(&state, closing: false)
             if !state.frames.isEmpty { state.frames[state.frames.count - 1].hadElementChild = true }
+            var env = state.frames.last?.env ?? Self.rootEnvironment
+            for attribute in attributes where Self.isNamespaceDeclaration(attribute) {
+                env[attribute.name.prefix == "xmlns" ? attribute.name.localName : ""] = attribute.value
+            }
             let opened = startTagOpenDeriv(state.current, name)
             let attributed = attributes
                 .filter { !Self.isNamespaceDeclaration($0) }
-                .reduce(opened) { attributeDeriv($0, $1) }
+                .reduce(opened) { attributeDeriv($0, $1, env: env) }
             state.current = startTagCloseDeriv(attributed)
-            state.frames.append(RelaxNGStreamFrame())
+            state.frames.append(RelaxNGStreamFrame(env: env))
         case let .characters(text), let .cdata(text):
             if !state.frames.isEmpty { state.frames[state.frames.count - 1].pendingText += text }
         case .endElement:
@@ -335,13 +371,21 @@ extension PureXML.Schema.RelaxNGEngine {
     private func flushText(_ state: inout PureXML.Schema.RelaxNGStreamingState, closing: Bool) {
         guard let index = state.frames.indices.last else { return }
         let text = state.frames[index].pendingText
-        guard !text.isEmpty else { return }
+        let env = state.frames[index].env
+        guard !text.isEmpty else {
+            // An empty element is optional empty text (the tree walk's rule),
+            // so a data/value pattern admitting "" matches <e/>.
+            if closing, !state.frames[index].hadElementChild {
+                state.current = choice(state.current, textDeriv(state.current, "", env: env))
+            }
+            return
+        }
         state.frames[index].pendingText = ""
         if !Self.isWhitespace(text) {
-            state.current = textDeriv(state.current, text)
+            state.current = textDeriv(state.current, text, env: env)
         } else if closing, !state.frames[index].hadElementChild {
             // A lone whitespace text child is optional, the `childrenDeriv` rule.
-            state.current = choice(state.current, textDeriv(state.current, text))
+            state.current = choice(state.current, textDeriv(state.current, text, env: env))
         }
         // Whitespace among element siblings is ignorable and skipped.
     }
