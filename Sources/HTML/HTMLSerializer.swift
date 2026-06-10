@@ -26,7 +26,7 @@ extension PureXML.HTML {
                 output += attributeText(attribute)
             }
             output += ">"
-            if Elements.void.contains(name) {
+            if Elements.void.contains(name.lowercased()) {
                 return output
             }
             output += content(of: element, name: name)
@@ -34,7 +34,7 @@ extension PureXML.HTML {
         }
 
         private static func content(of element: PureXML.Model.Element, name: String) -> String {
-            if Elements.rawText.contains(name) {
+            if Elements.rawText.contains(name.lowercased()) {
                 return element.children.map(rawText).joined()
             }
             return element.children.map(serialize).joined()
@@ -54,12 +54,12 @@ extension PureXML.HTML {
 
         private static func escapeText(_ value: String) -> String {
             var result = ""
-            for character in value {
-                switch character {
+            for scalar in value.unicodeScalars {
+                switch scalar {
                 case "&": result += "&amp;"
                 case "<": result += "&lt;"
                 case ">": result += "&gt;"
-                default: result.append(character)
+                default: result += latin1Entity(scalar) ?? String(Character(scalar))
                 }
             }
             return result
@@ -67,15 +67,37 @@ extension PureXML.HTML {
 
         private static func escapeAttribute(_ value: String) -> String {
             var result = ""
-            for character in value {
-                switch character {
+            for scalar in value.unicodeScalars {
+                switch scalar {
                 case "&": result += "&amp;"
                 case "\"": result += "&quot;"
                 case "<": result += "&lt;"
-                default: result.append(character)
+                default: result += latin1Entity(scalar) ?? String(Character(scalar))
                 }
             }
             return result
+        }
+
+        /// The HTML 4.01 Latin-1 named entities: U+00A0 through U+00FF map
+        /// onto these names in order (the html output method's escapes).
+        private static let latin1Names = [
+            "nbsp", "iexcl", "cent", "pound", "curren", "yen", "brvbar", "sect",
+            "uml", "copy", "ordf", "laquo", "not", "shy", "reg", "macr",
+            "deg", "plusmn", "sup2", "sup3", "acute", "micro", "para", "middot",
+            "cedil", "sup1", "ordm", "raquo", "frac14", "frac12", "frac34", "iquest",
+            "Agrave", "Aacute", "Acirc", "Atilde", "Auml", "Aring", "AElig", "Ccedil",
+            "Egrave", "Eacute", "Ecirc", "Euml", "Igrave", "Iacute", "Icirc", "Iuml",
+            "ETH", "Ntilde", "Ograve", "Oacute", "Ocirc", "Otilde", "Ouml", "times",
+            "Oslash", "Ugrave", "Uacute", "Ucirc", "Uuml", "Yacute", "THORN", "szlig",
+            "agrave", "aacute", "acirc", "atilde", "auml", "aring", "aelig", "ccedil",
+            "egrave", "eacute", "ecirc", "euml", "igrave", "iacute", "icirc", "iuml",
+            "eth", "ntilde", "ograve", "oacute", "ocirc", "otilde", "ouml", "divide",
+            "oslash", "ugrave", "uacute", "ucirc", "uuml", "yacute", "thorn", "yuml",
+        ]
+
+        private static func latin1Entity(_ scalar: Unicode.Scalar) -> String? {
+            guard scalar.value >= 0xA0, scalar.value <= 0xFF else { return nil }
+            return "&" + latin1Names[Int(scalar.value) - 0xA0] + ";"
         }
     }
 }

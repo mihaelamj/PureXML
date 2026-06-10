@@ -43,7 +43,8 @@ extension PureXML.XSLT {
         }
 
         private static func isWhitespace(_ value: String) -> Bool {
-            value.allSatisfy(\.isWhitespace)
+            // XML whitespace only: NBSP and other Unicode spaces are content.
+            value.allSatisfy { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" }
         }
     }
 }

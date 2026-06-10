@@ -51,7 +51,8 @@ struct HTMLTests {
     @Test("Character references are decoded and re-escaped")
     func test_entities() {
         #expect(roundTrip("<p>a &amp; b &lt; c &#65;</p>") == "<p>a &amp; b &lt; c A</p>")
-        #expect(roundTrip("<p>&nbsp;&copy;</p>") == "<p>\u{A0}\u{A9}</p>")
+        // Latin-1 characters re-encode to their HTML 4.01 names on output.
+        #expect(roundTrip("<p>&nbsp;&copy;</p>") == "<p>&nbsp;&copy;</p>")
     }
 
     @Test("Comments and an unmatched end tag are handled leniently")

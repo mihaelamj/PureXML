@@ -53,7 +53,7 @@ struct XSLTParserTests {
             return
         }
         #expect(select == "item")
-        guard case .valueOf(select: "@id") = body.first else {
+        guard case .valueOf(select: "@id", raw: false) = body.first else {
             Issue.record("expected value-of")
             return
         }

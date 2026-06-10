@@ -18,16 +18,71 @@ public extension PureXML.XSLT {
         let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader)
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
-        if sheet.output.method == "text" { return textValue(of: result) }
+        let method = sheet.output.method ?? defaultMethod(for: result)
+        if method == "text" { return RawText.resolve(textValue(of: result)) }
         let body: String
-        if sheet.output.method == "html" {
-            body = PureXML.HTML.serialize(result)
+        if method == "html" {
+            body = PureXML.HTML.serialize(withContentTypeMeta(result, encoding: sheet.output.encoding ?? "UTF-8"))
         } else {
             let fixed = XSLTNamespaceFixup.apply(result)
             let prepared = withCDATASections(fixed, sheet.output.cdataSectionElements)
-            body = PureXML.serialize(prepared, options: options.applying(sheet.output))
+            var emitOptions = options.applying(sheet.output)
+            if sheet.output.omitXMLDeclaration == nil { emitOptions.includeXMLDeclaration = true }
+            body = PureXML.serialize(prepared, options: emitOptions)
         }
-        return doctype(for: result, sheet.output) + body
+        return doctype(for: result, sheet.output) + RawText.resolve(body)
+    }
+
+    /// The default output method (16.1): html when the first element of the
+    /// result is named html in any case combination (with only whitespace
+    /// text before it), otherwise xml.
+    private static func defaultMethod(for node: PureXML.Model.Node) -> String {
+        guard case let .document(children) = node else { return "xml" }
+        for child in children {
+            switch child {
+            case let .element(element):
+                let isHTML = element.name.description.lowercased() == "html" && (element.name.namespaceURI ?? "").isEmpty
+                return isHTML ? "html" : "xml"
+            case let .text(value) where value.allSatisfy { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" }:
+                continue
+            default:
+                return "xml"
+            }
+        }
+        return "xml"
+    }
+
+    /// Returns `node` with a `META http-equiv="Content-Type"` element
+    /// prepended to the children of the first `head` element (16.2: the html
+    /// output method should add a meta element giving the encoding).
+    private static func withContentTypeMeta(_ node: PureXML.Model.Node, encoding: String) -> PureXML.Model.Node {
+        switch node {
+        case let .document(children):
+            return .document(children.map { withContentTypeMeta($0, encoding: encoding) })
+        case let .element(element):
+            var children = element.children.map { withContentTypeMeta($0, encoding: encoding) }
+            let needsMeta = element.name.localName.lowercased() == "head"
+                && !children.contains(where: { isContentTypeMeta($0) })
+            if needsMeta {
+                let meta = PureXML.Model.Element(
+                    name: .init("META"),
+                    attributes: [
+                        .init("http-equiv", "Content-Type"),
+                        .init("content", "text/html; charset=\(encoding)"),
+                    ],
+                    children: [],
+                )
+                children.insert(.element(meta), at: 0)
+            }
+            return .element(.init(name: element.name, attributes: element.attributes, children: children))
+        default:
+            return node
+        }
+    }
+
+    private static func isContentTypeMeta(_ node: PureXML.Model.Node) -> Bool {
+        guard case let .element(element) = node, element.name.localName.lowercased() == "meta" else { return false }
+        return element.attributes.contains { $0.name.localName.lowercased() == "http-equiv" }
     }
 
     /// Returns `node` with the text children of any element named in `names`

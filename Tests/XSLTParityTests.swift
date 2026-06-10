@@ -6,7 +6,14 @@ struct XSLTParityTests {
     private let xsl = "xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\""
 
     private func transform(_ stylesheet: String, _ source: String) throws -> String {
-        try PureXML.XSLT.transform(stylesheet: stylesheet, source: source)
+        // These cases assert result markup, not the prolog: drop the
+        // spec-default XML declaration the xml method now writes.
+        let output = try PureXML.XSLT.transform(stylesheet: stylesheet, source: source)
+        guard output.hasPrefix("<?xml ") else { return output }
+        guard let end = output.range(of: "?>") else { return output }
+        var body = String(output[end.upperBound...])
+        if body.hasPrefix("\n") { body.removeFirst() }
+        return body
     }
 
     @Test("xsl:key indexes nodes and key() retrieves them")
@@ -63,7 +70,7 @@ struct XSLTParityTests {
             source: "<x/>",
             documentLoader: { uri in uri == "ext.xml" ? "<data><v>loaded</v></data>" : nil },
         )
-        #expect(result == "<out>loaded</out>")
+        #expect(result == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<out>loaded</out>")
     }
 
     @Test("xsl:comment and xsl:processing-instruction emit their nodes")
@@ -97,7 +104,7 @@ struct XSLTParityTests {
           <xsl:template match="/"><out>z</out></xsl:template>
         </xsl:stylesheet>
         """
-        #expect(try transform(stylesheet, "<r/>") == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<out>z</out>")
+        #expect(try PureXML.XSLT.transform(stylesheet: stylesheet, source: "<r/>") == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<out>z</out>")
     }
 
     @Test("xsl:include folds in another stylesheet's templates")
@@ -118,7 +125,7 @@ struct XSLTParityTests {
             source: "<r><i>a</i></r>",
             documentLoader: { $0 == "lib.xsl" ? included : nil },
         )
-        #expect(result == "<out><hit>a</hit></out>")
+        #expect(result == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<out><hit>a</hit></out>")
     }
 
     @Test("xsl:import is overridden by the importing stylesheet")
@@ -140,6 +147,6 @@ struct XSLTParityTests {
             source: "<r><i>a</i></r>",
             documentLoader: { $0 == "base.xsl" ? base : nil },
         )
-        #expect(result == "<out><high>a</high></out>")
+        #expect(result == "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<out><high>a</high></out>")
     }
 }

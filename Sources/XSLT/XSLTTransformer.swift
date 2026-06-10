@@ -152,7 +152,10 @@ extension PureXML.XSLT {
         }
 
         fileprivate func string(_ expression: String, _ context: XSLTContext) -> String {
-            value(expression, context)?.string ?? ""
+            // Raw-output markers do not survive string extraction (16.4:
+            // escaping is disabled only for text written directly to the
+            // result tree), so a fragment round-trip re-enables escaping.
+            PureXML.XSLT.RawText.stripped(value(expression, context)?.string ?? "")
         }
 
         fileprivate func boolean(_ expression: String, _ context: XSLTContext) -> Bool {
@@ -189,7 +192,8 @@ extension PureXML.XSLT.Transformer {
     private func simpleEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem]? {
         switch instruction {
         case let .literalText(text): [.node(.text(text))]
-        case let .valueOf(select): [.node(.text(string(select, context)))]
+        case let .valueOf(select, raw):
+            [.node(.text(raw ? PureXML.XSLT.RawText.marked(string(select, context)) : string(select, context)))]
         case let .applyTemplates(select, mode, sorts, parameters):
             applyTemplates(
                 to: sorted(selectNodes(select ?? "node()", context), sorts),

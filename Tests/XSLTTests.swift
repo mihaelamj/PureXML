@@ -6,7 +6,14 @@ struct XSLTTests {
     private let xsl = "xmlns:xsl=\"http://www.w3.org/1999/XSL/Transform\""
 
     private func transform(_ stylesheet: String, _ source: String) throws -> String {
-        try PureXML.XSLT.transform(stylesheet: stylesheet, source: source)
+        // These cases assert result markup, not the prolog: drop the
+        // spec-default XML declaration the xml method now writes.
+        let output = try PureXML.XSLT.transform(stylesheet: stylesheet, source: source)
+        guard output.hasPrefix("<?xml ") else { return output }
+        guard let end = output.range(of: "?>") else { return output }
+        var body = String(output[end.upperBound...])
+        if body.hasPrefix("\n") { body.removeFirst() }
+        return body
     }
 
     @Test("call-template passes with-param values, falling back to param defaults")

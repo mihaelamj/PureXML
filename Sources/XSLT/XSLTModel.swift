@@ -44,7 +44,7 @@ public extension PureXML.XSLT {
         /// Literal character data copied to the result.
         case literalText(String)
         /// `xsl:value-of`: the string value of an XPath expression.
-        case valueOf(select: String)
+        case valueOf(select: String, raw: Bool)
         /// `xsl:apply-templates` with an optional node-set selection, mode, sorts,
         /// and passed parameters.
         case applyTemplates(select: String?, mode: String?, sorts: [Sort], parameters: [Binding])

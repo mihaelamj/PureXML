@@ -230,7 +230,7 @@ extension PureXML.XSLT {
             switch node.kind {
             case .text, .cdata:
                 let value = node.value
-                return value.allSatisfy(\.isWhitespace) ? nil : .literalText(value)
+                return value.allSatisfy { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" } ? nil : .literalText(value)
             case .element:
                 return XSLTNode.isXSL(node) ? xslInstruction(node) : literalElement(node)
             default:
@@ -248,7 +248,10 @@ extension PureXML.XSLT {
 
         private static func simpleInstruction(_ node: XSLTTree) -> Instruction? {
             switch XSLTNode.localName(node) {
-            case "value-of": .valueOf(select: XSLTNode.attribute(node, "select") ?? "")
+            case "value-of": .valueOf(
+                    select: XSLTNode.attribute(node, "select") ?? "",
+                    raw: XSLTNode.attribute(node, "disable-output-escaping") == "yes",
+                )
             case "apply-templates": .applyTemplates(
                     select: XSLTNode.attribute(node, "select"),
                     mode: XSLTNode.attribute(node, "mode"),
@@ -260,7 +263,11 @@ extension PureXML.XSLT {
                     name: XSLTNode.attribute(node, "name") ?? "",
                     parameters: withParameters(node),
                 )
-            case "text": .literalText(node.stringValue)
+            case "text": .literalText(
+                    XSLTNode.attribute(node, "disable-output-escaping") == "yes"
+                        ? PureXML.XSLT.RawText.marked(node.stringValue)
+                        : node.stringValue,
+                )
             case "variable", "param": variable(node)
             case "copy": .copy(useAttributeSets: useAttributeSets(node), body: body(node))
             case "message": .message(terminate: XSLTNode.attribute(node, "terminate") == "yes", body: body(node))
