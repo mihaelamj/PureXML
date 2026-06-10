@@ -119,13 +119,12 @@ public extension PureXML.Validation {
 
         /// The DTD's own declarations are valid (duplicate element types,
         /// repeated mixed names, multiple IDs, undeclared notations in lists,
-        /// illegal defaults). Reported once, at the document root.
+        /// illegal defaults). Emitted once per validation, each finding
+        /// already located at the declaration it is about.
         static var declarationValidity: Validation<PureXML.Model.Node, DTDSchema> {
             .init(
                 description: "The DTD declarations satisfy their validity constraints",
-                check: { context in
-                    context.document.declarationErrors.map { DTDFailure(reason: $0, at: context.codingPath) }
-                },
+                check: { context in context.document.declarationErrors },
                 when: { $0.codingPath.isEmpty },
             )
         }

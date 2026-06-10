@@ -17,8 +17,8 @@ public extension PureXML.Validation {
         /// Validity findings about the declarations themselves (duplicate
         /// element types, repeated mixed-content names, multiple ID attributes,
         /// undeclared notations in NOTATION lists, illegal attribute defaults),
-        /// reported once per validation at the document root.
-        let declarationErrors: [String]
+        /// each located at the declaration it is about.
+        let declarationErrors: [PureXML.Validation.ValidationError]
         /// Whether the document declared `standalone='yes'`, which forbids
         /// depending on external declarations (2.9).
         let standalone: Bool
@@ -43,7 +43,13 @@ public extension PureXML.Validation {
                 parsedAttributes[name] = AttributeListParser.parse(body)
             }
             attributes = parsedAttributes
-            declarationErrors = documentType.validityFindings + Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
+            let scanned = documentType.validityFindings.map { finding in
+                PureXML.Validation.ValidationError(
+                    reason: finding.reason,
+                    at: finding.subject.map { [PureXML.Validation.PathKey.element($0)] } ?? [],
+                )
+            }
+            declarationErrors = scanned + Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
             self.standalone = standalone
             externalElementModels = Set(documentType.elementModels.keys).subtracting(documentType.internalElementModels)
             var external: [String: [AttributeDeclaration]] = [:]

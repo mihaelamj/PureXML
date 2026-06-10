@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Scanner-side validity findings are now located structured values (validation-framework audit follow-up): `DocumentType.validityFindings` carries `ValidityFinding` values (reason plus the declared name they are about) instead of strings, `DTDSchema.declarationErrors` holds ready `ValidationError`s, and every declaration-level finding renders at its declaration's coding path (`x`, `r/@a`) instead of "at root of document", matching the XSD consistency-errors precedent. Finding texts are unchanged.
+
 ### Added
 
 - RELAX NG grammar scoping and include depth, third burn-down (#131): each `grammar` element opens its own define scope (names are scope-mangled in the flat table, so nested grammars do not collide) and `parentRef` reaches the enclosing scope; `include` is transitive (an included grammar's own includes merge first) and a define carried by the include element replaces the included grammar's same-name define (the 4.7 override); `div` wrappers flatten into their grammar while still contributing ns/datatypeLibrary inheritance (4.11); `value` text is kept untrimmed so whitespace-preserving datatypes compare exactly (6.2.9); and `dataExcept` recurses through choice patterns. The spec suite is now clean except one class: valid 286/289 and invalid 287/291, with all six remaining instance cases the QName datatype (its value space needs prefix resolution in both the schema and instance contexts), plus the asserted schema-correctness item.

@@ -73,9 +73,10 @@ extension DTDScanner {
                 let opens = replacement.count(where: { $0 == "(" })
                 let closes = replacement.count(where: { $0 == ")" })
                 if opens != closes {
-                    doctype.validityFindings.append(
+                    doctype.validityFindings.append(PureXML.Parsing.ValidityFinding(
                         "the content model of '\(element)' uses parameter entity '%\(name);' with improper group/PE nesting",
-                    )
+                        subject: element,
+                    ))
                 }
             }
             index = rawModel.index(after: semicolon)

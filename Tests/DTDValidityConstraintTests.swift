@@ -25,6 +25,15 @@ struct DTDValidityConstraintTests {
         #expect(try errors(xml).contains { $0.contains("declared more than once") })
     }
 
+    @Test("Declaration findings carry the declaration's coding path")
+    func test_findingsAreLocated() throws {
+        let xml = "<!DOCTYPE r [<!ELEMENT r EMPTY><!ELEMENT x (#PCDATA)><!ELEMENT x (#PCDATA)><!ATTLIST r a (one|one) #IMPLIED>]>\n<r/>"
+        let rendered = try PureXML.validateAgainstInternalDTD(xml).map { String(describing: $0) }
+        #expect(rendered.contains { $0.hasSuffix("at path: x") })
+        #expect(rendered.contains { $0.hasSuffix("at path: r/@a") })
+        #expect(!rendered.contains { $0.contains("at root of document") })
+    }
+
     @Test("Mixed content may not repeat a name")
     func test_mixedDuplicates() throws {
         let xml = "<!DOCTYPE r [<!ELEMENT r EMPTY><!ELEMENT y (#PCDATA|x|x)*>]>\n<r/>"

@@ -42,8 +42,9 @@ public extension PureXML.Parsing {
         /// the DTD: an undeclared entity referenced where the external subset
         /// might have declared it (VC: Entity Declared) or a content-model
         /// group split across parameter entities (VC: Proper Group/PE
-        /// Nesting). Reported by the validator at the document root.
-        public var validityFindings: [String] = []
+        /// Nesting). The validator turns each into a located error at the
+        /// finding's subject.
+        public var validityFindings: [ValidityFinding] = []
 
         public init(
             entities: [String: String] = [:],

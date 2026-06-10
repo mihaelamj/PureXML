@@ -2,25 +2,31 @@ extension PureXML.Validation.DTDSchema {
     /// The declaration-level validity constraints: violations that exist in the
     /// DTD itself, independent of any instance content. Computed once when the
     /// schema is built and reported at the document root.
+    typealias Finding = PureXML.Validation.ValidationError
+    typealias Key = PureXML.Validation.PathKey
+
     static func declarationFindings(
         _ documentType: PureXML.Parsing.DocumentType,
         attributes: [String: [PureXML.Validation.AttributeDeclaration]],
         notations: Set<String>,
-    ) -> [String] {
-        var findings: [String] = []
+    ) -> [Finding] {
+        var findings: [Finding] = []
         // VC: Unique Element Type Declaration.
         for name in documentType.duplicateElements.sorted() {
-            findings.append("element type '\(name)' is declared more than once")
+            findings.append(Finding(reason: "element type '\(name)' is declared more than once", at: [.element(name)]))
         }
         // VC: Notation Declared, an unparsed entity's notation must exist.
         for (entity, unparsed) in documentType.unparsedEntities.sorted(by: { $0.key < $1.key }) {
             guard !notations.contains(unparsed.notation) else { continue }
-            findings.append("unparsed entity '\(entity)' names undeclared notation '\(unparsed.notation)'")
+            findings.append(Finding(
+                reason: "unparsed entity '\(entity)' names undeclared notation '\(unparsed.notation)'",
+                at: [.element(entity)],
+            ))
         }
         // VC: No Duplicate Types in mixed content.
         for (name, model) in documentType.elementModels.sorted(by: { $0.key < $1.key }) {
             if let duplicate = duplicateMixedName(model) {
-                findings.append("mixed content of '\(name)' repeats '\(duplicate)'")
+                findings.append(Finding(reason: "mixed content of '\(name)' repeats '\(duplicate)'", at: [.element(name)]))
             }
         }
         for (element, declarations) in attributes.sorted(by: { $0.key < $1.key }) {
@@ -35,24 +41,28 @@ extension PureXML.Validation.DTDSchema {
         element: String,
         declarations: [PureXML.Validation.AttributeDeclaration],
         notations: Set<String>,
-    ) -> [String] {
-        var findings: [String] = []
+    ) -> [Finding] {
+        var findings: [Finding] = []
         if declarations.count(where: { $0.type == .id }) > 1 {
-            findings.append("element '\(element)' declares more than one ID attribute")
+            findings.append(Finding(reason: "element '\(element)' declares more than one ID attribute", at: [.element(element)]))
         }
         for declaration in declarations {
+            let path: [Key] = [.element(element), .attribute(declaration.name)]
             if case let .notation(allowed) = declaration.type {
                 for name in allowed.sorted() where !notations.contains(name) {
-                    findings.append("NOTATION attribute '\(declaration.name)' on '\(element)' lists undeclared notation '\(name)'")
+                    findings.append(Finding(
+                        reason: "NOTATION attribute '\(declaration.name)' on '\(element)' lists undeclared notation '\(name)'",
+                        at: path,
+                    ))
                 }
             }
             // Errata E2: tokens in an enumerated or NOTATION list must be
             // distinct.
             if let duplicate = duplicateToken(declaration.type) {
-                findings.append("attribute '\(declaration.name)' on '\(element)' repeats the token '\(duplicate)'")
+                findings.append(Finding(reason: "attribute '\(declaration.name)' on '\(element)' repeats the token '\(duplicate)'", at: path))
             }
             if let problem = defaultProblem(declaration) {
-                findings.append("attribute '\(declaration.name)' on '\(element)' \(problem)")
+                findings.append(Finding(reason: "attribute '\(declaration.name)' on '\(element)' \(problem)", at: path))
             }
         }
         return findings

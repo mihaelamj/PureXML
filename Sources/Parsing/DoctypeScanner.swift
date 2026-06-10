@@ -345,9 +345,10 @@ extension DTDScanner {
         guard !read.closed else { return read.text }
         let expanded = expandParameterReferences(read.text)
         guard let close = expanded.firstIndex(of: ">") else { return read.text }
-        doctype.validityFindings.append(
+        doctype.validityFindings.append(PureXML.Parsing.ValidityFinding(
             "the \(kind) declaration for '\(name)' is completed inside a parameter-entity replacement (VC: Proper Declaration/PE Nesting)",
-        )
+            subject: name,
+        ))
         return String(expanded[..<close])
     }
 

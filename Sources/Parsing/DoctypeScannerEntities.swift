@@ -47,7 +47,7 @@ extension DTDScanner {
             if entityDeclaredIsWellFormedness {
                 throw ParseError.undefinedEntity(name: name, refMark)
             }
-            doctype.validityFindings.append("parameter entity '%\(name);' is referenced but not declared")
+            doctype.validityFindings.append(PureXML.Parsing.ValidityFinding("parameter entity '%\(name);' is referenced but not declared"))
             return
         }
         guard depth < maxDepth else {

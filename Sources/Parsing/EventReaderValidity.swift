@@ -36,7 +36,7 @@ extension PureXML.Parsing.EventReader {
                 undeclared: &undeclared,
             )
             for name in undeclared {
-                documentType.validityFindings.append("general entity '&\(name);' is referenced but not declared")
+                documentType.validityFindings.append(PureXML.Parsing.ValidityFinding("general entity '&\(name);' is referenced but not declared"))
             }
             return decoded
         }
@@ -79,7 +79,10 @@ extension PureXML.Parsing.EventReader {
               let model = documentType.elementModels[current.localName] ?? documentType.elementModels[current.description],
               model == "EMPTY"
         else { return }
-        documentType.validityFindings.append("\(what) appears in the EMPTY element <\(current.description)>")
+        documentType.validityFindings.append(PureXML.Parsing.ValidityFinding(
+            "\(what) appears in the EMPTY element <\(current.description)>",
+            subject: current.description,
+        ))
     }
 
     /// The errata E15 validity findings a text run can carry: any reference
@@ -91,7 +94,10 @@ extension PureXML.Parsing.EventReader {
               let model = documentType.elementModels[current.localName] ?? documentType.elementModels[current.description]
         else { return }
         if model == "EMPTY" {
-            documentType.validityFindings.append("a reference appears in the EMPTY element <\(current.description)>")
+            documentType.validityFindings.append(PureXML.Parsing.ValidityFinding(
+                "a reference appears in the EMPTY element <\(current.description)>",
+                subject: current.description,
+            ))
             return
         }
         // Errata E15: a direct character reference is character data even
@@ -100,7 +106,10 @@ extension PureXML.Parsing.EventReader {
         let isElementContent = model.hasPrefix("(") && !model.hasPrefix("(#PCDATA")
         let isReferenceWhitespace = !decoded.isEmpty && decoded.allSatisfy(\.isWhitespace)
         if isElementContent, isReferenceWhitespace, referencesCharacter(raw) {
-            documentType.validityFindings.append("character-reference whitespace in the element content of <\(current.description)>")
+            documentType.validityFindings.append(PureXML.Parsing.ValidityFinding(
+                "character-reference whitespace in the element content of <\(current.description)>",
+                subject: current.description,
+            ))
         }
     }
 

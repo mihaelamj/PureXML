@@ -298,7 +298,7 @@ extension DTDScanner {
                 if entityDeclaredIsWellFormedness {
                     throw ParseError.undefinedEntity(name: name, mark)
                 }
-                doctype.validityFindings.append("entity '&\(name);' in an attribute default is referenced but not declared")
+                doctype.validityFindings.append(PureXML.Parsing.ValidityFinding("entity '&\(name);' in an attribute default is referenced but not declared"))
                 return
             }
             try walkDefaultReferences(replacement, visiting: visiting.union([name]), at: mark)
