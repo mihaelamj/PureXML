@@ -91,6 +91,15 @@ public extension PureXML.Parsing {
             }
         }
 
+        /// The entity table visible to references. A standalone document must
+        /// not reference an entity declared outside its internal subset (WFC:
+        /// Entity Declared, 2.9), so external declarations are hidden and such
+        /// a reference reports as undeclared.
+        var referencableEntities: [String: String] {
+            guard xmlDeclaration?.standalone == true else { return documentType.entities }
+            return documentType.entities.filter { documentType.internalEntities.contains($0.key) }
+        }
+
         private mutating func nextAtTopLevel() throws -> Event? {
             while true {
                 reader.skipSpace()
@@ -230,19 +239,20 @@ public extension PureXML.Parsing {
                 raw.append(character)
                 reader.advance()
             }
-            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: documentType.entities) : nil
+            let entities = referencableEntities
+            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: entities) : nil
             if let split {
                 let replacement = try EntityDecoder.includeForContent(
                     split.name,
-                    entities: documentType.entities,
+                    entities: entities,
                     budget: &entityBudget,
                     at: mark,
                 )
                 reader.inject(replacement + split.remainder)
-                let prefix = try EntityDecoder.decode(split.prefix, entities: documentType.entities, budget: &entityBudget, at: mark)
+                let prefix = try EntityDecoder.decode(split.prefix, entities: entities, budget: &entityBudget, at: mark)
                 return prefix.isEmpty ? nil : .characters(prefix)
             }
-            return try .characters(EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark))
+            return try .characters(EntityDecoder.decode(raw, entities: entities, budget: &entityBudget, at: mark))
         }
 
         private mutating func scanProcessingInstruction() throws -> (target: String, data: String) {

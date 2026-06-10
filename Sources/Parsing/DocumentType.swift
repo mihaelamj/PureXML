@@ -30,6 +30,14 @@ public extension PureXML.Parsing {
         /// Element types declared by more than one `<!ELEMENT>` (VC: Unique
         /// Element Type Declaration); the first declaration stays in effect.
         public var duplicateElements: Set<String> = []
+        /// General entities declared in the internal subset; the rest came from
+        /// the external subset (the standalone VCs and WFC depend on origin).
+        public var internalEntities: Set<String> = []
+        /// Element types whose content model was declared in the internal subset.
+        public var internalElementModels: Set<String> = []
+        /// The `<!ATTLIST>` bodies declared in the internal subset only, keyed
+        /// by element, so externally-declared attributes are distinguishable.
+        public var internalAttributeLists: [String: String] = [:]
 
         public init(
             entities: [String: String] = [:],

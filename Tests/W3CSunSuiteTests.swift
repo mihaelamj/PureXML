@@ -18,27 +18,15 @@ struct W3CSunSuiteTests {
         ProcessInfo.processInfo.environment["XMLCONF_ROOT"]
     }
 
-    /// not-wf cases this implementation knowingly accepts, the current
-    /// frontier (exact, so any regression is caught): not-sa03 needs the
-    /// standalone='yes' entity-declared WFC.
-    private let knownNotWFAccepted: Set<String> = [
-        "not-wf/not-sa03.xml",
-    ]
+    /// not-wf cases this implementation knowingly accepts (none).
+    private let knownNotWFAccepted: Set<String> = []
 
     /// valid cases this implementation knowingly fails.
     private let knownValidFailures: Set<String> = []
 
     /// invalid cases where this implementation knowingly reports no validity
-    /// error yet: one family, the standalone='yes' validity constraints
-    /// (externally-declared defaults/entities/normalization effects must not
-    /// change the standalone document's infoset), which needs standalone and
-    /// declaration-provenance tracking.
-    private let knownInvalidAccepted: Set<String> = [
-        "invalid/not-sa01.xml", "invalid/not-sa02.xml", "invalid/not-sa04.xml",
-        "invalid/not-sa05.xml", "invalid/not-sa06.xml", "invalid/not-sa07.xml",
-        "invalid/not-sa08.xml", "invalid/not-sa09.xml", "invalid/not-sa10.xml",
-        "invalid/not-sa11.xml", "invalid/not-sa12.xml", "invalid/not-sa13.xml",
-    ]
+    /// error (none).
+    private let knownInvalidAccepted: Set<String> = []
 
     private struct ManifestCase {
         let id: String

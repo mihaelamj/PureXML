@@ -19,8 +19,16 @@ public extension PureXML.Validation {
         /// undeclared notations in NOTATION lists, illegal attribute defaults),
         /// reported once per validation at the document root.
         let declarationErrors: [String]
+        /// Whether the document declared `standalone='yes'`, which forbids
+        /// depending on external declarations (2.9).
+        let standalone: Bool
+        /// Element types whose content model came from the external subset.
+        let externalElementModels: Set<String>
+        /// Attribute declarations whose winning declaration came from the
+        /// external subset, keyed by element.
+        let externalAttributes: [String: [AttributeDeclaration]]
 
-        init(_ documentType: PureXML.Parsing.DocumentType) {
+        init(_ documentType: PureXML.Parsing.DocumentType, standalone: Bool = false) {
             notations = Set(documentType.notations.keys)
             unparsedEntities = Set(documentType.unparsedEntities.keys)
             doctypeName = documentType.name
@@ -36,6 +44,19 @@ public extension PureXML.Validation {
             }
             attributes = parsedAttributes
             declarationErrors = Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
+            self.standalone = standalone
+            externalElementModels = Set(documentType.elementModels.keys).subtracting(documentType.internalElementModels)
+            var external: [String: [AttributeDeclaration]] = [:]
+            for (element, declarations) in parsedAttributes {
+                let internalNames = Set(
+                    AttributeListParser.parse(documentType.internalAttributeLists[element] ?? "").map(\.name),
+                )
+                let externallyDeclared = declarations.filter { !internalNames.contains($0.name) }
+                if !externallyDeclared.isEmpty {
+                    external[element] = externallyDeclared
+                }
+            }
+            externalAttributes = external
         }
 
         /// Whether the schema declares any elements or attributes.

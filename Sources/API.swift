@@ -85,7 +85,7 @@ public extension PureXML {
         resolver: Parsing.EntityResolver = .refusing,
     ) throws -> [Validation.ValidationError] {
         let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits, resolver: resolver)
-        let schema = Validation.DTDSchema(parsed.documentType)
+        let schema = Validation.DTDSchema(parsed.documentType, standalone: parsed.declaration?.standalone == true)
         return Validation.DTD.validator(strict: strict).errors(for: parsed.node, in: schema)
     }
 

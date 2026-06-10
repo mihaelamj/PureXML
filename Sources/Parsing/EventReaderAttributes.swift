@@ -57,6 +57,6 @@ extension PureXML.Parsing.EventReader {
         guard reader.consume(String(quote)) else {
             throw PureXML.Parsing.ParseError.unexpectedEndOfInput(reader.mark)
         }
-        return try PureXML.Parsing.EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark)
+        return try PureXML.Parsing.EntityDecoder.decode(raw, entities: referencableEntities, budget: &entityBudget, at: mark)
     }
 }

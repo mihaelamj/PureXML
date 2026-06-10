@@ -19,6 +19,7 @@ public extension PureXML.Validation {
                 .validating(tokenizedAttributeTypes, notationAttributes)
                 .validating(identifierIntegrity)
                 .validating(declarationValidity, rootElementType)
+                .validating(standaloneAttributes, standaloneElementWhitespace)
             if strict { validator = validator.validating(undeclaredElement, undeclaredAttributes) }
             return validator
         }

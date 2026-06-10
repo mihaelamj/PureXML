@@ -38,6 +38,9 @@ struct DTDScanner {
     let limits: PureXML.Parsing.Limits
     let resolver: PureXML.Parsing.EntityResolver
     var doctype = PureXML.Parsing.DocumentType()
+    /// True while scanning the external subset, so declarations record their
+    /// origin (the standalone validity constraints depend on it).
+    var inExternalContext = false
     var parameterBudget: Int
     /// Bounds parameter-entity injection recursion (modularized DTDs nest, but
     /// only a little); deeper references are ignored rather than trapping.
@@ -92,6 +95,8 @@ struct DTDScanner {
             return
         }
         var sub = Reader(text)
+        inExternalContext = true
+        defer { inExternalContext = false }
         try scanTextDeclaration(&sub, at: mark)
         try scanDeclarations(&sub, depth: 1, terminatedByBracket: false, at: mark)
     }
@@ -235,6 +240,9 @@ struct DTDScanner {
             }
         } else if doctype.entities[name] == nil {
             doctype.entities[name] = value
+            if !inExternalContext {
+                doctype.internalEntities.insert(name)
+            }
         }
     }
 
@@ -260,6 +268,9 @@ struct DTDScanner {
             return
         }
         doctype.elementModels[name] = model
+        if !inExternalContext {
+            doctype.internalElementModels.insert(name)
+        }
     }
 
     private mutating func scanAttributeListDeclaration(_ reader: inout Reader) throws {
@@ -285,6 +296,13 @@ struct DTDScanner {
             doctype.attributeLists[name] = "\(existing) \(trimmed)"
         } else {
             doctype.attributeLists[name] = trimmed
+        }
+        if !inExternalContext {
+            if let existing = doctype.internalAttributeLists[name] {
+                doctype.internalAttributeLists[name] = "\(existing) \(trimmed)"
+            } else {
+                doctype.internalAttributeLists[name] = trimmed
+            }
         }
     }
 }
