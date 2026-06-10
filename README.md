@@ -88,7 +88,7 @@ flowchart TB
   OutEnc["#106 output encodings: complete"]:::done
   StreamVal["#107 streaming validation: DTD, RELAX NG, XSD"]:::done
   MoreEnc["#108 encodings: ISO-2022-JP, EUC-TW"]:::done
-  Depth["Tier 3 done; #104 done; Tier 2 conformance corpora: harness in, corpora growing"]:::todo
+  Depth["Tier 3 done; analysis findings #109-#119 all fixed incl. Particle Valid Restriction #117; Tier 2 corpora ongoing"]:::todo
   Epic105 --> OutEnc
   OutEnc --> StreamVal
   StreamVal --> MoreEnc
