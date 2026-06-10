@@ -158,6 +158,38 @@ struct XSDIdentityTests {
         #expect(try validate(xsd, dangling).contains { $0.reason.contains("no matching key 'pk'") })
     }
 
+    @Test("A malformed field XPath is a located error, not a silently disabled constraint")
+    func test_malformedFieldReported() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+            </xs:complexType>
+            <xs:key name="k"><xs:selector xpath="item"/><xs:field xpath="@id["/></xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let errors = try validate(xsd, "<list><item id=\"1\"/><item id=\"1\"/></list>")
+        #expect(errors.contains { $0.reason.contains("invalid field XPath '@id['") }, "\(errors.map(\.reason))")
+    }
+
+    @Test("A malformed selector XPath is a located error")
+    func test_malformedSelectorReported() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+            </xs:complexType>
+            <xs:key name="k"><xs:selector xpath="item["/><xs:field xpath="@id"/></xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let errors = try validate(xsd, "<list><item id=\"1\"/></list>")
+        #expect(errors.contains { $0.reason.contains("invalid selector XPath 'item['") }, "\(errors.map(\.reason))")
+    }
+
     @Test("A child-element field locates the error at that child")
     func test_childElementField() throws {
         let xsd = """

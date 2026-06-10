@@ -34,9 +34,30 @@ extension PureXML.Schema {
             at path: [PureXML.Validation.PathKey] = [],
         ) -> [PureXML.Validation.ValidationError] {
             guard !constraints.isEmpty else { return [] }
-            var issues: [PureXML.Validation.ValidationError] = []
+            // A selector or field XPath that does not compile is a schema-author
+            // error, reported once up front rather than silently disabling the
+            // constraint (the broken query still evaluates as no-match below).
+            var issues: [PureXML.Validation.ValidationError] = compileErrors(at: path)
             walk(root, at: path, scopes: [], into: &issues)
             return issues
+        }
+
+        /// One located error per constraint XPath that fails to compile, in a
+        /// deterministic order. The failed compilations are cached, so the walk
+        /// afterwards treats those constraints as matching nothing.
+        private func compileErrors(at path: [PureXML.Validation.PathKey]) -> [PureXML.Validation.ValidationError] {
+            var errors: [PureXML.Validation.ValidationError] = []
+            for key in constraints.keys.sorted() {
+                for constraint in constraints[key] ?? [] {
+                    if cache.query(constraint.selector) == nil {
+                        errors.append(.init(reason: "identity constraint '\(constraint.name)': invalid selector XPath '\(constraint.selector)'", at: path))
+                    }
+                    for field in constraint.fields where cache.query(field) == nil {
+                        errors.append(.init(reason: "identity constraint '\(constraint.name)': invalid field XPath '\(field)'", at: path))
+                    }
+                }
+            }
+            return errors
         }
 
         private func walk(
