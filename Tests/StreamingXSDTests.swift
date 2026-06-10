@@ -67,4 +67,20 @@ struct StreamingXSDTests {
         // No items at all (item is required, maxOccurs unbounded but minOccurs 1).
         try check("<order><id>1</id></order>", expectValid: false)
     }
+
+    @Test("The streaming content check is a composable Validation value")
+    func test_shallowValidityRule() {
+        // The streaming content check applied directly through the Validation rule.
+        let validator = PureXML.Schema.ComplexValidator()
+        let rule = PureXML.Schema.ComplexValidator.shallowValidity
+        #expect(rule.description == "Each streamed element is valid against its declared XSD type")
+        // An empty-content element carrying a child element is invalid.
+        let bad = PureXML.Schema.ResolvedElement(
+            element: PureXML.Model.Element("v", children: [.element(.init("child"))]),
+            type: .complex(PureXML.Schema.ComplexType(content: .empty)),
+        )
+        let errors = rule.apply(to: bad, at: [.element("v")], in: validator)
+        #expect(errors.contains { $0.reason.contains("must be empty") })
+        #expect(errors.first?.codingPath.map(\.stringValue) == ["v"])
+    }
 }

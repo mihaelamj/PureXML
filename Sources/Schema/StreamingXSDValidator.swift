@@ -69,7 +69,10 @@ public extension PureXML.Validation {
         private mutating func close() {
             guard let frame = stack.popLast() else { return }
             if let effective = frame.effective {
-                collected += validator.validateShallow(frame.synthesized(), as: effective, at: frame.path)
+                // Apply the streaming content check as a composable Validation value
+                // (the OpenAPIKit idiom), not a bare method call.
+                let subject = PureXML.Schema.ResolvedElement(element: frame.synthesized(), type: effective)
+                collected += PureXML.Schema.ComplexValidator.shallowValidity.apply(to: subject, at: frame.path, in: validator)
             }
         }
 
