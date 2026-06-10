@@ -13,18 +13,24 @@ final class RNGCompiler {
     /// sharing a name agree on one method, and the single define that omits
     /// `combine` still merges by it.
     private var defineCombine: [String: String] = [:]
-    private let loader: (String) -> String?
-    private var visited: Set<String> = []
+    /// How many defines of each name omitted `combine` (at most one may).
+    private var combinelessDefines: [String: Int] = [:]
+    /// Every ref/parentRef target, checked against the defines at the end.
+    private var referenced: Set<String> = []
+    /// Schema-correctness problems discovered during compilation.
+    var violations: [String] = []
+    let loader: (String) -> String?
+    var visited: Set<String> = []
     /// The URI of the document currently being compiled (nil for the top
     /// level): hrefs inside a loaded document resolve against it.
-    private var documentBase: String?
+    var documentBase: String?
     /// The `ns` value carried across a document boundary: an externalRef's
     /// in-scope ns applies to the loaded pattern when it has none of its own
     /// (simplification 4.6); the tree-ancestor walk cannot cross documents.
-    private var fallbackNamespace = ""
+    var fallbackNamespace = ""
     /// The start pattern contributed by an `include`d grammar (4.7), used when
     /// the including grammar declares no start of its own.
-    private var includedStart: Pattern?
+    var includedStart: Pattern?
     /// Each `grammar` element opens its own define scope; names are mangled
     /// with the scope identifier so nested grammars do not collide and
     /// `parentRef` reaches the enclosing grammar's scope.
@@ -33,6 +39,18 @@ final class RNGCompiler {
 
     private func mangled(_ name: String) -> String {
         "\(scopeStack.last ?? 0)\u{1}\(name)"
+    }
+
+    /// Builds a ref, recording the target for the resolution check; a
+    /// parentRef outside any nested grammar is a schema error.
+    private func reference(_ name: String, parent: Bool) -> Pattern {
+        if parent, scopeStack.count < 2 {
+            violations.append("parentRef '\(name)' has no enclosing grammar")
+            return .notAllowed
+        }
+        let target = parent ? parentMangled(name) : mangled(name)
+        referenced.insert(target)
+        return .ref(target)
     }
 
     private func parentMangled(_ name: String) -> String {
@@ -48,6 +66,14 @@ final class RNGCompiler {
 
     init(loader: @escaping (String) -> String?) {
         self.loader = loader
+    }
+
+    /// Refs whose targets no define supplies, as schema errors.
+    func unresolvedReferences() -> [String] {
+        referenced.subtracting(defines.keys).sorted().map { target in
+            let name = target.split(separator: "\u{1}").last.map(String.init) ?? target
+            return "ref '\(name)' has no matching define"
+        }
     }
 
     func topLevel(_ node: Tree) -> Pattern {
@@ -71,6 +97,9 @@ final class RNGCompiler {
         }
         let starts = RNGNode.components(node, named: "start")
         guard let first = starts.first else {
+            if includedStart == nil {
+                violations.append("grammar has no start")
+            }
             return includedStart ?? .notAllowed
         }
         // Multiple starts combine like defines (4.17): the named method wins,
@@ -94,12 +123,20 @@ final class RNGCompiler {
     /// Adds a `define`, honoring `combine`: a second definition of the same name
     /// with `combine="choice"`/`"interleave"` merges with the existing one rather
     /// than replacing it (a plain redefinition still replaces).
-    private func addDefine(_ define: Tree) {
+    func addDefine(_ define: Tree) {
         guard let rawName = RNGNode.attribute(define, "name") else { return }
         let name = mangled(rawName)
         let pattern = combined(RNGNode.elementChildren(define), .sequence)
         if let method = RNGNode.attribute(define, "combine") {
+            if let established = defineCombine[name], established != method {
+                violations.append("define '\(rawName)' uses conflicting combine methods (4.17)")
+            }
             defineCombine[name] = method
+        } else {
+            combinelessDefines[name, default: 0] += 1
+            if combinelessDefines[name] == 2 {
+                violations.append("more than one define of '\(rawName)' omits combine (4.17)")
+            }
         }
         guard let existing = defines[name] else {
             defines[name] = pattern
@@ -109,47 +146,6 @@ final class RNGCompiler {
         case "choice": defines[name] = .choice(existing, pattern)
         case "interleave": defines[name] = .interleave(existing, pattern)
         default: defines[name] = pattern
-        }
-    }
-
-    /// Merges an `include`d grammar: its `define`s first, then the `include`'s own
-    /// nested `define`s, which override or (with `combine`) merge with them.
-    private func mergeInclude(_ node: Tree) {
-        guard let href = RNGNode.resolvedHref(node, documentBase: documentBase), !visited.contains(href),
-              let text = loader(href), let root = try? PureXML.parseTree(text),
-              let grammar = RNGNode.elementChildren(root).first
-        else {
-            return
-        }
-        visited.insert(href)
-        let outerBase = documentBase
-        let outerNamespace = fallbackNamespace
-        documentBase = href
-        if RNGNode.inheritedNS(grammar) == nil {
-            fallbackNamespace = effectiveNS(node)
-        }
-        // The included grammar's own includes merge first (4.7 is transitive).
-        for nested in RNGNode.components(grammar, named: "include") {
-            mergeInclude(nested)
-        }
-        // A define carried by the include element REPLACES the included
-        // grammar's define of the same name (4.7 override), so those names
-        // are skipped here and added from the include's children below.
-        let overrides = Set(RNGNode.children(node, named: "define").compactMap { RNGNode.attribute($0, "name") })
-        for define in RNGNode.components(grammar, named: "define") {
-            guard let name = RNGNode.attribute(define, "name"), !overrides.contains(name) else { continue }
-            addDefine(define)
-        }
-        if includedStart == nil, let start = RNGNode.components(grammar, named: "start").first {
-            includedStart = combined(RNGNode.elementChildren(start), .sequence)
-        }
-        documentBase = outerBase
-        fallbackNamespace = outerNamespace
-        if let override = RNGNode.children(node, named: "start").first {
-            includedStart = combined(RNGNode.elementChildren(override), .sequence)
-        }
-        for define in RNGNode.children(node, named: "define") {
-            addDefine(define)
         }
     }
 
@@ -176,8 +172,8 @@ final class RNGCompiler {
     /// nested grammars, and external references.
     private func referencePattern(_ node: Tree) -> Pattern? {
         switch RNGNode.localName(node) {
-        case "ref": .ref(mangled(RNGNode.attribute(node, "name") ?? ""))
-        case "parentRef": .ref(parentMangled(RNGNode.attribute(node, "name") ?? ""))
+        case "ref": reference(RNGNode.attribute(node, "name") ?? "", parent: false)
+        case "parentRef": reference(RNGNode.attribute(node, "name") ?? "", parent: true)
         case "grammar": grammar(node)
         case "externalRef": externalRef(node)
         default: nil
@@ -194,12 +190,18 @@ final class RNGCompiler {
     /// does not define is an unknown datatype, so the pattern matches nothing.
     private func dataPattern(_ node: Tree) -> Pattern {
         let typeName = RNGNode.strip(RNGNode.attribute(node, "type") ?? "string")
-        guard let base = resolvedBuiltin(typeName, library: datatypeLibrary(of: node)) else { return .notAllowed }
+        guard let base = resolvedBuiltin(typeName, library: datatypeLibrary(of: node)) else {
+            violations.append("datatype '\(typeName)' is not defined by the datatype library in scope")
+            return .notAllowed
+        }
         var facets = PureXML.Schema.Facets()
         for param in RNGNode.children(node, named: "param") {
             if let name = RNGNode.attribute(param, "name") {
                 PureXML.Schema.RelaxNGFacets.apply(name, RNGNode.text(param), into: &facets)
             }
+        }
+        if datatypeLibrary(of: node) == "", !RNGNode.children(node, named: "param").isEmpty {
+            violations.append("the built-in datatype library defines no params for '\(typeName)'")
         }
         let type = PureXML.Schema.SimpleType(base: base, facets: facets)
         // 4.12: an except child excludes its (implicitly choice-combined)
@@ -215,7 +217,10 @@ final class RNGCompiler {
     /// type; an explicit `type` the in-scope `datatypeLibrary` does not define is
     /// an unknown datatype, so the value matches nothing.
     private func valuePattern(_ node: Tree) -> Pattern {
-        guard let type = valueType(node) else { return .notAllowed }
+        guard let type = valueType(node) else {
+            violations.append("datatype '\(RNGNode.attribute(node, "type") ?? "")' is not defined by the datatype library in scope")
+            return .notAllowed
+        }
         if type.base == .qName {
             // The QName value space: resolve the literal's prefix against the
             // schema's xmlns scope; an unprefixed literal takes the in-scope
@@ -261,29 +266,6 @@ final class RNGCompiler {
             current = candidate.parent
         }
         return ""
-    }
-
-    /// Resolves an `externalRef` to the referenced schema's pattern, merging any
-    /// grammar `define`s it carries into this compiler's table.
-    private func externalRef(_ node: Tree) -> Pattern {
-        guard let href = RNGNode.resolvedHref(node, documentBase: documentBase), !visited.contains(href),
-              let text = loader(href), let root = try? PureXML.parseTree(text),
-              let top = RNGNode.elementChildren(root).first
-        else {
-            return .notAllowed
-        }
-        visited.insert(href)
-        let outerBase = documentBase
-        let outerNamespace = fallbackNamespace
-        documentBase = href
-        if RNGNode.inheritedNS(top) == nil {
-            fallbackNamespace = effectiveNS(node)
-        }
-        defer {
-            documentBase = outerBase
-            fallbackNamespace = outerNamespace
-        }
-        return topLevel(top)
     }
 
     private func compositePattern(_ node: Tree) -> Pattern {
@@ -332,8 +314,19 @@ extension PureXML.Schema {
             guard let top = RNGNode.elementChildren(root).first else {
                 throw PureXML.Schema.SchemaError.notASchema
             }
+            // The schema document must itself match the RELAX NG grammar.
+            if let problem = RelaxNGGrammarCheck.violation(top) {
+                throw PureXML.Schema.SchemaError.invalidRelaxNG(reason: problem)
+            }
             let compiler = RNGCompiler(loader: loader)
             let start = compiler.topLevel(top)
+            let unresolved = compiler.unresolvedReferences()
+            if let problem = compiler.violations.first ?? unresolved.first {
+                throw PureXML.Schema.SchemaError.invalidRelaxNG(reason: problem)
+            }
+            if let problem = RelaxNGRestrictions.violation(start: start, defines: compiler.defines) {
+                throw PureXML.Schema.SchemaError.invalidRelaxNG(reason: problem)
+            }
             return (start, compiler.defines)
         }
     }

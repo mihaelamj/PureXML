@@ -9,6 +9,9 @@ public extension PureXML.Schema {
         /// an element with `maxOccurs` at most 1, and the group itself may occur at
         /// most once.
         case invalidAllGroup(reason: String)
+        /// A RELAX NG schema document does not match the RELAX NG grammar or
+        /// its restrictions (sections 3, 4.16-4.18).
+        case invalidRelaxNG(reason: String)
         /// The compiled schema fails one or more consistency rules (a `final`
         /// violation, an unfaithful restriction); every finding is carried, so a
         /// schema with several problems reports them all at once.
@@ -22,6 +25,8 @@ public extension PureXML.Schema {
                 "redefined type '\(type)' must derive from itself"
             case let .invalidAllGroup(reason):
                 "invalid xs:all group: \(reason)"
+            case let .invalidRelaxNG(reason):
+                "invalid RELAX NG schema: \(reason)"
             case let .inconsistent(findings):
                 findings.joined(separator: "; ")
             }

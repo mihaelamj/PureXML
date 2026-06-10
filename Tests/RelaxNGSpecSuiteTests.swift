@@ -18,14 +18,16 @@ struct RelaxNGSpecSuiteTests {
         ProcessInfo.processInfo.environment["RNG_TS_ROOT"]
     }
 
-    /// The burn-down frontier (exact, so progress and regressions both show).
-    /// The instance level is fully clean: every valid instance is accepted
-    /// and every invalid one rejected. One class remains: schema correctness
-    /// is not validated, so every `incorrect` schema compiles (the count is
-    /// asserted exactly below); closing it means validating schemas against
-    /// the RELAX NG grammar and the section 4.16-4.18 restrictions before
-    /// pattern interpretation.
-    private let knownIncorrectCompiledCount = 213
+    /// The suite is clean to one documented class. Instance level: every
+    /// valid instance accepted, every invalid one rejected. Schema level:
+    /// incorrect schemas are rejected by the grammar check (section 3), the
+    /// compiler checks (4.5-4.19), and the restrictions checker (7.1-7.4),
+    /// except the seven cases whose schema names use pre-Fifth-Edition
+    /// character classes (70, 72-74, 79, 86, 87): this package implements
+    /// XML 1.0 5e name productions, where those characters became legal (the
+    /// same class as xmltest 141 and the IBM P85-89 block). The count is
+    /// asserted exactly so drift in either direction is caught.
+    private let knownIncorrectCompiledCount = 7
     private let knownCorrectRejected: Set<Int> = []
     private let knownValidRejected: Set<Int> = []
     private let knownInvalidAccepted: Set<Int> = []
@@ -182,7 +184,7 @@ struct RelaxNGSpecSuiteTests {
         }
         #expect(
             incorrectAccepted.count == knownIncorrectCompiledCount,
-            "incorrect-schema class drifted: \(incorrectAccepted.count) (baseline \(knownIncorrectCompiledCount))",
+            "incorrect-schema class drifted: \(incorrectAccepted.count) (baseline \(knownIncorrectCompiledCount)): \(incorrectAccepted)",
         )
         #expect(correctRejected.isEmpty, "rejected \(correctRejected.count) correct schemas: \(correctRejected)")
         #expect(validRejected.isEmpty, "rejected \(validRejected.count) valid instances: \(validRejected)")

@@ -23,16 +23,19 @@ struct RelaxNGDatatypeLibraryTests {
         #expect(try validXML(rng, "<v>anything here</v>"))
     }
 
-    @Test("An XSD type without the XSD library is an unknown datatype and matches nothing")
+    @Test("An XSD type without the XSD library is a schema error")
     func test_unknownTypeInDefaultLibrary() throws {
         let rng = """
         <element name="n" xmlns="http://relaxng.org/ns/structure/1.0">
           <data type="integer"/>
         </element>
         """
-        // `integer` is not in the default library, so no value validates.
-        #expect(try !validXML(rng, "<n>5</n>"))
-        #expect(try !validXML(rng, "<n>x</n>"))
+        // The default library defines only string and token; an unknown
+        // datatype is a schema error (the spec suite's incorrect class), not
+        // a match-nothing pattern.
+        #expect(throws: PureXML.Schema.SchemaError.self) {
+            _ = try PureXML.Schema.RelaxNG(rng)
+        }
     }
 
     @Test("Declaring the XSD datatypeLibrary makes xsd types resolve")
@@ -59,14 +62,16 @@ struct RelaxNGDatatypeLibraryTests {
         #expect(try !validXML(rng, "<n>4.2</n>"))
     }
 
-    @Test("A value with an unknown explicit type matches nothing")
-    func test_valueUnknownType() throws {
+    @Test("A value with an unknown explicit type is a schema error")
+    func test_unknownValueType() throws {
         let rng = """
         <element name="n" xmlns="http://relaxng.org/ns/structure/1.0">
           <value type="integer">5</value>
         </element>
         """
-        #expect(try !validXML(rng, "<n>5</n>"))
+        #expect(throws: PureXML.Schema.SchemaError.self) {
+            _ = try PureXML.Schema.RelaxNG(rng)
+        }
     }
 
     @Test("nsName with except excludes a name in the namespace")

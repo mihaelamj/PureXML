@@ -40,8 +40,8 @@ struct RelaxNGCombineTests {
         #expect(try !valid(rng, "<root><a/></root>"))
     }
 
-    @Test("A plain redefinition without combine still replaces")
-    func test_plainRedefinitionReplaces() throws {
+    @Test("Two defines of one name must not both omit combine (4.17)")
+    func test_plainRedefinitionRejected() throws {
         let rng = """
         <grammar \(rngNamespace)>
           <start><ref name="content"/></start>
@@ -49,7 +49,10 @@ struct RelaxNGCombineTests {
           <define name="content"><element name="b"><empty/></element></define>
         </grammar>
         """
-        #expect(try !valid(rng, "<a/>"))
-        #expect(try valid(rng, "<b/>"))
+        // Spec 4.17: at most one define of a name may omit combine; a second
+        // combine-less definition is a schema error, not a replacement.
+        #expect(throws: PureXML.Schema.SchemaError.self) {
+            _ = try PureXML.Schema.RelaxNG(rng)
+        }
     }
 }
