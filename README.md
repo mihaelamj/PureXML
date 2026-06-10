@@ -101,7 +101,7 @@ flowchart TB
   Epic122["#122 official spec suites"]:::epic
   XSTS["#129 W3C XSD test suite (XSTS)"]:::todo
   XSLTTS["#130 OASIS XSLT 1.0 suite (+XPath corpus)"]:::todo
-  RNGTS["#131 RELAX NG spec test suite"]:::todo
+  RNGTS["#131 RELAX NG spec suite: runner + baselines in, burning down"]:::review
   C14NTS["#132 C14N spec vectors: complete"]:::done
   Epic105 --> Epic121
   Epic105 --> Epic122
@@ -125,7 +125,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **931 tests in 159 suites** (`swift test`).
+currently runs **932 tests in 160 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
