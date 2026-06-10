@@ -11,6 +11,9 @@ public extension PureXML.Schema {
         /// an element with `maxOccurs` at most 1, and the group itself may occur at
         /// most once.
         case invalidAllGroup(reason: String)
+        /// A complex-type restriction's content model is not a structurally valid
+        /// subset of its base's ("Particle Valid (Restriction)" in XSD 1.0).
+        case invalidRestriction(type: String, base: String, reason: String)
 
         public var description: String {
             switch self {
@@ -22,6 +25,8 @@ public extension PureXML.Schema {
                 "redefined type '\(type)' must derive from itself"
             case let .invalidAllGroup(reason):
                 "invalid xs:all group: \(reason)"
+            case let .invalidRestriction(type, base, reason):
+                "type '\(type)' is not a valid restriction of '\(base)': \(reason)"
             }
         }
     }
@@ -57,6 +62,18 @@ public extension PureXML.Schema {
             typeBlock = compiled.typeBlock
             typeDerivation = compiled.typeDerivation
             targetNamespace = compiled.targetNamespace
+            // Particle Valid (Restriction): a complex type derived by restriction
+            // must accept a subset of its base (deterministic order for stable
+            // error reporting).
+            for name in typeDerivation.keys.sorted() {
+                guard let derivation = typeDerivation[name], derivation.method == .restriction,
+                      case let .complex(restrictedType)? = types[name],
+                      case let .complex(baseType)? = types[derivation.base]
+                else { continue }
+                if let reason = ParticleRestriction.violation(restricted: restrictedType.content, base: baseType.content) {
+                    throw SchemaError.invalidRestriction(type: name, base: derivation.base, reason: reason)
+                }
+            }
         }
 
         /// Validates an instance document against the schema, returning one located

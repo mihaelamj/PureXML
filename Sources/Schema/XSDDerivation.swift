@@ -9,10 +9,9 @@ extension PureXML.Schema.XSDParser {
     /// substitution member's derivation against its head's `block`).
     ///
     /// Note: this records the derivation *backbone* (base + method) and enforces
-    /// `block`, `final`, and abstract usage. It does NOT verify that a complex-type
-    /// restriction is a structurally valid subset of its base ("Particle Valid
-    /// (Restriction)" in XSD 1.0), which is a much larger algorithm; a structurally
-    /// unfaithful restriction is accepted here.
+    /// `block`, `final`, and abstract usage. The structural subset check for a
+    /// complex-type restriction ("Particle Valid (Restriction)" in XSD 1.0) runs
+    /// separately at schema compile, see ``ParticleRestriction``.
     struct DerivationTables {
         var typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:]
         var abstractTypes: Set<String> = []
