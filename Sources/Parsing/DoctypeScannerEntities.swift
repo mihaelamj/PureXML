@@ -12,7 +12,7 @@ extension DTDScanner {
             if let text = resolver.resolveEntity(name, id) {
                 // An external parsed entity may begin with a text declaration,
                 // which is not part of its replacement text (4.3.1).
-                doctype.entities[name] = strippingTextDeclaration(text)
+                doctype.entities[name] = try? strippingTextDeclaration(text)
             }
         }
     }
@@ -65,7 +65,11 @@ extension DTDScanner {
         } else if isParameter {
             if doctype.parameterEntities[name] == nil {
                 if let text = resolver.resolveExternalSubset(id) {
-                    doctype.parameterEntities[name] = expandParameterReferences(strippingTextDeclaration(text))
+                    if let stripped = try? strippingTextDeclaration(text) {
+                        doctype.parameterEntities[name] = expandParameterReferences(stripped)
+                    } else {
+                        unresolvedParameterEntities.insert(name)
+                    }
                 } else {
                     unresolvedParameterEntities.insert(name)
                 }

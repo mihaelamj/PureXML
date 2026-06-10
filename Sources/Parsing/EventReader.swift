@@ -116,7 +116,13 @@ public extension PureXML.Parsing {
                     return .processingInstruction(target: instruction.target, data: instruction.data)
                 }
                 if reader.matches("<!DOCTYPE") {
-                    documentType = try DoctypeScanner.scan(&reader, limits: limits, resolver: resolver, standalone: xmlDeclaration?.standalone == true)
+                    documentType = try DoctypeScanner.scan(
+                        &reader,
+                        limits: limits,
+                        resolver: resolver,
+                        standalone: xmlDeclaration?.standalone == true,
+                        documentVersion: xmlDeclaration?.version,
+                    )
                     continue
                 }
                 if reader.matches("</") || reader.matches("<![CDATA[") {
@@ -190,27 +196,6 @@ public extension PureXML.Parsing {
             open.append(resolved.name)
             sawRoot = true
             return .startElement(name: resolved.name, attributes: resolved.attributes)
-        }
-
-        private mutating func scanEndTag() throws -> Event {
-            let mark = reader.mark
-            reader.consume("</")
-            let name = try scanName()
-            reader.skipSpace()
-            guard reader.consume(">") else {
-                throw ParseError.unterminatedTag(reader.mark)
-            }
-            guard let top = open.last else {
-                throw ParseError.unexpectedEndTag(name: name.description, mark)
-            }
-            // Tag matching is lexical (the qualified-name text must match); the
-            // open name additionally carries its resolved namespace URI.
-            guard top.description == name.description else {
-                throw ParseError.mismatchedEndTag(expected: top.description, found: name.description, mark)
-            }
-            open.removeLast()
-            namespaces.leaveElement()
-            return .endElement(name: top)
         }
 
         /// Returns the next text event, or nil after splicing: a reference to

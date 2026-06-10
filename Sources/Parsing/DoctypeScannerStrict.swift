@@ -136,7 +136,14 @@ extension DTDScanner {
     /// text (4.3.1): the declaration is not part of the replacement text. Text
     /// without one passes through unchanged, including text whose `<?xml` is
     /// not actually a text declaration.
-    func strippingTextDeclaration(_ text: String) -> String {
+    /// Errata E38: an external entity may not declare a version the document
+    /// does not at least match ("1.1" inside a "1.0" document is an error).
+    func textDeclarationVersionAllowed(_ declaration: PureXML.Parsing.XMLDeclaration) -> Bool {
+        guard let declared = declaration.version else { return true }
+        return declared <= documentVersion
+    }
+
+    func strippingTextDeclaration(_ text: String) throws -> String {
         guard text.hasPrefix("<?xml") else { return text }
         // Foundation-free search for the closing '?>'.
         var close = text.index(text.startIndex, offsetBy: 5)
@@ -147,10 +154,13 @@ extension DTDScanner {
             close = text.index(after: close)
         }
         guard close < text.endIndex else { return text }
-        let declaration = String(text[text.index(text.startIndex, offsetBy: 5) ..< close])
-        guard declaration.first?.isWhitespace == true,
-              PureXML.Parsing.XMLDeclaration.parseTextDeclaration(declaration) != nil
+        let body = String(text[text.index(text.startIndex, offsetBy: 5) ..< close])
+        guard body.first?.isWhitespace == true,
+              let declaration = PureXML.Parsing.XMLDeclaration.parseTextDeclaration(body)
         else { return text }
+        guard textDeclarationVersionAllowed(declaration) else {
+            throw ParseError.malformedDeclaration(.start)
+        }
         return String(text[text.index(close, offsetBy: 2)...])
     }
 

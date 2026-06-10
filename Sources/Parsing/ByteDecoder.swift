@@ -7,11 +7,11 @@ extension PureXML.Parsing {
         static func decode(_ bytes: [UInt8]) throws -> String {
             let (sniffed, bomLength) = InputEncoding.detectWithBOM(bytes)
             // With no BOM the byte sniff defaults to UTF-8; honor a declared
-            // single-byte encoding if the XML declaration names one.
-            var encoding = sniffed
-            if sniffed == .utf8, bomLength == 0, let declared = declaredEncoding(in: bytes) {
-                encoding = declared
-            }
+            // single-byte encoding if the XML declaration names one. A declared
+            // encoding that contradicts the actual bytes or the BOM is a fatal
+            // error (4.3.3): 16/32-bit names on 8-bit content, or any name
+            // outside the BOM's family.
+            let encoding = try declarationConsistentEncoding(sniffed: sniffed, bomLength: bomLength, bytes: bytes)
             let body = bytes.dropFirst(bomLength)
             if let cjk = multiByteDecode(encoding, body) {
                 return cjk
@@ -130,6 +130,76 @@ extension PureXML.Parsing {
             return String(scalars)
         }
 
+        /// Applies the declared encoding when the sniff allows it, throwing on
+        /// a contradiction (4.3.3): a 16/32-bit name over 8-bit bytes, or any
+        /// name outside the BOM's family.
+        private static func declarationConsistentEncoding(
+            sniffed: InputEncoding,
+            bomLength: Int,
+            bytes: [UInt8],
+        ) throws -> InputEncoding {
+            if bomLength == 0 {
+                guard sniffed == .utf8, let declared = declaredEncoding(in: bytes) else { return sniffed }
+                guard !isWideUnicode(declared) else {
+                    throw PureXML.Parsing.ParseError.malformedEncoding
+                }
+                return declared
+            }
+            let declared = declaredEncoding(after: sniffed, in: bytes, bomLength: bomLength)
+            if let declared, !sameFamily(declared, as: sniffed) {
+                throw PureXML.Parsing.ParseError.malformedEncoding
+            }
+            return sniffed
+        }
+
+        /// Whether the encoding is a 16- or 32-bit Unicode form, which cannot
+        /// describe content whose declaration was readable as 8-bit bytes.
+        private static func isWideUnicode(_ encoding: InputEncoding) -> Bool {
+            switch encoding {
+            case .utf16BigEndian, .utf16LittleEndian, .utf32BigEndian, .utf32LittleEndian: true
+            default: false
+            }
+        }
+
+        /// Whether a declared encoding is consistent with the BOM-sniffed one:
+        /// the same encoding, or any 8-bit ASCII-compatible name under a UTF-8
+        /// BOM is still a contradiction, only utf-8 itself agrees; the generic
+        /// utf-16/utf-32 names agree with either byte order.
+        private static func sameFamily(_ declared: InputEncoding, as sniffed: InputEncoding) -> Bool {
+            if declared == sniffed { return true }
+            switch (sniffed, declared) {
+            case (.utf16BigEndian, .utf16LittleEndian), (.utf16LittleEndian, .utf16BigEndian),
+                 (.utf32BigEndian, .utf32LittleEndian), (.utf32LittleEndian, .utf32BigEndian):
+                // The generic names map to one byte order; a BOM of the other
+                // order still names the same encoding.
+                return true
+            default:
+                return false
+            }
+        }
+
+        /// Reads the `encoding` pseudo-attribute of a BOM-prefixed document by
+        /// reducing the header to its ASCII bytes per the sniffed family.
+        private static func declaredEncoding(after sniffed: InputEncoding, in bytes: [UInt8], bomLength: Int) -> InputEncoding? {
+            switch sniffed {
+            case .utf8:
+                return declaredEncoding(in: Array(bytes.dropFirst(bomLength)))
+            case .utf16BigEndian, .utf16LittleEndian:
+                let body = bytes.dropFirst(bomLength).prefix(512)
+                var ascii: [UInt8] = []
+                var index = body.startIndex
+                while index < body.endIndex, body.index(after: index) < body.endIndex {
+                    let high = sniffed == .utf16BigEndian ? body[index] : body[body.index(after: index)]
+                    let low = sniffed == .utf16BigEndian ? body[body.index(after: index)] : body[index]
+                    if high == 0 { ascii.append(low) }
+                    index = body.index(index, offsetBy: 2)
+                }
+                return declaredEncoding(in: ascii)
+            default:
+                return nil
+            }
+        }
+
         /// Reads the `encoding` pseudo-attribute from an XML declaration that is
         /// ASCII-compatible at the front (UTF-8 or a single-byte encoding).
         static func declaredEncoding(in bytes: [UInt8]) -> InputEncoding? {
@@ -156,6 +226,10 @@ extension PureXML.Parsing {
         /// The declared encoding names PureXML recognizes, mapped to their encoding.
         private static let encodingByName: [String: InputEncoding] = [
             "utf-8": .utf8, "utf8": .utf8, "us-ascii": .utf8, "ascii": .utf8,
+            "utf-16": .utf16BigEndian, "utf16": .utf16BigEndian,
+            "utf-16be": .utf16BigEndian, "utf-16le": .utf16LittleEndian,
+            "utf-32": .utf32BigEndian, "utf32": .utf32BigEndian,
+            "utf-32be": .utf32BigEndian, "utf-32le": .utf32LittleEndian,
             "iso-8859-1": .latin1, "latin1": .latin1, "latin-1": .latin1, "l1": .latin1,
             "windows-1252": .windows1252, "cp1252": .windows1252, "cp-1252": .windows1252,
             "windows-1254": .windows1254, "cp1254": .windows1254,

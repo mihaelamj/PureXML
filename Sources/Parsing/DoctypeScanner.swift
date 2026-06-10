@@ -15,12 +15,13 @@ extension PureXML.Parsing {
             limits: Limits,
             resolver: EntityResolver = .refusing,
             standalone: Bool = false,
+            documentVersion: String? = nil,
         ) throws -> DocumentType {
             let mark = reader.mark
             guard limits.allowDoctype else {
                 throw ParseError.unsupportedDoctype(mark)
             }
-            var scanner = DTDScanner(limits: limits, resolver: resolver, standalone: standalone)
+            var scanner = DTDScanner(limits: limits, resolver: resolver, standalone: standalone, documentVersion: documentVersion)
             return try scanner.scan(&reader, at: mark)
         }
     }
@@ -42,6 +43,9 @@ struct DTDScanner {
     /// undeclared-entity reference a well-formedness error rather than a
     /// validity finding (WFC vs VC: Entity Declared).
     let standalone: Bool
+    /// The document's XML version: an external entity may not declare a
+    /// higher version in its text declaration (errata E38).
+    let documentVersion: String
     var doctype = PureXML.Parsing.DocumentType()
     /// True while scanning the external subset, so declarations record their
     /// origin (the standalone validity constraints depend on it).
@@ -55,10 +59,16 @@ struct DTDScanner {
     /// only a little); deeper references are ignored rather than trapping.
     let maxDepth = 40
 
-    init(limits: PureXML.Parsing.Limits, resolver: PureXML.Parsing.EntityResolver, standalone: Bool = false) {
+    init(
+        limits: PureXML.Parsing.Limits,
+        resolver: PureXML.Parsing.EntityResolver,
+        standalone: Bool = false,
+        documentVersion: String? = nil,
+    ) {
         self.limits = limits
         self.resolver = resolver
         self.standalone = standalone
+        self.documentVersion = documentVersion ?? "1.0"
         parameterBudget = limits.maxEntityExpansion
     }
 

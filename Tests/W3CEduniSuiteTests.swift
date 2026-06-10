@@ -26,13 +26,8 @@ struct W3CEduniSuiteTests {
         ("misc/ht-bh.xml", "misc"),
     ]
 
-    /// not-wf cases this implementation knowingly accepts: the encoding-
-    /// declaration mismatches the byte decoder does not yet reject (a
-    /// declared encoding contradicting the actual bytes or BOM), tracked
-    /// as #137.
-    private let knownNotWFAccepted: Set<String> = [
-        "errata-2e/E38.xml", "errata-2e/E61.xml", "misc/007.xml", "misc/008.xml",
-    ]
+    /// not-wf cases this implementation knowingly accepts (none).
+    private let knownNotWFAccepted: Set<String> = []
 
     /// valid cases this implementation knowingly fails, two classes: the
     /// grapheme-cluster lexing limitation (a combining mark directly after an
