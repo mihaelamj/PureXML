@@ -34,16 +34,11 @@ enum XSLTNumbering {
             return counts.reversed()
         case "any":
             var total = 0
-            var stopped = false
             walkPreceding(node) { candidate in
-                if matchesFrom(candidate) {
-                    stopped = true
-                    return false
-                }
+                if matchesFrom(candidate) { return false }
                 if matchesCount(candidate) { total += 1 }
                 return true
             }
-            _ = stopped
             return [total]
         default: // single
             var current: Tree? = node

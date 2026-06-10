@@ -28,6 +28,23 @@ extension PureXML.XSLT {
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
+            // One table for all pattern matching: matches() runs per
+            // (template, node) during template selection, so a fresh table
+            // per call would be allocated millions of times on large inputs.
+            let caches = keyIndexes
+            patternTable = PureXML.XSLT.Library.table(
+                current: .tree(root),
+                keys: { documentRoot in
+                    let identity = ObjectIdentifier(documentRoot)
+                    if let cached = caches.indexes[identity] { return cached }
+                    let built = PureXML.XSLT.Library.buildKeyIndex(stylesheet: stylesheet, root: documentRoot)
+                    caches.indexes[identity] = built
+                    return built
+                },
+                loader: documentLoader,
+                decimalFormats: stylesheet.decimalFormats,
+                documents: documentCache,
+            )
         }
 
         /// The key index for `documentRoot`, built on first use (keys apply
@@ -86,15 +103,11 @@ extension PureXML.XSLT {
         }
 
         /// The function table match patterns evaluate with (`key()`/`id()`
-        /// patterns), rooted at the document.
+        /// patterns), rooted at the document and built once in init.
+        private let patternTable: PureXML.XPath.FunctionTable
+
         private func patternFunctions() -> PureXML.XPath.FunctionTable {
-            PureXML.XSLT.Library.table(
-                current: .tree(root),
-                keys: { keyIndex(for: $0) },
-                loader: documentLoader,
-                decimalFormats: stylesheet.decimalFormats,
-                documents: documentCache,
-            )
+            patternTable
         }
 
         func applyTemplates(
@@ -209,7 +222,10 @@ extension PureXML.XSLT {
             // Raw-output markers do not survive string extraction (16.4:
             // escaping is disabled only for text written directly to the
             // result tree), so a fragment round-trip re-enables escaping.
-            PureXML.XSLT.RawText.stripped(value(expression, context)?.string ?? "")
+            // Gated so source text in a stylesheet without
+            // disable-output-escaping passes through untouched.
+            let extracted = value(expression, context)?.string ?? ""
+            return stylesheet.usesRawText ? PureXML.XSLT.RawText.stripped(extracted) : extracted
         }
 
         func boolean(_ expression: String, _ context: XSLTContext) -> Bool {

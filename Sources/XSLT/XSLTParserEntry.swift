@@ -43,8 +43,11 @@ struct Parts {
 extension PureXML.XSLT.XSLTParser {
     static func parse(_ xsl: String, loader: (String) -> String? = { _ in nil }) throws -> PureXML.XSLT.Stylesheet {
         let root = try PureXML.parseTree(xsl, limits: .init(allowDoctype: true))
+        let usesRawText = containsSubstring(xsl, "disable-output-escaping")
         if let top = stylesheetElement(root) {
-            return compile(top, loader: loader, precedence: 0)
+            var sheet = compile(top, loader: loader, precedence: 0)
+            sheet.usesRawText = usesRawText
+            return sheet
         }
         // Simplified syntax (2.3): a literal result element carrying
         // xsl:version becomes the body of a match="/" template.
@@ -61,9 +64,23 @@ extension PureXML.XSLT.XSLTParser {
                 parameters: [],
                 body: [body],
             ))
-            return parts.stylesheet
+            var sheet = parts.stylesheet
+            sheet.usesRawText = usesRawText
+            return sheet
         }
         throw PureXML.XSLT.XSLTError.notAStylesheet
+    }
+
+    /// Substring search without Foundation (the stdlib String-argument
+    /// `contains` needs a newer platform floor).
+    private static func containsSubstring(_ text: String, _ needle: String) -> Bool {
+        guard let head = needle.first else { return true }
+        var search = text[...]
+        while let start = search.firstIndex(of: head) {
+            if search[start...].hasPrefix(needle) { return true }
+            search = search[search.index(after: start)...]
+        }
+        return false
     }
 
     static func stylesheetElement(_ root: XSLTTree) -> XSLTTree? {

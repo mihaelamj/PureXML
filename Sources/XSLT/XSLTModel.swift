@@ -254,6 +254,11 @@ public extension PureXML.XSLT {
         /// `xsl:decimal-format` declarations for `format-number`, keyed by name; the
         /// empty key is the default (unnamed) format.
         public var decimalFormats: [String: DecimalFormat]
+        /// Whether the stylesheet mentions `disable-output-escaping` anywhere,
+        /// so the serializer only post-processes raw-text markers when the
+        /// feature can actually be in play (a source document that happens to
+        /// contain the private-use marker characters is otherwise untouched).
+        public var usesRawText: Bool = false
         /// `xsl:namespace-alias` rewrites, keyed by the stylesheet namespace URI
         /// (the empty key is the no-namespace/default case).
         public var namespaceAliases: [String: NamespaceAlias]

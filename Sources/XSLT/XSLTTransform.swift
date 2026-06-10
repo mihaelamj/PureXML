@@ -19,7 +19,11 @@ public extension PureXML.XSLT {
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         let method = sheet.output.method ?? defaultMethod(for: result)
-        if method == "text" { return RawText.resolve(textValue(of: result)) }
+        if method == "text" {
+            // Text output is never escaped, so raw markers are only removed,
+            // never "unescaped".
+            return sheet.usesRawText ? RawText.stripped(textValue(of: result)) : textValue(of: result)
+        }
         let body: String
         if method == "html" {
             body = PureXML.HTML.serialize(withContentTypeMeta(result, encoding: sheet.output.encoding ?? "UTF-8"))
@@ -31,7 +35,7 @@ public extension PureXML.XSLT {
             body = PureXML.serialize(prepared, options: emitOptions)
         }
         // The XML declaration stays first; the doctype follows it.
-        let resolved = RawText.resolve(body)
+        let resolved = sheet.usesRawText ? RawText.resolve(body) : body
         let documentType = doctype(for: result, sheet.output, method: method)
         guard !documentType.isEmpty else { return resolved }
         if resolved.hasPrefix("<?xml "), let end = rangeOf("?>", in: resolved[...]) {
