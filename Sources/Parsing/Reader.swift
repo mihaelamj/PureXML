@@ -3,6 +3,13 @@ extension PureXML.Parsing {
     /// one at a time, keeping only a small lookahead buffer, so it never holds
     /// the whole input in memory. Tracks line, column, and offset for
     /// diagnostics. Internal to the parser; not part of the API.
+    ///
+    /// Lexing is scalar-level: every buffered `Character` holds exactly one
+    /// Unicode scalar (multi-scalar graphemes from the source are split), so a
+    /// combining mark directly after an ASCII delimiter cannot merge with it
+    /// and XML's scalar-defined productions classify correctly. Grapheme
+    /// clusters reassemble naturally wherever scanned text is appended to a
+    /// `String`.
     struct Reader {
         private let pull: () -> Character?
         private var buffer: [Character] = []
@@ -19,12 +26,24 @@ extension PureXML.Parsing {
         private var pendingRaw: Character?
 
         init(pulling pull: @escaping () -> Character?) {
-            self.pull = pull
+            // Split multi-scalar graphemes so the buffer is scalar-level.
+            var queued: [Character] = []
+            self.pull = {
+                if !queued.isEmpty { return queued.removeFirst() }
+                guard let next = pull() else { return nil }
+                let scalars = next.unicodeScalars
+                guard scalars.count > 1 else { return next }
+                var parts = scalars.map(Character.init)
+                let first = parts.removeFirst()
+                queued = parts
+                return first
+            }
         }
 
         init(_ string: String) {
-            var iterator = string.makeIterator()
-            self.init(pulling: { iterator.next() })
+            // Iterate scalars directly: each yielded Character is one scalar.
+            var iterator = string.unicodeScalars.makeIterator()
+            self.init(pulling: { iterator.next().map(Character.init) })
         }
 
         /// Ensures the lookahead buffer holds at least `count` characters (or the
@@ -123,7 +142,7 @@ extension PureXML.Parsing {
         /// (4.4.2 Included). Position tracking keeps reporting the source
         /// document's marks, the libxml2 model for entity boundaries.
         mutating func inject(_ text: String) {
-            buffer.insert(contentsOf: text, at: 0)
+            buffer.insert(contentsOf: text.unicodeScalars.map(Character.init), at: 0)
         }
     }
 }

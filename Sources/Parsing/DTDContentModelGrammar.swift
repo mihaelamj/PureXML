@@ -26,7 +26,8 @@ private struct ModelScanner {
     private var index = 0
 
     init(_ text: String) {
-        characters = Array(text)
+        // Scalar-level: a combining mark must not merge with a delimiter.
+        characters = text.unicodeScalars.map(Character.init)
     }
 
     var isAtEnd: Bool {

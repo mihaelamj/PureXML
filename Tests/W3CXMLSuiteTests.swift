@@ -15,17 +15,15 @@ struct W3CXMLSuiteTests {
         ProcessInfo.processInfo.environment["XMLTS_ROOT"]
     }
 
-    /// The one case this implementation knowingly accepts although the suite
-    /// marks it not-well-formed: 141 expects the 1998 suite's name-character
-    /// classes where this package implements XML 1.0 Fifth Edition's (U+0E5C
-    /// is a name character there). The runner opts into the strict
-    /// internal-subset profile, so the conditional-section and PE-reference
-    /// feature cases (063, 160-162) are rejected as the suite expects. The
-    /// baseline is exact, so any regression in the 185 cases that DO pass is
-    /// still caught.
-    private let knownNotWFDeviations: Set<String> = [
-        "141.xml",
-    ]
+    /// Cases the suite's own manifest excludes from a Fifth Edition,
+    /// namespace-aware processor: 140 and 141 are EDITION="1 2 3 4" (their
+    /// rejected characters became legal name characters in 5e). With the
+    /// strict internal-subset profile opted in, every applicable not-wf case
+    /// is rejected: the deviation baseline is empty.
+    private let editionExcluded: Set<String> = ["140.xml", "141.xml"]
+
+    /// not-wf cases this implementation knowingly accepts (none).
+    private let knownNotWFDeviations: Set<String> = []
 
     /// valid/sa/012.xml is flagged NAMESPACE='no' by the suite's own
     /// manifest: it declares an attribute named ':', a pre-namespace XML 1.0
@@ -71,7 +69,7 @@ struct W3CXMLSuiteTests {
         }
         let directory = root + "/not-wf/sa"
         var unexpectedlyAccepted: [String] = []
-        for file in try files(in: directory) where !knownNotWFDeviations.contains(file) {
+        for file in try files(in: directory) where !knownNotWFDeviations.contains(file) && !editionExcluded.contains(file) {
             if (try? parse(file: file, in: directory)) != nil {
                 unexpectedlyAccepted.append(file)
             }

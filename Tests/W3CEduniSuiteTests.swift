@@ -29,27 +29,12 @@ struct W3CEduniSuiteTests {
     /// not-wf cases this implementation knowingly accepts (none).
     private let knownNotWFAccepted: Set<String> = []
 
-    /// valid cases this implementation knowingly fails, one class: the
-    /// grapheme-cluster lexing limitation (a combining mark directly after an
-    /// ASCII delimiter merges into one Swift Character, so scalar-level 5e
-    /// name characters are mis-lexed; #135).
-    private let knownValidFailures: Set<String> = [
-        "errata-4e/ibm04v01.xml", "errata-4e/ibm05v03.xml", "errata-4e/ibm07v01.xml",
-        "errata-4e/ibm85n107.xml", "errata-4e/ibm85n114.xml", "errata-4e/ibm85n119.xml",
-        "errata-4e/ibm85n121.xml", "errata-4e/ibm85n122.xml", "errata-4e/ibm85n136.xml",
-        "errata-4e/ibm85n137.xml", "errata-4e/ibm85n45.xml", "errata-4e/ibm85n50.xml",
-        "errata-4e/ibm85n51.xml", "errata-4e/ibm85n52.xml", "errata-4e/ibm85n53.xml",
-        "errata-4e/ibm85n54.xml", "errata-4e/ibm85n63.xml", "errata-4e/ibm85n73.xml",
-        "errata-4e/ibm85n74.xml", "errata-4e/ibm85n76.xml", "errata-4e/ibm85n89.xml",
-        "errata-4e/ibm85n91.xml", "errata-4e/ibm86n04.xml", "errata-4e/ibm87n60.xml",
-    ]
+    /// valid cases this implementation knowingly fails (none).
+    private let knownValidFailures: Set<String> = []
 
     /// invalid cases where this implementation knowingly reports no validity
-    /// error (none); 140.xml is carried here because it cannot parse yet (the
-    /// grapheme-cluster lexing class: its element name is a combining mark).
-    private let knownInvalidAccepted: Set<String> = [
-        "errata-4e/140.xml",
-    ]
+    /// error (none).
+    private let knownInvalidAccepted: Set<String> = []
 
     private struct ManifestCase {
         let id: String

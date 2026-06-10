@@ -29,8 +29,10 @@ struct W3CIBMSuiteTests {
     /// Ideographic, CombiningChar, Digit, Extender), deleted by XML 1.0 Fifth
     /// Edition, whose Name productions this package implements; the characters
     /// these cases reject became legal (the xmltest 141 class). The count is
-    /// asserted exactly so a regression in either direction is caught.
-    private let preFifthEditionCaseCount = 279
+    /// asserted exactly so a regression in either direction is caught (it grew
+    /// from 279 to 300 when scalar-level lexing let combining-mark names parse
+    /// as the Fifth Edition says they should).
+    private let preFifthEditionCaseCount = 300
 
     private func isPreFifthEditionCharacterClass(_ uri: String) -> Bool {
         (85 ... 89).contains { uri.hasPrefix("not-wf/P\($0)/") }
