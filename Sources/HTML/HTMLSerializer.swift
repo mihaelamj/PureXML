@@ -73,14 +73,23 @@ extension PureXML.HTML {
 
         private static func escapeAttribute(_ value: String) -> String {
             var result = ""
+            var previousWasAmpersand = false
             for scalar in value.unicodeScalars {
+                if previousWasAmpersand {
+                    // The html method leaves & unescaped when a { follows
+                    // (the &{...} convention, 16.2).
+                    result += scalar == "{" ? "&" : "&amp;"
+                    previousWasAmpersand = false
+                }
                 switch scalar {
-                case "&": result += "&amp;"
+                case "&":
+                    previousWasAmpersand = true
                 case "\"": result += "&quot;"
                 case "<": result += "&lt;"
                 default: result += latin1Entity(scalar) ?? String(Character(scalar))
                 }
             }
+            if previousWasAmpersand { result += "&amp;" }
             return result
         }
 

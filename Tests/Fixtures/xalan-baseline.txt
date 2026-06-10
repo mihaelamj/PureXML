@@ -82,9 +82,6 @@ numbering/numbering63
 output/output22
 output/output26
 output/output32
-output/output33
-output/output34
-output/output37
 output/output40
 output/output48
 output/output49
