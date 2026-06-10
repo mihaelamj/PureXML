@@ -3,6 +3,7 @@
 private typealias ResultItem = PureXML.XSLT.ResultItem
 private typealias XSLTContext = PureXML.XSLT.XSLTContext
 private typealias Termination = PureXML.XSLT.Termination
+private typealias MatchCache = PureXML.XSLT.MatchCache
 
 extension PureXML.XSLT {
     /// Runs a compiled stylesheet against a source tree, producing a result tree
@@ -15,6 +16,7 @@ extension PureXML.XSLT {
         let documentLoader: (String) -> String?
         private let keyIndex: PureXML.XSLT.KeyIndex
         private let termination = Termination()
+        private let matchCache = MatchCache()
 
         /// The `xsl:message terminate="yes"` text, if one fired during `run()`.
         var terminationMessage: String? {
@@ -51,14 +53,7 @@ extension PureXML.XSLT {
         }
 
         private func matches(_ node: PureXML.Model.TreeNode, _ pattern: String) -> Bool {
-            for branch in pattern.split(separator: "|") {
-                let trimmed = branch.trimmingXMLWhitespace()
-                let path = trimmed.hasPrefix("/") ? trimmed : "//" + trimmed
-                if let query = try? PureXML.XPath.Query(path), query.nodes(over: root).contains(where: { $0 === node }) {
-                    return true
-                }
-            }
-            return false
+            matchCache.nodes(matching: pattern, over: root).contains(ObjectIdentifier(node))
         }
 
         fileprivate func applyTemplates(

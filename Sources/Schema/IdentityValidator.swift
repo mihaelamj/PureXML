@@ -1,3 +1,17 @@
+/// Compiles each distinct XPath string once per validation run, so a
+/// constraint's selector and field queries are not re-parsed at every element
+/// the walk visits. A string that fails to compile caches as nil (no match).
+private final class XPathQueryCache {
+    private var queries: [String: PureXML.XPath.Query?] = [:]
+
+    func query(_ xpath: String) -> PureXML.XPath.Query? {
+        if let cached = queries[xpath] { return cached }
+        let compiled = try? PureXML.XPath.Query(xpath)
+        queries[xpath] = compiled
+        return compiled
+    }
+}
+
 extension PureXML.Schema {
     /// Validates XSD identity constraints (`unique`, `key`, `keyref`) over an
     /// instance document. Each constraint is evaluated at every element whose
@@ -8,6 +22,12 @@ extension PureXML.Schema {
     struct IdentityValidator {
         /// The constraints declared for each element local name.
         let constraints: [String: [IdentityConstraint]]
+        /// Selector and field XPaths compiled once per run, not per element.
+        private let cache = XPathQueryCache()
+
+        init(constraints: [String: [IdentityConstraint]]) {
+            self.constraints = constraints
+        }
 
         func validate(
             _ root: PureXML.Model.TreeNode,
@@ -162,13 +182,13 @@ extension PureXML.Schema {
         // MARK: XPath helpers
 
         private func select(_ xpath: String, at node: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
-            guard let query = try? PureXML.XPath.Query(xpath) else { return [] }
+            guard let query = cache.query(xpath) else { return [] }
             return query.nodes(over: node)
         }
 
         private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode) -> [String?] {
             fields.map { field in
-                guard let query = try? PureXML.XPath.Query(field), let value = try? query.value(at: node) else {
+                guard let query = cache.query(field), let value = try? query.value(at: node) else {
                     return nil
                 }
                 if let nodes = value.nodes, nodes.isEmpty { return nil }
