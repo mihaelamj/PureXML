@@ -41,6 +41,26 @@ public extension PureXML.Parsing {
             return declaration
         }
 
+        /// Parses an external entity's text declaration (production 77):
+        /// `VersionInfo? EncodingDecl S?`. The version is optional, the
+        /// encoding is required, and `standalone` is not allowed.
+        static func parseTextDeclaration(_ data: String) -> XMLDeclaration? {
+            var scanner = PseudoAttributeScanner(data)
+            guard let pairs = scanner.scan(), !pairs.isEmpty else { return nil }
+            var remaining = pairs
+            var declaration = XMLDeclaration()
+            if remaining.first?.name == "version" {
+                guard isValidVersion(remaining[0].value) else { return nil }
+                declaration.version = remaining[0].value
+                remaining.removeFirst()
+            }
+            guard remaining.count == 1, remaining[0].name == "encoding",
+                  isValidEncodingName(remaining[0].value)
+            else { return nil }
+            declaration.encoding = remaining[0].value
+            return declaration
+        }
+
         /// Whether the pseudo-attribute names appear in the grammar's fixed order
         /// with no repeats: version, then encoding, then standalone.
         private static func isOrdered(_ names: [String]) -> Bool {

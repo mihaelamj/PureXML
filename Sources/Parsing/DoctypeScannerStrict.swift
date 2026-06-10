@@ -17,10 +17,7 @@ extension DTDScanner {
             }
             reader.skipSpace()
         }
-        let name = scanName(&reader)
-        guard !name.isEmpty else {
-            throw ParseError.invalidEntityDeclaration(mark)
-        }
+        let name = try scanStrictName(&reader, at: mark)
         guard reader.peek()?.isWhitespace == true else {
             throw ParseError.invalidEntityDeclaration(mark)
         }
@@ -56,11 +53,13 @@ extension DTDScanner {
         if reader.peek()?.isWhitespace == true {
             reader.skipSpace()
             if reader.consume("NDATA") {
-                // NDATA is for unparsed general entities only.
-                guard !isParameter else {
+                // NDATA is for unparsed general entities only, and `S Name`
+                // must follow (production 76).
+                guard !isParameter, reader.peek()?.isWhitespace == true else {
                     throw ParseError.invalidEntityDeclaration(mark)
                 }
-                notation = notationName(&reader)
+                reader.skipSpace()
+                notation = try scanStrictName(&reader, at: mark)
             }
         } else if reader.peek() != ">" {
             throw ParseError.invalidEntityDeclaration(mark)
@@ -74,8 +73,9 @@ extension DTDScanner {
     }
 
     /// Validates an entity value literal: every character must be an XML Char,
-    /// and every `&` must begin a complete reference (`&name;` or a character
-    /// reference); a bare ampersand is not well-formed.
+    /// every `&` must begin a complete reference (`&name;` or a character
+    /// reference), and every `%` must begin a complete parameter-entity
+    /// reference (production 9 admits no bare `%` or `&` in an EntityValue).
     func validateEntityLiteral(_ value: String, at mark: Mark) throws {
         let characters = Array(value)
         var index = 0
@@ -84,19 +84,56 @@ extension DTDScanner {
             guard character.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isChar) else {
                 throw ParseError.invalidCharacter(mark)
             }
-            if character == "&" {
+            if character == "&" || character == "%" {
                 var probe = index + 1
-                if probe < characters.count, characters[probe] == "#" { probe += 1 }
+                if character == "&", probe < characters.count, characters[probe] == "#" { probe += 1 }
                 let bodyStart = probe
-                while probe < characters.count, characters[probe] != ";", !characters[probe].isWhitespace, characters[probe] != "&" {
+                let stops: Set<Character> = [";", "&", "%"]
+                while probe < characters.count, !stops.contains(characters[probe]), !characters[probe].isWhitespace {
                     probe += 1
                 }
                 guard probe > bodyStart, probe < characters.count, characters[probe] == ";" else {
-                    throw ParseError.invalidReference("&", mark)
+                    throw ParseError.invalidReference(String(character), mark)
                 }
                 index = probe
             }
             index += 1
+        }
+    }
+
+    /// Scans a Name strictly: the first character must satisfy NameStartChar
+    /// and the rest NameChar, so `-ge` or `.pe` is rejected where the lenient
+    /// continuation-character scan would accept it.
+    mutating func scanStrictName(_ reader: inout Reader, at mark: Mark) throws -> String {
+        guard let first = reader.peek(), first.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isNameStart) else {
+            throw ParseError.expectedName(mark)
+        }
+        return scanName(&reader)
+    }
+
+    /// Consumes the external subset's optional text declaration
+    /// `<?xml VersionInfo? EncodingDecl S? ?>` (production 77): unlike the
+    /// document's XML declaration, the version is optional, the encoding is
+    /// required, and `standalone` is not allowed.
+    mutating func scanTextDeclaration(_ reader: inout Reader, at mark: Mark) throws {
+        // Reader copies share their pull source, so look ahead in place: only
+        // '<?xml' followed by whitespace opens a text declaration ('<?xml-…'
+        // is an ordinary PI target and '<?xml?>' falls through to the
+        // reserved-target check).
+        guard reader.matches("<?xml"), reader.peek(5)?.isWhitespace == true else {
+            return
+        }
+        reader.consume("<?xml")
+        var text = ""
+        while !reader.matches("?>") {
+            guard let character = reader.advance() else {
+                throw ParseError.malformedDeclaration(mark)
+            }
+            text.append(character)
+        }
+        reader.consume("?>")
+        guard PureXML.Parsing.XMLDeclaration.parseTextDeclaration(text) != nil else {
+            throw ParseError.malformedDeclaration(mark)
         }
     }
 

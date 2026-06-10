@@ -227,6 +227,11 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             reader.consume("<?")
             let target = try scanName()
+            // Production 16: the target and the data must be separated by
+            // whitespace, so `<?target+++?>` is not well-formed.
+            if let next = reader.peek(), !next.isWhitespace, !reader.matches("?>") {
+                throw ParseError.unexpectedCharacter(next, reader.mark)
+            }
             reader.skipSpace()
             var data = ""
             var length = 0

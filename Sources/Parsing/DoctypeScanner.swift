@@ -41,7 +41,7 @@ struct DTDScanner {
     var parameterBudget: Int
     /// Bounds parameter-entity injection recursion (modularized DTDs nest, but
     /// only a little); deeper references are ignored rather than trapping.
-    private let maxDepth = 40
+    let maxDepth = 40
 
     init(limits: PureXML.Parsing.Limits, resolver: PureXML.Parsing.EntityResolver) {
         self.limits = limits
@@ -63,7 +63,7 @@ struct DTDScanner {
         guard reader.consume(">") else {
             throw ParseError.unterminatedTag(mark)
         }
-        loadExternalSubset(at: mark)
+        try loadExternalSubset(at: mark)
         resolveExternalEntities()
         return doctype
     }
@@ -82,16 +82,19 @@ struct DTDScanner {
 
     /// Loads the external subset through the resolver, if one is configured and
     /// returns text. External declarations never override internal ones (the
-    /// internal subset is scanned first and wins).
-    private mutating func loadExternalSubset(at mark: Mark) {
+    /// internal subset is scanned first and wins). A grammar violation in the
+    /// external subset is a well-formedness error of the document, so errors
+    /// propagate. The subset may open with a text declaration (production 77).
+    private mutating func loadExternalSubset(at mark: Mark) throws {
         guard let id = doctype.externalSubset, let text = resolver.resolveExternalSubset(id) else {
             return
         }
         var sub = Reader(text)
-        try? scanDeclarations(&sub, depth: 1, terminatedByBracket: false, at: mark)
+        try scanTextDeclaration(&sub, at: mark)
+        try scanDeclarations(&sub, depth: 1, terminatedByBracket: false, at: mark)
     }
 
-    private mutating func scanDeclarations(
+    mutating func scanDeclarations(
         _ reader: inout Reader,
         depth: Int,
         terminatedByBracket: Bool,
@@ -112,52 +115,14 @@ struct DTDScanner {
                 try scanParameterReference(&reader, depth: depth, at: mark)
             } else if reader.matches("<![") {
                 try scanConditionalSection(&reader, depth: depth, at: mark)
-            } else {
+            } else if character == "<" {
                 try scanMarkupDeclaration(&reader)
+            } else {
+                // Only markup declarations, PE references, and whitespace may
+                // appear between declarations.
+                throw ParseError.malformedDeclaration(reader.mark)
             }
         }
-    }
-
-    /// Processes a conditional section `<![INCLUDE[ … ]]>` or `<![IGNORE[ … ]]>`.
-    /// The keyword may be a parameter-entity reference, so it is parameter-expanded
-    /// first. An INCLUDE section's declarations are scanned; an IGNORE section's
-    /// body is discarded. Nested sections are handled by re-scanning the body.
-    private mutating func scanConditionalSection(_ reader: inout Reader, depth: Int, at mark: Mark) throws {
-        reader.consume("<![")
-        var keywordRaw = ""
-        while let character = reader.peek(), character != "[" {
-            keywordRaw.append(character)
-            reader.advance()
-        }
-        reader.consume("[")
-        let body = readConditionalBody(&reader)
-        if expandParameterReferences(keywordRaw).trimmingXMLWhitespace() == "INCLUDE", depth < maxDepth {
-            var sub = Reader(body)
-            try scanDeclarations(&sub, depth: depth + 1, terminatedByBracket: false, at: mark)
-        }
-    }
-
-    /// Reads the body of a conditional section up to its matching `]]>`, keeping
-    /// any nested `<![ … ]]>` sections intact so an INCLUDE can re-scan them.
-    private mutating func readConditionalBody(_ reader: inout Reader) -> String {
-        var body = ""
-        var nesting = 1
-        while reader.peek() != nil {
-            if reader.matches("<![") {
-                nesting += 1
-                reader.consume("<![")
-                body += "<!["
-            } else if reader.matches("]]>") {
-                reader.consume("]]>")
-                nesting -= 1
-                if nesting == 0 { break }
-                body += "]]>"
-            } else if let character = reader.peek() {
-                body.append(character)
-                reader.advance()
-            }
-        }
-        return body
     }
 
     private mutating func scanMarkupDeclaration(_ reader: inout Reader) throws {
@@ -180,10 +145,11 @@ struct DTDScanner {
                 throw ParseError.reservedProcessingInstructionTarget(mark)
             }
             skip(&reader, until: "?>")
-        } else if reader.matches("<!") {
-            skip(&reader, until: ">")
         } else {
-            reader.advance()
+            // Any other construct here (an unknown or lowercase declaration
+            // keyword, space after '<!', a DOCTYPE inside a subset, a bare '<')
+            // is not well-formed.
+            throw ParseError.malformedDeclaration(reader.mark)
         }
     }
 
@@ -191,9 +157,14 @@ struct DTDScanner {
     /// entity's replacement text and scanning its declarations. Bounded by depth
     /// and the expansion budget.
     private mutating func scanParameterReference(_ reader: inout Reader, depth: Int, at mark: Mark) throws {
+        let refMark = reader.mark
         reader.consume("%")
         let name = scanName(&reader)
-        reader.consume(";")
+        // PEReference is '%' Name ';' exactly: no space after '%' (an empty
+        // name) and the semicolon must follow the name directly.
+        guard !name.isEmpty, reader.consume(";") else {
+            throw ParseError.invalidReference("%\(name)", refMark)
+        }
         guard depth < maxDepth, let replacement = doctype.parameterEntities[name] else {
             return
         }
@@ -224,20 +195,28 @@ struct DTDScanner {
         }
     }
 
-    mutating func notationName(_ reader: inout Reader) -> String {
-        reader.skipSpace()
-        return scanName(&reader)
-    }
-
+    /// `<!NOTATION S Name S (ExternalID | PublicID) S? '>'` (production 82):
+    /// the identifier is required and nothing may follow it but whitespace.
     private mutating func scanNotationDeclaration(_ reader: inout Reader) throws {
         let mark = reader.mark
         reader.consume("<!NOTATION")
+        guard reader.peek()?.isWhitespace == true else {
+            throw ParseError.malformedDeclaration(mark)
+        }
         reader.skipSpace()
-        let name = scanName(&reader)
+        let name = try scanStrictName(&reader, at: mark)
+        guard reader.peek()?.isWhitespace == true else {
+            throw ParseError.malformedDeclaration(mark)
+        }
         reader.skipSpace()
-        let id = try parseStrictExternalID(&reader, requireSystem: false, at: mark)
-        skip(&reader, until: ">")
-        if !name.isEmpty, let id, doctype.notations[name] == nil {
+        guard let id = try parseStrictExternalID(&reader, requireSystem: false, at: mark) else {
+            throw ParseError.malformedDeclaration(mark)
+        }
+        reader.skipSpace()
+        guard reader.consume(">") else {
+            throw ParseError.malformedDeclaration(mark)
+        }
+        if doctype.notations[name] == nil {
             doctype.notations[name] = id
         }
     }
