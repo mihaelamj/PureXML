@@ -2,8 +2,6 @@ public extension PureXML.Schema {
     /// An error compiling or applying a schema.
     enum SchemaError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
         case notASchema
-        /// A type derives from a base that declares that derivation method `final`.
-        case finalViolation(type: String, base: String, method: String)
         /// A type inside `xs:redefine` does not redefine itself: its restriction or
         /// extension base must name the type it redefines.
         case redefineIncompatible(type: String)
@@ -11,22 +9,21 @@ public extension PureXML.Schema {
         /// an element with `maxOccurs` at most 1, and the group itself may occur at
         /// most once.
         case invalidAllGroup(reason: String)
-        /// A complex-type restriction's content model is not a structurally valid
-        /// subset of its base's ("Particle Valid (Restriction)" in XSD 1.0).
-        case invalidRestriction(type: String, base: String, reason: String)
+        /// The compiled schema fails one or more consistency rules (a `final`
+        /// violation, an unfaithful restriction); every finding is carried, so a
+        /// schema with several problems reports them all at once.
+        case inconsistent([String])
 
         public var description: String {
             switch self {
             case .notASchema:
                 "the document is not an xs:schema"
-            case let .finalViolation(type, base, method):
-                "type '\(type)' derives from '\(base)' by \(method), which '\(base)' declares final"
             case let .redefineIncompatible(type):
                 "redefined type '\(type)' must derive from itself"
             case let .invalidAllGroup(reason):
                 "invalid xs:all group: \(reason)"
-            case let .invalidRestriction(type, base, reason):
-                "type '\(type)' is not a valid restriction of '\(base)': \(reason)"
+            case let .inconsistent(findings):
+                findings.joined(separator: "; ")
             }
         }
     }
@@ -62,17 +59,16 @@ public extension PureXML.Schema {
             typeBlock = compiled.typeBlock
             typeDerivation = compiled.typeDerivation
             targetNamespace = compiled.targetNamespace
-            // Particle Valid (Restriction): a complex type derived by restriction
-            // must accept a subset of its base (deterministic order for stable
-            // error reporting).
-            for name in typeDerivation.keys.sorted() {
-                guard let derivation = typeDerivation[name], derivation.method == .restriction,
-                      case let .complex(restrictedType)? = types[name],
-                      case let .complex(baseType)? = types[derivation.base]
-                else { continue }
-                if let reason = ParticleRestriction.violation(restricted: restrictedType.content, base: baseType.content) {
-                    throw SchemaError.invalidRestriction(type: name, base: derivation.base, reason: reason)
-                }
+            // Schema consistency through the validation framework: every named
+            // type is checked by the composable rules (final respected, Particle
+            // Valid (Restriction)), and ALL findings are reported together.
+            let findings = PureXML.Validation.XSDSchema.consistencyErrors(
+                types: compiled.types,
+                typeDerivation: compiled.typeDerivation,
+                typeFinal: compiled.typeFinal,
+            )
+            if !findings.isEmpty {
+                throw SchemaError.inconsistent(findings.map { String(describing: $0) })
             }
         }
 

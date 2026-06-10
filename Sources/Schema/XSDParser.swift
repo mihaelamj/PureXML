@@ -15,7 +15,10 @@ extension PureXML.Schema {
             var visited: Set<String> = []
             let containers = XSDNode.collectContainers(schema, loader, &visited)
             let derivation = derivationTables(containers)
-            try checkFinal(derivation)
+            // checkRedefine and checkAllGroups examine the raw schema source, the
+            // schema-compilation analog of well-formedness, so they stay throws;
+            // the model-level consistency checks (final, restriction subsets) are
+            // Validation rules collected by Schema.Document.
             try checkRedefine(containers)
             try checkAllGroups(containers)
             var context = XSDContext(
@@ -58,6 +61,7 @@ extension PureXML.Schema {
                 abstractElements: derivation.abstractElements,
                 typeBlock: derivation.typeBlock,
                 typeDerivation: derivation.typeDerivation,
+                typeFinal: derivation.typeFinal,
                 targetNamespace: context.targetNamespace,
             )
         }

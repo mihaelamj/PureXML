@@ -116,6 +116,9 @@ extension PureXML.Schema {
         /// Each named complex type's base type and derivation method, the backbone
         /// the `block` check walks from an `xsi:type` to its declared type.
         var typeDerivation: [String: TypeDerivation] = [:]
+        /// Derivation methods each named type declares `final`, for the
+        /// schema-consistency rules.
+        var typeFinal: [String: Set<DerivationMethod>] = [:]
         /// The schema's target namespace, so the root element's namespace can be
         /// checked against it.
         var targetNamespace: String?

@@ -104,15 +104,6 @@ extension PureXML.Schema.XSDParser {
         return methods
     }
 
-    /// Throws when any type derives from a base by a method that base declares
-    /// `final`.
-    static func checkFinal(_ tables: DerivationTables) throws {
-        for (name, derivation) in tables.typeDerivation {
-            guard tables.typeFinal[derivation.base]?.contains(derivation.method) == true else { continue }
-            throw SchemaFault.finalViolation(type: name, base: derivation.base, method: methodName(derivation.method))
-        }
-    }
-
     /// Throws when a type inside an `xs:redefine` does not derive from itself: a
     /// redefinition's `base` must name the type being redefined.
     static func checkRedefine(_ containers: [XSDTree]) throws {
