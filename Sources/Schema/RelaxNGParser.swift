@@ -1,97 +1,36 @@
-private typealias Tree = PureXML.Model.TreeNode
-
-/// Tree helpers for the RELAX NG parser. File-scope and private.
-private enum RNGNode {
-    static func localName(_ node: Tree) -> String? {
-        node.name?.localName
-    }
-
-    static func attribute(_ node: Tree, _ name: String) -> String? {
-        let raw = node.attributes.first { $0.name.localName == name }?.value
-        // Simplification 4.2: the value of name, type, and combine attributes
-        // is whitespace-trimmed.
-        guard let raw, ["name", "type", "combine"].contains(name) else { return raw }
-        return raw.trimmingXMLWhitespace()
-    }
-
-    /// The RELAX NG namespace; simplification 4.1 removes foreign-namespace
-    /// elements (annotations such as documentation or comments) before any
-    /// pattern interpretation.
-    static let relaxNGNamespace = "http://relaxng.org/ns/structure/1.0"
-
-    static func elementChildren(_ node: Tree) -> [Tree] {
-        node.children.filter { child in
-            guard child.kind == .element else { return false }
-            // Simplification 4.1: only RELAX NG-namespace elements are schema
-            // content. An element with no namespace counts as schema content
-            // only when the whole document is unqualified (leniency for
-            // namespace-less schemas); under a qualified parent it is foreign.
-            let uri = child.name?.namespaceURI
-            if uri == relaxNGNamespace { return true }
-            return uri == nil && node.name?.namespaceURI == nil
-        }
-    }
-
-    static func children(_ node: Tree, named name: String) -> [Tree] {
-        elementChildren(node).filter { localName($0) == name }
-    }
-
-    static func text(_ node: Tree) -> String {
-        node.stringValue.trimmingXMLWhitespace()
-    }
-
-    static func strip(_ qualified: String) -> String {
-        qualified.split(separator: ":").last.map(String.init) ?? qualified
-    }
-
-    /// Resolves `reference` against an optional base URI (RFC 3986), keeping a
-    /// relative base's merged form relative (the same adjustment external
-    /// identifiers use).
-    static func resolveRelative(_ reference: String, against base: String?) -> String {
-        guard let base, !base.isEmpty else { return reference }
-        let merged = PureXML.Canonical.Canonicalizer.resolveURI(reference, against: base)
-        let baseHasScheme = base.split(separator: "/", maxSplits: 1)[0].hasSuffix(":")
-        if !base.hasPrefix("/"), !baseHasScheme, !reference.hasPrefix("/"), merged.hasPrefix("/") {
-            return String(merged.dropFirst())
-        }
-        return merged
-    }
-
-    /// The `href` of an include/externalRef, resolved against the document's
-    /// base and the `xml:base` attributes in scope at the node (4.5).
-    static func resolvedHref(_ node: Tree, documentBase: String?) -> String? {
-        guard let href = attribute(node, "href") else { return nil }
-        var bases: [String] = []
-        var cursor: Tree? = node
-        while let current = cursor {
-            if let base = current.attributes.first(where: { $0.name.prefix == "xml" && $0.name.localName == "base" })?.value {
-                bases.append(base)
-            }
-            cursor = current.parent
-        }
-        if let documentBase { bases.append(documentBase) }
-        var resolved = href
-        for base in bases {
-            resolved = resolveRelative(resolved, against: base)
-        }
-        return resolved
-    }
-}
+private typealias Tree = RNGTree
 
 /// Compiles a RELAX NG XML-syntax document into the pattern algebra, resolving
 /// `include` and `externalRef` through a loader. Holds the accumulating `define`
 /// table so external grammars merge into it. File-scope and private.
-private final class RNGCompiler {
+final class RNGCompiler {
     typealias Pattern = PureXML.Schema.Pattern
     typealias NameClass = PureXML.Schema.NameClass
     typealias Compositor = PureXML.Schema.Compositor
 
     private(set) var defines: [String: Pattern] = [:]
+    /// The combine method established for each define name (4.17): defines
+    /// sharing a name agree on one method, and the single define that omits
+    /// `combine` still merges by it.
+    private var defineCombine: [String: String] = [:]
     private let loader: (String) -> String?
     private var visited: Set<String> = []
     /// The URI of the document currently being compiled (nil for the top
     /// level): hrefs inside a loaded document resolve against it.
     private var documentBase: String?
+    /// The `ns` value carried across a document boundary: an externalRef's
+    /// in-scope ns applies to the loaded pattern when it has none of its own
+    /// (simplification 4.6); the tree-ancestor walk cannot cross documents.
+    private var fallbackNamespace = ""
+    /// The start pattern contributed by an `include`d grammar (4.7), used when
+    /// the including grammar declares no start of its own.
+    private var includedStart: Pattern?
+
+    /// The ns in scope at a schema node: its own/ancestor `ns` attribute, or
+    /// the namespace inherited across the document boundary.
+    func effectiveNS(_ node: Tree) -> String {
+        RNGNode.inheritedNS(node) ?? fallbackNamespace
+    }
 
     init(loader: @escaping (String) -> String?) {
         self.loader = loader
@@ -108,8 +47,26 @@ private final class RNGCompiler {
         for define in RNGNode.children(node, named: "define") {
             addDefine(define)
         }
-        let start = RNGNode.children(node, named: "start").first
-        return start.map { combined(RNGNode.elementChildren($0), .sequence) } ?? .notAllowed
+        let starts = RNGNode.children(node, named: "start")
+        guard let first = starts.first else {
+            return includedStart ?? .notAllowed
+        }
+        // Multiple starts combine like defines (4.17): the named method wins,
+        // and the single start that omits `combine` still merges by it.
+        var method: String?
+        for start in starts {
+            if let named = RNGNode.attribute(start, "combine") { method = named }
+        }
+        var result = combined(RNGNode.elementChildren(first), .sequence)
+        for start in starts.dropFirst() {
+            let next = combined(RNGNode.elementChildren(start), .sequence)
+            switch method {
+            case "choice": result = .choice(result, next)
+            case "interleave": result = .interleave(result, next)
+            default: result = next
+            }
+        }
+        return result
     }
 
     /// Adds a `define`, honoring `combine`: a second definition of the same name
@@ -118,11 +75,14 @@ private final class RNGCompiler {
     private func addDefine(_ define: Tree) {
         guard let name = RNGNode.attribute(define, "name") else { return }
         let pattern = combined(RNGNode.elementChildren(define), .sequence)
+        if let method = RNGNode.attribute(define, "combine") {
+            defineCombine[name] = method
+        }
         guard let existing = defines[name] else {
             defines[name] = pattern
             return
         }
-        switch RNGNode.attribute(define, "combine") {
+        switch defineCombine[name] {
         case "choice": defines[name] = .choice(existing, pattern)
         case "interleave": defines[name] = .interleave(existing, pattern)
         default: defines[name] = pattern
@@ -140,12 +100,22 @@ private final class RNGCompiler {
         }
         visited.insert(href)
         let outerBase = documentBase
+        let outerNamespace = fallbackNamespace
         documentBase = href
-        defer { documentBase = outerBase }
+        if RNGNode.inheritedNS(grammar) == nil {
+            fallbackNamespace = effectiveNS(node)
+        }
         for define in RNGNode.children(grammar, named: "define") {
             addDefine(define)
         }
+        if includedStart == nil, let start = RNGNode.children(grammar, named: "start").first {
+            includedStart = combined(RNGNode.elementChildren(start), .sequence)
+        }
         documentBase = outerBase
+        fallbackNamespace = outerNamespace
+        if let override = RNGNode.children(node, named: "start").first {
+            includedStart = combined(RNGNode.elementChildren(override), .sequence)
+        }
         for define in RNGNode.children(node, named: "define") {
             addDefine(define)
         }
@@ -153,7 +123,7 @@ private final class RNGCompiler {
 
     // MARK: Patterns
 
-    private func pattern(_ node: Tree) -> Pattern {
+    func pattern(_ node: Tree) -> Pattern {
         leafPattern(node) ?? compositePattern(node)
     }
 
@@ -189,7 +159,13 @@ private final class RNGCompiler {
                 PureXML.Schema.RelaxNGFacets.apply(name, RNGNode.text(param), into: &facets)
             }
         }
-        return .data(PureXML.Schema.SimpleType(base: base, facets: facets))
+        let type = PureXML.Schema.SimpleType(base: base, facets: facets)
+        // 4.12: an except child excludes its (implicitly choice-combined)
+        // patterns from the data type's lexical space.
+        if let except = RNGNode.children(node, named: "except").first {
+            return .dataExcept(type, combined(RNGNode.elementChildren(except), .choice))
+        }
+        return .data(type)
     }
 
     /// Builds a `<value>` pattern carrying its datatype, so the value compares in
@@ -246,8 +222,15 @@ private final class RNGCompiler {
         }
         visited.insert(href)
         let outerBase = documentBase
+        let outerNamespace = fallbackNamespace
         documentBase = href
-        defer { documentBase = outerBase }
+        if RNGNode.inheritedNS(top) == nil {
+            fallbackNamespace = effectiveNS(node)
+        }
+        defer {
+            documentBase = outerBase
+            fallbackNamespace = outerNamespace
+        }
         return topLevel(top)
     }
 
@@ -278,73 +261,6 @@ private final class RNGCompiler {
         let (nameClass, contentNodes) = nameClassAndContent(node)
         let content = contentNodes.isEmpty ? Pattern.text : combined(contentNodes, .sequence)
         return .attribute(nameClass, content)
-    }
-
-    private func nameClassAndContent(_ node: Tree) -> (NameClass, [Tree]) {
-        let children = RNGNode.elementChildren(node)
-        if let name = RNGNode.attribute(node, "name") {
-            let namespace = RNGNode.attribute(node, "ns") ?? ""
-            return (.name(namespace: namespace, localName: name), children)
-        }
-        guard let first = children.first else { return (.anyName, []) }
-        return (nameClass(first), Array(children.dropFirst()))
-    }
-
-    // MARK: Combinators and name classes
-
-    private func combined(_ nodes: [Tree], _ compositor: Compositor) -> Pattern {
-        let patterns = nodes.map(pattern)
-        let identity: Pattern = compositor == .choice ? .notAllowed : .empty
-        guard let first = patterns.first else { return identity }
-        return patterns.dropFirst().reduce(first) { combine($0, $1, compositor) }
-    }
-
-    private func combine(_ lhs: Pattern, _ rhs: Pattern, _ compositor: Compositor) -> Pattern {
-        switch compositor {
-        case .sequence: .group(lhs, rhs)
-        case .choice: .choice(lhs, rhs)
-        case .all: .interleave(lhs, rhs)
-        }
-    }
-
-    private func nameClass(_ node: Tree) -> NameClass {
-        switch RNGNode.localName(node) {
-        case "name":
-            .name(namespace: RNGNode.attribute(node, "ns") ?? "", localName: RNGNode.text(node))
-        case "anyName":
-            anyName(node)
-        case "nsName":
-            nsName(node)
-        case "choice":
-            nameClassChoice(RNGNode.elementChildren(node))
-        default:
-            .anyName
-        }
-    }
-
-    private func anyName(_ node: Tree) -> NameClass {
-        guard let except = exceptClass(node) else { return .anyName }
-        return .anyNameExcept(except)
-    }
-
-    private func nsName(_ node: Tree) -> NameClass {
-        let namespace = RNGNode.attribute(node, "ns") ?? ""
-        guard let except = exceptClass(node) else { return .nsName(namespace) }
-        return .nsNameExcept(namespace: namespace, except: except)
-    }
-
-    /// The name class of a `<name-class>`'s `<except>` child, treating multiple
-    /// children as an implicit choice (`anyName`/`nsName` minus the union).
-    private func exceptClass(_ node: Tree) -> NameClass? {
-        guard let except = RNGNode.children(node, named: "except").first else { return nil }
-        let children = RNGNode.elementChildren(except)
-        return children.isEmpty ? nil : nameClassChoice(children)
-    }
-
-    private func nameClassChoice(_ nodes: [Tree]) -> NameClass {
-        let classes = nodes.map(nameClass)
-        guard let first = classes.first else { return .anyName }
-        return classes.dropFirst().reduce(first) { .choice($0, $1) }
     }
 }
 

@@ -36,6 +36,9 @@ public extension PureXML.Schema {
         case element(NameClass, Pattern)
         case attribute(NameClass, Pattern)
         case data(SimpleType)
+        /// `<data>` with an `<except>` child: the type matches but the except
+        /// pattern must not (4.12).
+        case dataExcept(SimpleType, Pattern)
         case value(SimpleType, String)
         case list(Pattern)
         case ref(String)

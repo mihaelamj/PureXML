@@ -92,6 +92,8 @@ extension PureXML.Schema {
             case let .value(type, literal):
                 type.valueMatches(string, literal: literal) ? .empty : .notAllowed
             case let .data(type): type.validate(string) == nil ? .empty : .notAllowed
+            case let .dataExcept(type, except):
+                type.validate(string) == nil && !nullable(valueDeriv(except, string)) ? .empty : .notAllowed
             case let .list(inner): listMatches(inner, string) ? .empty : .notAllowed
             default: .notAllowed
             }
@@ -124,7 +126,11 @@ extension PureXML.Schema {
         }
 
         private func valueMatches(_ content: PureXML.Schema.Pattern, _ value: String) -> Bool {
-            value.isEmpty ? nullable(content) : nullable(textDeriv(content, value))
+            if nullable(textDeriv(content, value)) { return true }
+            // A whitespace-only attribute value also matches a pattern that
+            // matches the empty sequence, the same leniency element content
+            // gets for ignorable whitespace.
+            return value.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isWhitespace) && nullable(content)
         }
 
         private func oneOrMoreP(_ inner: PureXML.Schema.Pattern) -> PureXML.Schema.Pattern {
@@ -206,7 +212,9 @@ extension PureXML.Schema.RelaxNGEngine {
 
     private func childrenDeriv(_ pattern: PureXML.Schema.Pattern, _ children: [PureXML.Model.Node]) -> PureXML.Schema.Pattern {
         let coalesced = Self.coalesceText(children)
-        if coalesced.isEmpty { return pattern }
+        // Clark's algorithm treats an empty element as optional empty text, so
+        // a data/value pattern whose lexical space admits "" matches <e/>.
+        if coalesced.isEmpty { return choice(pattern, textDeriv(pattern, "")) }
         if coalesced.count == 1, case let .text(string) = coalesced[0] {
             let derived = textDeriv(pattern, string)
             return Self.isWhitespace(string) ? choice(pattern, derived) : derived

@@ -33,12 +33,10 @@ struct RelaxNGSpecSuiteTests {
     private let knownIncorrectCompiledCount = 213
     private let knownCorrectRejected: Set<Int> = []
     private let knownValidRejected: Set<Int> = [
-        98, 104, 109, 110, 111, 115, 119, 120, 124, 125, 126, 127, 128, 130,
-        131, 132, 133, 142, 190, 191, 194, 195, 208, 209, 210, 236, 256, 258,
-        265, 266, 268, 269, 271, 328, 372, 374, 378, 379, 380,
+        98, 111, 115, 133, 195, 208, 209, 210, 271, 328, 379, 380,
     ]
     private let knownInvalidAccepted: Set<Int> = [
-        104, 124, 125, 126, 127, 128, 142, 264, 271,
+        120, 142, 264, 271, 378, 379,
     ]
 
     private struct SpecCase {
