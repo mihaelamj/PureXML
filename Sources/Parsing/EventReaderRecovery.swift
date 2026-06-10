@@ -60,6 +60,9 @@ extension PureXML.Parsing.EventReader {
             if character == "-", reader.peek() == "-" {
                 throw PureXML.Parsing.ParseError.doubleHyphenInComment(mark)
             }
+            guard character.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isChar) else {
+                throw PureXML.Parsing.ParseError.invalidCharacter(reader.mark)
+            }
             content.append(character)
         }
         reader.consume("-->")

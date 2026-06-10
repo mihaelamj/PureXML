@@ -45,6 +45,9 @@ public extension PureXML.Parsing {
         case missingSpaceBeforeAttribute(Mark)
         /// A character outside the XML `Char` production appears in content.
         case invalidCharacter(Mark)
+        /// A processing instruction uses the reserved target `xml` (any case),
+        /// which is only legal as the document's XML declaration.
+        case reservedProcessingInstructionTarget(Mark)
 
         public var description: String {
             switch self {
@@ -106,6 +109,8 @@ public extension PureXML.Parsing {
                 "attributes must be separated by whitespace at \(mark)"
             case let .invalidCharacter(mark):
                 "character is not allowed in XML content at \(mark)"
+            case let .reservedProcessingInstructionTarget(mark):
+                "the processing-instruction target 'xml' is reserved at \(mark)"
             case let .malformedDeclaration(mark):
                 "malformed XML declaration at \(mark)"
             }

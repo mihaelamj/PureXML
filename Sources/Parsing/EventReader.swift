@@ -105,6 +105,11 @@ public extension PureXML.Parsing {
                     let mark = reader.mark
                     let instruction = try scanProcessingInstruction()
                     if instruction.target.lowercased() == "xml" {
+                        // The reserved target is only legal as the XML declaration,
+                        // which must be the very first bytes of the document.
+                        guard mark == .start, instruction.target == "xml" else {
+                            throw ParseError.reservedProcessingInstructionTarget(mark)
+                        }
                         try recordDeclaration(instruction.data, at: mark)
                         continue
                     }
@@ -138,7 +143,11 @@ public extension PureXML.Parsing {
             if reader.matches("<!--") { return try scanComment() }
             if reader.matches("<![CDATA[") { return try scanCDATA() }
             if reader.matches("<?") {
+                let mark = reader.mark
                 let instruction = try scanProcessingInstruction()
+                if instruction.target.lowercased() == "xml" {
+                    throw ParseError.reservedProcessingInstructionTarget(mark)
+                }
                 return .processingInstruction(target: instruction.target, data: instruction.data)
             }
             if reader.matches("<!DOCTYPE") {
@@ -227,6 +236,9 @@ public extension PureXML.Parsing {
                 }
                 length += 1
                 try checkContent(length, mark)
+                guard character.unicodeScalars.allSatisfy(XMLCharacter.isChar) else {
+                    throw ParseError.invalidCharacter(reader.mark)
+                }
                 data.append(character)
             }
             reader.consume("?>")

@@ -101,12 +101,19 @@ private struct EntityExpander {
 
     private static func characterReference(_ body: String, at mark: PureXML.Parsing.Mark) throws -> Character {
         let digits = String(body.dropFirst())
-        let scalarValue: UInt32? = if digits.hasPrefix("x") || digits.hasPrefix("X") {
+        // XML 1.0: only lowercase 'x' introduces a hex reference, and the
+        // referenced code point must be a valid XML Char (rejecting NUL, bare
+        // control characters, surrogates, and U+FFFE/U+FFFF).
+        let scalarValue: UInt32? = if digits.hasPrefix("x") {
             UInt32(digits.dropFirst(), radix: 16)
+        } else if digits.hasPrefix("X") {
+            nil
         } else {
             UInt32(digits, radix: 10)
         }
-        guard let value = scalarValue, let scalar = Unicode.Scalar(value) else {
+        guard let value = scalarValue, let scalar = Unicode.Scalar(value),
+              PureXML.Parsing.XMLCharacter.isChar(scalar)
+        else {
             throw PureXML.Parsing.ParseError.invalidReference("&\(body);", mark)
         }
         return Character(scalar)

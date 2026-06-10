@@ -24,17 +24,15 @@ struct W3CXMLSuiteTests {
     /// markup in values). The baseline below is exact, so any regression in
     /// the cases that DO pass is still caught.
     private let knownNotWFDeviations: Set<String> = [
-        "031.xml", "032.xml", "054.xml", "057.xml", "058.xml", "059.xml", "060.xml", "061.xml",
-        "062.xml", "063.xml", "064.xml", "065.xml", "066.xml", "067.xml", "068.xml", "069.xml",
-        "074.xml", "078.xml", "079.xml", "080.xml", "082.xml", "084.xml", "085.xml", "086.xml",
-        "087.xml", "089.xml", "090.xml", "091.xml", "092.xml", "093.xml", "096.xml", "101.xml",
-        "102.xml", "103.xml", "107.xml", "113.xml", "114.xml", "115.xml", "116.xml", "117.xml",
-        "119.xml", "120.xml", "121.xml", "122.xml", "123.xml", "124.xml", "125.xml", "126.xml",
-        "127.xml", "128.xml", "129.xml", "130.xml", "131.xml", "132.xml", "133.xml", "134.xml",
-        "135.xml", "136.xml", "137.xml", "138.xml", "139.xml", "140.xml", "141.xml", "142.xml",
-        "143.xml", "144.xml", "147.xml", "148.xml", "149.xml", "150.xml", "151.xml", "153.xml",
-        "154.xml", "155.xml", "156.xml", "157.xml", "158.xml", "160.xml", "161.xml", "162.xml",
-        "165.xml", "168.xml", "169.xml", "170.xml", "171.xml", "172.xml", "173.xml", "174.xml",
+        "054.xml", "057.xml", "058.xml", "059.xml", "060.xml", "061.xml", "062.xml", "063.xml",
+        "064.xml", "065.xml", "066.xml", "067.xml", "068.xml", "069.xml", "074.xml", "078.xml",
+        "079.xml", "080.xml", "082.xml", "084.xml", "085.xml", "086.xml", "087.xml", "089.xml",
+        "090.xml", "091.xml", "092.xml", "096.xml", "101.xml", "102.xml", "103.xml", "107.xml",
+        "113.xml", "114.xml", "115.xml", "116.xml", "117.xml", "119.xml", "120.xml", "121.xml",
+        "122.xml", "123.xml", "124.xml", "125.xml", "126.xml", "127.xml", "128.xml", "129.xml",
+        "130.xml", "131.xml", "132.xml", "133.xml", "134.xml", "135.xml", "136.xml", "137.xml",
+        "138.xml", "139.xml", "140.xml", "141.xml", "149.xml", "153.xml", "158.xml", "160.xml",
+        "161.xml", "162.xml", "165.xml", "168.xml", "169.xml", "170.xml", "173.xml", "174.xml",
         "175.xml", "180.xml", "182.xml", "183.xml", "184.xml",
     ]
 
