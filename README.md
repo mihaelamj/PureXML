@@ -89,7 +89,7 @@ flowchart TB
   Epic105["#105 parity frontier: complete (#106 #107 #108 output encodings, streaming validation, last encodings; findings #109-#119; first W3C pass #120)"]:::epic
   Epic121["#121 xmlconf full archive"]:::epic
   Oasis["#123 OASIS/NIST section: complete, zero deviations"]:::done
-  Sun["#124 Sun section: DTD-validity baselines"]:::todo
+  Sun["#124 Sun section: runner + exact baselines in, burning down"]:::review
   IBM["#125 IBM section: per-production validity depth"]:::todo
   Japanese["#126 japanese section: encoding declarations"]:::todo
   Eduni["#127 eduni: errata + namespaces"]:::todo
@@ -117,7 +117,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **863 tests in 144 suites** (`swift test`).
+currently runs **866 tests in 145 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
