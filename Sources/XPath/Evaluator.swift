@@ -62,8 +62,22 @@ extension PureXML.XPath {
             functions: FunctionTable = FunctionTable(),
             namespaces: [String: String] = [:],
         ) throws -> Value {
+            try value(_: expression, atNode: .tree(node), position: position, size: size, variables: variables, functions: functions, namespaces: namespaces)
+        }
+
+        /// Like `value(_:at:...)` but starting from any XPath node, attributes
+        /// and namespace nodes included (the XSLT current node can be either).
+        static func value(
+            _ expression: Expression,
+            atNode node: Node,
+            position: Int,
+            size: Int,
+            variables: [String: Value],
+            functions: FunctionTable = FunctionTable(),
+            namespaces: [String: String] = [:],
+        ) throws -> Value {
             let context = EvaluationContext(
-                node: .tree(node),
+                node: node,
                 position: position,
                 size: size,
                 variables: variables,

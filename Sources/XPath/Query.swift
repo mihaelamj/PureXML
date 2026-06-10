@@ -87,6 +87,25 @@ public extension PureXML.XPath {
             )
         }
 
+        /// Like the tree-node form, but the context may be any XPath node:
+        /// XSLT applies templates to attribute and namespace nodes too.
+        func value(
+            atNode node: Node,
+            position: Int,
+            size: Int,
+            variables: [String: Value],
+            functions: FunctionTable,
+        ) throws -> Value {
+            try Evaluator.value(
+                expression,
+                atNode: node,
+                position: position,
+                size: size,
+                variables: variables,
+                functions: functions,
+            )
+        }
+
         /// Like ``nodes(over:)`` but with an extra function table merged in.
         func nodes(over root: PureXML.Model.TreeNode, functions: FunctionTable) -> [PureXML.Model.TreeNode] {
             Evaluator.nodes(expression, over: root, functions: functions)

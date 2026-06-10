@@ -40,10 +40,10 @@ extension PureXML.XSLT {
                 }
             }
             let context = XSLTContext(node: root, position: 1, size: 1, variables: variables)
-            return .document(applyTemplates(to: [root], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
+            return .document(applyTemplates(to: [.tree(root)], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
-        fileprivate func bestTemplate(for node: PureXML.Model.TreeNode, mode: String?, below ceiling: Int = .max) -> Template? {
+        fileprivate func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max) -> Template? {
             stylesheet.templates.enumerated()
                 .filter { $0.element.mode == mode && $0.element.importPrecedence < ceiling && ($0.element.match.map { matches(node, $0) } ?? false) }
                 .max { lhs, rhs in
@@ -57,19 +57,40 @@ extension PureXML.XSLT {
             matchCache.nodes(matching: pattern, over: root).contains(ObjectIdentifier(node))
         }
 
+        /// Pattern membership for any XPath node kind.
+        func matches(_ node: PureXML.XPath.Node, _ pattern: String) -> Bool {
+            switch node {
+            case let .tree(tree):
+                matches(tree, pattern)
+            case let .attribute(owner, attribute):
+                matchCache.attributes(matching: pattern, over: root)
+                    .contains(PureXML.XSLT.AttributeIdentity(owner: ObjectIdentifier(owner), name: attribute.name.description))
+            case .namespace:
+                false
+            }
+        }
+
         fileprivate func applyTemplates(
-            to nodes: [PureXML.Model.TreeNode],
+            to nodes: [PureXML.XPath.Node],
             mode: String?,
             parameters: [Binding],
             _ context: XSLTContext,
         ) -> [ResultItem] {
             var items: [ResultItem] = []
-            for (offset, node) in nodes.enumerated() {
-                let nodeContext = XSLTContext(node: node, position: offset + 1, size: nodes.count, variables: context.variables, mode: mode)
-                if let template = bestTemplate(for: node, mode: mode) {
+            for (offset, xnode) in nodes.enumerated() {
+                guard let owner = Self.ownerNode(xnode) else { continue }
+                let nodeContext = XSLTContext(
+                    node: owner,
+                    current: xnode.treeNode == nil ? xnode : nil,
+                    position: offset + 1,
+                    size: nodes.count,
+                    variables: context.variables,
+                    mode: mode,
+                )
+                if let template = bestTemplate(for: xnode, mode: mode) {
                     items += instantiateTemplate(template, nodeContext, passing: parameters, from: context)
                 } else {
-                    items += builtInRule(node, mode: mode, nodeContext)
+                    items += builtInRule(xnode, mode: mode, nodeContext)
                 }
             }
             return items
@@ -95,14 +116,21 @@ extension PureXML.XSLT {
             return instantiate(template.body, context)
         }
 
-        private func builtInRule(_ node: PureXML.Model.TreeNode, mode: String?, _ context: XSLTContext) -> [ResultItem] {
-            switch node.kind {
-            case .element, .document:
-                applyTemplates(to: node.children, mode: mode, parameters: [], context)
-            case .text, .cdata:
-                [.node(.text(node.value))]
-            default:
-                []
+        private func builtInRule(_ xnode: PureXML.XPath.Node, mode: String?, _ context: XSLTContext) -> [ResultItem] {
+            switch xnode {
+            case let .tree(node):
+                switch node.kind {
+                case .element, .document:
+                    applyTemplates(to: node.children.map { .tree($0) }, mode: mode, parameters: [], context)
+                case .text, .cdata:
+                    [.node(.text(node.value))]
+                default:
+                    []
+                }
+            case let .attribute(_, attribute):
+                [.node(.text(attribute.value))]
+            case let .namespace(_, _, uri):
+                [.node(.text(uri))]
             }
         }
 
@@ -133,12 +161,12 @@ extension PureXML.XSLT {
         func value(_ expression: String, _ context: XSLTContext) -> PureXML.XPath.Value? {
             guard let query = try? PureXML.XPath.Query(expression) else { return nil }
             return try? query.value(
-                at: context.node,
+                atNode: context.focus,
                 position: context.position,
                 size: context.size,
                 variables: context.variables,
                 functions: PureXML.XSLT.Library.table(
-                    current: context.node,
+                    current: context.focus,
                     keys: keyIndex,
                     loader: documentLoader,
                     decimalFormats: stylesheet.decimalFormats,
@@ -151,6 +179,21 @@ extension PureXML.XSLT {
             value(expression, context)?.nodes?.compactMap(\.treeNode) ?? []
         }
 
+        /// Like `selectNodes` but keeping attribute and namespace nodes,
+        /// which templates apply to as well.
+        func selectXPathNodes(_ expression: String, _ context: XSLTContext) -> [PureXML.XPath.Node] {
+            value(expression, context)?.nodes ?? []
+        }
+
+        /// The element a context is built around for `xnode`: the node itself
+        /// when it is a tree node, otherwise its owner element.
+        static func ownerNode(_ xnode: PureXML.XPath.Node) -> PureXML.Model.TreeNode? {
+            switch xnode {
+            case let .tree(node): node
+            case let .attribute(owner, _), let .namespace(owner, _, _): owner
+            }
+        }
+
         fileprivate func string(_ expression: String, _ context: XSLTContext) -> String {
             // Raw-output markers do not survive string extraction (16.4:
             // escaping is disabled only for text written directly to the
@@ -158,7 +201,7 @@ extension PureXML.XSLT {
             PureXML.XSLT.RawText.stripped(value(expression, context)?.string ?? "")
         }
 
-        fileprivate func boolean(_ expression: String, _ context: XSLTContext) -> Bool {
+        func boolean(_ expression: String, _ context: XSLTContext) -> Bool {
             value(expression, context)?.boolean ?? false
         }
 
@@ -196,7 +239,7 @@ extension PureXML.XSLT.Transformer {
             [.node(.text(raw ? PureXML.XSLT.RawText.marked(string(select, context)) : string(select, context)))]
         case let .applyTemplates(select, mode, sorts, parameters):
             applyTemplates(
-                to: sorted(selectNodes(select ?? "node()", context), sorts),
+                to: sorted(selectXPathNodes(select ?? "node()", context), sorts),
                 mode: mode,
                 parameters: parameters,
                 context,
@@ -252,35 +295,10 @@ extension PureXML.XSLT.Transformer {
     /// only those below the current template's import precedence, falling back to
     /// the built-in rule when none match.
     private func applyImports(_ context: XSLTContext) -> [ResultItem] {
-        if let template = bestTemplate(for: context.node, mode: context.mode, below: context.importPrecedence) {
+        if let template = bestTemplate(for: context.focus, mode: context.mode, below: context.importPrecedence) {
             return instantiateTemplate(template, context, passing: [], from: context)
         }
-        return builtInRule(context.node, mode: context.mode, context)
-    }
-
-    private func forEach(
-        _ select: String,
-        _ sorts: [PureXML.XSLT.Sort],
-        _ body: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> [ResultItem] {
-        let nodes = sorted(selectNodes(select, context), sorts)
-        var items: [ResultItem] = []
-        for (offset, node) in nodes.enumerated() {
-            items += instantiate(body, XSLTContext(node: node, position: offset + 1, size: nodes.count, variables: context.variables))
-        }
-        return items
-    }
-
-    private func chooseInstruction(
-        _ whens: [PureXML.XSLT.Branch],
-        _ otherwise: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> [ResultItem] {
-        for branch in whens where boolean(branch.test, context) {
-            return instantiate(branch.body, context)
-        }
-        return instantiate(otherwise, context)
+        return builtInRule(context.focus, mode: context.mode, context)
     }
 
     private func callTemplate(_ name: String, _ parameters: [PureXML.XSLT.Binding], _ context: XSLTContext) -> [ResultItem] {
@@ -320,7 +338,10 @@ extension PureXML.XSLT.Transformer {
         var children: [PureXML.Model.Node] = []
         for item in instantiate(body, context) {
             switch item {
-            case let .attribute(attribute): attributes.append(attribute)
+            case let .attribute(attribute):
+                // Ignored once content has been added (the XSLT recovery for
+                // an attribute created after children).
+                if children.isEmpty { attributes.append(attribute) }
             case let .node(node): children.append(node)
             }
         }
@@ -348,37 +369,5 @@ extension PureXML.XSLT.Transformer {
             case let .expression(expression): result += string(expression, context)
             }
         }
-    }
-
-    private func sorted(_ nodes: [PureXML.Model.TreeNode], _ sorts: [PureXML.XSLT.Sort]) -> [PureXML.Model.TreeNode] {
-        guard !sorts.isEmpty else { return nodes }
-        return nodes.enumerated().sorted { lhs, rhs in
-            for sort in sorts {
-                let order = compareKeys(lhs.element, rhs.element, sort)
-                if order != 0 { return order < 0 }
-            }
-            return lhs.offset < rhs.offset
-        }.map(\.element)
-    }
-
-    private func compareKeys(_ lhs: PureXML.Model.TreeNode, _ rhs: PureXML.Model.TreeNode, _ sort: PureXML.XSLT.Sort) -> Int {
-        let left = keyValue(sort.select, lhs)
-        let right = keyValue(sort.select, rhs)
-        var order: Int
-        if sort.numeric {
-            let leftNumber = PureXML.XPath.Value.parseNumber(left)
-            let rightNumber = PureXML.XPath.Value.parseNumber(right)
-            order = leftNumber == rightNumber ? 0 : (leftNumber < rightNumber ? -1 : 1)
-        } else if let caseOrder = sort.caseOrder {
-            order = Self.caseInsensitiveCompare(left, right, caseOrder)
-        } else {
-            order = left == right ? 0 : (left < right ? -1 : 1)
-        }
-        return sort.descending ? -order : order
-    }
-
-    private func keyValue(_ expression: String, _ node: PureXML.Model.TreeNode) -> String {
-        guard let query = try? PureXML.XPath.Query(expression) else { return "" }
-        return (try? query.value(at: node).string) ?? ""
     }
 }

@@ -9,9 +9,18 @@ extension PureXML.XSLT {
     /// The evaluation context during instantiation.
     struct XSLTContext {
         var node: PureXML.Model.TreeNode
+        /// The current node when it is not a tree node (an attribute or
+        /// namespace node); `node` then holds its owner element.
+        var current: PureXML.XPath.Node?
         var position: Int
         var size: Int
         var variables: [String: PureXML.XPath.Value]
+
+        /// The XPath context node: `current` when set, else the tree node.
+        var focus: PureXML.XPath.Node {
+            current ?? .tree(node)
+        }
+
         /// The mode of the template currently being instantiated, so `apply-imports`
         /// re-applies in the same mode.
         var mode: String?
@@ -21,6 +30,7 @@ extension PureXML.XSLT {
 
         init(
             node: PureXML.Model.TreeNode,
+            current: PureXML.XPath.Node? = nil,
             position: Int,
             size: Int,
             variables: [String: PureXML.XPath.Value],
@@ -28,6 +38,7 @@ extension PureXML.XSLT {
             importPrecedence: Int = .max,
         ) {
             self.node = node
+            self.current = current
             self.position = position
             self.size = size
             self.variables = variables

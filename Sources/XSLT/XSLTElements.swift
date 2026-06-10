@@ -87,13 +87,29 @@ extension PureXML.XSLT.Transformer {
     }
 
     func copyInstruction(_ useAttributeSets: [String], _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
+        // A non-tree current node copies itself: an attribute node yields an
+        // attribute result, a namespace node its declaration.
+        if let current = context.current {
+            switch current {
+            case let .attribute(_, attribute):
+                return [.attribute(attribute)]
+            case let .namespace(_, prefix, uri):
+                return [.attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:" + prefix, uri))]
+            case .tree:
+                break
+            }
+        }
         switch context.node.kind {
         case .element:
-            [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
+            return [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
         case .text, .cdata:
-            [.node(.text(context.node.value))]
+            return [.node(.text(context.node.value))]
+        case .comment:
+            return [.node(.comment(context.node.value))]
+        case .processingInstruction:
+            return [.node(.processingInstruction(target: context.node.name?.description ?? "", data: context.node.value))]
         default:
-            instantiate(body, context)
+            return instantiate(body, context)
         }
     }
 }

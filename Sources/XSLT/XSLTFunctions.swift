@@ -178,14 +178,14 @@ extension PureXML.XSLT {
         /// The XSLT functions for an evaluation whose current node is `current`,
         /// reading the prebuilt `keys` index and the injected `document` loader.
         static func table(
-            current: PureXML.Model.TreeNode,
+            current: PureXML.XPath.Node,
             keys: KeyIndex,
             loader: @escaping (String) -> String?,
             decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
             documents: PureXML.XSLT.DocumentCache,
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
-                .adding("current") { _, _ in .nodeSet([.tree(current)]) }
+                .adding("current") { _, _ in .nodeSet([current]) }
                 .adding("format-number") { arguments, _ in
                     let name = arguments.count > 2 ? arguments[2].string : ""
                     return .string(FormatNumber.format(
