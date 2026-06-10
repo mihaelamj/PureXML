@@ -19,26 +19,37 @@ extension PureXML.XSLT {
         private var matched: [String: PatternMatches] = [:]
 
         /// The identities of the tree nodes `pattern` selects over `root`.
-        func nodes(matching pattern: String, over root: PureXML.Model.TreeNode, functions: PureXML.XPath.FunctionTable = .init()) -> Set<ObjectIdentifier> {
-            compute(pattern, root, functions).trees
+        func nodes(
+            matching pattern: String,
+            over root: PureXML.Model.TreeNode,
+            functions: PureXML.XPath.FunctionTable = .init(),
+            namespaces: [String: String] = [:],
+        ) -> Set<ObjectIdentifier> {
+            compute(pattern, root, functions, namespaces).trees
         }
 
         /// The identities of the attribute nodes `pattern` selects over `root`.
-        func attributes(matching pattern: String, over root: PureXML.Model.TreeNode, functions: PureXML.XPath.FunctionTable = .init()) -> Set<AttributeIdentity> {
-            compute(pattern, root, functions).attributes
+        func attributes(
+            matching pattern: String,
+            over root: PureXML.Model.TreeNode,
+            functions: PureXML.XPath.FunctionTable = .init(),
+            namespaces: [String: String] = [:],
+        ) -> Set<AttributeIdentity> {
+            compute(pattern, root, functions, namespaces).attributes
         }
 
         /// Computed and cached on first use; a branch that fails to compile
         /// selects nothing. The function table makes `key()` and `id()`
-        /// patterns work.
-        private func compute(_ pattern: String, _ root: PureXML.Model.TreeNode, _ functions: PureXML.XPath.FunctionTable) -> PatternMatches {
-            if let cached = matched[pattern] { return cached }
+        /// patterns work; the bindings resolve prefixed name tests by URI.
+        private func compute(_ pattern: String, _ root: PureXML.Model.TreeNode, _ functions: PureXML.XPath.FunctionTable, _ namespaces: [String: String]) -> PatternMatches {
+            let key = pattern + "\u{1}" + namespaces.sorted(by: { $0.key < $1.key }).map { $0.key + "=" + $0.value }.joined(separator: ";")
+            if let cached = matched[key] { return cached }
             var result = PatternMatches()
             for branch in pattern.split(separator: "|") {
                 let trimmed = branch.trimmingXMLWhitespace()
                 let path = trimmed.hasPrefix("/") || trimmed.hasPrefix("key(") || trimmed.hasPrefix("id(") ? trimmed : "//" + trimmed
                 guard let query = try? PureXML.XPath.Query(path),
-                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: [:], functions: functions),
+                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: [:], functions: functions, namespaces: namespaces),
                       let selected = value.nodes
                 else { continue }
                 for node in selected {
@@ -52,7 +63,7 @@ extension PureXML.XSLT {
                     }
                 }
             }
-            matched[pattern] = result
+            matched[key] = result
             return result
         }
     }

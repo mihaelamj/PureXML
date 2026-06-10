@@ -197,6 +197,7 @@ extension PureXML.XSLT {
                 importPrecedence: precedence,
                 parameters: parameters,
                 body: body,
+                namespaces: inScopeNamespaces(node).filter { !$0.key.isEmpty },
             )
         }
 

@@ -45,7 +45,10 @@ extension PureXML.XSLT {
 
         fileprivate func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max) -> Template? {
             stylesheet.templates.enumerated()
-                .filter { $0.element.mode == mode && $0.element.importPrecedence < ceiling && ($0.element.match.map { matches(node, $0) } ?? false) }
+                .filter { entry in
+                    entry.element.mode == mode && entry.element.importPrecedence < ceiling
+                        && (entry.element.match.map { matches(node, $0, entry.element.namespaces) } ?? false)
+                }
                 .max { lhs, rhs in
                     (lhs.element.importPrecedence, lhs.element.priority, lhs.offset)
                         < (rhs.element.importPrecedence, rhs.element.priority, rhs.offset)
@@ -53,17 +56,17 @@ extension PureXML.XSLT {
                 .element
         }
 
-        func matches(_ node: PureXML.Model.TreeNode, _ pattern: String) -> Bool {
-            matchCache.nodes(matching: pattern, over: root, functions: patternFunctions()).contains(ObjectIdentifier(node))
+        func matches(_ node: PureXML.Model.TreeNode, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
+            matchCache.nodes(matching: pattern, over: root, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
         }
 
         /// Pattern membership for any XPath node kind.
-        func matches(_ node: PureXML.XPath.Node, _ pattern: String) -> Bool {
+        func matches(_ node: PureXML.XPath.Node, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
             switch node {
             case let .tree(tree):
-                matches(tree, pattern)
+                matches(tree, pattern, namespaces)
             case let .attribute(owner, attribute):
-                matchCache.attributes(matching: pattern, over: root, functions: patternFunctions())
+                matchCache.attributes(matching: pattern, over: root, functions: patternFunctions(), namespaces: namespaces)
                     .contains(PureXML.XSLT.AttributeIdentity(owner: ObjectIdentifier(owner), name: attribute.name.description))
             case .namespace:
                 false
@@ -118,6 +121,7 @@ extension PureXML.XSLT {
         ) -> [ResultItem] {
             var context = context
             context.importPrecedence = template.importPrecedence
+            context.namespaces = template.namespaces
             for parameter in template.parameters {
                 if let passed = parameters.first(where: { $0.name == parameter.name }) {
                     context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
@@ -184,6 +188,7 @@ extension PureXML.XSLT {
                     decimalFormats: stylesheet.decimalFormats,
                     documents: documentCache,
                 ),
+                namespaces: context.namespaces,
             )
         }
 

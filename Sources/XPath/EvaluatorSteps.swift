@@ -99,11 +99,17 @@ extension PureXML.XPath.Evaluator {
     /// local name; otherwise it falls back to the in-document prefix string (the
     /// behavior when no bindings are supplied).
     private static func qualifiedMatches(_ qualified: PureXML.Model.QualifiedName, _ name: String, _ namespaces: [String: String]) -> Bool {
-        if !namespaces.isEmpty, let colon = name.firstIndex(of: ":") {
-            let prefix = String(name[..<colon])
-            if let uri = namespaces[prefix] {
-                let local = String(name[name.index(after: colon)...])
-                return qualified.localName == local && (qualified.namespaceURI ?? "") == uri
+        if !namespaces.isEmpty {
+            if let colon = name.firstIndex(of: ":") {
+                let prefix = String(name[..<colon])
+                if let uri = namespaces[prefix] {
+                    let local = String(name[name.index(after: colon)...])
+                    return qualified.localName == local && (qualified.namespaceURI ?? "") == uri
+                }
+            } else {
+                // With bindings supplied, the XPath 1.0 rule applies exactly:
+                // an unprefixed name test selects the null namespace.
+                return qualified.localName == name && (qualified.namespaceURI ?? "").isEmpty
             }
         }
         return qualified.description == name || qualified.localName == name

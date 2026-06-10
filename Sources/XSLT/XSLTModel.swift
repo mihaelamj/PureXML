@@ -231,6 +231,9 @@ public extension PureXML.XSLT {
         public var importPrecedence: Int
         public var parameters: [Binding]
         public var body: [Instruction]
+        /// The stylesheet xmlns bindings in scope at the template, for
+        /// resolving prefixes in its match pattern and expressions.
+        public var namespaces: [String: String] = [:]
     }
 
     /// A compiled stylesheet: its template rules, global variables, keys, output

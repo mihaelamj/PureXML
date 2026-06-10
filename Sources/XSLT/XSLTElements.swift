@@ -61,7 +61,7 @@ extension PureXML.XSLT.Transformer {
             } else if let uri = namespaces[prefix] {
                 name = PureXML.Model.QualifiedName(prefix: prefix, localName: name.localName, namespaceURI: uri)
             }
-        } else if !isAttribute, let defaultURI = namespaces[""] {
+        } else if !isAttribute, let defaultURI = namespaces[""], !defaultURI.isEmpty {
             name = PureXML.Model.QualifiedName(prefix: nil, localName: name.localName, namespaceURI: defaultURI)
         }
         return name
@@ -70,6 +70,13 @@ extension PureXML.XSLT.Transformer {
     func elementInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
         guard case let .element(nameTemplate, namespaceTemplate, namespaces, useAttributeSets, body) = instruction else {
             return []
+        }
+        let raw = avt(nameTemplate, context)
+        let parts = raw.split(separator: ":", omittingEmptySubsequences: false)
+        if raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2 {
+            // An unusable element name: the recovery is to emit the content
+            // without the wrapper element.
+            return instantiate(body, context).filter { if case .attribute = $0 { false } else { true } }
         }
         let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: false)
         return [buildElement(name: name, literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]

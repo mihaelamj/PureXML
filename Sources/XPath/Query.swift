@@ -95,6 +95,7 @@ public extension PureXML.XPath {
             size: Int,
             variables: [String: Value],
             functions: FunctionTable,
+            namespaces: [String: String] = [:],
         ) throws -> Value {
             try Evaluator.value(
                 expression,
@@ -103,6 +104,7 @@ public extension PureXML.XPath {
                 size: size,
                 variables: variables,
                 functions: functions,
+                namespaces: namespaces,
             )
         }
 

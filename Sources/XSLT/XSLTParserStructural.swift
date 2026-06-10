@@ -48,9 +48,11 @@ extension PureXML.XSLT.XSLTParser {
         var bindings: [String: String] = [:]
         var current: XSLTTree? = node
         while let candidate = current {
-            for attribute in candidate.attributes where attribute.name.prefix == "xmlns" {
-                if bindings[attribute.name.localName] == nil {
+            for attribute in candidate.attributes {
+                if attribute.name.prefix == "xmlns", bindings[attribute.name.localName] == nil {
                     bindings[attribute.name.localName] = attribute.value
+                } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns", bindings[""] == nil {
+                    bindings[""] = attribute.value
                 }
             }
             current = candidate.parent
@@ -64,12 +66,6 @@ extension PureXML.XSLT.XSLTParser {
     /// and `extension-element-prefixes` in scope.
     static func copiedNamespaces(_ node: XSLTTree) -> [String: String] {
         var bindings = inScopeNamespaces(node)
-        var current: XSLTTree? = node
-        while let candidate = current {
-            let defaults = candidate.attributes.filter { $0.name.prefix == nil && $0.name.localName == "xmlns" }
-            if bindings[""] == nil, let declared = defaults.first { bindings[""] = declared.value }
-            current = candidate.parent
-        }
         var excludedURIs: Set<String> = [XSLTNode.namespace]
         for prefix in excludedPrefixTokens(node) {
             let key = prefix == "#default" ? "" : prefix
