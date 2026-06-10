@@ -37,7 +37,10 @@ public extension PureXML.Parsing.ParseError {
         case let .unexpectedEndOfInput(mark), let .unterminatedTag(mark), let .unterminatedComment(mark),
              let .unterminatedCDATA(mark), let .expectedName(mark), let .expectedEquals(mark),
              let .unquotedAttributeValue(mark), let .amplificationLimitExceeded(mark),
-             let .junkAfterDocumentElement(mark), let .unsupportedDoctype(mark), let .malformedDeclaration(mark):
+             let .junkAfterDocumentElement(mark), let .unsupportedDoctype(mark), let .malformedDeclaration(mark),
+             let .doubleHyphenInComment(mark), let .rawLessThanInAttribute(mark),
+             let .cdataCloseInContent(mark), let .missingSpaceBeforeAttribute(mark),
+             let .invalidCharacter(mark):
             mark
         case let .unexpectedCharacter(_, mark), let .mismatchedEndTag(_, _, mark),
              let .duplicateAttribute(_, mark), let .invalidReference(_, mark),

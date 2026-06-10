@@ -34,6 +34,17 @@ public extension PureXML.Parsing {
         /// The XML declaration `<?xml ... ?>` is malformed: its pseudo-attributes
         /// are out of order, unknown, or carry an illegal value.
         case malformedDeclaration(Mark)
+        /// A comment contains `--`, which XML 1.0 forbids inside comments.
+        case doubleHyphenInComment(Mark)
+        /// An attribute value contains a raw `<`, which must be escaped.
+        case rawLessThanInAttribute(Mark)
+        /// Character data contains the literal `]]>` sequence, which must be
+        /// escaped outside a CDATA section.
+        case cdataCloseInContent(Mark)
+        /// Two attributes are not separated by whitespace.
+        case missingSpaceBeforeAttribute(Mark)
+        /// A character outside the XML `Char` production appears in content.
+        case invalidCharacter(Mark)
 
         public var description: String {
             switch self {
@@ -85,6 +96,16 @@ public extension PureXML.Parsing {
                 "input bytes are malformed for the detected encoding"
             case let .notImplemented(detail):
                 "not implemented: \(detail)"
+            case let .doubleHyphenInComment(mark):
+                "'--' is not allowed inside a comment at \(mark)"
+            case let .rawLessThanInAttribute(mark):
+                "raw '<' is not allowed in an attribute value at \(mark)"
+            case let .cdataCloseInContent(mark):
+                "']]>' must be escaped in character data at \(mark)"
+            case let .missingSpaceBeforeAttribute(mark):
+                "attributes must be separated by whitespace at \(mark)"
+            case let .invalidCharacter(mark):
+                "character is not allowed in XML content at \(mark)"
             case let .malformedDeclaration(mark):
                 "malformed XML declaration at \(mark)"
             }

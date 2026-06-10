@@ -55,6 +55,11 @@ extension PureXML.Parsing.EventReader {
             }
             length += 1
             try checkContent(length, mark)
+            // XML 1.0: '--' may not appear inside a comment (this also rejects
+            // the '--->' ending, since its first two hyphens hit this check).
+            if character == "-", reader.peek() == "-" {
+                throw PureXML.Parsing.ParseError.doubleHyphenInComment(mark)
+            }
             content.append(character)
         }
         reader.consume("-->")

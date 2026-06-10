@@ -23,14 +23,14 @@ public extension PureXML.Parsing {
         /// The parsed XML declaration `<?xml ... ?>`, when the document opens with
         /// one; nil otherwise.
         var xmlDeclaration: XMLDeclaration?
-        private var entityBudget: Int
+        var entityBudget: Int
 
         var pending: [Event] = []
         private var sawRoot = false
         private var primed = false
         /// When true, ``next()`` repairs malformed input in place instead of
         /// throwing: it records a ``Diagnostic`` and emits best-effort events.
-        private let recovering: Bool
+        let recovering: Bool
         var reachedEnd = false
         /// The problems found so far, when reading in recovering mode.
         var diagnostics: [Diagnostic] = []
@@ -202,6 +202,12 @@ public extension PureXML.Parsing {
             while let character = reader.peek(), character != "<" {
                 length += 1
                 try checkContent(length, mark)
+                if character == ">", raw.hasSuffix("]]") {
+                    throw ParseError.cdataCloseInContent(reader.mark)
+                }
+                guard character.unicodeScalars.allSatisfy(XMLCharacter.isChar) else {
+                    throw ParseError.invalidCharacter(reader.mark)
+                }
                 raw.append(character)
                 reader.advance()
             }
@@ -227,56 +233,7 @@ public extension PureXML.Parsing {
             return (target.description, data)
         }
 
-        private mutating func scanAttributes() throws -> [PureXML.Model.Attribute] {
-            var attributes: [PureXML.Model.Attribute] = []
-            var seen: Set<String> = []
-            while true {
-                reader.skipSpace()
-                guard let next = reader.peek(), next != ">", next != "/" else {
-                    return attributes
-                }
-                let mark = reader.mark
-                let name = try scanName()
-                reader.skipSpace()
-                guard reader.consume("=") else {
-                    throw ParseError.expectedEquals(reader.mark)
-                }
-                reader.skipSpace()
-                let value = try scanAttributeValue()
-                guard seen.insert(name.description).inserted else {
-                    if recovering {
-                        // Keep the element: record the duplicate and drop the later
-                        // occurrence rather than failing the whole start tag.
-                        diagnostics.append(Diagnostic(.duplicateAttribute(name: name.description, mark)))
-                        continue
-                    }
-                    throw ParseError.duplicateAttribute(name: name.description, mark)
-                }
-                attributes.append(PureXML.Model.Attribute(name: name, value: value))
-            }
-        }
-
-        private mutating func scanAttributeValue() throws -> String {
-            let mark = reader.mark
-            guard let quote = reader.peek(), quote == "\"" || quote == "'" else {
-                throw ParseError.unquotedAttributeValue(reader.mark)
-            }
-            reader.advance()
-            var raw = ""
-            var length = 0
-            while let character = reader.peek(), character != quote {
-                length += 1
-                try checkContent(length, mark)
-                raw.append(character)
-                reader.advance()
-            }
-            guard reader.consume(String(quote)) else {
-                throw ParseError.unexpectedEndOfInput(reader.mark)
-            }
-            return try EntityDecoder.decode(raw, entities: documentType.entities, budget: &entityBudget, at: mark)
-        }
-
-        private mutating func scanName() throws -> PureXML.Model.QualifiedName {
+        mutating func scanName() throws -> PureXML.Model.QualifiedName {
             let mark = reader.mark
             guard let first = reader.peek(), first.isXMLNameStart else {
                 throw ParseError.expectedName(reader.mark)
