@@ -48,6 +48,8 @@ public extension PureXML.Parsing {
         /// A processing instruction uses the reserved target `xml` (any case),
         /// which is only legal as the document's XML declaration.
         case reservedProcessingInstructionTarget(Mark)
+        /// An `<!ELEMENT>` content model does not match the XML 1.0 grammar.
+        case invalidContentModel(element: String, Mark)
 
         public var description: String {
             switch self {
@@ -111,6 +113,8 @@ public extension PureXML.Parsing {
                 "character is not allowed in XML content at \(mark)"
             case let .reservedProcessingInstructionTarget(mark):
                 "the processing-instruction target 'xml' is reserved at \(mark)"
+            case let .invalidContentModel(element, mark):
+                "the content model of <!ELEMENT \(element)> is malformed at \(mark)"
             case let .malformedDeclaration(mark):
                 "malformed XML declaration at \(mark)"
             }

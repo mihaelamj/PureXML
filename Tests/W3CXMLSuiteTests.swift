@@ -29,11 +29,9 @@ struct W3CXMLSuiteTests {
         "079.xml", "080.xml", "082.xml", "084.xml", "085.xml", "086.xml", "087.xml", "089.xml",
         "090.xml", "091.xml", "092.xml", "096.xml", "101.xml", "102.xml", "103.xml", "107.xml",
         "113.xml", "114.xml", "115.xml", "116.xml", "117.xml", "119.xml", "120.xml", "121.xml",
-        "122.xml", "123.xml", "124.xml", "125.xml", "126.xml", "127.xml", "128.xml", "129.xml",
-        "130.xml", "131.xml", "132.xml", "133.xml", "134.xml", "135.xml", "136.xml", "137.xml",
-        "138.xml", "139.xml", "140.xml", "141.xml", "149.xml", "153.xml", "158.xml", "160.xml",
-        "161.xml", "162.xml", "165.xml", "168.xml", "169.xml", "170.xml", "173.xml", "174.xml",
-        "175.xml", "180.xml", "182.xml", "183.xml", "184.xml",
+        "140.xml", "141.xml", "149.xml", "153.xml", "158.xml", "160.xml", "161.xml", "162.xml",
+        "165.xml", "168.xml", "169.xml", "170.xml", "173.xml", "174.xml", "175.xml", "180.xml",
+        "182.xml",
     ]
 
     /// valid/sa/114.xml: a CDATA section inside an entity value must protect

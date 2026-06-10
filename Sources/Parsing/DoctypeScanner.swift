@@ -112,7 +112,7 @@ private struct DTDScanner {
             } else if reader.matches("<![") {
                 try scanConditionalSection(&reader, depth: depth, at: mark)
             } else {
-                scanMarkupDeclaration(&reader)
+                try scanMarkupDeclaration(&reader)
             }
         }
     }
@@ -159,11 +159,11 @@ private struct DTDScanner {
         return body
     }
 
-    private mutating func scanMarkupDeclaration(_ reader: inout Reader) {
+    private mutating func scanMarkupDeclaration(_ reader: inout Reader) throws {
         if reader.matches("<!ENTITY") {
             scanEntityDeclaration(&reader)
         } else if reader.matches("<!ELEMENT") {
-            scanElementDeclaration(&reader)
+            try scanElementDeclaration(&reader)
         } else if reader.matches("<!ATTLIST") {
             scanAttributeListDeclaration(&reader)
         } else if reader.matches("<!NOTATION") {
@@ -266,14 +266,24 @@ private struct DTDScanner {
         }
     }
 
-    private mutating func scanElementDeclaration(_ reader: inout Reader) {
+    private mutating func scanElementDeclaration(_ reader: inout Reader) throws {
+        let mark = reader.mark
         reader.consume("<!ELEMENT")
+        guard reader.peek()?.isWhitespace == true else {
+            throw PureXML.Parsing.ParseError.invalidContentModel(element: "", mark)
+        }
         reader.skipSpace()
         let name = scanName(&reader)
+        guard reader.peek()?.isWhitespace == true else {
+            throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
+        }
         reader.skipSpace()
-        let model = expandParameterReferences(readUntilClose(&reader))
+        let model = expandParameterReferences(readUntilClose(&reader)).trimmingXMLWhitespace()
+        guard PureXML.Parsing.DTDContentModelGrammar.isValid(model) else {
+            throw PureXML.Parsing.ParseError.invalidContentModel(element: name, mark)
+        }
         guard !name.isEmpty, doctype.elementModels[name] == nil else { return }
-        doctype.elementModels[name] = model.trimmingXMLWhitespace()
+        doctype.elementModels[name] = model
     }
 
     private mutating func scanAttributeListDeclaration(_ reader: inout Reader) {
