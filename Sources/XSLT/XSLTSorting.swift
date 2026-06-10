@@ -109,4 +109,26 @@ extension PureXML.XSLT.Transformer {
         }
         return []
     }
+
+    /// Binds the template's parameters (a passed `with-param` wins over the
+    /// declared default) and instantiates its body.
+    func instantiateTemplate(
+        _ template: PureXML.XSLT.Template,
+        _ context: XSLTContext,
+        passing parameters: [PureXML.XSLT.Binding],
+        from caller: XSLTContext,
+    ) -> [ResultItem] {
+        var context = context
+        context.importPrecedence = template.importPrecedence
+        context.importRangeLow = template.importRangeLow
+        context.namespaces = template.namespaces
+        for parameter in template.parameters {
+            if let passed = parameters.first(where: { $0.name == parameter.name }) {
+                context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
+            } else {
+                context.variables[parameter.name] = variableValue(parameter.select, parameter.body, context)
+            }
+        }
+        return instantiate(template.body, context)
+    }
 }

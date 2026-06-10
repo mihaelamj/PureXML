@@ -13,9 +13,15 @@ public extension PureXML.XSLT {
     ) throws -> String {
         let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
-        let root = try PureXML.parseTree(source, limits: .init(allowDoctype: true), resolver: PureXML.XSLT.loaderResolver(documentLoader))
+        let parsed = try PureXML.Parsing.Parser().parseWithDocumentType(
+            source,
+            limits: .init(allowDoctype: true),
+            resolver: PureXML.XSLT.loaderResolver(documentLoader),
+        )
+        let root = PureXML.Model.TreeNode(parsed.node)
+        let idAttributes = PureXML.XSLT.declaredIDAttributes(parsed.documentType)
         Whitespace.strip(root, stylesheet: sheet)
-        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader)
+        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader, idAttributes: idAttributes)
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         let method = sheet.output.method ?? defaultMethod(for: result)

@@ -154,4 +154,34 @@ struct XSLTCompositionTests {
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: source)
             == "<out><inner xmlns:a=\"urn:a\" xmlns:b=\"urn:b\"/></out>")
     }
+
+    @Test("id() resolves only DTD-declared ID attributes; no DTD means no IDs")
+    func test_idRequiresDTD() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:value-of select="id('c')"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let withDTD = """
+        <!DOCTYPE doc [<!ELEMENT doc (e*)> <!ELEMENT e (#PCDATA)> <!ATTLIST e id ID #IMPLIED>]>
+        <doc><e id="b">no</e><e id="c">yes</e></doc>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: withDTD) == "<out>yes</out>")
+        let withoutDTD = "<doc><e id=\"c\">yes</e></doc>"
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: withoutDTD) == "<out></out>")
+    }
+
+    @Test("generate-id() is non-empty and distinct for attribute and namespace nodes")
+    func test_generateIDNodeKinds() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="text"/>
+          <xsl:template match="/">
+            <xsl:if test="generate-id(//e) != '' and generate-id(//e/@a) != '' and generate-id(//e/@a) != generate-id(//e)">distinct</xsl:if>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<r><e a=\"1\"/></r>") == "distinct")
+    }
 }

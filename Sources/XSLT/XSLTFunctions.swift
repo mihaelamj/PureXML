@@ -218,50 +218,22 @@ extension PureXML.XSLT {
                     }
                     return .nodeSet(references.flatMap { documentReference($0, loader, documents) })
                 }
+                .adding("id") { arguments, context in
+                    idLookup(arguments, context, documents)
+                }
                 .adding("generate-id") { arguments, context in
                     // No argument uses the context node; an explicit empty node-set
-                    // is the empty string, per the XSLT definition.
-                    let node = arguments.isEmpty ? context.node.treeNode : arguments.first?.nodes?.first?.treeNode
+                    // is the empty string, per the XSLT definition. Attribute and
+                    // namespace nodes get IDs through their identity hash (owner
+                    // plus name), distinct from every tree node's.
+                    let node: PureXML.XPath.Node? = arguments.isEmpty ? context.node : arguments.first?.nodes?.first
                     guard let node else { return .string("") }
-                    return .string("N\(UInt(bitPattern: ObjectIdentifier(node).hashValue))")
+                    return .string("N\(UInt(bitPattern: node.hashValue))")
                 }
                 .adding("system-property") { arguments, _ in systemProperty(arguments.first?.string ?? "") }
                 .adding("element-available") { arguments, _ in .boolean(instructionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("function-available") { arguments, _ in .boolean(functionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("unparsed-entity-uri") { _, _ in .string("") }
-        }
-
-        /// The `key()` implementation: the index belongs to the current
-        /// node's document; a node-set second argument unions the matches for
-        /// each member's string value; results come back in document order.
-        private static func keyLookup(
-            _ arguments: [PureXML.XPath.Value],
-            _ context: PureXML.XPath.EvaluationContext,
-            _ keys: (PureXML.Model.TreeNode) -> KeyIndex,
-        ) -> PureXML.XPath.Value {
-            let name = arguments.first?.string ?? ""
-            guard arguments.count > 1 else { return .nodeSet([]) }
-            let values: [String] = if let nodes = arguments[1].nodes {
-                nodes.map(\.stringValue)
-            } else {
-                [arguments[1].string]
-            }
-            let owner: PureXML.Model.TreeNode? = switch context.node {
-            case let .tree(tree): tree
-            case let .attribute(treeOwner, _), let .namespace(treeOwner, _, _): treeOwner
-            }
-            guard var documentRoot = owner else { return .nodeSet([]) }
-            while let parent = documentRoot.parent {
-                documentRoot = parent
-            }
-            let index = keys(documentRoot)
-            var matched: [PureXML.Model.TreeNode] = []
-            for value in values {
-                for node in index[name]?[value] ?? [] where !matched.contains(where: { $0 === node }) {
-                    matched.append(node)
-                }
-            }
-            return .nodeSet(matched.map { PureXML.XPath.Node.tree($0) }.sorted(by: PureXML.XPath.Node.precedes))
         }
 
         /// Loads one `document()` reference: the whole document, or, when the

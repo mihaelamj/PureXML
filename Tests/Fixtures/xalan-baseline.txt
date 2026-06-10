@@ -31,8 +31,6 @@ expression/expression02
 extend/extend01
 extend/extend02
 extend/extend04
-idkey/idkey09
-idkey/idkey30
 idkey/idkey31
 idkey/idkey43
 idkey/idkey45

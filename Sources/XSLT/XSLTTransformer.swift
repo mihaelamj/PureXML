@@ -24,10 +24,18 @@ extension PureXML.XSLT {
             termination.message
         }
 
-        init(stylesheet: Stylesheet, root: PureXML.Model.TreeNode, documentLoader: @escaping (String) -> String? = { _ in nil }) {
+        init(
+            stylesheet: Stylesheet,
+            root: PureXML.Model.TreeNode,
+            documentLoader: @escaping (String) -> String? = { _ in nil },
+            idAttributes: [String: Set<String>] = [:],
+        ) {
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
+            if !idAttributes.isEmpty {
+                documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
+            }
             // One table for all pattern matching: matches() runs per
             // (template, node) during template selection, so a fresh table
             // per call would be allocated millions of times on large inputs.
@@ -140,28 +148,6 @@ extension PureXML.XSLT {
             return items
         }
 
-        /// Binds the template's parameters (a passed `with-param` wins over the
-        /// declared default) and instantiates its body.
-        fileprivate func instantiateTemplate(
-            _ template: Template,
-            _ context: XSLTContext,
-            passing parameters: [Binding],
-            from caller: XSLTContext,
-        ) -> [ResultItem] {
-            var context = context
-            context.importPrecedence = template.importPrecedence
-            context.importRangeLow = template.importRangeLow
-            context.namespaces = template.namespaces
-            for parameter in template.parameters {
-                if let passed = parameters.first(where: { $0.name == parameter.name }) {
-                    context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
-                } else {
-                    context.variables[parameter.name] = variableValue(parameter.select, parameter.body, context)
-                }
-            }
-            return instantiate(template.body, context)
-        }
-
         func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
@@ -179,7 +165,7 @@ extension PureXML.XSLT {
             return items
         }
 
-        private func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
+        func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
             if let select { return value(select, context) ?? .string("") }
             // A body variable is a result-tree fragment: a queryable document node.
             let children = instantiate(body, context).compactMap(Self.nodeOf).map(PureXML.Model.TreeNode.init)

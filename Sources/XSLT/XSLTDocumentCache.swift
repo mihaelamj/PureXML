@@ -29,5 +29,22 @@ extension PureXML.XSLT {
     final class DocumentCache {
         var trees: [String: PureXML.Model.TreeNode] = [:]
         var sources: [String: PureXML.Model.Node] = [:]
+        /// DTD-declared ID attributes per document root identity: element
+        /// name to the names of its ID-typed attributes. A document with no
+        /// entry has no IDs (the XPath id() definition needs the DTD).
+        var idAttributes: [ObjectIdentifier: [String: Set<String>]] = [:]
+    }
+
+    /// The ID-typed attributes a document type declares, element name to
+    /// attribute names (XPath id() resolves through these).
+    static func declaredIDAttributes(_ documentType: PureXML.Parsing.DocumentType) -> [String: Set<String>] {
+        var declared: [String: Set<String>] = [:]
+        for (element, body) in documentType.attributeLists {
+            let names = PureXML.Validation.AttributeListParser.parse(body)
+                .filter { $0.type == .id }
+                .map(\.name)
+            if !names.isEmpty { declared[element, default: []].formUnion(names) }
+        }
+        return declared
     }
 }
