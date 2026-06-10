@@ -15,8 +15,10 @@ extension PureXML.XPath {
         var functions: FunctionTable
         /// Prefix-to-URI bindings supplied at evaluation time, so a name test like
         /// `x:foo` resolves `x` to a URI and matches by namespace rather than by the
-        /// document's own prefix. Empty by default, in which case matching falls
-        /// back to the in-document prefix string.
+        /// document's own prefix. When any bindings are supplied the XPath 1.0
+        /// rule applies exactly: an unprefixed name test selects only the null
+        /// namespace. Empty by default, in which case matching falls back to
+        /// the in-document prefix string.
         var namespaces: [String: String] = [:]
 
         /// A copy positioned on `node` at one-based `position` within a node-set of
