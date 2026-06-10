@@ -7,27 +7,26 @@ extension PureXML.Parsing.ByteDecoder {
     enum EUCTW {
         static func decode(_ bytes: ArraySlice<UInt8>) -> String {
             var scalars = String.UnicodeScalarView()
-            let array = Array(bytes)
-            var index = 0
-            while index < array.count {
-                let byte = array[index]
+            var index = bytes.startIndex
+            while index < bytes.endIndex {
+                let byte = bytes[index]
                 if byte <= 0x7F {
                     scalars.append(Unicode.Scalar(byte))
                     index += 1
                 } else if byte == 0x8E {
-                    guard index + 3 < array.count else { scalars.append("\u{FFFD}")
+                    guard index + 3 < bytes.endIndex else { scalars.append("\u{FFFD}")
                         index += 1
                         continue
                     }
-                    scalars.append(fourByteScalar(array[index + 1], array[index + 2], array[index + 3]) ?? "\u{FFFD}")
+                    scalars.append(fourByteScalar(bytes[index + 1], bytes[index + 2], bytes[index + 3]) ?? "\u{FFFD}")
                     index += 4
                 } else if (0xA1 ... 0xFE).contains(byte) {
-                    guard index + 1 < array.count, (0xA1 ... 0xFE).contains(array[index + 1]) else {
+                    guard index + 1 < bytes.endIndex, (0xA1 ... 0xFE).contains(bytes[index + 1]) else {
                         scalars.append("\u{FFFD}")
                         index += 1
                         continue
                     }
-                    scalars.append(planeScalar(eucTWPlane1, byte, array[index + 1]) ?? "\u{FFFD}")
+                    scalars.append(planeScalar(eucTWPlane1, byte, bytes[index + 1]) ?? "\u{FFFD}")
                     index += 2
                 } else {
                     scalars.append("\u{FFFD}")

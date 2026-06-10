@@ -29,6 +29,11 @@ extension PureXML.Parsing {
 
 /// Carries the mutable state of one decode pass (output and remaining budget) so
 /// the recursive expansion stays a few small methods. File-scope and private.
+///
+/// Two independent bounds defend against expansion attacks: the character
+/// `budget` caps total output, and the `visiting` set caps recursion depth,
+/// since each entity name may appear at most once per chain, the expansion
+/// depth is bounded by the number of declared entities (a cycle is an error).
 private struct EntityExpander {
     let entities: [String: String]
     let mark: PureXML.Parsing.Mark

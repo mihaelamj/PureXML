@@ -8,13 +8,12 @@ extension PureXML.Parsing.ByteDecoder {
             var scalars = String.UnicodeScalarView()
             var mode: ISO2022JPMode = .ascii
             var lead: UInt8?
-            let array = Array(bytes)
-            var index = 0
-            while index < array.count {
-                let byte = array[index]
+            var index = bytes.startIndex
+            while index < bytes.endIndex {
+                let byte = bytes[index]
                 index += 1
                 if byte == 0x1B {
-                    mode = applyEscape(array, &index, into: &scalars) ?? mode
+                    mode = applyEscape(bytes, &index, into: &scalars) ?? mode
                     lead = nil
                     continue
                 }
@@ -26,16 +25,16 @@ extension PureXML.Parsing.ByteDecoder {
 
         /// Reads the bytes after an escape and returns the new mode, or nil (with a
         /// replacement emitted) for an unrecognized sequence.
-        private static func applyEscape(_ array: [UInt8], _ index: inout Int, into scalars: inout String.UnicodeScalarView) -> ISO2022JPMode? {
-            guard index < array.count else { scalars.append("\u{FFFD}")
+        private static func applyEscape(_ bytes: ArraySlice<UInt8>, _ index: inout Int, into scalars: inout String.UnicodeScalarView) -> ISO2022JPMode? {
+            guard index < bytes.endIndex else { scalars.append("\u{FFFD}")
                 return nil
             }
-            let first = array[index]
+            let first = bytes[index]
             index += 1
-            guard index < array.count else { scalars.append("\u{FFFD}")
+            guard index < bytes.endIndex else { scalars.append("\u{FFFD}")
                 return nil
             }
-            let second = array[index]
+            let second = bytes[index]
             index += 1
             switch (first, second) {
             case (0x28, 0x42): return .ascii // ESC ( B

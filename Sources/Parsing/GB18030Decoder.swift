@@ -7,10 +7,9 @@ extension PureXML.Parsing.ByteDecoder {
     enum GB18030 {
         static func decode(_ bytes: ArraySlice<UInt8>) -> String {
             var scalars = String.UnicodeScalarView()
-            let arr = Array(bytes)
-            var index = 0
-            while index < arr.count {
-                let byte = arr[index]
+            var index = bytes.startIndex
+            while index < bytes.endIndex {
+                let byte = bytes[index]
                 if byte <= 0x7F {
                     scalars.append(Unicode.Scalar(byte))
                     index += 1
@@ -18,7 +17,7 @@ extension PureXML.Parsing.ByteDecoder {
                     scalars.append("\u{20AC}") // euro
                     index += 1
                 } else if (0x81 ... 0xFE).contains(byte) {
-                    index += step(arr, index, byte, into: &scalars)
+                    index += step(bytes, index, byte, into: &scalars)
                 } else {
                     scalars.append("\u{FFFD}")
                     index += 1
@@ -31,25 +30,25 @@ extension PureXML.Parsing.ByteDecoder {
         /// it advanced. A digit second byte opens the four-byte form; anything else
         /// is a two-byte pair resolved through the GBK index.
         private static func step(
-            _ arr: [UInt8],
+            _ bytes: ArraySlice<UInt8>,
             _ index: Int,
             _ lead: UInt8,
             into scalars: inout String.UnicodeScalarView,
         ) -> Int {
-            guard index + 1 < arr.count else {
+            guard index + 1 < bytes.endIndex else {
                 scalars.append("\u{FFFD}")
                 return 1
             }
-            let second = arr[index + 1]
+            let second = bytes[index + 1]
             if (0x30 ... 0x39).contains(second) {
-                guard index + 3 < arr.count,
-                      (0x81 ... 0xFE).contains(arr[index + 2]),
-                      (0x30 ... 0x39).contains(arr[index + 3])
+                guard index + 3 < bytes.endIndex,
+                      (0x81 ... 0xFE).contains(bytes[index + 2]),
+                      (0x30 ... 0x39).contains(bytes[index + 3])
                 else {
                     scalars.append("\u{FFFD}")
                     return 1
                 }
-                let pointer = fourBytePointer(lead, second, arr[index + 2], arr[index + 3])
+                let pointer = fourBytePointer(lead, second, bytes[index + 2], bytes[index + 3])
                 scalars.append(rangeScalar(pointer) ?? "\u{FFFD}")
                 return 4
             }

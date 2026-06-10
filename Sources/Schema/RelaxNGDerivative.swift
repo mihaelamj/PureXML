@@ -3,6 +3,12 @@ extension PureXML.Schema {
     /// derivatives (James Clark's "An algorithm for RELAX NG validation"). The
     /// pattern is repeatedly derived with respect to each event of the instance;
     /// the document is valid when the residual pattern is nullable.
+    ///
+    /// Bound: there is no derivative memoization (patterns are not hashable by
+    /// design). The simplifying constructors (`choice`/`group`/`interleave`
+    /// short-circuit on `notAllowed` and `empty`) keep the residual small for
+    /// real-world grammars, but an adversarial grammar of deeply nested
+    /// choices can still grow it; treat untrusted schemas accordingly.
     struct RelaxNGEngine {
         let defines: [String: PureXML.Schema.Pattern]
 

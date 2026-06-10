@@ -175,7 +175,7 @@ extension PureXML.Parsing {
 
         private static func indexOfSubsequence(_ needle: [UInt8], in haystack: [UInt8]) -> Int? {
             guard !needle.isEmpty, haystack.count >= needle.count else { return nil }
-            for start in 0 ... (haystack.count - needle.count) where Array(haystack[start ..< start + needle.count]) == needle {
+            for start in 0 ... (haystack.count - needle.count) where haystack[start ..< start + needle.count].elementsEqual(needle) {
                 return start
             }
             return nil
