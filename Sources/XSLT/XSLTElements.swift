@@ -34,4 +34,66 @@ extension PureXML.XSLT.Transformer {
         }
         return result
     }
+
+    /// The expanded name an xsl:element/xsl:attribute creates (7.1.2/7.1.3):
+    /// an explicit namespace attribute wins; otherwise a prefixed name
+    /// resolves against the instruction's in-scope stylesheet declarations
+    /// (an unprefixed attribute name stays in no namespace).
+    func createdName(
+        _ nameTemplate: PureXML.XSLT.ValueTemplate,
+        _ namespaceTemplate: PureXML.XSLT.ValueTemplate?,
+        _ namespaces: [String: String],
+        _ context: PureXML.XSLT.XSLTContext,
+        isAttribute: Bool,
+    ) -> PureXML.Model.QualifiedName {
+        let raw = avt(nameTemplate, context)
+        var name = PureXML.Model.QualifiedName(raw)
+        if let namespaceTemplate {
+            let uri = avt(namespaceTemplate, context)
+            if !uri.isEmpty {
+                return PureXML.Model.QualifiedName(prefix: name.prefix, localName: name.localName, namespaceURI: uri)
+            }
+            return PureXML.Model.QualifiedName(prefix: nil, localName: name.localName, namespaceURI: nil)
+        }
+        if let prefix = name.prefix {
+            if prefix == "xml" {
+                name = PureXML.Model.QualifiedName(prefix: prefix, localName: name.localName, namespaceURI: "http://www.w3.org/XML/1998/namespace")
+            } else if let uri = namespaces[prefix] {
+                name = PureXML.Model.QualifiedName(prefix: prefix, localName: name.localName, namespaceURI: uri)
+            }
+        } else if !isAttribute, let defaultURI = namespaces[""] {
+            name = PureXML.Model.QualifiedName(prefix: nil, localName: name.localName, namespaceURI: defaultURI)
+        }
+        return name
+    }
+
+    func elementInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
+        guard case let .element(nameTemplate, namespaceTemplate, namespaces, useAttributeSets, body) = instruction else {
+            return []
+        }
+        let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: false)
+        return [buildElement(name: name, literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
+    }
+
+    func attributeInstruction(
+        _ nameTemplate: PureXML.XSLT.ValueTemplate,
+        _ namespaceTemplate: PureXML.XSLT.ValueTemplate?,
+        _ namespaces: [String: String],
+        _ body: [PureXML.XSLT.Instruction],
+        _ context: XSLTContext,
+    ) -> [PureXML.XSLT.ResultItem] {
+        let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: true)
+        return [.attribute(.init(name: name, value: Self.text(of: instantiate(body, context))))]
+    }
+
+    func copyInstruction(_ useAttributeSets: [String], _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
+        switch context.node.kind {
+        case .element:
+            [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
+        case .text, .cdata:
+            [.node(.text(context.node.value))]
+        default:
+            instantiate(body, context)
+        }
+    }
 }

@@ -59,11 +59,11 @@ public extension PureXML.XSLT {
         case literalElement(name: PureXML.Model.QualifiedName, attributes: [LiteralAttribute], useAttributeSets: [String], body: [Instruction])
         /// `xsl:element` whose name is an attribute value template, with any
         /// `use-attribute-sets`.
-        case element(name: ValueTemplate, useAttributeSets: [String], body: [Instruction])
+        case element(name: ValueTemplate, namespace: ValueTemplate?, namespaces: [String: String], useAttributeSets: [String], body: [Instruction])
         /// `xsl:attribute` whose name is an attribute value template.
-        case attribute(name: ValueTemplate, body: [Instruction])
+        case attribute(name: ValueTemplate, namespace: ValueTemplate?, namespaces: [String: String], body: [Instruction])
         /// `xsl:copy`: a shallow copy of the context node.
-        case copy(body: [Instruction])
+        case copy(useAttributeSets: [String], body: [Instruction])
         /// `xsl:copy-of`: a deep copy of a selected node-set.
         case copyOf(select: String)
         /// `xsl:call-template` by name with passed parameters.

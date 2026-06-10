@@ -23,7 +23,8 @@ public extension PureXML.XSLT {
         if sheet.output.method == "html" {
             body = PureXML.HTML.serialize(result)
         } else {
-            let prepared = withCDATASections(result, sheet.output.cdataSectionElements)
+            let fixed = XSLTNamespaceFixup.apply(result)
+            let prepared = withCDATASections(fixed, sheet.output.cdataSectionElements)
             body = PureXML.serialize(prepared, options: options.applying(sheet.output))
         }
         return doctype(for: result, sheet.output) + body

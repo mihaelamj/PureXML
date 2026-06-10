@@ -1,4 +1,4 @@
-private typealias Tree = PureXML.Model.TreeNode
+typealias XSLTTree = PureXML.Model.TreeNode
 
 /// The accumulating declarations of a stylesheet as its top-level elements are
 /// compiled, plus the folding of an included or imported sub-stylesheet. File
@@ -44,27 +44,27 @@ private struct Parts {
     }
 }
 
-/// Tree helpers for the XSLT parser. File-scope and private.
-private enum XSLTNode {
+/// XSLTTree helpers for the XSLT parser. File-scope and private.
+enum XSLTNode {
     static let namespace = "http://www.w3.org/1999/XSL/Transform"
 
-    static func localName(_ node: Tree) -> String? {
+    static func localName(_ node: XSLTTree) -> String? {
         node.name?.localName
     }
 
-    static func isXSL(_ node: Tree) -> Bool {
+    static func isXSL(_ node: XSLTTree) -> Bool {
         node.kind == .element && (node.name?.namespaceURI == namespace || node.name?.prefix == "xsl")
     }
 
-    static func attribute(_ node: Tree, _ name: String) -> String? {
+    static func attribute(_ node: XSLTTree, _ name: String) -> String? {
         node.attributes.first { $0.name.localName == name }?.value
     }
 
-    static func elementChildren(_ node: Tree) -> [Tree] {
+    static func elementChildren(_ node: XSLTTree) -> [XSLTTree] {
         node.children.filter { $0.kind == .element }
     }
 
-    static func children(_ node: Tree, named name: String) -> [Tree] {
+    static func children(_ node: XSLTTree, named name: String) -> [XSLTTree] {
         elementChildren(node).filter { localName($0) == name }
     }
 }
@@ -97,7 +97,7 @@ extension PureXML.XSLT {
             return compile(top, loader: loader, precedence: 0)
         }
 
-        private static func stylesheetElement(_ root: Tree) -> Tree? {
+        private static func stylesheetElement(_ root: XSLTTree) -> XSLTTree? {
             guard let top = XSLTNode.elementChildren(root).first, XSLTNode.isXSL(top),
                   XSLTNode.localName(top) == "stylesheet" || XSLTNode.localName(top) == "transform"
             else {
@@ -107,7 +107,7 @@ extension PureXML.XSLT {
         }
 
         /// Compiles a stylesheet element, folding in `xsl:include`/`xsl:import`.
-        private static func compile(_ top: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
+        private static func compile(_ top: XSLTTree, loader: (String) -> String?, precedence: Int) -> Stylesheet {
             var parts = Parts()
             for child in XSLTNode.elementChildren(top) where XSLTNode.isXSL(child) {
                 absorb(child, into: &parts, loader: loader, precedence: precedence)
@@ -115,7 +115,7 @@ extension PureXML.XSLT {
             return parts.stylesheet
         }
 
-        private static func absorb(_ child: Tree, into parts: inout Parts, loader: (String) -> String?, precedence: Int) {
+        private static func absorb(_ child: XSLTTree, into parts: inout Parts, loader: (String) -> String?, precedence: Int) {
             if absorbDeclaration(child, into: &parts, precedence: precedence) { return }
             switch XSLTNode.localName(child) {
             case "include": parts.fold(load(child, loader: loader, precedence: precedence), isImport: false)
@@ -126,7 +126,7 @@ extension PureXML.XSLT {
 
         /// Absorbs a non-composition top-level declaration, returning whether it
         /// was one (so the caller can then try `include`/`import`).
-        private static func absorbDeclaration(_ child: Tree, into parts: inout Parts, precedence: Int) -> Bool {
+        private static func absorbDeclaration(_ child: XSLTTree, into parts: inout Parts, precedence: Int) -> Bool {
             switch XSLTNode.localName(child) {
             case "template": parts.templates.append(template(child, precedence: precedence))
             case "variable", "param": parts.globals.append(variable(child))
@@ -144,11 +144,11 @@ extension PureXML.XSLT {
 
         /// The whitespace-separated element name tests of an `xsl:strip-space` or
         /// `xsl:preserve-space` element's `elements` attribute.
-        private static func elementNames(_ node: Tree) -> Set<String> {
+        private static func elementNames(_ node: XSLTTree) -> Set<String> {
             Set((XSLTNode.attribute(node, "elements") ?? "").split(whereSeparator: \.isWhitespace).map(String.init))
         }
 
-        private static func load(_ node: Tree, loader: (String) -> String?, precedence: Int) -> Stylesheet? {
+        private static func load(_ node: XSLTTree, loader: (String) -> String?, precedence: Int) -> Stylesheet? {
             guard let href = XSLTNode.attribute(node, "href"), let text = loader(href),
                   let root = try? PureXML.parseTree(text), let top = stylesheetElement(root)
             else {
@@ -157,7 +157,7 @@ extension PureXML.XSLT {
             return compile(top, loader: loader, precedence: precedence)
         }
 
-        private static func parseOutput(_ node: Tree) -> Output {
+        private static func parseOutput(_ node: XSLTTree) -> Output {
             Output(
                 method: XSLTNode.attribute(node, "method"),
                 indent: XSLTNode.attribute(node, "indent").map { $0 == "yes" },
@@ -171,7 +171,7 @@ extension PureXML.XSLT {
             )
         }
 
-        private static func key(_ node: Tree) -> Key {
+        private static func key(_ node: XSLTTree) -> Key {
             Key(
                 name: XSLTNode.attribute(node, "name") ?? "",
                 match: XSLTNode.attribute(node, "match") ?? "",
@@ -181,7 +181,7 @@ extension PureXML.XSLT {
 
         // MARK: Templates
 
-        private static func template(_ node: Tree, precedence: Int) -> Template {
+        private static func template(_ node: XSLTTree, precedence: Int) -> Template {
             let match = XSLTNode.attribute(node, "match")
             let priority = XSLTNode.attribute(node, "priority").flatMap(Double.init)
                 ?? match.map(defaultPriority) ?? 0
@@ -200,7 +200,7 @@ extension PureXML.XSLT {
             )
         }
 
-        private static func binding(_ node: Tree) -> Binding {
+        private static func binding(_ node: XSLTTree) -> Binding {
             Binding(
                 name: XSLTNode.attribute(node, "name") ?? "",
                 select: XSLTNode.attribute(node, "select"),
@@ -208,7 +208,7 @@ extension PureXML.XSLT {
             )
         }
 
-        private static func withParameters(_ node: Tree) -> [Binding] {
+        private static func withParameters(_ node: XSLTTree) -> [Binding] {
             XSLTNode.children(node, named: "with-param").map(binding)
         }
 
@@ -222,11 +222,11 @@ extension PureXML.XSLT {
 
         // MARK: Bodies and instructions
 
-        private static func body(_ node: Tree) -> [Instruction] {
+        static func body(_ node: XSLTTree) -> [Instruction] {
             node.children.compactMap(instruction)
         }
 
-        private static func instruction(_ node: Tree) -> Instruction? {
+        private static func instruction(_ node: XSLTTree) -> Instruction? {
             switch node.kind {
             case .text, .cdata:
                 let value = node.value
@@ -238,7 +238,7 @@ extension PureXML.XSLT {
             }
         }
 
-        private static func xslInstruction(_ node: Tree) -> Instruction? {
+        private static func xslInstruction(_ node: XSLTTree) -> Instruction? {
             if let known = simpleInstruction(node) ?? structuralInstruction(node) { return known }
             // An unrecognized XSLT element instantiates its xsl:fallback children
             // (forwards-compatible processing); with none, it is dropped.
@@ -246,7 +246,7 @@ extension PureXML.XSLT {
             return fallback.isEmpty ? nil : .fallback(body: fallback)
         }
 
-        private static func simpleInstruction(_ node: Tree) -> Instruction? {
+        private static func simpleInstruction(_ node: XSLTTree) -> Instruction? {
             switch XSLTNode.localName(node) {
             case "value-of": .valueOf(select: XSLTNode.attribute(node, "select") ?? "")
             case "apply-templates": .applyTemplates(
@@ -262,45 +262,18 @@ extension PureXML.XSLT {
                 )
             case "text": .literalText(node.stringValue)
             case "variable", "param": variable(node)
-            case "copy": .copy(body: body(node))
+            case "copy": .copy(useAttributeSets: useAttributeSets(node), body: body(node))
             case "message": .message(terminate: XSLTNode.attribute(node, "terminate") == "yes", body: body(node))
             case "apply-imports": .applyImports
             default: nil
             }
         }
 
-        private static func structuralInstruction(_ node: Tree) -> Instruction? {
-            switch XSLTNode.localName(node) {
-            case "for-each":
-                .forEach(select: XSLTNode.attribute(node, "select") ?? "", sorts: sorts(node), body: body(node))
-            case "if":
-                .ifInstruction(test: XSLTNode.attribute(node, "test") ?? "", body: body(node))
-            case "choose":
-                choose(node)
-            case "element":
-                .element(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), useAttributeSets: useAttributeSets(node), body: body(node))
-            case "attribute":
-                .attribute(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
-            case "number":
-                .number(
-                    count: XSLTNode.attribute(node, "count"),
-                    from: XSLTNode.attribute(node, "from"),
-                    format: XSLTNode.attribute(node, "format") ?? "1",
-                )
-            case "comment":
-                .comment(body: body(node))
-            case "processing-instruction":
-                .processingInstruction(name: valueTemplate(XSLTNode.attribute(node, "name") ?? ""), body: body(node))
-            default:
-                nil
-            }
-        }
-
-        private static func variable(_ node: Tree) -> Instruction {
+        private static func variable(_ node: XSLTTree) -> Instruction {
             .variable(name: XSLTNode.attribute(node, "name") ?? "", select: XSLTNode.attribute(node, "select"), body: body(node))
         }
 
-        private static func choose(_ node: Tree) -> Instruction {
+        static func choose(_ node: XSLTTree) -> Instruction {
             let whens = XSLTNode.children(node, named: "when").map { branch in
                 Branch(test: XSLTNode.attribute(branch, "test") ?? "", body: body(branch))
             }
@@ -308,7 +281,7 @@ extension PureXML.XSLT {
             return .choose(whens: whens, otherwise: otherwise)
         }
 
-        private static func literalElement(_ node: Tree) -> Instruction {
+        private static func literalElement(_ node: XSLTTree) -> Instruction {
             guard let name = node.name else { return .literalText("") }
             // xmlns declarations and the special xsl:* attributes (use-attribute-sets,
             // version, exclude-result-prefixes …) are not copied to the output.
@@ -319,11 +292,11 @@ extension PureXML.XSLT {
         }
 
         /// The whitespace-separated names of `[xsl:]use-attribute-sets` on `node`.
-        private static func useAttributeSets(_ node: Tree) -> [String] {
+        static func useAttributeSets(_ node: XSLTTree) -> [String] {
             (XSLTNode.attribute(node, "use-attribute-sets") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
         }
 
-        private static func caseOrder(_ node: Tree) -> PureXML.XSLT.CaseOrder? {
+        private static func caseOrder(_ node: XSLTTree) -> PureXML.XSLT.CaseOrder? {
             switch XSLTNode.attribute(node, "case-order") {
             case "upper-first": .upperFirst
             case "lower-first": .lowerFirst
@@ -331,7 +304,7 @@ extension PureXML.XSLT {
             }
         }
 
-        private static func sorts(_ node: Tree) -> [Sort] {
+        static func sorts(_ node: XSLTTree) -> [Sort] {
             XSLTNode.children(node, named: "sort").map { sort in
                 Sort(
                     select: XSLTNode.attribute(sort, "select") ?? ".",
@@ -349,7 +322,7 @@ extension PureXML.XSLT {
 private extension PureXML.XSLT.XSLTParser {
     /// Records an `xsl:namespace-alias`: the namespace bound to `stylesheet-prefix`
     /// is rewritten to the one bound to `result-prefix` (with that prefix) on output.
-    static func addNamespaceAlias(_ child: Tree, into parts: inout Parts) {
+    static func addNamespaceAlias(_ child: XSLTTree, into parts: inout Parts) {
         let stylePrefix = XSLTNode.attribute(child, "stylesheet-prefix") ?? "#default"
         let resultPrefix = XSLTNode.attribute(child, "result-prefix") ?? "#default"
         let key = resolvePrefix(stylePrefix, at: child) ?? ""
@@ -361,8 +334,8 @@ private extension PureXML.XSLT.XSLTParser {
 
     /// Resolves a namespace prefix (or `#default`) to its URI from the `xmlns`
     /// declarations in scope at `node`, walking up to the stylesheet element.
-    static func resolvePrefix(_ prefix: String, at node: Tree) -> String? {
-        var current: Tree? = node
+    static func resolvePrefix(_ prefix: String, at node: XSLTTree) -> String? {
+        var current: XSLTTree? = node
         while let element = current {
             for attribute in element.attributes {
                 let isDefault = prefix == "#default" && attribute.name.prefix == nil && attribute.name.localName == "xmlns"
@@ -374,14 +347,14 @@ private extension PureXML.XSLT.XSLTParser {
         return nil
     }
 
-    static func addAttributeSet(_ child: Tree, into parts: inout Parts) {
+    static func addAttributeSet(_ child: XSLTTree, into parts: inout Parts) {
         guard let name = XSLTNode.attribute(child, "name") else { return }
         parts.attributeSets[name] = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
     }
 
     /// Reads an `xsl:decimal-format`'s symbol overrides; each unset attribute
     /// keeps the XSLT standard default.
-    static func decimalFormat(_ node: Tree) -> PureXML.XSLT.DecimalFormat {
+    static func decimalFormat(_ node: XSLTTree) -> PureXML.XSLT.DecimalFormat {
         var format = PureXML.XSLT.DecimalFormat()
         func char(_ name: String, _ keyPath: WritableKeyPath<PureXML.XSLT.DecimalFormat, Character>) {
             if let value = XSLTNode.attribute(node, name)?.first { format[keyPath: keyPath] = value }

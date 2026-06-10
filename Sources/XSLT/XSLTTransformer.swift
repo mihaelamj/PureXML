@@ -1,7 +1,7 @@
 /// The transformer's runtime types are defined in XSLTRuntime.swift (nested in
 /// the namespace); these file-private aliases keep them unqualified here.
-private typealias ResultItem = PureXML.XSLT.ResultItem
-private typealias XSLTContext = PureXML.XSLT.XSLTContext
+typealias ResultItem = PureXML.XSLT.ResultItem
+typealias XSLTContext = PureXML.XSLT.XSLTContext
 private typealias Termination = PureXML.XSLT.Termination
 private typealias MatchCache = PureXML.XSLT.MatchCache
 
@@ -105,7 +105,7 @@ extension PureXML.XSLT {
             }
         }
 
-        fileprivate func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
+        func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
             var items: [ResultItem] = []
             var context = context
             for instruction in body {
@@ -157,7 +157,7 @@ extension PureXML.XSLT {
             return nil
         }
 
-        fileprivate static func text(of items: [ResultItem]) -> String {
+        static func text(of items: [ResultItem]) -> String {
             items.reduce(into: "") { result, item in
                 if case let .node(node) = item { result += Self.stringValue(node) }
             }
@@ -226,12 +226,12 @@ extension PureXML.XSLT.Transformer {
         switch instruction {
         case let .literalElement(name, attributes, useAttributeSets, body):
             [literalResult(name, attributes, useAttributeSets, body, context)]
-        case let .element(nameTemplate, useAttributeSets, body):
-            [buildElement(name: .init(avt(nameTemplate, context)), literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
-        case let .attribute(nameTemplate, body):
-            [.attribute(.init(avt(nameTemplate, context), Self.text(of: instantiate(body, context))))]
-        case let .copy(body):
-            copyInstruction(body, context)
+        case .element:
+            elementInstruction(instruction, context)
+        case let .attribute(nameTemplate, namespaceTemplate, namespaces, body):
+            attributeInstruction(nameTemplate, namespaceTemplate, namespaces, body, context)
+        case let .copy(useAttributeSets, body):
+            copyInstruction(useAttributeSets, body, context)
         case let .number(count, _, format):
             [.node(.text(PureXML.XSLT.Numbering.value(of: context.node, count: count, format: format)))]
         case let .comment(body):
@@ -302,20 +302,9 @@ extension PureXML.XSLT.Transformer {
         }
     }
 
-    private func copyInstruction(_ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
-        switch context.node.kind {
-        case .element:
-            [buildElement(name: context.node.name ?? .init(""), literalAttributes: [], useAttributeSets: [], body: body, context)]
-        case .text, .cdata:
-            [.node(.text(context.node.value))]
-        default:
-            instantiate(body, context)
-        }
-    }
-
     // MARK: Building elements
 
-    private func buildElement(
+    func buildElement(
         name: PureXML.Model.QualifiedName,
         literalAttributes: [PureXML.XSLT.LiteralAttribute],
         useAttributeSets: [String],
@@ -351,7 +340,7 @@ extension PureXML.XSLT.Transformer {
         return result
     }
 
-    private func avt(_ template: PureXML.XSLT.ValueTemplate, _ context: XSLTContext) -> String {
+    func avt(_ template: PureXML.XSLT.ValueTemplate, _ context: XSLTContext) -> String {
         template.reduce(into: "") { result, part in
             switch part {
             case let .literal(text): result += text

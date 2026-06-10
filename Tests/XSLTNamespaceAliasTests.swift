@@ -18,8 +18,9 @@ struct XSLTNamespaceAliasTests {
           <xsl:template match="/"><a:thing/></xsl:template>
         </xsl:stylesheet>
         """
-        // The element's prefix is rewritten from the stylesheet alias to the result.
-        #expect(try transform(style, "<x/>") == "<b:thing/>")
+        // The element's prefix is rewritten from the stylesheet alias to the
+        // result, and the serializer declares the result namespace.
+        #expect(try transform(style, "<x/>") == "<b:thing xmlns:b=\"urn:to\"/>")
     }
 
     @Test("A non-aliased literal element is untouched")
