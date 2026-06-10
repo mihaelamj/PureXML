@@ -73,14 +73,21 @@ extension PureXML.XPath {
 
         private static func following(of node: Node) -> [Node] {
             let all = documentNodes(of: node)
-            guard let index = all.firstIndex(of: node) else { return [] }
-            let excluded = Set(descendants(of: node))
-            return all[(index + 1)...].filter { !excluded.contains($0) }
+            if let index = all.firstIndex(of: node) {
+                let excluded = Set(descendants(of: node))
+                return all[(index + 1)...].filter { !excluded.contains($0) }
+            }
+            // An attribute or namespace start: document order places it after
+            // its owner and before the owner's children, and it has no
+            // descendants, so everything after the owner follows.
+            guard let owner = node.parent, let index = all.firstIndex(of: owner) else { return [] }
+            return Array(all[(index + 1)...])
         }
 
         private static func preceding(of node: Node) -> [Node] {
             let all = documentNodes(of: node)
-            guard let index = all.firstIndex(of: node) else { return [] }
+            let anchorIndex = all.firstIndex(of: node) ?? node.parent.flatMap { all.firstIndex(of: $0) }
+            guard let index = anchorIndex else { return [] }
             let excluded = Set(ancestors(of: node))
             return all[..<index].filter { !excluded.contains($0) }.reversed()
         }
