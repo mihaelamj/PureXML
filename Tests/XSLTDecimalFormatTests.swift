@@ -62,4 +62,32 @@ struct XSLTDecimalFormatTests {
         let neg = formatNumber("format-number(-5, '0')", decimalFormats: "<xsl:decimal-format minus-sign=\"~\"/>")
         #expect(try transform(neg, "<x/>") == "~5")
     }
+
+    @Test("Literal affixes pass through around the number part")
+    func test_affixes() throws {
+        #expect(try transform(formatNumber("format-number(95.4857, 'PRE###.####SUF')"), "<x/>") == "PRE95.4857SUF")
+        #expect(try transform(formatNumber("format-number(26931.4, '+#,###.#')"), "<x/>") == "+26,931.4")
+    }
+
+    @Test("The negative subpattern supplies its affixes; without distinguishing ones the minus sign applies")
+    func test_negativeSubpattern() throws {
+        #expect(try transform(formatNumber("format-number(-26931.4, '#,###.#;(#,###.#)')"), "<x/>") == "(26,931.4)")
+        #expect(try transform(formatNumber("format-number(-26931.4, '#,###.#;#,###.#')"), "<x/>") == "-26,931.4")
+        #expect(try transform(formatNumber("format-number(-87504.4812, '000,000.000###')"), "<x/>") == "-087,504.4812")
+    }
+
+    @Test("Per-mille multiplies by a thousand and keeps the symbol")
+    func test_perMille() throws {
+        #expect(try transform(formatNumber("format-number(0.4857, '###.###\u{2030}')"), "<x/>") == "485.7\u{2030}")
+    }
+
+    @Test("The grouping size comes from the pattern's last grouping separator")
+    func test_groupingSize() throws {
+        #expect(try transform(formatNumber("format-number(987654321, '###,##0,00.00')"), "<x/>") == "9,87,65,43,21.00")
+    }
+
+    @Test("Fraction digits render exactly, without float drift")
+    func test_fractionExact() throws {
+        #expect(try transform(formatNumber("format-number(87504.4812, '000,000.000###')"), "<x/>") == "087,504.4812")
+    }
 }

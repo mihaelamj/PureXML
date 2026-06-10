@@ -362,6 +362,7 @@ private extension PureXML.XSLT.XSLTParser {
         char("decimal-separator", \.decimalSeparator)
         char("grouping-separator", \.groupingSeparator)
         char("percent", \.percent)
+        char("per-mille", \.perMille)
         char("zero-digit", \.zeroDigit)
         char("digit", \.digit)
         char("pattern-separator", \.patternSeparator)

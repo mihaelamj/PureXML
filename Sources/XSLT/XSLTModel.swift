@@ -175,6 +175,7 @@ public extension PureXML.XSLT {
         public var decimalSeparator: Character = "."
         public var groupingSeparator: Character = ","
         public var percent: Character = "%"
+        public var perMille: Character = "\u{2030}"
         public var zeroDigit: Character = "0"
         public var digit: Character = "#"
         public var patternSeparator: Character = ";"

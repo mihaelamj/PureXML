@@ -1,12 +1,15 @@
 private typealias DecimalFormat = PureXML.XSLT.DecimalFormat
 
-/// The digit-place counts and grouping derived from a format-number picture.
-/// File scope and private.
+/// The digit-place counts, grouping, affixes, and multiplier derived from a
+/// format-number subpattern. File scope and private.
 private struct NumberLayout {
-    let minInteger: Int
-    let minFraction: Int
-    let maxFraction: Int
-    let grouping: Bool
+    var prefix = ""
+    var suffix = ""
+    var minInteger = 0
+    var minFraction = 0
+    var maxFraction = 0
+    var groupingSize = 0
+    var multiplier = 1.0
 }
 
 extension PureXML.XSLT {
@@ -16,56 +19,134 @@ extension PureXML.XSLT {
     enum FormatNumber {
         static func format(_ value: Double, _ picture: String, _ symbols: DecimalFormat = DecimalFormat()) -> String {
             guard !value.isNaN else { return symbols.notANumber }
-            if value.isInfinite { return (value < 0 ? String(symbols.minusSign) : "") + symbols.infinity }
             guard !picture.isEmpty else { return PureXML.XPath.Value.format(value) }
-            let percent = picture.contains(symbols.percent)
-            let pattern = picture.filter { $0 != symbols.percent }
-            let parts = pattern.split(separator: symbols.decimalSeparator, maxSplits: 1, omittingEmptySubsequences: false)
-            let integerPattern = String(parts.first ?? "")
-            let fractionPattern = parts.count > 1 ? String(parts[1]) : ""
-
-            let minInteger = integerPattern.count(where: { $0 == symbols.zeroDigit })
-            let minFraction = fractionPattern.count(where: { $0 == symbols.zeroDigit })
-            let maxFraction = fractionPattern.count(where: { $0 == symbols.zeroDigit || $0 == symbols.digit })
-            let grouping = integerPattern.contains(symbols.groupingSeparator)
-
-            var magnitude = Swift.abs(percent ? value * 100 : value)
-            magnitude = round(magnitude, places: maxFraction)
-            let layout = NumberLayout(minInteger: minInteger, minFraction: minFraction, maxFraction: maxFraction, grouping: grouping)
-            let rendered = render(magnitude, layout, symbols)
-            return (value < 0 ? String(symbols.minusSign) : "") + rendered + (percent ? String(symbols.percent) : "")
+            let subpatterns = picture.split(separator: symbols.patternSeparator, maxSplits: 1, omittingEmptySubsequences: false)
+            let positive = parse(String(subpatterns[0]), symbols)
+            // The negative subpattern contributes only its affixes; digit
+            // places, grouping, and multiplier come from the positive one.
+            // Without one the default negative prefix is the minus sign.
+            var layout = positive
+            if value < 0 {
+                let negative = subpatterns.count > 1 ? parse(String(subpatterns[1]), symbols) : nil
+                if let negative, !(negative.prefix.isEmpty && negative.suffix.isEmpty) {
+                    layout.prefix = negative.prefix
+                    layout.suffix = negative.suffix
+                } else {
+                    // No negative subpattern, or one with no distinguishing
+                    // affixes: the default negative prefix is the minus sign.
+                    layout.prefix = String(symbols.minusSign) + layout.prefix
+                }
+            }
+            if value.isInfinite { return layout.prefix + symbols.infinity + layout.suffix }
+            let magnitude = Swift.abs(value) * positive.multiplier
+            return layout.prefix + render(magnitude, layout, symbols) + layout.suffix
         }
 
-        private static func round(_ value: Double, places: Int) -> Double {
-            var scale = 1.0
-            for _ in 0 ..< places {
-                scale *= 10
+        /// Splits one subpattern into prefix, number part, and suffix, reading
+        /// the digit places, the grouping size (digits after the last grouping
+        /// separator), and the percent/per-mille multiplier from it.
+        private static func parse(_ subpattern: String, _ symbols: DecimalFormat) -> NumberLayout {
+            var layout = NumberLayout()
+            // When the decimal and grouping separators collide, every
+            // occurrence reads as grouping (the Xalan resolution).
+            let decimal: Character? = symbols.decimalSeparator == symbols.groupingSeparator ? nil : symbols.decimalSeparator
+            let numberCharacters = Set([symbols.zeroDigit, symbols.digit, symbols.groupingSeparator, symbols.decimalSeparator])
+            var phase = 0 // 0 prefix, 1 number, 2 suffix
+            var inFraction = false
+            var sinceGrouping: Int?
+            for character in subpattern {
+                if character == symbols.percent || character == symbols.perMille {
+                    layout.multiplier = character == symbols.percent ? 100 : 1000
+                    if phase == 1 { phase = 2 }
+                    appendAffix(character, phase, &layout)
+                    continue
+                }
+                if numberCharacters.contains(character), phase < 2 {
+                    phase = 1
+                    if character == decimal {
+                        inFraction = true
+                    } else {
+                        countPlace(character, inFraction, symbols, &layout, &sinceGrouping)
+                    }
+                    continue
+                }
+                if phase == 1 { phase = 2 }
+                appendAffix(character, phase, &layout)
             }
-            return (value * scale).rounded() / scale
+            layout.groupingSize = sinceGrouping ?? 0
+            return layout
+        }
+
+        /// Tallies one digit-area character into the layout's place counts and
+        /// the running last-grouping-interval width.
+        private static func countPlace(
+            _ character: Character,
+            _ inFraction: Bool,
+            _ symbols: DecimalFormat,
+            _ layout: inout NumberLayout,
+            _ sinceGrouping: inout Int?,
+        ) {
+            if character == symbols.groupingSeparator {
+                if !inFraction { sinceGrouping = 0 }
+            } else if inFraction {
+                layout.maxFraction += 1
+                if character == symbols.zeroDigit { layout.minFraction += 1 }
+            } else {
+                if character == symbols.zeroDigit { layout.minInteger += 1 }
+                sinceGrouping = sinceGrouping.map { $0 + 1 }
+            }
+        }
+
+        private static func appendAffix(_ character: Character, _ phase: Int, _ layout: inout NumberLayout) {
+            // The generic currency sign renders as this processor's (en-US)
+            // currency symbol, the JDK affix substitution.
+            let resolved: Character = character == "\u{A4}" ? "$" : character
+            if phase == 0 {
+                layout.prefix.append(resolved)
+            } else {
+                layout.suffix.append(resolved)
+            }
         }
 
         private static func render(_ value: Double, _ layout: NumberLayout, _ symbols: DecimalFormat) -> String {
-            let integerValue = Int(value)
-            var integerDigits = String(integerValue)
-            while integerDigits.count < Swift.max(1, layout.minInteger) {
-                integerDigits = "0" + integerDigits
-            }
-            var integerText = digitsToSymbols(integerDigits, symbols)
-            if layout.grouping { integerText = group(integerText, symbols.groupingSeparator) }
-
-            var fractionValue = value - Double(integerValue)
-            var fractionDigits = ""
+            // One scaled rounding, then pure integer digit extraction: repeated
+            // float multiplication would re-introduce representation error
+            // (0.4812 must render 4812, not 481199...).
+            var scale = 1.0
             for _ in 0 ..< layout.maxFraction {
-                fractionValue *= 10
-                let digit = Int(fractionValue)
-                fractionDigits += String(digit)
-                fractionValue -= Double(digit)
+                scale *= 10
             }
+            let (integerDigits, allFractionDigits) = digits(value, scale: scale, places: layout.maxFraction)
+            var paddedInteger = integerDigits
+            while paddedInteger.count < Swift.max(1, layout.minInteger) {
+                paddedInteger = "0" + paddedInteger
+            }
+            var integerText = digitsToSymbols(paddedInteger, symbols)
+            if layout.groupingSize > 0 { integerText = group(integerText, symbols.groupingSeparator, layout.groupingSize) }
+
+            var fractionDigits = allFractionDigits
             while fractionDigits.count > layout.minFraction, fractionDigits.hasSuffix("0") {
                 fractionDigits.removeLast()
             }
             let fractionText = digitsToSymbols(fractionDigits, symbols)
             return fractionText.isEmpty ? integerText : integerText + String(symbols.decimalSeparator) + fractionText
+        }
+
+        /// The integer and fraction digit strings of `value` carried to
+        /// `places` fraction digits, via a single scaled rounding when the
+        /// magnitude fits an Int exactly.
+        private static func digits(_ value: Double, scale: Double, places: Int) -> (String, String) {
+            let scaled = (value * scale).rounded()
+            guard scaled < 9_007_199_254_740_992 else { // 2^53: beyond it Double has no fraction anyway
+                return (String(Int(value)), String(repeating: "0", count: places))
+            }
+            let total = Int(scaled)
+            let divisor = Int(scale)
+            var fraction = String(total % divisor)
+            while fraction.count < places {
+                fraction = "0" + fraction
+            }
+            return (String(total / divisor), places > 0 ? fraction : "")
         }
 
         /// Maps ASCII digits to the format's digit set, offset from its zero-digit.
@@ -77,10 +158,10 @@ extension PureXML.XSLT {
             })
         }
 
-        private static func group(_ digits: String, _ separator: Character) -> String {
+        private static func group(_ digits: String, _ separator: Character, _ size: Int) -> String {
             var result = ""
             for (offset, character) in digits.reversed().enumerated() {
-                if offset > 0, offset.isMultiple(of: 3) { result.append(separator) }
+                if offset > 0, offset.isMultiple(of: size) { result.append(separator) }
                 result.append(character)
             }
             return String(result.reversed())
