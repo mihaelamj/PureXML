@@ -94,17 +94,28 @@ extension PureXML.Schema {
             return states.count - 1
         }
 
+        /// Occurrence counts unroll into automaton states, so they are
+        /// capped: beyond the cap a repetition is treated as unbounded, the
+        /// libxml2 posture (its cap is 16384). Without this, a schema with
+        /// maxOccurs in the trillions allocates until the process dies
+        /// (found by XSTS groupF009v, #129).
+        private static let occursUnrollCap = 16384
+
         private mutating func particle(_ particle: PureXML.Schema.Particle) -> (start: Int, accept: Int) {
             let start = addState()
             var current = start
-            for _ in 0 ..< particle.minOccurs {
+            let boundedMin = Swift.min(particle.minOccurs, Self.occursUnrollCap)
+            for _ in 0 ..< boundedMin {
                 let part = term(particle.term)
                 states[current].epsilon.append(part.start)
                 current = part.accept
             }
             let accept = addState()
-            if let maximum = particle.maxOccurs {
-                appendOptional(particle.term, count: maximum - particle.minOccurs, from: current, to: accept)
+            if particle.minOccurs > Self.occursUnrollCap {
+                // The tail of an absurd minOccurs is approximated as star.
+                appendStar(particle.term, from: current, to: accept)
+            } else if let maximum = particle.maxOccurs, maximum - boundedMin <= Self.occursUnrollCap {
+                appendOptional(particle.term, count: maximum - boundedMin, from: current, to: accept)
             } else {
                 appendStar(particle.term, from: current, to: accept)
             }

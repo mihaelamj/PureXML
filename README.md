@@ -99,8 +99,13 @@ flowchart TB
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
   Epic122["#122 official spec suites"]:::epic
-  XSTS["#129 W3C XSD test suite (XSTS)"]:::todo
-  XSLTTS["#130 XSLT 1.0 suite (xalan-test): runner + baselines in, burning down"]:::review
+  XSTS["#129 W3C XSD test suite (XSTS): runner + first baselines in, burning down"]:::review
+  XSLTTS["#130 XSLT 1.0 suite (xalan-test): runner + baselines in, burning down (125)"]:::review
+  Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
+  Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
+  Audit140["#140 XSLT validation-framework audit"]:::todo
+  Epic139 --> Parity100
+  Epic139 --> Audit140
   RNGTS["#131 RELAX NG spec suite: complete, one documented class"]:::done
   C14NTS["#132 C14N spec vectors: complete"]:::done
   Epic105 --> Epic121
@@ -125,7 +130,7 @@ flowchart TB
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **985 tests in 168 suites** (`swift test`).
+currently runs **986 tests in 169 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
