@@ -99,7 +99,7 @@ flowchart TB
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
   Epic122["#122 official spec suites"]:::epic
-  XSTS["#129 W3C XSD test suite (XSTS): runner + first baselines in, burning down"]:::review
+  XSTS["#129 W3C XSD test suite (XSTS): runner in, occurrence-cap DoS fix; first measurement 2026-06-14"]:::review
   XSLTTS["#130 XSLT 1.0 suite (xalan-test): runner + baselines in, burning down (125)"]:::review
   Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
   Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
