@@ -20,6 +20,33 @@ cross-implementation correctness check.
 These are the honest starting numbers the #139 optimization passes burn
 down; the table updates as passes land, never silently.
 
+## Current record (size series + real corpora, best of 3)
+
+| corpus | parse | serialize | xpath |
+|---|---|---|---|
+| generated 4.2 MB | 0.34 s (18.7x) | 0.064 s (5.5x) | 0.15 s (11.9x) |
+| generated 42 MB | 3.49 s (18.7x) | 0.63 s (5.6x) | 1.57 s (11.7x) |
+| generated 210 MB | 19.3 s (19.7x) | 3.19 s (5.6x) | 9.4 s (libxml2: **refused**) |
+| NASA ADC 25 MB (real) | 1.73 s (24.5x) | 0.42 s (8.0x) | 0.76 s (19.4x) |
+| SwissProt 115 MB (real) | 11.0 s (22.0x) | 1.77 s (5.5x) | 5.0 s (18.7x) |
+
+Two findings only the large corpora could surface:
+
+- PureXML's document-order sort was quadratic on flat fan-outs (42 MB:
+  27 s in XPath, ratio 190x). Fixed; and the first fix attempt was itself
+  quadratic in a worse place (an eager sibling-table built per predicate
+  evaluation: one hour at 42 MB), caught by sampling the live run. The
+  cache now early-outs single-node sets and builds a parent's table only
+  on its second lookup. XPath at 42 MB: 27.1 s -> 1.57 s.
+- libxml2 refuses XPath evaluation past its XPATH_MAX_NODESET_LENGTH cap
+  (10M nodes): the 210 MB corpus query returns NULL by design. PureXML
+  completes it in 9.4 s. The protective counterpart for hostile input is
+  tracked as #143.
+
+Scaling: all three PureXML operations are linear in document size (ratios
+flat from 4 MB to 210 MB), and there is no 2 GB integer cliff (64-bit
+offsets throughout; libxml2's xmlReadMemory takes an int byte count).
+
 ## Optimization log
 
 | pass | change | parse | xpath | serialize |

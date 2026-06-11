@@ -108,14 +108,35 @@ public extension PureXML.XPath {
         private static let attributeBand = -1
 
         private static func treePath(_ node: PureXML.Model.TreeNode) -> [Int] {
+            treePath(node, cache: nil)
+        }
+
+        /// The root path, with an optional per-operation sibling-index cache:
+        /// without one, finding a node's index among its siblings is linear,
+        /// which turns a sort over a flat fan-out (one parent, n children)
+        /// quadratic. The cache enumerates each distinct parent once, making
+        /// total key computation linear in the tree.
+        static func treePath(_ node: PureXML.Model.TreeNode, cache: SiblingIndexCache?) -> [Int] {
             var path: [Int] = []
             var current = node
             while let parent = current.parent {
-                let index = parent.children.firstIndex { $0 === current } ?? 0
-                path.append(index)
+                path.append(cache?.index(of: current, in: parent) ?? parent.children.firstIndex { $0 === current } ?? 0)
                 current = parent
             }
             return path.reversed()
+        }
+
+        /// `documentOrder` with the sibling-index cache applied.
+        func documentOrder(cache: SiblingIndexCache) -> [Int] {
+            switch self {
+            case let .tree(node):
+                return Self.treePath(node, cache: cache)
+            case let .attribute(owner, attribute):
+                let index = owner.attributes.firstIndex { $0.name == attribute.name } ?? 0
+                return Self.treePath(owner, cache: cache) + [Self.attributeBand, index]
+            case let .namespace(owner, prefix, _):
+                return Self.treePath(owner, cache: cache) + [Self.namespaceBand, prefix.hashValue]
+            }
         }
 
         /// Whether `lhs` precedes `rhs` in document order. Each call recomputes
@@ -141,14 +162,20 @@ extension Sequence<PureXML.XPath.Node> {
     /// (decorate-sort-undecorate) rather than recomputing the root path on every
     /// comparison, which turns an O(n log n x depth) sort into O(n log n).
     func sortedByDocumentOrder() -> [PureXML.XPath.Node] {
-        map { (node: $0, key: $0.documentOrder) }
+        // Zero- and one-node sets are already sorted: the common predicate
+        // case must not touch order keys at all.
+        let nodes = Array(self)
+        if nodes.count <= 1 { return nodes }
+        let cache = PureXML.XPath.SiblingIndexCache()
+        return nodes.map { (node: $0, key: $0.documentOrder(cache: cache)) }
             .sorted { PureXML.XPath.Node.ordered($0.key, before: $1.key) }
             .map(\.node)
     }
 
     /// The first node in document order, computing each node's order key once.
     func firstInDocumentOrder() -> PureXML.XPath.Node? {
-        map { (node: $0, key: $0.documentOrder) }
+        let cache = PureXML.XPath.SiblingIndexCache()
+        return map { (node: $0, key: $0.documentOrder(cache: cache)) }
             .min { PureXML.XPath.Node.ordered($0.key, before: $1.key) }?
             .node
     }

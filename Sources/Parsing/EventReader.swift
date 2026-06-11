@@ -40,7 +40,7 @@ public extension PureXML.Parsing {
 
         /// Creates a reader over a character-pulling source. The closure returns
         /// the next character or nil at end of input.
-        init(
+        public init(
             pulling pull: @escaping () -> Character?,
             limits: Limits = .default,
             resolver: EntityResolver = .refusing,
@@ -54,7 +54,7 @@ public extension PureXML.Parsing {
         }
 
         /// Creates a reader over a string (a convenience over the streaming init).
-        init(_ string: String, limits: Limits = .default, resolver: EntityResolver = .refusing, recovering: Bool = false) {
+        public init(_ string: String, limits: Limits = .default, resolver: EntityResolver = .refusing, recovering: Bool = false) {
             reader = Reader(string)
             self.limits = limits
             self.resolver = resolver
@@ -67,7 +67,7 @@ public extension PureXML.Parsing {
         /// diagnostic and reading continues, popping to a matching open element on
         /// a mismatched end tag and stopping (so the caller closes what is open) on
         /// truncation.
-        mutating func next() throws -> Event? {
+        public mutating func next() throws -> Event? {
             if !primed {
                 primed = true
                 if reader.peek() == "\u{FEFF}" {

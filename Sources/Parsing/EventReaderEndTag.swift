@@ -1,7 +1,9 @@
 /// The end-tag scanner, split from the reader body to keep it under the
 /// length caps. Behavior is part of EventReader proper.
 extension PureXML.Parsing.EventReader {
-    typealias Event = PureXML.Parsing.Event
+    /// Public: this alias shadows the public Parsing.Event for the whole
+    /// type, so it must not narrow the public next() signature (#142).
+    public typealias Event = PureXML.Parsing.Event
     typealias ParseError = PureXML.Parsing.ParseError
     mutating func scanEndTag() throws -> Event {
         let mark = reader.mark

@@ -61,21 +61,31 @@ int main(int argc, char **argv) {
     }
     printf("libxml2,serialize,%ld,%.6f\n", size, best_serialize);
 
-    /* XPath: count a broad selection. */
+    /* XPath: count a broad selection. libxml2 caps node sets at
+     * XPATH_MAX_NODESET_LENGTH (10M): past that the evaluation returns
+     * NULL, which is reported rather than dereferenced. */
     double best_xpath = 1e9;
-    long count = 0;
+    long count = -1;
     for (int i = 0; i < iterations; i++) {
         double t0 = now();
         xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
         xmlXPathObjectPtr res = xmlXPathEvalExpression((const xmlChar *)"count(//item[@kind='even'])", ctx);
-        count = (long)res->floatval;
-        double dt = now() - t0;
-        if (dt < best_xpath) best_xpath = dt;
-        xmlXPathFreeObject(res);
+        if (res) {
+            count = (long)res->floatval;
+            double dt = now() - t0;
+            if (dt < best_xpath) best_xpath = dt;
+            xmlXPathFreeObject(res);
+        }
         xmlXPathFreeContext(ctx);
+        if (!res) break;
     }
-    printf("libxml2,xpath,%ld,%.6f\n", size, best_xpath);
-    fprintf(stderr, "libxml2 xpath count: %ld\n", count);
+    if (count >= 0) {
+        printf("libxml2,xpath,%ld,%.6f\n", size, best_xpath);
+        fprintf(stderr, "libxml2 xpath count: %ld\n", count);
+    } else {
+        printf("libxml2,xpath,%ld,refused\n", size);
+        fprintf(stderr, "libxml2 xpath: evaluation refused (node-set cap)\n");
+    }
 
     xmlFreeDoc(doc);
     xmlCleanupParser();

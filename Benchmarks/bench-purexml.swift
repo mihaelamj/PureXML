@@ -29,10 +29,18 @@ func best(_ iterations: Int, _ body: () throws -> Void) rethrows -> Double {
 // Parse.
 var tree: PureXML.Model.TreeNode!
 let parseTime = try best(iterations) {
-    tree = try PureXML.parseTree(source)
+    tree = try PureXML.parseTree(source, limits: .init(allowDoctype: true))
 }
 
 print("purexml,parse,\(bytes),\(String(format: "%.6f", parseTime))")
+
+/// SAX (event stream only): isolates scanner cost from tree construction.
+let saxTime = try best(iterations) {
+    var reader = PureXML.events(source, limits: .init(allowDoctype: true))
+    while try reader.next() != nil {}
+}
+
+print("purexml,sax,\(bytes),\(String(format: "%.6f", saxTime))")
 
 // Serialize.
 let node = tree.node

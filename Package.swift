@@ -17,6 +17,11 @@ let package = Package(
             path: "Sources",
         ),
         .testTarget(
+            name: "PureXMLPublicAPITests",
+            dependencies: ["PureXML"],
+            path: "PublicAPITests",
+        ),
+        .testTarget(
             name: "PureXMLTests",
             dependencies: ["PureXML"],
             path: "Tests",
