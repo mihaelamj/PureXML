@@ -325,6 +325,7 @@ extension PureXML.XSLT {
                     descending: XSLTNode.attribute(sort, "order") == "descending",
                     numeric: XSLTNode.attribute(sort, "data-type") == "number",
                     caseOrder: caseOrder(sort),
+                    lang: XSLTNode.attribute(sort, "lang").map(valueTemplate),
                 )
             }
         }

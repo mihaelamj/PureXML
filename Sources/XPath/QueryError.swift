@@ -2,6 +2,9 @@ public extension PureXML.XPath {
     /// An error compiling or evaluating an XPath query.
     enum QueryError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
         case empty
+        /// The evaluation budget was exceeded (``PureXML/XPath/Budget``):
+        /// a node-set grew past the configured maximum.
+        case budgetExceeded(Int)
         case unexpectedToken(String)
         case expectedNodeTest
         case unterminatedPredicate
@@ -18,6 +21,7 @@ public extension PureXML.XPath {
         public var description: String {
             switch self {
             case .empty: "the XPath expression is empty"
+            case let .budgetExceeded(cap): "the evaluation budget was exceeded (node-set cap \(cap))"
             case let .unexpectedToken(token): "unexpected token '\(token)'"
             case .expectedNodeTest: "expected a node test"
             case .unterminatedPredicate: "unterminated predicate"

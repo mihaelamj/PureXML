@@ -171,10 +171,11 @@ extension PureXML.XSLT.Transformer {
         }
         if let valueExpression = spec.value {
             let number = value(valueExpression, context)?.number ?? .nan
-            // Outside [1, 2^53) the number renders as a plain XPath number
-            // (below one there is nothing to format; above, the Int
-            // conversion would trap and a Double holds no fraction anyway).
-            guard number.isFinite, number.rounded() >= 1, number.rounded() < 9_007_199_254_740_992 else {
+            // Outside [1, Int.max] the number renders as a plain XPath
+            // number (below one there is nothing to format; above, the Int
+            // conversion would trap; the bound is platform-correct, so
+            // wasm32's 32-bit Int is honored too).
+            guard number.isFinite, number.rounded() >= 1, number.rounded() <= Double(Int.max) else {
                 return PureXML.XPath.Value.format(number)
             }
             return XSLTNumbering.format([Int(number.rounded())], spec.format, grouping)

@@ -109,8 +109,6 @@ select/select28
 select/select67
 select/select68
 select/select75
-sort/sort-alphabet-polish
-sort/sort-alphabet-russian
 sort/sort02
 sort/sort10
 sort/sort14

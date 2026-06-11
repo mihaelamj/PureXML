@@ -64,8 +64,9 @@ public extension PureXML.XPath {
             size: Int = 1,
             variables: [String: Value] = [:],
             namespaces: [String: String] = [:],
+            budget: Budget? = nil,
         ) throws -> Value {
-            try Evaluator.value(expression, at: node, position: position, size: size, variables: variables, namespaces: namespaces)
+            try Evaluator.value(expression, at: node, position: position, size: size, variables: variables, namespaces: namespaces, budget: budget)
         }
 
         /// Like ``value(at:position:size:variables:)`` but with an extra function

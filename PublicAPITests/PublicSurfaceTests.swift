@@ -48,4 +48,17 @@ struct PublicSurfaceTests {
         }
         #expect(events == 5)
     }
+
+    @Test("An evaluation budget throws instead of evaluating unbounded")
+    func test_evaluationBudget() throws {
+        let tree = try PureXML.parseTree("<r><a/><a/><a/><a/><a/></r>")
+        let query = try PureXML.XPath.Query("//a")
+        // Unbounded evaluates; a budget below the result size throws.
+        #expect(try query.value(at: tree).nodes?.count == 5)
+        #expect(throws: PureXML.XPath.QueryError.budgetExceeded(3)) {
+            _ = try query.value(at: tree, budget: .init(maxNodeSetLength: 3))
+        }
+        // The libxml2-compatible cap admits ordinary documents.
+        #expect(try query.value(at: tree, budget: .libxml2Compatible).nodes?.count == 5)
+    }
 }

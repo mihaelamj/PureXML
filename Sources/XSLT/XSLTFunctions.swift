@@ -147,12 +147,14 @@ extension PureXML.XSLT {
         /// here may trap, whatever the value or the picture.
         private static func digits(_ value: Double, scale: Double, places: Int) -> (String, String) {
             let scaled = (value * scale).rounded()
+            // Int64 explicitly: on wasm32 Int is 32 bits and the conversion
+            // would trap at 2^31 (found by the WASI test run, #144).
             guard scaled.isFinite, scaled < 9_007_199_254_740_992, scale < 9_007_199_254_740_992 else {
                 let integer = PureXML.XPath.Value.format(value.rounded(.towardZero))
                 return (integer, String(repeating: "0", count: places))
             }
-            let total = Int(scaled)
-            let divisor = Int(scale)
+            let total = Int64(scaled)
+            let divisor = Int64(scale)
             var fraction = String(total % divisor)
             while fraction.count < places {
                 fraction = "0" + fraction

@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The last parity items, to one hundred percent (#143, #144, #130): XPath gains a configurable protective evaluation budget (`PureXML.XPath.Budget`, with a `libxml2Compatible` preset matching its fixed 10M node-set cap), threaded through query evaluation and thrown as a located `QueryError.budgetExceeded` instead of libxml2's silent refusal, default unbounded; xsl:sort honors `lang` (an attribute value template) with tailored alphabet orders for Polish and Russian derived from the conformance golds (diacritics interleaved, Cyrillic Yo after Ye), case-folded, falling back to the default order for untailored languages; and the WASM gate executes the full test suite under wasmtime on an actual WASI runtime (build-only with a notice when wasmtime is absent), wired into CI. The first WASI run immediately caught a real wasm32 trap: format-number's digit extraction converted through Int, which is 32 bits on wasm32 and trapped at 2^31 despite the 2^53 guard; the internals are now explicitly Int64 and the xsl:number bound is platform-correct (`Double(Int.max)`). Xalan baseline 127 to 125.
+
+### Added
+
 - Public streaming surface (#142) and a public-API test target: `EventReader.next()`, both initializers, and the `Event` alias are public, so external consumers can pull events with bounded memory over arbitrarily large inputs (an internal typealias in a split file had been shadowing the public `Parsing.Event`, narrowing `next()` to internal; the benchmark harness found it). A new `PureXMLPublicAPITests` target compiles against the public surface without `@testable`, so any public facade over internal members fails CI; it pins parse/query/serialize, streaming pull, and the chunked pull source.
 
 ### Fixed

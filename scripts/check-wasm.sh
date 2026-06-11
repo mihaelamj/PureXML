@@ -21,3 +21,19 @@ fi
 
 swift_command build --swift-sdk "$SDK_ID"
 swift_command build -c release --swift-sdk "$SDK_ID"
+
+# Runtime proof (#144): when wasmtime is available, the full test suite
+# executes on an actual WASI runtime; the first such run caught a real
+# wasm32 trap (32-bit Int conversion in format-number). Build-only when
+# wasmtime is absent, with a notice.
+if command -v wasmtime >/dev/null 2>&1; then
+  swift_command build --build-tests --swift-sdk "$SDK_ID"
+  TEST_BINARY="$(ls .build/wasm32-*/debug/*PackageTests.xctest 2>/dev/null | head -1)"
+  if [ -n "$TEST_BINARY" ]; then
+    wasmtime run --dir . "$TEST_BINARY" --testing-library swift-testing
+  else
+    echo "wasm: test binary not found; skipping runtime execution" >&2
+  fi
+else
+  echo "wasm: wasmtime not installed; build-only (install wasmtime for the runtime proof)" >&2
+fi

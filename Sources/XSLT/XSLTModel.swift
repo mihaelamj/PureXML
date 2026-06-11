@@ -30,8 +30,12 @@ public extension PureXML.XSLT {
         /// `case-order`: when set, the comparison is case-insensitive and this
         /// breaks ties; when nil, the comparison is the default codepoint order.
         public var caseOrder: CaseOrder?
+        /// `lang` as an attribute value template; a tailored alphabet order
+        /// applies when the evaluated language has one.
+        public var lang: ValueTemplate?
 
-        public init(select: String, descending: Bool, numeric: Bool, caseOrder: CaseOrder? = nil) {
+        public init(select: String, descending: Bool, numeric: Bool, caseOrder: CaseOrder? = nil, lang: ValueTemplate? = nil) {
+            self.lang = lang
             self.select = select
             self.descending = descending
             self.numeric = numeric

@@ -23,9 +23,20 @@ extension PureXML.XSLT.Transformer {
             keyContext.namespaces = context.namespaces
             return SortEntry(offset: offset, node: xnode, keys: sorts.map { string($0.select, keyContext) })
         }
+        // A lang attribute value template evaluates once per sort, in the
+        // caller's context; a known language selects its tailored alphabet.
+        let tailorings: [[Character: Int]?] = sorts.map { sort in
+            sort.lang.flatMap { PureXML.XSLT.Collation.table(for: avt($0, context)) }
+        }
         return keyed.sorted { lhs, rhs in
             for (index, sort) in sorts.enumerated() {
-                let order = Self.compareKeys(lhs.keys[index], rhs.keys[index], sort)
+                let order: Int
+                if !sort.numeric, sort.caseOrder == nil, let ranks = tailorings[index] {
+                    let tailored = PureXML.XSLT.Collation.compare(lhs.keys[index], rhs.keys[index], ranks)
+                    order = sort.descending ? -tailored : tailored
+                } else {
+                    order = Self.compareKeys(lhs.keys[index], rhs.keys[index], sort)
+                }
                 if order != 0 { return order < 0 }
             }
             return lhs.offset < rhs.offset

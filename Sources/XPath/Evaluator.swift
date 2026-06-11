@@ -61,8 +61,9 @@ extension PureXML.XPath {
             variables: [String: Value],
             functions: FunctionTable = FunctionTable(),
             namespaces: [String: String] = [:],
+            budget: Budget? = nil,
         ) throws -> Value {
-            try value(_: expression, atNode: .tree(node), position: position, size: size, variables: variables, functions: functions, namespaces: namespaces)
+            try value(_: expression, atNode: .tree(node), position: position, size: size, variables: variables, functions: functions, namespaces: namespaces, budget: budget)
         }
 
         /// Like `value(_:at:...)` but starting from any XPath node, attributes
@@ -75,6 +76,7 @@ extension PureXML.XPath {
             variables: [String: Value],
             functions: FunctionTable = FunctionTable(),
             namespaces: [String: String] = [:],
+            budget: Budget? = nil,
         ) throws -> Value {
             let context = EvaluationContext(
                 node: node,
@@ -83,6 +85,7 @@ extension PureXML.XPath {
                 variables: variables,
                 functions: library.merging(functions),
                 namespaces: namespaces,
+                budget: budget,
             )
             return try eval(expression, context)
         }
@@ -144,7 +147,7 @@ extension PureXML.XPath {
 
         private static func evalPath(absolute: Bool, steps: [Step], _ context: EvaluationContext) throws -> Value {
             let start: Node = absolute ? root(of: context.node) : context.node
-            return .nodeSet(orderUnique(evaluateSteps(steps, from: [start], context)))
+            return try .nodeSet(orderUnique(evaluateSteps(steps, from: [start], context)))
         }
 
         private static func evalFilter(
@@ -156,7 +159,7 @@ extension PureXML.XPath {
             var nodes = try orderUnique(nodeSet(eval(primary, context)))
             nodes = try applyPredicates(predicates, to: nodes, context)
             if !steps.isEmpty {
-                nodes = orderUnique(evaluateSteps(steps, from: nodes, context))
+                nodes = try orderUnique(evaluateSteps(steps, from: nodes, context))
             }
             return .nodeSet(nodes)
         }

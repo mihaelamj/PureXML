@@ -11,7 +11,7 @@ extension PureXML.XPath.Evaluator {
     /// Walks the steps from a starting node-set, threading each step's result into
     /// the next. Predicates run with proximity position within each context node's
     /// axis result.
-    static func evaluateSteps(_ steps: [Step], from start: [Node], _ context: EvaluationContext) -> [Node] {
+    static func evaluateSteps(_ steps: [Step], from start: [Node], _ context: EvaluationContext) throws -> [Node] {
         var current = start
         for step in steps {
             var result: [Node] = []
@@ -19,10 +19,11 @@ extension PureXML.XPath.Evaluator {
             for contextNode in current {
                 let matched = PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
                     .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
-                let filtered = (try? applyPredicates(step.predicates, to: matched, context)) ?? matched
+                let filtered = try applyPredicates(step.predicates, to: matched, context)
                 for node in filtered where seen.insert(node).inserted {
                     result.append(node)
                 }
+                try context.checkBudget(result.count)
             }
             current = result
         }

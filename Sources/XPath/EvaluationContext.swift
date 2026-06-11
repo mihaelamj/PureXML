@@ -20,6 +20,15 @@ extension PureXML.XPath {
         /// namespace. Empty by default, in which case matching falls back to
         /// the in-document prefix string.
         var namespaces: [String: String] = [:]
+        /// The optional protective budget; nil evaluates unbounded.
+        var budget: Budget?
+
+        /// Throws when `count` exceeds the budget's node-set cap.
+        func checkBudget(_ count: Int) throws {
+            if let budget, count > budget.maxNodeSetLength {
+                throw QueryError.budgetExceeded(budget.maxNodeSetLength)
+            }
+        }
 
         /// A copy positioned on `node` at one-based `position` within a node-set of
         /// `size`, keeping the same variables, functions, and namespace bindings.
@@ -31,6 +40,7 @@ extension PureXML.XPath {
                 variables: variables,
                 functions: functions,
                 namespaces: namespaces,
+                budget: budget,
             )
         }
     }
