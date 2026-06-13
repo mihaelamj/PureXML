@@ -35,7 +35,10 @@ extension PureXML.Regex {
             switch self {
             case .digit: scalar.properties.numericType == .decimal
             case .space: scalar == " " || scalar == "\t" || scalar == "\n" || scalar == "\r"
-            case .word: scalar.properties.isAlphabetic || scalar.properties.numericType == .decimal || scalar == "_"
+            // XSD \w is [#x0000-#x10FFFF]-[\p{P}\p{Z}\p{C}]: everything except
+            // punctuation, separators, and other. So symbols and marks are word
+            // characters, and `_` (Pc) is not, unlike the Perl definition.
+            case .word: !(CategoryMatcher.matches("P", scalar) || CategoryMatcher.matches("Z", scalar) || CategoryMatcher.matches("C", scalar))
             case .nameStart: PureXML.Parsing.XMLCharacter.isNameStart(scalar)
             case .nameChar: PureXML.Parsing.XMLCharacter.isNameChar(scalar)
             case .anyButLineBreak: scalar != "\n" && scalar != "\r"

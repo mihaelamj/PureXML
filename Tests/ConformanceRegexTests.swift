@@ -21,7 +21,9 @@ struct ConformanceRegexTests {
             // Character-class escapes.
             PatternSpec(name: "digits-ok", pattern: "\\d{3}", value: "123", valid: true),
             PatternSpec(name: "digits-fail", pattern: "\\d{3}", value: "12a", valid: false),
-            PatternSpec(name: "word-chars", pattern: "\\w+", value: "a_1", valid: true),
+            // XSD \w excludes punctuation, so the connector `_` (Pc) is not a word char.
+            PatternSpec(name: "word-chars", pattern: "\\w+", value: "abc1", valid: true),
+            PatternSpec(name: "word-chars-no-underscore", pattern: "\\w", value: "_", valid: false),
             PatternSpec(name: "whitespace-escape", pattern: "a\\sb", value: "a b", valid: true),
             // Unicode categories and blocks.
             PatternSpec(name: "category-letters", pattern: "\\p{L}+", value: "abcé", valid: true),
