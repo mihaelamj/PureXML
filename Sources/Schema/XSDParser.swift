@@ -148,7 +148,14 @@ extension PureXML.Schema {
             }
             let wildcard = attributeWildcard(under: node, context)
             guard let particle = modelGroup(in: node, context) else {
-                return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: .empty)
+                // A mixed type with no content model still permits character data
+                // (just no child elements): mixed content over an empty particle,
+                // not the empty content type, which forbids text.
+                guard mixed else {
+                    return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: .empty)
+                }
+                let emptyParticle = Particle(term: .group(.init(compositor: .sequence, particles: [])))
+                return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: .mixed(emptyParticle))
             }
             return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: mixed ? .mixed(particle) : .elementOnly(particle))
         }
