@@ -19,19 +19,19 @@ struct XSTSSuiteTests {
     }
 
     /// Exact-count baselines against the 2006-11-06 archive (first measured
-    /// 2026-06-13, over 14383 groups). These ratchet down as conformance work
-    /// closes deviations (#145-#148); a count rising is a regression. The
-    /// instance counts reflect the #146 list-facet fix (built-in list length
-    /// counts items), the #147 union-facet fix (pattern and enumeration
-    /// enforced on unions), and the #147 duration-ordering fix (minInclusive and
-    /// friends on xs:duration). The suite is opt-in, so CI and plain
+    /// 2026-06-13, over 14383 groups), counting only tests whose expected outcome
+    /// is settled: entries marked `<current status="queried">` (disputed in W3C
+    /// Bugzilla, with the expected validity itself contested) are excluded, since
+    /// agreeing or disagreeing with a contested expectation is not meaningful.
+    /// These ratchet down as conformance work closes deviations (#145-#148); a
+    /// count rising is a regression. The suite is opt-in, so CI and plain
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
-    private let knownSchemaValidRejected = 74
-    private let knownSchemaInvalidAccepted = 2467
-    private let knownInstanceValidRejected = 369
-    private let knownInstanceInvalidAccepted = 210
+    private let knownSchemaValidRejected = 72
+    private let knownSchemaInvalidAccepted = 2461
+    private let knownInstanceValidRejected = 338
+    private let knownInstanceInvalidAccepted = 179
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
@@ -98,6 +98,7 @@ struct XSTSSuiteTests {
         var schema: PureXML.Schema.Document?
         var schemaExpectedValid = true
         for schemaTest in elements(named: "schemaTest", under: .element(group)) {
+            guard isAccepted(schemaTest) else { continue }
             guard let first = references(in: .element(schemaTest), named: "schemaDocument").first else { continue }
             schemaExpectedValid = expectedValidity(schemaTest) != "invalid"
             let schemaPath = resolve(first, against: directory)
@@ -133,6 +134,7 @@ struct XSTSSuiteTests {
         into counters: inout Counters,
     ) {
         for instanceTest in elements(named: "instanceTest", under: .element(group)) {
+            guard isAccepted(instanceTest) else { continue }
             let expected = expectedValidity(instanceTest)
             guard expected == "valid" || expected == "invalid",
                   let href = references(in: .element(instanceTest), named: "instanceDocument").first,
@@ -183,6 +185,15 @@ struct XSTSSuiteTests {
 
     private func attribute(_ name: String, of element: PureXML.Model.Element) -> String? {
         element.attributes.first { $0.name.localName == name }?.value
+    }
+
+    /// Whether a schemaTest/instanceTest's expected outcome is settled. The suite
+    /// marks disputed entries `<current status="queried">` (often with a W3C
+    /// Bugzilla reference) where the expected validity is itself contested; those
+    /// are not authoritative, so they are not counted as agreements or deviations.
+    private func isAccepted(_ test: PureXML.Model.Element) -> Bool {
+        guard let current = elements(named: "current", under: .element(test)).first else { return true }
+        return (attribute("status", of: current) ?? "accepted") == "accepted"
     }
 
     private func expectedValidity(_ element: PureXML.Model.Element) -> String {
