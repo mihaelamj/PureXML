@@ -201,6 +201,11 @@ public extension PureXML.Schema {
         }
 
         private func lengthError(_ value: String, _ primitive: Primitive) -> String? {
+            // length/minLength/maxLength measure characters, octets, or list
+            // items depending on the type; for QName the spec leaves the unit
+            // unspecified (XSD 1.0 Datatypes 4.3.1), so like Xerces and the XSTS
+            // NIST oracle we do not constrain QName values by length.
+            if case .qName = primitive { return nil }
             let length = primitive.measuredLength(value)
             if let exact = facets.length, length != exact { return "length \(length) is not \(exact)" }
             if let minimum = facets.minLength, length < minimum { return "length \(length) is below \(minimum)" }
