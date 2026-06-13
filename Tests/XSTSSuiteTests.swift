@@ -30,7 +30,7 @@ struct XSTSSuiteTests {
     /// are written to /tmp/xsts-failures.txt for the burn-down.
     private let knownSchemaValidRejected = 72
     private let knownSchemaInvalidAccepted = 2461
-    private let knownInstanceValidRejected = 308
+    private let knownInstanceValidRejected = 288
     private let knownInstanceInvalidAccepted = 165
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
@@ -137,10 +137,17 @@ struct XSTSSuiteTests {
             guard isAccepted(instanceTest) else { continue }
             let expected = expectedValidity(instanceTest)
             guard expected == "valid" || expected == "invalid",
-                  let href = references(in: .element(instanceTest), named: "instanceDocument").first,
-                  let xml = try? String(contentsOfFile: resolve(href, against: directory), encoding: .utf8)
+                  let href = references(in: .element(instanceTest), named: "instanceDocument").first
             else { continue }
-            let isValid = ((try? schema.validate(xml))?.isEmpty) ?? false
+            let instancePath = resolve(href, against: directory)
+            guard let xml = try? String(contentsOfFile: instancePath, encoding: .utf8) else { continue }
+            // Resolve the instance's xsi:schemaLocation hints relative to the
+            // instance file, so a strict wildcard can find declarations in them.
+            let instanceDirectory = self.directory(of: instancePath)
+            let loader: (String) -> String? = { location in
+                (try? String(contentsOfFile: resolve(location, against: instanceDirectory), encoding: .utf8))
+            }
+            let isValid = ((try? schema.validate(xml, schemaLoader: loader))?.isEmpty) ?? false
             if expected == "valid", !isValid {
                 counters.instanceValidRejected += 1
                 counters.note("\(name)/\(attribute("name", of: instanceTest) ?? "?"): valid instance rejected")
