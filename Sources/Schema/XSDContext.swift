@@ -124,6 +124,30 @@ extension PureXML.Schema {
         /// The schema's target namespace, so the root element's namespace can be
         /// checked against it.
         var targetNamespace: String?
+        /// Schema-validity findings gathered while parsing (malformed facet
+        /// definitions and the like), reported together with the model-level
+        /// consistency findings when the schema is compiled.
+        var schemaErrors: [String] = []
+    }
+
+    /// Collects schema-validity findings during parsing. A reference type so the
+    /// findings survive the value-type ``XSDContext``'s copies (`visiting(_:)`):
+    /// every copy shares the one collector, and the parser harvests it at the end.
+    final class SchemaDiagnostics {
+        private(set) var errors: [String] = []
+
+        func report(_ message: String) {
+            errors.append(message)
+        }
+
+        /// The findings with exact-duplicate messages removed, first occurrence
+        /// kept. The same malformed definition is visited more than once (named
+        /// simple types resolve over repeated passes), so dedup keeps one finding
+        /// per distinct problem.
+        var deduplicated: [String] {
+            var seen: Set<String> = []
+            return errors.filter { seen.insert($0).inserted }
+        }
     }
 
     /// The parsing context: the named simple types resolved so far, plus the
@@ -159,6 +183,9 @@ extension PureXML.Schema {
         /// Named complex types being resolved up the current `complexContent`
         /// derivation chain, a guard against a cyclic base reference.
         var visitingTypes: Set<String> = []
+        /// The shared schema-validity finding collector. A reference type, so the
+        /// value-type context's copies all report into the one place.
+        let diagnostics = SchemaDiagnostics()
 
         func visiting(_ group: String) -> XSDContext {
             var copy = self

@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461** | we rarely catch a bad one |
+| **invalid-schemas-accepted** | **2461 -> 2082** | we rarely catch a bad one (facet-definition validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -38,16 +38,17 @@ existing pattern: collect ALL findings, report them together.
 
 Each iteration targets one self-contained rule family with a clean root cause.
 
-1. **Facet-definition validity** (XSD Part 2 §4.3). Each constraining facet's
-   `value` must be a valid instance of the facet's own type (`length`,
-   `minLength`, `maxLength`, `totalDigits`, `fractionDigits` are
-   `nonNegativeInteger`; `positiveInteger` for `totalDigits`; `minInclusive`
-   etc. must be valid in the base value space); facet co-occurrence rules
-   (`length` excludes `minLength`/`maxLength`; `minInclusive` excludes
-   `minExclusive`; `maxInclusive` excludes `maxExclusive`; `minInclusive` <=
-   `maxInclusive`; `minLength` <= `maxLength`; `fractionDigits` <=
-   `totalDigits`); `whiteSpace` may not weaken an inherited value. Big chunk of
-   DataTypes (703) and SimpleType (139).
+1. **Facet-definition validity** (XSD Part 2 §4.3). _Partly done (2461 -> 2082)._
+   Landed: length-family facet values must be `nonNegativeInteger`
+   (`totalDigits` a `positiveInteger`); `length` excludes
+   `minLength`/`maxLength`; `minLength` <= `maxLength`; `fractionDigits` <=
+   `totalDigits`. **Still open in this family:** `minInclusive`/`maxInclusive`/
+   `minExclusive`/`maxExclusive` value well-formedness in the base value space
+   and their mutual exclusions/ordering; facet applicability per base
+   (`fractionDigits` only on decimal-derived, `length` only on
+   string/binary/list, etc.); `whiteSpace` may not weaken an inherited value;
+   facet repetition. Inherited-facet co-occurrence (across derivation steps) is
+   deliberately not checked yet (current pass reads only the local restriction).
 2. **Resolvable references.** Every QName a schema names (`type`, element /
    attribute / group `ref`, restriction / extension `base`, `itemType`,
    `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a

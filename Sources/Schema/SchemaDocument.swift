@@ -120,14 +120,17 @@ public extension PureXML.Schema {
             targetNamespace = compiled.targetNamespace
             // Schema consistency through the validation framework: every named
             // type is checked by the composable rules (final respected, Particle
-            // Valid (Restriction)), and ALL findings are reported together.
+            // Valid (Restriction)), and ALL findings are reported together, joined
+            // with the schema-validity findings gathered while parsing (malformed
+            // facet definitions and the like).
             let findings = PureXML.Validation.XSDSchema.consistencyErrors(
                 types: compiled.types,
                 typeDerivation: compiled.typeDerivation,
                 typeFinal: compiled.typeFinal,
             )
-            if !findings.isEmpty {
-                throw SchemaError.inconsistent(findings.map { String(describing: $0) })
+            let allFindings = compiled.schemaErrors + findings.map { String(describing: $0) }
+            if !allFindings.isEmpty {
+                throw SchemaError.inconsistent(allFindings)
             }
         }
 

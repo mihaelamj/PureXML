@@ -40,17 +40,7 @@ extension PureXML.Schema {
                     types[name] = .complex(complexType(node, context))
                 }
             }
-            var elements: [String: ElementType] = [:]
-            for node in allChildren(containers, named: "element") where XSDNode.attribute(node, "name") != nil {
-                let name = XSDNode.attribute(node, "name") ?? ""
-                let type = elementType(node, context)
-                elements[name] = type
-                // An `xs:element ref="name"` resolves to this declaration's type
-                // through a reserved key (a colon keeps it out of the NCName-only
-                // type namespace), letting forward and recursive refs resolve at
-                // validation time.
-                types[elementKey(name)] = type
-            }
+            let elements = globalElements(containers, context, into: &types)
             let (nillable, elementConstraints) = elementMetadata(containers)
             return XSDCompiled(
                 elements: elements,
@@ -65,7 +55,27 @@ extension PureXML.Schema {
                 typeDerivation: derivation.typeDerivation,
                 typeFinal: derivation.typeFinal,
                 targetNamespace: context.targetNamespace,
+                schemaErrors: context.diagnostics.deduplicated,
             )
+        }
+
+        /// The global element declarations, also registering each under a reserved
+        /// `element:name` key in `types` so an `xs:element ref="name"` resolves to
+        /// this declaration's type (a colon keeps it out of the NCName-only type
+        /// namespace), letting forward and recursive refs resolve at validation time.
+        private static func globalElements(
+            _ containers: [XSDTree],
+            _ context: XSDContext,
+            into types: inout [String: ElementType],
+        ) -> [String: ElementType] {
+            var elements: [String: ElementType] = [:]
+            for node in allChildren(containers, named: "element") where XSDNode.attribute(node, "name") != nil {
+                let name = XSDNode.attribute(node, "name") ?? ""
+                let type = elementType(node, context)
+                elements[name] = type
+                types[elementKey(name)] = type
+            }
+            return elements
         }
 
         private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {
