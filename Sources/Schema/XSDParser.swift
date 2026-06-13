@@ -33,6 +33,9 @@ extension PureXML.Schema {
             context.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
             context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
             context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
+            for error in idAttributeErrors(schema) {
+                context.diagnostics.report(error)
+            }
             resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
             var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
             for node in allChildren(containers, named: "complexType") {

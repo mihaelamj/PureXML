@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 1789** | we rarely catch a bad one (facet-definition validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 1688** | we rarely catch a bad one (facet-definition validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -52,22 +52,28 @@ Each iteration targets one self-contained rule family with a clean root cause.
    may not weaken an inherited value; facet repetition. Inherited-facet
    co-occurrence (across derivation steps) is deliberately not checked yet
    (current pass reads only the local restriction).
-2. **Resolvable references.** Every QName a schema names (`type`, element /
-   attribute / group `ref`, restriction / extension `base`, `itemType`,
-   `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a
-   declaration at compile time. Machinery exists (`resolveReference`); it is not
-   run exhaustively at compile time. The `xsd0NN.e` "undeclared X" family.
+2. **`id` attribute validity** (xs:ID). _Done (1789 -> 1688)._ The `id`
+   attribute on any XSD component is xs:ID: each value must be a valid NCName and
+   unique within the schema document. Walks the schema-document tree, skipping
+   `appinfo`/`documentation` foreign content and treating only the unprefixed
+   `id` as the component identifier. Broad reach (idA-idK, attgA, attB, ctA).
 3. **Component-name uniqueness.** Identity-constraint names unique per schema;
    type / element / attribute names unique per namespace; no duplicate attribute
-   uses on a type. Cheap graph checks (IdentityConstraint 221, name cases).
-4. **Particle / model-group structural rules.** `all`-group restrictions
-   (already partly enforced), Unique Particle Attribution, element-decl
-   consistency. (ModelGroups, Particles, Group.)
-5. **Schema-for-schemas structural validity** (child order, misplaced
-   annotation, illegal content). This is the largest, most tedious tail. The
-   altitude decision: validate the schema *document* against the normative
-   schema-for-schemas (one general mechanism) rather than hand-coding each rule.
-   Defer until 1-4 are done and measure what remains.
+   uses on a type. Cheap graph checks (~12 identity-constraint-name cases, plus
+   type/element/attribute name collisions).
+4. **Resolvable references.** Every QName a schema names (`type`, element /
+   attribute / group `ref`, restriction / extension `base`, `itemType`,
+   `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a
+   declaration at compile time. Machinery exists (`resolveReference`); not run
+   exhaustively at compile time. The `xsd0NN.e` "undeclared X" family.
+5. **Facet applicability per base** (the open facet-family tail): which facets
+   a base admits (`fractionDigits` only on decimal-derived, `length` only on
+   string/binary/list, etc.), and a fixed facet may not be changed.
+6. **Particle / model-group structural rules** and **schema-for-schemas
+   structural validity** (child order, misplaced annotation, illegal content):
+   the largest, most tedious tail. Altitude decision: validate the schema
+   *document* against the normative schema-for-schemas (one general mechanism)
+   rather than hand-coding each rule. Defer until the above are done; re-measure.
 
 ## Per-iteration protocol (the PR-critic-loop)
 
