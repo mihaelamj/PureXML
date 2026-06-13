@@ -91,6 +91,19 @@ struct SchemaStructureTests {
         #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string" minOccurs="x"/></xs:sequence></xs:complexType>"#))
     }
 
+    @Test("a particle's minOccurs may not exceed its maxOccurs")
+    func test_occurrenceOrder() throws {
+        func wrap(_ particle: String) -> String {
+            "<xs:complexType name=\"t\"><xs:sequence>\(particle)</xs:sequence></xs:complexType>"
+        }
+        #expect(rejects(wrap(#"<xs:element name="a" type="xs:string" minOccurs="5" maxOccurs="2"/>"#)))
+        #expect(rejects(wrap(#"<xs:element name="a" type="xs:string" minOccurs="3" maxOccurs="0"/>"#)))
+        // Equal bounds, and unbounded, are fine.
+        try compile(wrap(#"<xs:element name="a" type="xs:string" minOccurs="2" maxOccurs="2"/>"#))
+        try compile(wrap(#"<xs:element name="a" type="xs:string" minOccurs="2" maxOccurs="unbounded"/>"#))
+        try compile(wrap(#"<xs:element name="a" type="xs:string" minOccurs="0" maxOccurs="0"/>"#))
+    }
+
     @Test("valid enumerated and occurrence attribute values compile")
     func test_validAttributeValues() throws {
         try compile(#"<xs:attribute name="a" type="xs:string" use="required"/>"#)

@@ -47,7 +47,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (twenty-three root causes, ~2138 deviations cleared)
+### Fixed (twenty-four root causes, ~2158 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -65,7 +65,7 @@ validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
 in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
 `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
-accepted 2461 to 997 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas); see `schema-validity-burndown.md`.
+accepted 2461 to 977 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)

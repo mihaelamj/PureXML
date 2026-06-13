@@ -65,6 +65,7 @@ extension PureXML.Schema.XSDParser {
         let children = PureXML.Schema.XSDNode.elementChildren(node)
         if node.name?.namespaceURI == xsdNamespace {
             errors += attributeValueErrors(node)
+            errors += occurrenceOrderErrors(node)
             if let local, let allowed = allowedChildren[local] {
                 let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
                 errors += childErrors(local: local, children: names, allowed: allowed)
@@ -136,6 +137,37 @@ extension PureXML.Schema.XSDParser {
         var digits = Substring(value)
         if digits.first == "+" { digits = digits.dropFirst() }
         return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
+    }
+
+    /// The finding, if any, for a particle whose `minOccurs` exceeds its
+    /// `maxOccurs`. `unbounded` is never exceeded, and a malformed value is left
+    /// to ``attributeValueError``; the comparison is by canonical magnitude, so it
+    /// holds for occurrence counts beyond a machine integer.
+    private static func occurrenceOrderErrors(_ node: XSDTree) -> [String] {
+        guard let minRaw = PureXML.Schema.XSDNode.attribute(node, "minOccurs"),
+              let maxRaw = PureXML.Schema.XSDNode.attribute(node, "maxOccurs")
+        else { return [] }
+        let minimum = minRaw.trimmingXMLWhitespace()
+        let maximum = maxRaw.trimmingXMLWhitespace()
+        guard maximum != "unbounded", isNonNegativeInteger(minimum), isNonNegativeInteger(maximum),
+              exceeds(minimum, maximum)
+        else { return [] }
+        return ["minOccurs (\(minRaw)) exceeds maxOccurs (\(maxRaw))"]
+    }
+
+    /// Whether nonNegativeInteger lexical `lhs` is strictly greater than `rhs`,
+    /// comparing canonical magnitude (sign and leading zeros stripped) by length
+    /// then lexically, so it is independent of machine-integer range.
+    private static func exceeds(_ lhs: String, _ rhs: String) -> Bool {
+        let left = canonicalMagnitude(lhs), right = canonicalMagnitude(rhs)
+        return left.count != right.count ? left.count > right.count : left > right
+    }
+
+    private static func canonicalMagnitude(_ value: String) -> Substring {
+        var digits = Substring(value)
+        if digits.first == "+" { digits = digits.dropFirst() }
+        let trimmed = digits.drop { $0 == "0" }
+        return trimmed.isEmpty ? "0" : trimmed
     }
 
     private static func childErrors(local: String, children: [String], allowed: Set<String>) -> [String] {
