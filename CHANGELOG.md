@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Schema.Document.validate(_:schemaLoader:)` honors an instance's `xsi:schemaLocation` and `xsi:noNamespaceSchemaLocation` (#147). Each referenced schema document is loaded through the supplied loader, compiled, and its global declarations merged in (the primary schema's own declarations win on conflict), so a strict or lax wildcard can resolve an element declared in another document. The plain `validate(_:)` is unchanged. XSTS: valid instances rejected 308 to 288 (the particle clusters whose wildcard-matched elements live in a separate, instance-referenced schema).
+
 ### Fixed
 
 - A `mixed="true"` complex type with no content model now permits character data (#147). Such a type (only attributes, no `sequence`/`choice`/`all`) was compiled to the empty content type, which forbids text, so a mixed element carrying only text was rejected. It is now mixed content over an empty particle: text is allowed, child elements are still not. XSTS: valid instances rejected 311 to 308.

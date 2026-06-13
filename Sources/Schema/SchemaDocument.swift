@@ -48,6 +48,58 @@ public extension PureXML.Schema {
         private let typeDerivation: [String: TypeDerivation]
         private let targetNamespace: String?
 
+        /// Combines already-compiled declaration tables, for merging the schemas
+        /// an instance references through `xsi:schemaLocation`. No consistency
+        /// check runs: each component schema was validated when first compiled.
+        private init(
+            elements: [String: ElementType],
+            types: [String: ElementType],
+            constraints: [String: [IdentityConstraint]],
+            nillableElements: Set<String>,
+            elementConstraints: [String: ValueConstraint],
+            abstractTypes: Set<String>,
+            abstractElements: Set<String>,
+            typeBlock: [String: Set<DerivationMethod>],
+            elementBlock: [String: Set<DerivationMethod>],
+            typeDerivation: [String: TypeDerivation],
+            targetNamespace: String?,
+        ) {
+            self.elements = elements
+            self.types = types
+            self.constraints = constraints
+            self.nillableElements = nillableElements
+            self.elementConstraints = elementConstraints
+            self.abstractTypes = abstractTypes
+            self.abstractElements = abstractElements
+            self.typeBlock = typeBlock
+            self.elementBlock = elementBlock
+            self.typeDerivation = typeDerivation
+            self.targetNamespace = targetNamespace
+        }
+
+        /// This schema with `other`'s global declarations merged in; this schema's
+        /// own declarations win on any key conflict. Used to fold in the schemas an
+        /// instance points at, so a strict/lax wildcard can resolve elements
+        /// declared in another document.
+        private func merging(_ other: Document) -> Document {
+            func mineFirst<V>(_ mine: [String: V], _ theirs: [String: V]) -> [String: V] {
+                mine.merging(theirs) { current, _ in current }
+            }
+            return Document(
+                elements: mineFirst(elements, other.elements),
+                types: mineFirst(types, other.types),
+                constraints: mineFirst(constraints, other.constraints),
+                nillableElements: nillableElements.union(other.nillableElements),
+                elementConstraints: mineFirst(elementConstraints, other.elementConstraints),
+                abstractTypes: abstractTypes.union(other.abstractTypes),
+                abstractElements: abstractElements.union(other.abstractElements),
+                typeBlock: mineFirst(typeBlock, other.typeBlock),
+                elementBlock: mineFirst(elementBlock, other.elementBlock),
+                typeDerivation: mineFirst(typeDerivation, other.typeDerivation),
+                targetNamespace: targetNamespace,
+            )
+        }
+
         /// Compiles a schema document. `schemaLoader` resolves the
         /// `schemaLocation` of `xs:include`, `xs:import`, and `xs:redefine` to
         /// schema source; it returns nil (the default) when external schemas are
@@ -84,6 +136,53 @@ public extension PureXML.Schema {
         /// when the root element has no global declaration.
         public func validate(_ xml: String) throws -> [PureXML.Validation.ValidationError] {
             try validate(PureXML.parse(xml))
+        }
+
+        /// Validates `xml`, additionally honoring the instance's
+        /// `xsi:schemaLocation` and `xsi:noNamespaceSchemaLocation` hints: each
+        /// referenced schema document is loaded through `schemaLoader`, compiled,
+        /// and its global declarations merged in (this schema's own declarations
+        /// win), so a strict or lax wildcard can resolve elements declared in
+        /// another document. With no hints this is `validate(_:)`.
+        public func validate(_ xml: String, schemaLoader: @escaping (String) -> String?) throws -> [PureXML.Validation.ValidationError] {
+            let node = try PureXML.parse(xml)
+            var combined = self
+            for location in Self.hintedSchemaLocations(in: node) {
+                guard let source = schemaLoader(location),
+                      let other = try? Document(source, schemaLoader: schemaLoader)
+                else { continue }
+                combined = combined.merging(other)
+            }
+            return combined.validate(node)
+        }
+
+        /// The schema-document locations an instance points at through
+        /// `xsi:schemaLocation` (the second token of each namespace/location pair)
+        /// and `xsi:noNamespaceSchemaLocation` (a single location).
+        private static func hintedSchemaLocations(in node: PureXML.Model.Node) -> [String] {
+            guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
+                return []
+            }
+            var locations: [String] = []
+            for attribute in root.attributes {
+                let isInstance = attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance"
+                    || attribute.name.prefix == "xsi"
+                guard isInstance else { continue }
+                switch attribute.name.localName {
+                case "schemaLocation":
+                    let tokens = attribute.value.split(whereSeparator: \.isWhitespace).map(String.init)
+                    var index = 1
+                    while index < tokens.count {
+                        locations.append(tokens[index])
+                        index += 2
+                    }
+                case "noNamespaceSchemaLocation":
+                    locations.append(attribute.value)
+                default:
+                    break
+                }
+            }
+            return locations
         }
 
         /// Validates `xml` against the schema while it is pulled event by event (the
