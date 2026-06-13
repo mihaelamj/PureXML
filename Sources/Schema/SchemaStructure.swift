@@ -63,13 +63,59 @@ extension PureXML.Schema.XSDParser {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         let children = PureXML.Schema.XSDNode.elementChildren(node)
-        if node.name?.namespaceURI == xsdNamespace, let local, let allowed = allowedChildren[local] {
-            let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
-            errors += childErrors(local: local, children: names, allowed: allowed)
+        if node.name?.namespaceURI == xsdNamespace {
+            errors += attributeValueErrors(node)
+            if let local, let allowed = allowedChildren[local] {
+                let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
+                errors += childErrors(local: local, children: names, allowed: allowed)
+            }
         }
         for child in children {
             collectStructure(child, into: &errors)
         }
+    }
+
+    /// The enumerated value space of the schema-vocabulary attributes that take a
+    /// fixed set of tokens. Each name has one meaning throughout XSD, so checking
+    /// by local name is safe; `minOccurs`/`maxOccurs` are handled numerically.
+    private static let attributeEnumerations: [String: Set<String>] = [
+        "form": ["qualified", "unqualified"],
+        "elementFormDefault": ["qualified", "unqualified"],
+        "attributeFormDefault": ["qualified", "unqualified"],
+        "use": ["optional", "prohibited", "required"],
+        "processContents": ["skip", "lax", "strict"],
+        "mixed": ["true", "false", "1", "0"],
+        "abstract": ["true", "false", "1", "0"],
+        "nillable": ["true", "false", "1", "0"],
+    ]
+
+    /// Findings for the unprefixed schema-vocabulary attributes on `node` whose
+    /// value falls outside its fixed value space: an enumerated attribute with an
+    /// unknown token, or `minOccurs`/`maxOccurs` that is not a `nonNegativeInteger`
+    /// (`maxOccurs` also admits `unbounded`). A prefixed (foreign) attribute is the
+    /// schema author's own and is not checked.
+    private static func attributeValueErrors(_ node: XSDTree) -> [String] {
+        var errors: [String] = []
+        for attribute in node.attributes where attribute.name.prefix == nil {
+            let name = attribute.name.localName
+            let value = attribute.value.trimmingXMLWhitespace()
+            if let allowed = attributeEnumerations[name], !allowed.contains(value) {
+                errors.append("attribute '\(name)' has invalid value '\(attribute.value)'")
+            } else if name == "minOccurs", !isNonNegativeInteger(value) {
+                errors.append("attribute 'minOccurs' must be a nonNegativeInteger, not '\(attribute.value)'")
+            } else if name == "maxOccurs", value != "unbounded", !isNonNegativeInteger(value) {
+                errors.append("attribute 'maxOccurs' must be a nonNegativeInteger or 'unbounded', not '\(attribute.value)'")
+            }
+        }
+        return errors
+    }
+
+    /// Whether `value` is a lexical `nonNegativeInteger` (optional `+`, ASCII
+    /// digits), independent of machine-integer range.
+    private static func isNonNegativeInteger(_ value: String) -> Bool {
+        var digits = Substring(value)
+        if digits.first == "+" { digits = digits.dropFirst() }
+        return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
     private static func childErrors(local: String, children: [String], allowed: Set<String>) -> [String] {

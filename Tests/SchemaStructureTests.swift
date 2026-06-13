@@ -74,6 +74,30 @@ struct SchemaStructureTests {
         """#)
     }
 
+    @Test("enumerated attributes accept only their value space")
+    func test_enumeratedAttributeValues() {
+        #expect(rejects(#"<xs:attribute name="a" type="xs:string" use="foo"/>"#))
+        #expect(rejects(#"<xs:attribute name="a" type="xs:string" use=""/>"#))
+        #expect(rejects(#"<xs:complexType name="t" mixed="yes"><xs:sequence/></xs:complexType>"#))
+        #expect(rejects(#"<xs:complexType name="t" abstract="maybe"><xs:sequence/></xs:complexType>"#))
+        #expect(rejects(#"<xs:element name="a" type="xs:string" form="Qualified"/>"#))
+    }
+
+    @Test("minOccurs and maxOccurs must be nonNegativeInteger (maxOccurs also unbounded)")
+    func test_occursValues() throws {
+        try compile(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>"#)
+        #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string" minOccurs="-1"/></xs:sequence></xs:complexType>"#))
+        #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string" maxOccurs="lots"/></xs:sequence></xs:complexType>"#))
+        #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string" minOccurs="x"/></xs:sequence></xs:complexType>"#))
+    }
+
+    @Test("valid enumerated and occurrence attribute values compile")
+    func test_validAttributeValues() throws {
+        try compile(#"<xs:attribute name="a" type="xs:string" use="required"/>"#)
+        try compile(#"<xs:complexType name="t" mixed="true"><xs:sequence/></xs:complexType>"#)
+        try compile(#"<xs:complexType name="t" abstract="false"><xs:sequence/></xs:complexType>"#)
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""

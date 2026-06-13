@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 1313** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 1190** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -73,11 +73,7 @@ Each iteration targets one self-contained rule family with a clean root cause.
    (1688 -> 1313, -375)._ A data-driven `allowedChildren` table (the schema-for-
    schemas child content model) rejects disallowed children, multi/misplaced
    `annotation`, and identity constraints missing selector/field, via one general
-   mechanism (`SchemaStructure.swift`). **Still open:** the **attribute model**
-   (which attributes each component admits, and their value types) is the obvious
-   next sibling table and the largest remaining lever; child *order* beyond the
-   leading annotation; and particle / model-group semantic rules (Unique Particle
-   Attribution, Particle-Valid-Restriction completeness).
+   mechanism (`SchemaStructure.swift`). Attribute **value** validity also landed (enumerated attributes, `minOccurs`/`maxOccurs`; 1313 -> 1190). **Still open:** attribute **applicability** (which attributes each component admits, e.g. `form` is prohibited on a global declaration, `ref` excludes `name`); child *order* beyond the leading annotation; and particle / model-group semantic rules (Unique Particle Attribution, Particle-Valid-Restriction completeness).
 
 ## Per-iteration protocol (the PR-critic-loop)
 
