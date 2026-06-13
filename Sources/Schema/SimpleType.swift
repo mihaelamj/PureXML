@@ -239,6 +239,7 @@ public extension PureXML.Schema {
         }
 
         private func rangeError(_ value: String, _ primitive: Primitive) -> String? {
+            if case .duration = primitive { return durationRangeError(value) }
             guard let actual = primitive.ordered(value) else { return nil }
             if let bound = facets.minInclusive, let limit = primitive.ordered(bound), actual < limit {
                 return "\(value) is below the inclusive minimum"
@@ -250,6 +251,29 @@ public extension PureXML.Schema {
                 return "\(value) is not above the exclusive minimum"
             }
             if let bound = facets.maxExclusive, let limit = primitive.ordered(bound), !(actual < limit) {
+                return "\(value) is not below the exclusive maximum"
+            }
+            return nil
+        }
+
+        /// Ordering facets on `xs:duration`, which is a partial order: a value
+        /// that is incomparable to the bound does not satisfy it (it is not in
+        /// the ordered range), so an incomparable result is a violation.
+        private func durationRangeError(_ value: String) -> String? {
+            guard let actual = DurationValue(value) else { return nil }
+            func order(_ bound: String?) -> DurationValue.Order? {
+                bound.flatMap(DurationValue.init).map(actual.compare(to:))
+            }
+            if let order = order(facets.minInclusive), order == .lessThan || order == .incomparable {
+                return "\(value) is below the inclusive minimum"
+            }
+            if let order = order(facets.maxInclusive), order == .greaterThan || order == .incomparable {
+                return "\(value) is above the inclusive maximum"
+            }
+            if let order = order(facets.minExclusive), order != .greaterThan {
+                return "\(value) is not above the exclusive minimum"
+            }
+            if let order = order(facets.maxExclusive), order != .lessThan {
                 return "\(value) is not below the exclusive maximum"
             }
             return nil
