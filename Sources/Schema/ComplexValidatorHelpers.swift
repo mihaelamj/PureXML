@@ -86,14 +86,24 @@ extension PureXML.Schema.ComplexValidator {
         lhs.namespaceURI == rhs.namespaceURI && lhs.localName == rhs.localName
     }
 
+    /// The element's character content, trimmed: used to decide whether an
+    /// element-only or empty type wrongly carries significant text (indentation
+    /// whitespace between child elements is not significant).
     static func textContent(_ element: PureXML.Model.Element) -> String {
-        let text = element.children.reduce(into: "") { result, child in
+        rawTextContent(element).trimmingXMLWhitespace()
+    }
+
+    /// The element's character content verbatim. Simple-content validation uses
+    /// this so the type's own `whiteSpace` facet decides normalization: a
+    /// `preserve` type (xs:string) keeps leading/trailing whitespace, while a
+    /// `collapse` type still trims and collapses through `process`.
+    static func rawTextContent(_ element: PureXML.Model.Element) -> String {
+        element.children.reduce(into: "") { result, child in
             switch child {
             case let .text(value), let .cdata(value): result += value
             default: break
             }
         }
-        return text.trimmingXMLWhitespace()
     }
 
     static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
