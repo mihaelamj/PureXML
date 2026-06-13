@@ -115,6 +115,14 @@ public extension PureXML.Schema {
             if case let .fixed(value) = self { return value }
             return nil
         }
+
+        /// The constraint's value, whether `default` or `fixed`: the value an
+        /// empty element or absent attribute takes.
+        public var value: String {
+            switch self {
+            case let .default(value), let .fixed(value): value
+            }
+        }
     }
 
     /// An attribute use on a complex type.

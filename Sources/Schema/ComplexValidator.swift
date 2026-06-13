@@ -87,6 +87,8 @@ public extension PureXML.Schema {
         func elementFixedErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure] {
             guard let fixed = elementConstraints[element.name.localName]?.fixedValue else { return [] }
             let text = Self.textContent(element)
+            // An empty element takes the fixed value; only present content must equal it.
+            if text.isEmpty { return [] }
             return text == fixed ? [] : [XSDFailure(reason: "element '\(element.name.localName)' is fixed and must be '\(fixed)'", at: path)]
         }
 
@@ -261,7 +263,12 @@ public extension PureXML.Schema {
                 if !child.children.compactMap(\.element).isEmpty {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)' must not have children", at: path))
                 }
-                if let error = simple.validate(Self.textContent(child)) {
+                // An empty element takes its `default`/`fixed` value; that value
+                // (not the empty string) is what must be valid against the type,
+                // including any xsi:type override already resolved into `simple`.
+                let text = Self.textContent(child)
+                let effective = text.isEmpty ? (elementConstraints[child.name.localName]?.value ?? text) : text
+                if let error = simple.validate(effective) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
                 }
                 errors += elementFixedErrors(child, at: path)
