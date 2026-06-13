@@ -195,6 +195,33 @@ struct SchemaStructureTests {
         #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element ref="g" type="xs:string"/></xs:sequence></xs:complexType><xs:element name="g" type="xs:string"/>"#))
     }
 
+    @Test("element declarations in one content model must be consistent")
+    func test_elementDeclsConsistent() throws {
+        // Same name, different type in one content model is invalid.
+        #expect(rejects(#"""
+        <xs:complexType name="t"><xs:sequence>
+          <xs:element name="a" type="xs:string"/>
+          <xs:element name="a" type="xs:integer"/>
+        </xs:sequence></xs:complexType>
+        """#))
+        // Same name, same type is fine.
+        try compile(#"""
+        <xs:complexType name="t"><xs:sequence>
+          <xs:element name="a" type="xs:string" minOccurs="0"/>
+          <xs:element name="a" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+        """#)
+        // A same name in a NESTED complex type is a different content model: allowed.
+        try compile(#"""
+        <xs:complexType name="t"><xs:sequence>
+          <xs:element name="a" type="xs:string"/>
+          <xs:element name="b">
+            <xs:complexType><xs:sequence><xs:element name="a" type="xs:integer"/></xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:sequence></xs:complexType>
+        """#)
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""
