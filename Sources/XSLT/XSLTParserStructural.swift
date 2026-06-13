@@ -65,7 +65,7 @@ extension PureXML.XSLT.XSLTParser {
     /// the namespaces of the prefixes listed in `exclude-result-prefixes`
     /// and `extension-element-prefixes` in scope.
     static func copiedNamespaces(_ node: XSLTTree) -> [String: String] {
-        var bindings = inScopeNamespaces(node)
+        let bindings = inScopeNamespaces(node)
         var excludedURIs: Set<String> = [XSLTNode.namespace]
         for prefix in excludedPrefixTokens(node) {
             let key = prefix == "#default" ? "" : prefix

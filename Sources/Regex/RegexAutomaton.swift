@@ -62,6 +62,20 @@ extension PureXML.Regex {
             return states.count - 1
         }
 
+        /// `{n,m}` quantifiers unroll into automaton states. Mirroring the XSD
+        /// content-model builder (`Schema.ContentNFABuilder`), each repetition is
+        /// capped and the total state count is bounded: past the ceiling a
+        /// repetition degrades to star, the libxml2 posture. Without this an
+        /// `xs:pattern` such as `a{1000000000}` (the XSTS msMeta Regex set)
+        /// allocates until the process is OOM-killed (#129). Real patterns are
+        /// tens of states, so only pathological quantifiers reach the ceiling.
+        private static let repeatUnrollCap = 16384
+        private static let totalStateCap = 1 << 20
+
+        private var stateBudgetExhausted: Bool {
+            states.count >= Self.totalStateCap
+        }
+
         private mutating func fragment(for node: Node) -> (start: Int, accept: Int) {
             switch node {
             case .empty:
@@ -109,14 +123,22 @@ extension PureXML.Regex {
         private mutating func repeatedFragment(_ node: Node, minimum: Int, maximum: Int?) -> (start: Int, accept: Int) {
             let start = addState()
             var current = start
-            for _ in 0 ..< minimum {
+            let boundedMin = Swift.min(minimum, Self.repeatUnrollCap)
+            var unrolled = 0
+            for _ in 0 ..< boundedMin {
+                if stateBudgetExhausted { break }
                 let part = fragment(for: node)
                 states[current].epsilon.append(part.start)
                 current = part.accept
+                unrolled += 1
             }
             let accept = addState()
-            if let maximum {
-                appendOptional(node, count: maximum - minimum, from: current, to: accept)
+            if stateBudgetExhausted || unrolled < boundedMin || minimum > Self.repeatUnrollCap {
+                // An absurd minimum, or a build that hit the total state ceiling
+                // mid-unroll, repeats freely (star) past the cap.
+                appendStar(node, from: current, to: accept)
+            } else if let maximum, maximum - boundedMin <= Self.repeatUnrollCap {
+                appendOptional(node, count: maximum - boundedMin, from: current, to: accept)
             } else {
                 appendStar(node, from: current, to: accept)
             }
@@ -126,6 +148,11 @@ extension PureXML.Regex {
         private mutating func appendOptional(_ node: Node, count: Int, from: Int, to accept: Int) {
             var current = from
             for _ in 0 ..< max(0, count) {
+                if stateBudgetExhausted {
+                    // Ran out of state budget: let the remainder repeat freely.
+                    appendStar(node, from: current, to: accept)
+                    return
+                }
                 let part = fragment(for: node)
                 states[current].epsilon.append(part.start)
                 states[current].epsilon.append(accept)

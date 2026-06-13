@@ -18,15 +18,18 @@ struct XSTSSuiteTests {
         ProcessInfo.processInfo.environment["XSTS_ROOT"]
     }
 
-    /// Exact-count baselines. These are PENDING the first measurement
-    /// (scheduled 2026-06-14): until it lands, a run against XSTS_ROOT
-    /// fails these assertions by design, and the failure messages carry
-    /// the measured counts to transcribe here. The suite is opt-in, so
-    /// CI and plain `swift test` are unaffected.
-    private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 0
-    private let knownInstanceValidRejected = 0
-    private let knownInstanceInvalidAccepted = 0
+    /// Exact-count baselines from the first measurement against the
+    /// 2006-11-06 archive (2026-06-13, over 14383 groups; schema ok 11786,
+    /// instance ok 23804). A case must leave these counts as conformance work
+    /// closes them, and a regression shows up as a count rising. The suite is
+    /// opt-in, so CI and plain `swift test` are unaffected; run it with
+    /// `swift test -c release --filter XSTS` (the debug build is far slower and
+    /// the corpus is large). Per-case deviations are written to
+    /// /tmp/xsts-failures.txt for the burn-down.
+    private let knownSchemaValidRejected = 75
+    private let knownSchemaInvalidAccepted = 2467
+    private let knownInstanceValidRejected = 604
+    private let knownInstanceInvalidAccepted = 582
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
