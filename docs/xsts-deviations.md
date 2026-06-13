@@ -86,7 +86,26 @@ own epic, not part of the instance-correctness burn-down.
 ## Category C: arguable / needs investigation
 
 - `test`, `elemT` (invalid instance accepted, ~86): not yet sampled; classify before fixing.
-- QName length (listed in A) is spec-murky; it sits in A because NIST and Xerces agree the instance is valid, so rejecting it is the defensible bug.
+
+## Category D: deliberate interpretations of spec-ambiguous points
+
+These are resolved, not open: the spec underspecifies the point and the suite's
+own contributors disagree, so a single behavior cannot satisfy all of them. We
+pick the defensible reading and accept the residual deviation.
+
+- **QName length facets are non-constraining.** XSD 1.0 Datatypes 4.3.1 defines
+  the unit of length for string (characters), anyURI (characters), binary
+  (octets), and list (items), but not for QName, so it is implementation-defined.
+  NIST (36+ cases) and Xerces treat `length`/`minLength`/`maxLength` on QName as
+  always satisfied; Microsoft (4 cases: `QName_length001/003`, `QName_minLength003`,
+  `QName_maxLength001`) treats them as character counts and expects rejection.
+  These are directly contradictory (NIST marks a 15-character value valid under
+  `length=1`; MS marks `foofo` invalid under `length=4`). We chose
+  non-constraining, matching Xerces and the larger NIST set, because a QName's
+  value is an abstract (namespace, local-name) pair with no defined character
+  length. Cost: the 4 MS cases remain in "invalid instances accepted". Fixing
+  the 36+ NIST false rejections (valid documents wrongly rejected) is the more
+  important direction.
 
 ## How a fix lands
 
