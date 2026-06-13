@@ -21,18 +21,18 @@ struct SchemaListFacetTests {
 
     @Test("length on NMTOKENS counts items, not characters")
     func test_nmtokensLength() throws {
-        let s = try schema("xs:NMTOKENS", #"<xs:length value="3"/>"#)
-        #expect(try s.validate("<v>alpha beta gamma</v>").isEmpty) // 3 items: valid
-        #expect(try !s.validate("<v>alpha beta</v>").isEmpty) // 2 items: invalid
-        #expect(try !s.validate("<v>alpha beta gamma delta</v>").isEmpty) // 4 items: invalid
+        let doc = try schema("xs:NMTOKENS", #"<xs:length value="3"/>"#)
+        #expect(try doc.validate("<v>alpha beta gamma</v>").isEmpty) // 3 items: valid
+        #expect(try !doc.validate("<v>alpha beta</v>").isEmpty) // 2 items: invalid
+        #expect(try !doc.validate("<v>alpha beta gamma delta</v>").isEmpty) // 4 items: invalid
     }
 
     @Test("minLength and maxLength on IDREFS count items")
     func test_idrefsMinMax() throws {
-        let s = try schema("xs:IDREFS", #"<xs:minLength value="2"/><xs:maxLength value="3"/>"#)
-        #expect(try s.validate("<v>a b</v>").isEmpty) // 2 items: valid
-        #expect(try s.validate("<v>a b c</v>").isEmpty) // 3 items: valid
-        #expect(try !s.validate("<v>a</v>").isEmpty) // 1 item: invalid
-        #expect(try !s.validate("<v>a b c d</v>").isEmpty) // 4 items: invalid
+        let doc = try schema("xs:IDREFS", #"<xs:minLength value="2"/><xs:maxLength value="3"/>"#)
+        #expect(try doc.validate("<v>a b</v>").isEmpty) // 2 items: valid
+        #expect(try doc.validate("<v>a b c</v>").isEmpty) // 3 items: valid
+        #expect(try !doc.validate("<v>a</v>").isEmpty) // 1 item: invalid
+        #expect(try !doc.validate("<v>a b c d</v>").isEmpty) // 4 items: invalid
     }
 }
