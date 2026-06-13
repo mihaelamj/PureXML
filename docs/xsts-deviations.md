@@ -29,38 +29,51 @@ which is an astral math capital); agreeing or disagreeing with a contested
 expectation is not meaningful, so the runner skips them. Excluding the queried
 entries removed about 70 apparent deviations that were never bugs.
 
-## Baseline (post #146 list-facet fix)
+## Baseline (settled expectations; after twelve fixes)
 
-| Kind | Count |
-|---|---|
-| valid schema rejected | 75 |
-| invalid schema accepted | 2467 |
-| valid instance rejected | 547 |
-| invalid instance accepted | 555 |
+| Kind | First measurement | Now |
+|---|---|---|
+| valid schema rejected | 75 | 72 |
+| invalid schema accepted | 2467 | 2461 |
+| valid instance rejected | 604 | 308 |
+| invalid instance accepted | 582 | 165 |
+
+Counts are against *settled* W3C expectations (queried/disputed entries excluded).
 
 XSTS is a deliberately adversarial, exhaustive corpus; mature validators
 (Xerces, libxml2) do not pass it fully. The goal is not a green number. It is to
 fix the deviations that are genuine correctness bugs affecting real documents,
 and to document the remainder as spec-justified, deliberate exclusions.
 
-## Category A: genuine correctness bugs (fix; real-data impact)
+## Category A: genuine correctness bugs
 
-These are cases where PureXML mishandles a feature it does support. Each is a
-real bug a user could hit with a well-formed schema and document.
+### Fixed (twelve root causes, ~640 deviations cleared)
 
-| Cluster(s) | Count | Root cause | Locus | Status |
-|---|---|---|---|---|
-| `list-NMTOKENS/IDREFS/ENTITIES` length facets | ~84 | length on a built-in list counted characters, not items | `XSDSimpleParser.simpleType` | **fixed (#146)** |
-| `union-*-pattern`, `union-*-enumeration` | ~200 | a union restricted by `enumeration`/`pattern` does not enforce the facet (value outside the enumeration is accepted) | `SimpleType.validateUnion` | open, one fix, high value |
-| `atomic-duration-minInclusive/maxInclusive` | ~50 | duration ordering bounds not enforced | duration comparison | open |
-| `reL`, `reI`, `RegexTest` (instance) | ~155 | missing Unicode block escapes (`\p{IsArmenian}` etc.) and category coverage in the regex engine | `Sources/Regex` | open, feature completion |
-| `atomic-QName-length`, `-minLength` | ~36 | character-length facet wrongly applied to `QName`; the spec/NIST treat QName length as non-constraining (Xerces agrees) | length facet on QName | open, over-strict |
-| `valueconstraint`, `isDefault` | ~26 | default/fixed value handling | element/attr defaults | open, needs sampling |
-| `particlesJk/Jj/Ha/Q/R` (schema), `particlesOb/Je` (instance) | ~110 | content-model construction/validation edge cases | content model | open, bounded |
-| `int_min/maxInclusive`, `int_min/maxExclusive` (schema) | ~16 | integer bound facets rejecting legal schemas | numeric facets | open, bounded |
+list-datatype length facets (#146) · union pattern/enumeration facets · duration
+partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
+Unicode block set · element-level `block` against `xsi:type` · empty-element
+default/fixed values + enumeration-restriction-replaces · `block="substitution"`
+on substitution-group heads · `\w`/`\W` XSD definition · document-scoped
+xs:ID/xs:IDREF uniqueness and resolution · `<xs:attribute ref>` resolution ·
+mixed-content type with no element model. Plus the measurement fix (exclude
+W3C-disputed `status="queried"` entries).
 
-Recommended order: union facets (~200, one fix) → QName length (~36) → regex
-Unicode blocks (~155) → duration ordering (~50) → particles/int facets.
+### Remaining, root-caused (the hard tail)
+
+Each is a substantial, self-contained study, not a one-locus cluster fix:
+
+| Cluster(s) | ~Count | Root cause (diagnosed) | Difficulty |
+|---|---|---|---|
+| `particlesOb/Je/Jf`, related | ~30 | `<xs:any>` defaults to `processContents="strict"`; the matched element's declaration lives in a *separate* schema document referenced only by the instance `xsi:schemaLocation` (no `<import>`). Needs multi-document schema loading + `xsi:schemaLocation` honoring, plus strict-wildcard semantics and Particle-Valid-Restriction. | large (new capability) |
+| `reI` | ~10 | `pattern` values containing literal tab/newline: XML attribute-value normalization (tab/newline to space) versus the value's `whiteSpace` facet. The "right" pattern text depends on that interaction. | subtle |
+| `test`, `elemT` | ~65 | heterogeneous grab-bags (MS "Additional"/element tests): many distinct minor causes, not one root cause. Each case needs individual triage. | per-case grind |
+| `idF`, `idc` remainder | ~15 | identity-constraint selector/field XPath edge cases beyond the implemented `unique`/`key`/`keyref` core. | moderate |
+| `wildG`, `stZ`, `addB` | ~25 | wildcard-in-group composition, simple-type edge cases, attribute-default edges. | mixed |
+
+The clean, single-root-cause, high-leverage fixes are exhausted. Reaching zero
+on the instance buckets requires the multi-document-schema capability (the
+largest single lever, ~30 cases) and per-case work on the grab-bags; neither is
+a quick fix, and rushing them would violate the project's no-shortcuts ethic.
 
 ## Category B: schema-for-schemas validity (unimplemented by design)
 
