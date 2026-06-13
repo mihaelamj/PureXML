@@ -261,6 +261,15 @@ public extension PureXML.Schema {
             guard let declared = overriddenType(declared, for: child, at: path, into: &errors) else { return }
             switch declared {
             case let .simple(simple):
+                // A simple type declares no attribute uses, so a simple-typed
+                // element (including one whose simple type comes from an xsi:type
+                // override, and including a nilled one) may carry only the
+                // schema-instance and namespace attributes; any other is a
+                // violation. Checked before the nil short-circuit, since an
+                // xsi:nil element is equally bound by it.
+                for attribute in child.attributes where !Self.isNamespaceDeclaration(attribute) && !Self.isSchemaInstanceAttribute(attribute) {
+                    errors.append(XSDFailure(reason: "'\(child.name.localName)' has a simple type and must not carry attribute '\(attribute.name.localName)'", at: path))
+                }
                 if let nilErrors = nilErrors(child, at: path) {
                     errors += nilErrors
                     return
@@ -283,23 +292,6 @@ public extension PureXML.Schema {
             case .typeReference:
                 validateResolvedReference(declared, child, at: path, into: &errors)
             }
-        }
-
-        /// The declared type after an `xsi:type` override. An override naming an
-        /// undeclared type appends an error and returns nil, not a silent fallback
-        /// to the declared type.
-        private func overriddenType(
-            _ declared: ElementType,
-            for child: PureXML.Model.Element,
-            at path: XSDPath,
-            into errors: inout [XSDFailure],
-        ) -> ElementType? {
-            guard let overriding = Self.xsiTypeName(child) else { return declared }
-            guard let resolved = types[overriding] else {
-                errors.append(XSDFailure(reason: "unknown xsi:type '\(overriding)' on '\(child.name.localName)'", at: path))
-                return nil
-            }
-            return resolved
         }
 
         /// Validates a child against a `typeReference` through the shared resolver,

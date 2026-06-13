@@ -106,6 +106,20 @@ extension PureXML.Schema.ComplexValidator {
         }
     }
 
+    /// Whether `complex` is the ur-type `xsd:anyType`: no declared attributes, a
+    /// skip attribute wildcard, and mixed content of a single unbounded skip
+    /// element wildcard. The ur-type admits any `xsi:type` substitution.
+    static func isUrType(_ complex: PureXML.Schema.ComplexType) -> Bool {
+        guard complex.attributes.isEmpty,
+              complex.attributeWildcard?.processContents == .skip,
+              case let .mixed(particle) = complex.content,
+              particle.minOccurs == 0, particle.maxOccurs == nil,
+              case let .wildcard(wildcard) = particle.term,
+              wildcard.processContents == .skip
+        else { return false }
+        return true
+    }
+
     static func isNamespaceDeclaration(_ attribute: PureXML.Model.Attribute) -> Bool {
         attribute.name.prefix == "xmlns" || (attribute.name.prefix == nil && attribute.name.localName == "xmlns")
     }

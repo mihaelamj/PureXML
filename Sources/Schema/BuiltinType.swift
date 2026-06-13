@@ -59,6 +59,44 @@ public extension PureXML.Schema {
             }
         }
 
+        /// The built-in this type is directly derived from in the XSD Part 2
+        /// datatype lattice, or nil for the primitives whose base is the implicit
+        /// root `anySimpleType`.
+        var derivationBase: BuiltinType? {
+            switch self {
+            case .normalizedString: .string
+            case .token: .normalizedString
+            case .language, .name, .nmtoken: .token
+            case .ncName: .name
+            case .id, .idref, .entity: .ncName
+            case .integer: .decimal
+            case .long: .integer
+            case .int: .long
+            case .short: .int
+            case .byte: .short
+            case .nonNegativeInteger, .nonPositiveInteger: .integer
+            case .positiveInteger: .nonNegativeInteger
+            case .negativeInteger: .nonPositiveInteger
+            case .unsignedLong: .nonNegativeInteger
+            case .unsignedInt: .unsignedLong
+            case .unsignedShort: .unsignedInt
+            case .unsignedByte: .unsignedShort
+            default: nil
+            }
+        }
+
+        /// Whether this type is `other` or is derived from it through the built-in
+        /// lattice. Used to check an `xsi:type` built-in validly substitutes for a
+        /// built-in declared type: a derived type may always stand in for its base.
+        func derives(from other: BuiltinType) -> Bool {
+            var current: BuiltinType? = self
+            while let type = current {
+                if type == other { return true }
+                current = type.derivationBase
+            }
+            return false
+        }
+
         var primitive: Primitive {
             if let primitive = Self.stringLike[self] { return primitive }
             if Self.integerLike.contains(self) { return .integer }

@@ -42,6 +42,18 @@ public extension PureXML.Schema {
             self.totalDigits = totalDigits
             self.fractionDigits = fractionDigits
         }
+
+        /// Whether no facet narrows the base type's value space: the type is the
+        /// bare built-in. Used to decide whether an `xsi:type` built-in may validly
+        /// substitute for a declared type (a faceted restriction may not be the
+        /// target of a built-in substitution).
+        public var isUnconstrained: Bool {
+            length == nil && minLength == nil && maxLength == nil && patterns.isEmpty
+                && enumeration == nil && whiteSpace == nil
+                && minInclusive == nil && maxInclusive == nil
+                && minExclusive == nil && maxExclusive == nil
+                && totalDigits == nil && fractionDigits == nil
+        }
     }
 
     /// A simple type's variety (XSD Part 2): atomic, a whitespace-separated list

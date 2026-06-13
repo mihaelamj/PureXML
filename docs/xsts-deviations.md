@@ -47,7 +47,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (twelve root causes, ~640 deviations cleared)
+### Fixed (thirteen root causes, ~655 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -55,8 +55,11 @@ Unicode block set · element-level `block` against `xsi:type` · empty-element
 default/fixed values + enumeration-restriction-replaces · `block="substitution"`
 on substitution-group heads · `\w`/`\W` XSD definition · document-scoped
 xs:ID/xs:IDREF uniqueness and resolution · `<xs:attribute ref>` resolution ·
-mixed-content type with no element model. Plus the measurement fix (exclude
-W3C-disputed `status="queried"` entries).
+mixed-content type with no element model · built-in `xsi:type` resolution gated
+by substitution validity (the XSD Part 2 derivation lattice), which also closed
+the two gaps it exposed (a simple-typed element rejecting stray attributes;
+identity fields comparing in value space when the node carries an `xsi:type`).
+Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)
 
@@ -67,7 +70,7 @@ Each is a substantial, self-contained study, not a one-locus cluster fix:
 | `particlesOb/Je/Jf`, related | ~30 | `<xs:any>` defaults to `processContents="strict"`; the matched element's declaration lives in a *separate* schema document referenced only by the instance `xsi:schemaLocation` (no `<import>`). Needs multi-document schema loading + `xsi:schemaLocation` honoring, plus strict-wildcard semantics and Particle-Valid-Restriction. | large (new capability) |
 | `reI` | ~10 | `pattern` values containing literal tab/newline: XML attribute-value normalization (tab/newline to space) versus the value's `whiteSpace` facet. The "right" pattern text depends on that interaction. | subtle |
 | `test`, `elemT` | ~65 | heterogeneous grab-bags (MS "Additional"/element tests): many distinct minor causes, not one root cause. Each case needs individual triage. | per-case grind |
-| `idF`, `idc` remainder | ~15 | identity-constraint selector/field XPath edge cases beyond the implemented `unique`/`key`/`keyref` core. | moderate |
+| `idF`, `idc` remainder | ~14 | identity-constraint selector/field XPath edge cases beyond the implemented core. The value-space comparison via instance `xsi:type` and built-in `xsi:type` resolution now land; what remains is the declared-type-driven value-space comparison (needs PSVI type assignment, since the field's declared simple type is not threaded into identity validation) and selector/field XPath edges. | moderate |
 | `wildG`, `stZ`, `addB` | ~25 | wildcard-in-group composition, simple-type edge cases, attribute-default edges. | mixed |
 
 The clean, single-root-cause, high-leverage fixes are exhausted. Reaching zero

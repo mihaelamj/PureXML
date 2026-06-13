@@ -12,6 +12,23 @@ private final class XPathQueryCache {
     }
 }
 
+/// One field of an identity tuple: its lexical value and the simple type it
+/// compares in (from the node's `xsi:type`, if any). Two field values are equal
+/// when they denote the same value: in the value space of their type when both
+/// share a built-in base (so `3.0` equals `3` for `xsd:decimal`), otherwise by
+/// lexical form.
+private struct FieldValue: Equatable {
+    let string: String
+    let type: PureXML.Schema.SimpleType?
+
+    static func == (lhs: FieldValue, rhs: FieldValue) -> Bool {
+        if let lhsType = lhs.type, let rhsType = rhs.type, lhsType.base == rhsType.base {
+            return lhsType.valueMatches(lhs.string, literal: rhs.string)
+        }
+        return lhs.string == rhs.string
+    }
+}
+
 extension PureXML.Schema {
     /// Validates XSD identity constraints (`unique`, `key`, `keyref`) over an
     /// instance document. Each constraint is evaluated at every element whose
@@ -63,10 +80,10 @@ extension PureXML.Schema {
         private func walk(
             _ node: PureXML.Model.TreeNode,
             at path: [PureXML.Validation.PathKey],
-            scopes: [[String: [[String?]]]],
+            scopes: [[String: [[FieldValue?]]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
-            var frame: [String: [[String?]]] = [:]
+            var frame: [String: [[FieldValue?]]] = [:]
             let declared = node.name.flatMap { constraints[$0.localName] } ?? []
             // Collect key and unique tuples first so a keyref on the same element
             // can resolve against them.
@@ -147,12 +164,12 @@ extension PureXML.Schema {
             _ constraint: IdentityConstraint,
             at node: PureXML.Model.TreeNode,
             path: [PureXML.Validation.PathKey],
-            frame: inout [String: [[String?]]],
+            frame: inout [String: [[FieldValue?]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
             guard isNonRef(constraint) else { return }
-            var tuples: [[String?]] = []
-            var seen: [[String?]] = []
+            var tuples: [[FieldValue?]] = []
+            var seen: [[FieldValue?]] = []
             for target in select(constraint.selector, at: node) {
                 let tuple = fieldTuple(constraint.fields, at: target)
                 let targetPath = path + steps(from: node, to: target)
@@ -175,7 +192,7 @@ extension PureXML.Schema {
             _ constraint: IdentityConstraint,
             at node: PureXML.Model.TreeNode,
             path: [PureXML.Validation.PathKey],
-            scopes: [[String: [[String?]]]],
+            scopes: [[String: [[FieldValue?]]]],
             into issues: inout [PureXML.Validation.ValidationError],
         ) {
             guard case let .keyref(refer) = constraint.kind else { return }
@@ -197,14 +214,38 @@ extension PureXML.Schema {
             return query.nodes(over: node)
         }
 
-        private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode) -> [String?] {
+        private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode) -> [FieldValue?] {
             fields.map { field in
                 guard let query = cache.query(field), let value = try? query.value(at: node) else {
                     return nil
                 }
                 if let nodes = value.nodes, nodes.isEmpty { return nil }
-                return value.string
+                return FieldValue(string: value.string, type: Self.effectiveType(of: value))
             }
+        }
+
+        /// The simple type a field value compares in: the built-in named by the
+        /// selected node's `xsi:type`, when present. Identity-constraint values
+        /// compare in their value space, so two `xsi:type="xsd:decimal"` fields
+        /// `3.0` and `3` are the same value and violate a `unique`/`key`. With no
+        /// `xsi:type` the comparison falls back to the lexical form (the type
+        /// declared in the schema is not threaded into identity validation).
+        private static func effectiveType(of value: PureXML.XPath.Value) -> SimpleType? {
+            guard let nodes = value.nodes, case let .tree(treeNode)? = nodes.first,
+                  treeNode.kind == .element, let local = xsiTypeLocalName(of: treeNode),
+                  let builtin = BuiltinType(rawValue: local)
+            else { return nil }
+            return SimpleType(base: builtin)
+        }
+
+        /// The local name of a tree node's `xsi:type` attribute value, recognized by
+        /// the schema-instance namespace or the conventional `xsi` prefix, or nil.
+        private static func xsiTypeLocalName(of node: PureXML.Model.TreeNode) -> String? {
+            let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
+            guard let attribute = node.attributes.first(where: {
+                $0.name.localName == "type" && ($0.name.namespaceURI == schemaInstance || $0.name.prefix == "xsi")
+            }) else { return nil }
+            return attribute.value.split(separator: ":").last.map(String.init) ?? attribute.value
         }
 
         private func label(_ constraint: IdentityConstraint) -> String {

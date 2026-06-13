@@ -15,7 +15,7 @@ struct XSDIdentityTests {
         \(head)
           <xs:element name="list">
             <xs:complexType>
-              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
             </xs:complexType>
             <xs:unique name="byId">
               <xs:selector xpath="item"/>
@@ -36,7 +36,7 @@ struct XSDIdentityTests {
         \(head)
           <xs:element name="list">
             <xs:complexType>
-              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
             </xs:complexType>
             <xs:key name="itemKey">
               <xs:selector xpath="item"/>
@@ -58,8 +58,8 @@ struct XSDIdentityTests {
           <xs:element name="orders">
             <xs:complexType>
               <xs:sequence>
-                <xs:element name="product" type="xs:string" maxOccurs="unbounded"/>
-                <xs:element name="line" type="xs:string" maxOccurs="unbounded"/>
+                <xs:element name="product" maxOccurs="unbounded"><xs:complexType><xs:attribute name="code" type="xs:string"/></xs:complexType></xs:element>
+                <xs:element name="line" maxOccurs="unbounded"><xs:complexType><xs:attribute name="product" type="xs:string"/></xs:complexType></xs:element>
               </xs:sequence>
             </xs:complexType>
             <xs:key name="prodKey">
@@ -88,7 +88,7 @@ struct XSDIdentityTests {
         \(head)
           <xs:element name="list">
             <xs:complexType>
-              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
             </xs:complexType>
             <xs:key name="itemKey">
               <xs:selector xpath="item"/>
@@ -114,7 +114,9 @@ struct XSDIdentityTests {
               <xs:sequence>
                 <xs:element name="group" maxOccurs="unbounded">
                   <xs:complexType>
-                    <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+                    <xs:sequence>
+                      <xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element>
+                    </xs:sequence>
                   </xs:complexType>
                 </xs:element>
               </xs:sequence>
@@ -164,7 +166,7 @@ struct XSDIdentityTests {
         \(head)
           <xs:element name="list">
             <xs:complexType>
-              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
             </xs:complexType>
             <xs:key name="k"><xs:selector xpath="item"/><xs:field xpath="@id["/></xs:key>
           </xs:element>
@@ -180,7 +182,7 @@ struct XSDIdentityTests {
         \(head)
           <xs:element name="list">
             <xs:complexType>
-              <xs:sequence><xs:element name="item" type="xs:string" maxOccurs="unbounded"/></xs:sequence>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
             </xs:complexType>
             <xs:key name="k"><xs:selector xpath="item["/><xs:field xpath="@id"/></xs:key>
           </xs:element>
