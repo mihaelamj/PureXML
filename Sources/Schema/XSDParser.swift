@@ -32,6 +32,7 @@ extension PureXML.Schema {
             context.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"
             context.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
             context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
+            context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
             resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
             var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
             for node in allChildren(containers, named: "complexType") {
@@ -166,44 +167,6 @@ extension PureXML.Schema {
         }
 
         // MARK: Attribute uses and groups
-
-        static func attributeUses(under node: XSDTree, _ context: XSDContext, visited: Set<String> = []) -> [AttributeUse] {
-            var uses: [AttributeUse] = []
-            for child in XSDNode.elementChildren(node) {
-                switch XSDNode.localName(child) {
-                case "attribute":
-                    if let use = attributeUse(child, context) { uses.append(use) }
-                case "attributeGroup":
-                    guard let ref = XSDNode.attribute(child, "ref") else { break }
-                    let name = XSDNode.stripPrefix(ref)
-                    guard !visited.contains(name), let group = context.attributeGroups[name] else { break }
-                    uses += attributeUses(under: group, context, visited: visited.union([name]))
-                default:
-                    break
-                }
-            }
-            return uses
-        }
-
-        private static func attributeUse(_ node: XSDTree, _ context: XSDContext) -> AttributeUse? {
-            guard let name = XSDNode.attribute(node, "name") else { return nil }
-            let required = XSDNode.attribute(node, "use") == "required"
-            let type: SimpleType = if let typeName = XSDNode.attribute(node, "type") {
-                XSDSimpleParser.simpleTypeReference(typeName, context)
-            } else if let inline = XSDNode.firstChild(node, named: "simpleType") {
-                XSDSimpleParser.simpleType(inline, context)
-            } else {
-                SimpleType(base: .string)
-            }
-            let qualified = XSDNode.attribute(node, "form") == "qualified"
-                || (XSDNode.attribute(node, "form") == nil && context.attributeFormQualified)
-            return AttributeUse(
-                name: PureXML.Model.QualifiedName(localName: name, namespaceURI: qualified ? context.targetNamespace : nil),
-                type: type,
-                required: required,
-                valueConstraint: valueConstraint(of: node),
-            )
-        }
 
         /// The `default` or `fixed` value constraint declared on an attribute or
         /// element node, if any (`fixed` takes precedence).
