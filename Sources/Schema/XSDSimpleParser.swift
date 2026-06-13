@@ -27,10 +27,46 @@ extension PureXML.Schema {
                 facets.enumeration = nil
             }
             applyFacets(restriction, into: &facets)
-            for error in facetDefinitionErrors(restriction, base: baseType) {
+            for error in facetDefinitionErrors(restriction, base: baseType) + patternErrors(restriction) {
                 context.diagnostics.report(error)
             }
             return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety)
+        }
+
+        /// Schema-validity findings for the `pattern` facets declared on one
+        /// `restriction`: each `pattern` value must be a valid XSD regular
+        /// expression. The pattern was only compiled lazily at instance time
+        /// (`try?`), so an unparseable one was silently ignored and the schema
+        /// accepted. Only the unambiguous structural errors reject (a quantifier
+        /// with nothing to repeat, `?a`; unbalanced parentheses, `((a)`); see
+        /// `rejectsPattern`.
+        static func patternErrors(_ restriction: XSDTree) -> [String] {
+            var errors: [String] = []
+            for facet in XSDNode.elementChildren(restriction) where XSDNode.localName(facet) == "pattern" {
+                let value = XSDNode.attribute(facet, "value") ?? ""
+                do {
+                    _ = try PureXML.Regex.Pattern(value)
+                } catch let error as PureXML.Regex.RegexError where rejectsPattern(error) {
+                    errors.append("pattern '\(value)' is not a valid regular expression: \(error)")
+                } catch {
+                    // A construct the engine does not support (`.empty`, `.unsupported`
+                    // for an untabulated `\p{Is...}` block, `.badQuantifier` for the
+                    // lenient `{,m}` form) is a valid XSD pattern, not a schema error.
+                }
+            }
+            return errors
+        }
+
+        /// Whether a regex-compile failure is a genuine syntax error (so the schema
+        /// is invalid), as opposed to an engine limitation on an otherwise-valid XSD
+        /// pattern. Conservative: only the unambiguous structural errors reject.
+        private static func rejectsPattern(_ error: PureXML.Regex.RegexError) -> Bool {
+            switch error {
+            case .unbalanced, .danglingQuantifier:
+                true
+            case .empty, .unsupported, .badQuantifier, .badEscape, .badClass:
+                false
+            }
         }
 
         /// Schema-validity findings for the constraining facets declared on one
