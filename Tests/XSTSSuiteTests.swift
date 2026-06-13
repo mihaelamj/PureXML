@@ -31,7 +31,7 @@ struct XSTSSuiteTests {
     private let knownSchemaValidRejected = 74
     private let knownSchemaInvalidAccepted = 2467
     private let knownInstanceValidRejected = 369
-    private let knownInstanceInvalidAccepted = 231
+    private let knownInstanceInvalidAccepted = 210
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

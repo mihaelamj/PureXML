@@ -74,7 +74,12 @@ struct RegexTests {
     func test_classEscapes() throws {
         #expect(try matches("\\d{4}", "2026"))
         #expect(try !matches("\\d{4}", "20x6"))
-        #expect(try matches("\\w+", "a_1"))
+        #expect(try matches("\\w+", "abc1"))
+        // XSD \w is the complement of \p{P}\p{Z}\p{C}: symbols and marks are word
+        // characters, while the connector `_` (Pc) and whitespace are not.
+        #expect(try matches("\\w", "+"))
+        #expect(try !matches("\\w", "_"))
+        #expect(try !matches("\\w", " "))
         #expect(try matches("a\\sb", "a b"))
         #expect(try matches("\\D+", "abc"))
     }
