@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Simple-content values preserve significant whitespace per the type's `whiteSpace` facet (#147). `textContent` trimmed leading/trailing whitespace unconditionally before the facet ran, so an `xs:string` (`whiteSpace="preserve"`) value that was whitespace-only or had significant edges (e.g. matching a `\t` pattern, or counted by a `length` facet) was wrongly emptied or shortened. Simple-content validation now reads the raw character content and lets the facet normalize it; the element-only/empty "no significant text" check still ignores indentation whitespace. XSTS: valid instances rejected 288 to 248.
+
 ### Added
 
 - `Schema.Document.validate(_:schemaLoader:)` honors an instance's `xsi:schemaLocation` and `xsi:noNamespaceSchemaLocation` (#147). Each referenced schema document is loaded through the supplied loader, compiled, and its global declarations merged in (the primary schema's own declarations win on conflict), so a strict or lax wildcard can resolve an element declared in another document. The plain `validate(_:)` is unchanged. XSTS: valid instances rejected 308 to 288 (the particle clusters whose wildcard-matched elements live in a separate, instance-referenced schema).

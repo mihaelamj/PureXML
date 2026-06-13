@@ -154,7 +154,7 @@ public extension PureXML.Schema {
                 rejectText(element, at: path, into: &errors)
             case let .simpleContent(type):
                 if !children.isEmpty { errors.append(XSDFailure(reason: "element must not have children", at: path)) }
-                if let error = type.validate(Self.textContent(element)) {
+                if let error = type.validate(Self.rawTextContent(element)) {
                     errors.append(XSDFailure(reason: "content: \(error)", at: path))
                 }
             case let .elementOnly(particle):
@@ -271,7 +271,7 @@ public extension PureXML.Schema {
                 // An empty element takes its `default`/`fixed` value; that value
                 // (not the empty string) is what must be valid against the type,
                 // including any xsi:type override already resolved into `simple`.
-                let text = Self.textContent(child)
+                let text = Self.rawTextContent(child)
                 let effective = text.isEmpty ? (elementConstraints[child.name.localName]?.value ?? text) : text
                 if let error = simple.validate(effective) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
