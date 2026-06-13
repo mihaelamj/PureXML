@@ -27,9 +27,11 @@ struct SchemaListFacetTests {
         #expect(try !doc.validate("<v>alpha beta gamma delta</v>").isEmpty) // 4 items: invalid
     }
 
-    @Test("minLength and maxLength on IDREFS count items")
-    func test_idrefsMinMax() throws {
-        let doc = try schema("xs:IDREFS", #"<xs:minLength value="2"/><xs:maxLength value="3"/>"#)
+    /// ENTITIES would drag in entity declarations and IDREFS in document-scoped
+    /// reference resolution; NMTOKENS isolates the list length facet itself.
+    @Test("minLength and maxLength on a built-in list count items")
+    func test_listMinMax() throws {
+        let doc = try schema("xs:NMTOKENS", #"<xs:minLength value="2"/><xs:maxLength value="3"/>"#)
         #expect(try doc.validate("<v>a b</v>").isEmpty) // 2 items: valid
         #expect(try doc.validate("<v>a b c</v>").isEmpty) // 3 items: valid
         #expect(try !doc.validate("<v>a</v>").isEmpty) // 1 item: invalid
