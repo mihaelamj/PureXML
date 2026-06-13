@@ -141,10 +141,23 @@ public extension PureXML.Schema {
         }
 
         private func validateUnion(_ lexical: String, members: [SimpleType]) -> String? {
-            for member in members where member.validate(lexical) == nil {
-                return nil
+            // The value must be valid against at least one member type.
+            guard members.contains(where: { $0.validate(lexical) == nil }) else {
+                return "'\(lexical)' does not match any member type of the union"
             }
-            return "'\(lexical)' does not match any member type of the union"
+            // `pattern` and `enumeration` are the only constraining facets XSD
+            // allows on a union (Datatypes 4.1.5); both apply on top of membership.
+            // Pattern matches the lexical value; enumeration compares in the
+            // value space of whichever member admits each value, so `01` equals an
+            // enumerated `1` for an integer member, matching the atomic path.
+            if let error = patternError(lexical) { return error }
+            if let enumeration = facets.enumeration {
+                let inEnumeration = enumeration.contains { candidate in
+                    members.contains { $0.valueMatches(lexical, literal: candidate) }
+                }
+                if !inEnumeration { return "'\(lexical)' is not in the enumeration" }
+            }
+            return nil
         }
 
         private func validateAtomic(_ lexical: String) -> String? {
