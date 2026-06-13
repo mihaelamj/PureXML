@@ -30,7 +30,7 @@ struct XSTSSuiteTests {
     /// are written to /tmp/xsts-failures.txt for the burn-down.
     private let knownSchemaValidRejected = 75
     private let knownSchemaInvalidAccepted = 2467
-    private let knownInstanceValidRejected = 502
+    private let knownInstanceValidRejected = 395
     private let knownInstanceInvalidAccepted = 261
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
