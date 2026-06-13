@@ -60,6 +60,7 @@ extension PureXML.Schema {
                 abstractTypes: derivation.abstractTypes,
                 abstractElements: derivation.abstractElements,
                 typeBlock: derivation.typeBlock,
+                elementBlock: derivation.elementBlock,
                 typeDerivation: derivation.typeDerivation,
                 typeFinal: derivation.typeFinal,
                 targetNamespace: context.targetNamespace,

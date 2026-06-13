@@ -10,6 +10,7 @@ public extension PureXML.Validation {
         public let elementConstraints: [String: PureXML.Schema.ValueConstraint]
         public let abstractTypes: Set<String>
         public let typeBlock: [String: Set<PureXML.Schema.DerivationMethod>]
+        public let elementBlock: [String: Set<PureXML.Schema.DerivationMethod>]
         public let typeDerivation: [String: PureXML.Schema.TypeDerivation]
 
         public init(
@@ -20,6 +21,7 @@ public extension PureXML.Validation {
             elementConstraints: [String: PureXML.Schema.ValueConstraint] = [:],
             abstractTypes: Set<String> = [],
             typeBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
+            elementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
             typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:],
         ) {
             self.types = types
@@ -29,6 +31,7 @@ public extension PureXML.Validation {
             self.elementConstraints = elementConstraints
             self.abstractTypes = abstractTypes
             self.typeBlock = typeBlock
+            self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
         }
     }
@@ -66,6 +69,7 @@ public extension PureXML.Validation {
                         elementConstraints: context.document.elementConstraints,
                         abstractTypes: context.document.abstractTypes,
                         typeBlock: context.document.typeBlock,
+                        elementBlock: context.document.elementBlock,
                         typeDerivation: context.document.typeDerivation,
                     )
                     .validate(root, as: declaration, at: [.element(root.name.description)])

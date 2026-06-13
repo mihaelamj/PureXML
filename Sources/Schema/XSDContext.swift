@@ -113,6 +113,8 @@ extension PureXML.Schema {
         var abstractElements: Set<String> = []
         /// Derivation methods the named type forbids when used through `xsi:type`.
         var typeBlock: [String: Set<DerivationMethod>] = [:]
+        /// Derivation methods each element declaration forbids through `xsi:type`.
+        var elementBlock: [String: Set<DerivationMethod>] = [:]
         /// Each named complex type's base type and derivation method, the backbone
         /// the `block` check walks from an `xsi:type` to its declared type.
         var typeDerivation: [String: TypeDerivation] = [:]

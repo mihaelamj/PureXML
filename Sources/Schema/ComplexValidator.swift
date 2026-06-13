@@ -25,6 +25,9 @@ public extension PureXML.Schema {
         let abstractTypes: Set<String>
         /// Derivation methods each named type forbids through `xsi:type`.
         let typeBlock: [String: Set<DerivationMethod>]
+        /// Derivation methods each element declaration forbids through `xsi:type`
+        /// (the `block` on the element, distinct from the block on its type).
+        let elementBlock: [String: Set<DerivationMethod>]
         /// Each named complex type's base and derivation method.
         let typeDerivation: [String: TypeDerivation]
 
@@ -34,6 +37,7 @@ public extension PureXML.Schema {
             elementConstraints: [String: ValueConstraint] = [:],
             abstractTypes: Set<String> = [],
             typeBlock: [String: Set<DerivationMethod>] = [:],
+            elementBlock: [String: Set<DerivationMethod>] = [:],
             typeDerivation: [String: TypeDerivation] = [:],
         ) {
             self.types = types
@@ -41,6 +45,7 @@ public extension PureXML.Schema {
             self.elementConstraints = elementConstraints
             self.abstractTypes = abstractTypes
             self.typeBlock = typeBlock
+            self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
         }
 
