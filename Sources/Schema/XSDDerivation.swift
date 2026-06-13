@@ -137,6 +137,9 @@ extension PureXML.Schema.XSDParser {
                 continue
             }
             result[head] = members.filter { member in
+                // `block="substitution"` forbids substitution-group substitution
+                // outright: no member may stand in for the head, whatever its type.
+                guard !blocked.contains(.substitution) else { return false }
                 guard let memberType = tables.elementTypeNames[member],
                       let methods = derivationMethods(from: memberType, to: headType, tables.typeDerivation)
                 else {
