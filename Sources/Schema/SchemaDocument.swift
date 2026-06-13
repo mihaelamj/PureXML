@@ -44,6 +44,7 @@ public extension PureXML.Schema {
         private let abstractTypes: Set<String>
         private let abstractElements: Set<String>
         private let typeBlock: [String: Set<DerivationMethod>]
+        private let elementBlock: [String: Set<DerivationMethod>]
         private let typeDerivation: [String: TypeDerivation]
         private let targetNamespace: String?
 
@@ -62,6 +63,7 @@ public extension PureXML.Schema {
             abstractTypes = compiled.abstractTypes
             abstractElements = compiled.abstractElements
             typeBlock = compiled.typeBlock
+            elementBlock = compiled.elementBlock
             typeDerivation = compiled.typeDerivation
             targetNamespace = compiled.targetNamespace
             // Schema consistency through the validation framework: every named
@@ -96,6 +98,7 @@ public extension PureXML.Schema {
                 elementConstraints: elementConstraints,
                 abstractTypes: abstractTypes,
                 typeBlock: typeBlock,
+                elementBlock: elementBlock,
                 typeDerivation: typeDerivation,
             )
             var driver = PureXML.Validation.StreamingXSDValidator(
@@ -138,6 +141,7 @@ public extension PureXML.Schema {
                 elementConstraints: elementConstraints,
                 abstractTypes: abstractTypes,
                 typeBlock: typeBlock,
+                elementBlock: elementBlock,
                 typeDerivation: typeDerivation,
             )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)

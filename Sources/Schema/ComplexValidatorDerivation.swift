@@ -23,16 +23,32 @@ extension PureXML.Schema.ComplexValidator {
         child: PureXML.Model.Element,
         at path: [PureXML.Validation.PathKey],
     ) -> PureXML.Validation.ValidationError? {
-        guard case let .typeReference(declaredName) = declared,
-              let substitute = Self.xsiTypeName(child), types[substitute] != nil,
-              let blocked = typeBlock[declaredName],
-              let methods = PureXML.Schema.XSDParser.derivationMethods(from: substitute, to: declaredName, typeDerivation),
-              !methods.isDisjoint(with: blocked)
+        guard case let .typeReference(reference) = declared,
+              let substitute = Self.xsiTypeName(child), types[substitute] != nil
         else {
             return nil
         }
+        // A ref'd child carries its type as an element-ref key (`element:foo`)
+        // that resolves through `types` to the concrete type; follow that chain
+        // to the declared type name the derivation backbone and `block` use.
+        var declaredName = reference
+        var steps = 0
+        while case let .typeReference(next)? = types[declaredName], next != declaredName, steps <= types.count {
+            declaredName = next
+            steps += 1
+        }
+        guard let methods = PureXML.Schema.XSDParser.derivationMethods(from: substitute, to: declaredName, typeDerivation) else {
+            return nil
+        }
+        // The substitution is blocked when the derivation method is disallowed by
+        // either the declared type's `block` or the element declaration's own
+        // `block` (keyed by the element's name).
+        let blocked = (typeBlock[declaredName] ?? []).union(elementBlock[child.name.localName] ?? [])
+        guard !methods.isDisjoint(with: blocked) else {
+            return nil
+        }
         return PureXML.Validation.ValidationError(
-            reason: "xsi:type '\(substitute)' is blocked: type '\(declaredName)' disallows substitution by this derivation",
+            reason: "xsi:type '\(substitute)' is blocked: substitution by this derivation is disallowed",
             at: path,
         )
     }
