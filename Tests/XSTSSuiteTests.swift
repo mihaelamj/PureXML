@@ -22,14 +22,15 @@ struct XSTSSuiteTests {
     /// 2026-06-13, over 14383 groups). These ratchet down as conformance work
     /// closes deviations (#145-#148); a count rising is a regression. The
     /// instance counts reflect the #146 list-facet fix (built-in list length
-    /// facets now count items). The suite is opt-in, so CI and plain
+    /// facets now count items) and the #147 union-facet fix (pattern and
+    /// enumeration enforced on unions). The suite is opt-in, so CI and plain
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
     private let knownSchemaValidRejected = 75
     private let knownSchemaInvalidAccepted = 2467
     private let knownInstanceValidRejected = 547
-    private let knownInstanceInvalidAccepted = 555
+    private let knownInstanceInvalidAccepted = 355
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
