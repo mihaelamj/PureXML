@@ -22,6 +22,13 @@ The oracle is binary and coarse: "invalid schema accepted" conflates *we have a
 bug* with *we do not implement this validity constraint by design*. The point of
 this document is to separate those.
 
+Only tests with a settled expectation are counted. The suite marks contested
+entries `<current status="queried">` (disputed in W3C Bugzilla, the expected
+validity itself in question, e.g. `\p{Lu}*` over two uppercase letters one of
+which is an astral math capital); agreeing or disagreeing with a contested
+expectation is not meaningful, so the runner skips them. Excluding the queried
+entries removed about 70 apparent deviations that were never bugs.
+
 ## Baseline (post #146 list-facet fix)
 
 | Kind | Count |
