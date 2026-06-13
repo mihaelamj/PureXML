@@ -42,9 +42,10 @@ extension PureXML.Schema {
             return .incomparable
         }
 
-        /// The instant, in seconds, of `reference` (day 1) + (months, seconds):
-        /// add the months with calendar rollover (clamping the day to the
-        /// resulting month's length, per the spec), then add the seconds.
+        /// The instant, in seconds, of `reference` + (months, seconds): add the
+        /// months with calendar rollover, then add the seconds. The reference
+        /// day is always 1, which is valid in every month, so no day clamping is
+        /// needed (a duration's day component lives in `seconds`, not here).
         private static func instant(
             _ reference: (year: Int, month: Int),
             addingMonths addMonths: Int,
@@ -54,8 +55,7 @@ extension PureXML.Schema {
             let yearsCarried = Int((Double(total) / 12.0).rounded(.down))
             let newYear = reference.year + yearsCarried
             let newMonth = total - yearsCarried * 12 + 1
-            let newDay = Swift.min(1, DateTimeValue.daysInMonth(year: newYear, month: newMonth))
-            let days = DateTimeValue.daysFromCivil(year: newYear, month: newMonth, day: newDay)
+            let days = DateTimeValue.daysFromCivil(year: newYear, month: newMonth, day: 1)
             return Double(days) * 86400 + seconds
         }
 
