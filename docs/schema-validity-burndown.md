@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 1092** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 1051** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -61,11 +61,13 @@ Each iteration targets one self-contained rule family with a clean root cause.
    type / element / attribute names unique per namespace; no duplicate attribute
    uses on a type. Cheap graph checks (~12 identity-constraint-name cases, plus
    type/element/attribute name collisions).
-4. **Resolvable references.** Every QName a schema names (`type`, element /
-   attribute / group `ref`, restriction / extension `base`, `itemType`,
-   `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a
-   declaration at compile time. Machinery exists (`resolveReference`); not run
-   exhaustively at compile time. The `xsd0NN.e` "undeclared X" family.
+4. **Resolvable references.** _Done (1092 -> 1051)._ `type`/`base`/`itemType`/
+   `memberTypes` types, `element`/`attribute`/`group`/`attributeGroup` `ref`, and
+   element `substitutionGroup` must resolve to a declared component or a built-in
+   (`SchemaReferences.swift`), matched by local name, skipped when
+   `import`/`include`/`redefine` may supply externals. **Still open:** keyref
+   `refer` resolution; the context-sensitive applicability rules (`form` on a
+   global decl, `ref` excluding `name`/`type`).
 5. **Facet applicability per base** (the open facet-family tail): which facets
    a base admits (`fractionDigits` only on decimal-derived, `length` only on
    string/binary/list, etc.), and a fixed facet may not be changed.

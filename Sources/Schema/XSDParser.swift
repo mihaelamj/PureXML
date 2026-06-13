@@ -36,14 +36,11 @@ extension PureXML.Schema {
             for error in idAttributeErrors(schema) + structureErrors(schema) {
                 context.diagnostics.report(error)
             }
-            resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
-            var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
-            for node in allChildren(containers, named: "complexType") {
-                if let name = XSDNode.attribute(node, "name") {
-                    types[name] = .complex(complexType(node, context))
-                }
-            }
+            var types = namedTypes(containers, into: &context)
             let elements = globalElements(containers, context, into: &types)
+            for error in referenceErrors(schema, in: context, elements: elements) {
+                context.diagnostics.report(error)
+            }
             let (nillable, elementConstraints) = elementMetadata(containers)
             return XSDCompiled(
                 elements: elements,
@@ -60,6 +57,19 @@ extension PureXML.Schema {
                 targetNamespace: context.targetNamespace,
                 schemaErrors: context.diagnostics.deduplicated,
             )
+        }
+
+        /// The named-type table: the global simple types resolved into `context`,
+        /// then each global complex type compiled and added by name.
+        private static func namedTypes(_ containers: [XSDTree], into context: inout XSDContext) -> [String: ElementType] {
+            resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
+            var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
+            for node in allChildren(containers, named: "complexType") {
+                if let name = XSDNode.attribute(node, "name") {
+                    types[name] = .complex(complexType(node, context))
+                }
+            }
+            return types
         }
 
         /// The global element declarations, also registering each under a reserved

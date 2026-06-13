@@ -1,7 +1,7 @@
 extension PureXML.Schema.XSDParser {
     /// The XML Schema namespace; only elements in it are schema vocabulary, so
     /// foreign elements (and annotation content) are not structurally checked.
-    private static let xsdNamespace = "http://www.w3.org/2001/XMLSchema"
+    static let xsdNamespace = "http://www.w3.org/2001/XMLSchema"
 
     /// The schema-for-schemas child content model (XSD 1.0 Structures): the
     /// XSD-namespace element local names each component admits as children. The
