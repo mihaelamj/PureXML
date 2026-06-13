@@ -13,19 +13,14 @@ extension PureXML.Schema {
             guard let restriction = XSDNode.firstChild(node, named: "restriction") else {
                 return SimpleType(base: .string)
             }
-            let baseName = XSDNode.stripPrefix(XSDNode.attribute(restriction, "base") ?? "string")
-            var base = BuiltinType.string
-            var facets = Facets()
-            var variety = Variety.atomic
-            if let builtin = BuiltinType(rawValue: baseName) {
-                base = builtin
-            } else if let parent = context.simpleTypes[baseName] {
-                base = parent.base
-                facets = parent.facets
-                variety = parent.variety
-            }
+            // Resolve the base through simpleTypeReference so the built-in list
+            // datatypes (NMTOKENS, IDREFS, ENTITIES) keep their list variety: a
+            // length facet on one of them counts list items, not characters (#146).
+            // Restricting a user type inherits its base, facets, and variety.
+            let baseType = simpleTypeReference(XSDNode.attribute(restriction, "base") ?? "string", context)
+            var facets = baseType.facets
             applyFacets(restriction, into: &facets)
-            return SimpleType(base: base, facets: facets, variety: variety)
+            return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety)
         }
 
         static func simpleTypeReference(_ typeName: String, _ context: XSDContext) -> SimpleType {
