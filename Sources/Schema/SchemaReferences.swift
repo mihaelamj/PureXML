@@ -36,8 +36,7 @@ extension PureXML.Schema.XSDParser {
     private static func hasExternalReference(_ schema: XSDTree) -> Bool {
         var found = false
         func walk(_ node: XSDTree) {
-            if node.name?.namespaceURI == xsdNamespace, let local = PureXML.Schema.XSDNode.localName(node),
-               ["import", "include", "redefine"].contains(local) {
+            if isExternalDefinition(node) {
                 found = true
                 return
             }
@@ -47,6 +46,15 @@ extension PureXML.Schema.XSDParser {
         }
         walk(schema)
         return found
+    }
+
+    /// Whether `node` is an `xs:import`/`xs:include`/`xs:redefine` (an XSD-namespace
+    /// element bringing in external definitions).
+    private static func isExternalDefinition(_ node: XSDTree) -> Bool {
+        guard node.name?.namespaceURI == xsdNamespace, let local = PureXML.Schema.XSDNode.localName(node) else {
+            return false
+        }
+        return local == "import" || local == "include" || local == "redefine"
     }
 
     private static func collectReferenceErrors(

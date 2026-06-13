@@ -154,6 +154,37 @@ extension PureXML.Schema.XSDParser {
         if ["unique", "key", "keyref"].contains(local), !(children.contains("selector") && children.contains("field")) {
             errors.append("identity constraint '\(local)' requires a selector and at least one field")
         }
+        if local == "complexType" {
+            errors += complexTypeContentErrors(children)
+        }
         return errors
+    }
+
+    /// The model groups and the attribute declarations a `complexType` may carry
+    /// directly, used to enforce its content-model shape.
+    private static let modelGroups: Set<String> = ["group", "all", "choice", "sequence"]
+    private static let directAttributes: Set<String> = ["attribute", "attributeGroup", "anyAttribute"]
+
+    /// Findings for a `complexType`'s direct content shape (XSD 1.0 Structures):
+    /// its content is `simpleContent`, `complexContent`, or a model group followed
+    /// by attributes, never a mix. So at most one of `simpleContent`/
+    /// `complexContent`; when one is present, no model group and no direct
+    /// attribute may sit beside it (they belong inside the derivation); and at most
+    /// one model group. Children inside `simpleContent`/`complexContent` are not
+    /// examined here, only the complexType's own children.
+    private static func complexTypeContentErrors(_ children: [String]) -> [String] {
+        let contentSpecs = children.count { $0 == "simpleContent" || $0 == "complexContent" }
+        let groups = children.count { modelGroups.contains($0) }
+        let attributes = children.count { directAttributes.contains($0) }
+        if contentSpecs > 1 {
+            return ["'complexType' may have only one of simpleContent or complexContent"]
+        }
+        if contentSpecs == 1, groups > 0 || attributes > 0 {
+            return ["'complexType' with simpleContent or complexContent may not also have a model group or attribute"]
+        }
+        if groups > 1 {
+            return ["'complexType' may have at most one model group"]
+        }
+        return []
     }
 }

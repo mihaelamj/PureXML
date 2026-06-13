@@ -115,6 +115,41 @@ struct SchemaStructureTests {
         try compile(#"<xs:complexType name="t"><xs:sequence><xs:element ref="g"/></xs:sequence></xs:complexType><xs:element name="g" type="xs:string"/>"#)
     }
 
+    @Test("a complexType's content shape is exclusive")
+    func test_complexTypeContentExclusivity() {
+        // simpleContent/complexContent are mutually exclusive and exclude a model
+        // group or a direct attribute; only one model group is allowed.
+        #expect(rejects(#"""
+        <xs:complexType name="t">
+          <xs:simpleContent><xs:extension base="xs:string"/></xs:simpleContent>
+          <xs:simpleContent><xs:extension base="xs:string"/></xs:simpleContent>
+        </xs:complexType>
+        """#))
+        #expect(rejects(#"""
+        <xs:complexType name="t">
+          <xs:simpleContent><xs:extension base="xs:string"/></xs:simpleContent>
+          <xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence>
+        </xs:complexType>
+        """#))
+        #expect(rejects(#"""
+        <xs:complexType name="t">
+          <xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence>
+          <xs:choice><xs:element name="b" type="xs:string"/></xs:choice>
+        </xs:complexType>
+        """#))
+    }
+
+    @Test("valid complexType content shapes compile")
+    func test_complexTypeContentValid() throws {
+        try compile(#"""
+        <xs:complexType name="t">
+          <xs:simpleContent><xs:extension base="xs:string"><xs:attribute name="a" type="xs:string"/></xs:extension></xs:simpleContent>
+        </xs:complexType>
+        """#)
+        try compile(#"<xs:complexType name="t"><xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence><xs:attribute name="x" type="xs:string"/></xs:complexType>"#)
+        try compile(#"<xs:complexType name="t"><xs:attribute name="x" type="xs:string"/></xs:complexType>"#)
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""
