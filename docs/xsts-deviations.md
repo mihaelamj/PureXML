@@ -47,7 +47,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (seventeen root causes, ~1447 deviations cleared)
+### Fixed (eighteen root causes, ~1822 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -65,7 +65,7 @@ validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
 in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
 `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
-accepted 2461 to 1688; see `schema-validity-burndown.md`.
+accepted 2461 to 1313 (also: schema-document structural validity against the schema-for-schemas content model); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)
@@ -106,12 +106,14 @@ schema-for-schemas. Examples found:
 | `annotation/annotB` | ~62 |
 | `addB`, `stF`, and the long tail | remainder of 2467 |
 
-**Decision:** enforcing this is a large, low-real-world-value effort (people do
-not author structurally broken schemas, and a too-lenient *compiler* does not
-corrupt valid-document validation). It would require a schema-document
-validation pass against the schema-for-schemas. Treated as a **documented,
-deliberate exclusion** unless a concrete need arises. If implemented, it is its
-own epic, not part of the instance-correctness burn-down.
+**Status (revised):** now being implemented as the general schema-for-schemas
+mechanism, not a per-rule pile. The content-model pass has landed (`id` validity,
+facet-definition validity, and the `allowedChildren` structural table), driving
+invalid-schemas-accepted from 2461 to 1313. The remaining structural work (the
+component **attribute model**, child order, particle semantics) continues under
+`schema-validity-burndown.md`. A too-lenient compiler does not corrupt
+valid-document validation, but rubber-stamping invalid schemas is the largest
+conformance gap, so it is being closed rather than excluded.
 
 ## Category C: arguable / needs investigation
 

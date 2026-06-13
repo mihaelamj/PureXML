@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 1688** | we rarely catch a bad one (facet-definition validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 1313** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -69,11 +69,15 @@ Each iteration targets one self-contained rule family with a clean root cause.
 5. **Facet applicability per base** (the open facet-family tail): which facets
    a base admits (`fractionDigits` only on decimal-derived, `length` only on
    string/binary/list, etc.), and a fixed facet may not be changed.
-6. **Particle / model-group structural rules** and **schema-for-schemas
-   structural validity** (child order, misplaced annotation, illegal content):
-   the largest, most tedious tail. Altitude decision: validate the schema
-   *document* against the normative schema-for-schemas (one general mechanism)
-   rather than hand-coding each rule. Defer until the above are done; re-measure.
+6. **Schema-for-schemas structural validity.** _Content-model pass done
+   (1688 -> 1313, -375)._ A data-driven `allowedChildren` table (the schema-for-
+   schemas child content model) rejects disallowed children, multi/misplaced
+   `annotation`, and identity constraints missing selector/field, via one general
+   mechanism (`SchemaStructure.swift`). **Still open:** the **attribute model**
+   (which attributes each component admits, and their value types) is the obvious
+   next sibling table and the largest remaining lever; child *order* beyond the
+   leading annotation; and particle / model-group semantic rules (Unique Particle
+   Attribution, Particle-Valid-Restriction completeness).
 
 ## Per-iteration protocol (the PR-critic-loop)
 
