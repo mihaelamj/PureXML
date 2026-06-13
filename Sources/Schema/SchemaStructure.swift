@@ -95,19 +95,39 @@ extension PureXML.Schema.XSDParser {
     /// (`maxOccurs` also admits `unbounded`). A prefixed (foreign) attribute is the
     /// schema author's own and is not checked.
     private static func attributeValueErrors(_ node: XSDTree) -> [String] {
-        var errors: [String] = []
-        for attribute in node.attributes where attribute.name.prefix == nil {
-            let name = attribute.name.localName
-            let value = attribute.value.trimmingXMLWhitespace()
-            if let allowed = attributeEnumerations[name], !allowed.contains(value) {
-                errors.append("attribute '\(name)' has invalid value '\(attribute.value)'")
-            } else if name == "minOccurs", !isNonNegativeInteger(value) {
-                errors.append("attribute 'minOccurs' must be a nonNegativeInteger, not '\(attribute.value)'")
-            } else if name == "maxOccurs", value != "unbounded", !isNonNegativeInteger(value) {
-                errors.append("attribute 'maxOccurs' must be a nonNegativeInteger or 'unbounded', not '\(attribute.value)'")
-            }
+        node.attributes.filter { $0.name.prefix == nil }.compactMap { attribute in
+            attributeValueError(attribute.name.localName, attribute.value)
         }
-        return errors
+    }
+
+    /// The schema-vocabulary attributes whose value is a single QName reference;
+    /// each has one meaning throughout XSD, so they are recognised by local name.
+    private static let qnameAttributes: Set<String> = ["type", "base", "ref", "itemType", "refer", "substitutionGroup"]
+
+    /// The finding, if any, for one unprefixed schema-vocabulary attribute whose
+    /// value falls outside its fixed value space: an enumerated token, an
+    /// occurrence count, a `name` (NCName), or a QName reference. Only the lexical
+    /// form is checked here; a QName's prefix is resolved elsewhere.
+    private static func attributeValueError(_ name: String, _ raw: String) -> String? {
+        let value = raw.trimmingXMLWhitespace()
+        if let allowed = attributeEnumerations[name] {
+            return allowed.contains(value) ? nil : "attribute '\(name)' has invalid value '\(raw)'"
+        }
+        switch name {
+        case "minOccurs":
+            return isNonNegativeInteger(value) ? nil : "attribute 'minOccurs' must be a nonNegativeInteger, not '\(raw)'"
+        case "maxOccurs":
+            return value == "unbounded" || isNonNegativeInteger(value) ? nil : "attribute 'maxOccurs' must be a nonNegativeInteger or 'unbounded', not '\(raw)'"
+        case "name":
+            return PureXML.Schema.Lexical.isNCName(value) ? nil : "attribute 'name' value '\(raw)' is not a valid NCName"
+        case "memberTypes":
+            let tokens = value.split(whereSeparator: \.isWhitespace).map(String.init)
+            return tokens.allSatisfy(PureXML.Schema.Lexical.isQName) ? nil : "attribute 'memberTypes' value '\(raw)' is not a list of QNames"
+        case _ where qnameAttributes.contains(name):
+            return PureXML.Schema.Lexical.isQName(value) ? nil : "attribute '\(name)' value '\(raw)' is not a valid QName"
+        default:
+            return nil
+        }
     }
 
     /// Whether `value` is a lexical `nonNegativeInteger` (optional `+`, ASCII

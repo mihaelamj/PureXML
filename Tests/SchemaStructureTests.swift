@@ -98,6 +98,23 @@ struct SchemaStructureTests {
         try compile(#"<xs:complexType name="t" abstract="false"><xs:sequence/></xs:complexType>"#)
     }
 
+    @Test("a component name must be a valid NCName")
+    func test_nameNCName() {
+        #expect(rejects(#"<xs:element name="" type="xs:string"/>"#))
+        #expect(rejects(#"<xs:element name="123" type="xs:string"/>"#))
+        #expect(rejects(#"<xs:complexType name="a:b"><xs:sequence/></xs:complexType>"#))
+        #expect(rejects(#"<xs:attribute name="a b" type="xs:string"/>"#))
+        try? compile(#"<xs:element name="_ok-1.2" type="xs:string"/>"#)
+    }
+
+    @Test("a QName-valued reference attribute must be a lexical QName")
+    func test_qnameReferences() throws {
+        #expect(rejects(#"<xs:element name="a" type=":_"/>"#))
+        #expect(rejects(#"<xs:element name="a" type="a:b:c"/>"#))
+        try compile(#"<xs:element name="a" type="xs:string"/>"#)
+        try compile(#"<xs:complexType name="t"><xs:sequence><xs:element ref="g"/></xs:sequence></xs:complexType><xs:element name="g" type="xs:string"/>"#)
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""
