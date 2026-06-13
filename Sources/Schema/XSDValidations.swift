@@ -63,7 +63,7 @@ public extension PureXML.Validation {
                     guard case let .element(root) = context.subject, let declaration = context.document.rootDeclaration else {
                         return []
                     }
-                    return PureXML.Schema.ComplexValidator(
+                    let validator = PureXML.Schema.ComplexValidator(
                         types: context.document.types,
                         nillableElements: context.document.nillableElements,
                         elementConstraints: context.document.elementConstraints,
@@ -72,7 +72,11 @@ public extension PureXML.Validation {
                         elementBlock: context.document.elementBlock,
                         typeDerivation: context.document.typeDerivation,
                     )
-                    .validate(root, as: declaration, at: [.element(root.name.description)])
+                    var errors = validator.validate(root, as: declaration, at: [.element(root.name.description)])
+                    // Document-scoped ID uniqueness and IDREF resolution, gathered
+                    // during the typed walk above, reported once the tree is seen.
+                    errors += validator.idErrors()
+                    return errors
                 },
                 when: { $0.codingPath.isEmpty },
             )

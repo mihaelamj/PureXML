@@ -30,6 +30,10 @@ public extension PureXML.Schema {
         let elementBlock: [String: Set<DerivationMethod>]
         /// Each named complex type's base and derivation method.
         let typeDerivation: [String: TypeDerivation]
+        /// Document-scoped xs:ID/xs:IDREF accumulator, filled during the typed walk
+        /// and reported by `idErrors()` once the whole tree has been seen. See the
+        /// ID/IDREF extension for `idErrors()` and `recordIDs(_:value:at:)`.
+        let idTracker = IDTracker()
 
         public init(
             types: [String: ElementType] = [:],
@@ -122,6 +126,7 @@ public extension PureXML.Schema {
                     if let fixed = use.valueConstraint?.fixedValue, match.value != fixed {
                         errors.append(XSDFailure(reason: "attribute '\(use.name.localName)' is fixed and must be '\(fixed)'", at: path))
                     }
+                    recordIDs(use.type, value: match.value, at: path)
                 } else if use.required {
                     errors.append(XSDFailure(reason: "missing required attribute '\(use.name.localName)'", at: path))
                 }
@@ -271,6 +276,7 @@ public extension PureXML.Schema {
                 if let error = simple.validate(effective) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
                 }
+                recordIDs(simple, value: text, at: path)
                 errors += elementFixedErrors(child, at: path)
             case let .complex(complex):
                 errors.append(contentsOf: validate(child, against: complex, at: path))
