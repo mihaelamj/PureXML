@@ -28,10 +28,10 @@ struct XSTSSuiteTests {
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
-    private let knownSchemaValidRejected = 75
+    private let knownSchemaValidRejected = 74
     private let knownSchemaInvalidAccepted = 2467
     private let knownInstanceValidRejected = 369
-    private let knownInstanceInvalidAccepted = 238
+    private let knownInstanceInvalidAccepted = 231
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
