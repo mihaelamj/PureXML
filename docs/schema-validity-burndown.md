@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 2082** | we rarely catch a bad one (facet-definition validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 1789** | we rarely catch a bad one (facet-definition validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -38,17 +38,20 @@ existing pattern: collect ALL findings, report them together.
 
 Each iteration targets one self-contained rule family with a clean root cause.
 
-1. **Facet-definition validity** (XSD Part 2 §4.3). _Partly done (2461 -> 2082)._
+1. **Facet-definition validity** (XSD Part 2 §4.3). _Mostly done (2461 -> 1789)._
    Landed: length-family facet values must be `nonNegativeInteger`
    (`totalDigits` a `positiveInteger`); `length` excludes
    `minLength`/`maxLength`; `minLength` <= `maxLength`; `fractionDigits` <=
-   `totalDigits`. **Still open in this family:** `minInclusive`/`maxInclusive`/
-   `minExclusive`/`maxExclusive` value well-formedness in the base value space
-   and their mutual exclusions/ordering; facet applicability per base
-   (`fractionDigits` only on decimal-derived, `length` only on
-   string/binary/list, etc.); `whiteSpace` may not weaken an inherited value;
-   facet repetition. Inherited-facet co-occurrence (across derivation steps) is
-   deliberately not checked yet (current pass reads only the local restriction).
+   `totalDigits`. Value-bound facets (`min`/`maxInclusive`,
+   `min`/`maxExclusive`) and `enumeration` values must be valid in the base
+   value space; `Inclusive` excludes `Exclusive` on each side; lower bound may
+   not exceed (nor, if exclusive, equal) the upper. (The bound-value check
+   exposed and fixed a `gMonth` `--MM--` lexical gap.) **Still open in this
+   family:** facet applicability per base (`fractionDigits` only on
+   decimal-derived, `length` only on string/binary/list, etc.); `whiteSpace`
+   may not weaken an inherited value; facet repetition. Inherited-facet
+   co-occurrence (across derivation steps) is deliberately not checked yet
+   (current pass reads only the local restriction).
 2. **Resolvable references.** Every QName a schema names (`type`, element /
    attribute / group `ref`, restriction / extension `base`, `itemType`,
    `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a

@@ -47,7 +47,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (fourteen root causes, ~1034 deviations cleared)
+### Fixed (sixteen root causes, ~1346 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -60,9 +60,11 @@ by substitution validity (the XSD Part 2 derivation lattice), which also closed
 the two gaps it exposed (a simple-typed element rejecting stray attributes;
 identity fields comparing in value space when the node carries an `xsi:type`) ·
 compile-time constraining-facet definition validity (length-family facets are
-`nonNegativeInteger`, co-occurrence and range order), the first cut at the
-schema-validity gap (invalid schemas accepted 2461 to 2082; see
-`schema-validity-burndown.md`).
+`nonNegativeInteger`, co-occurrence and range order) · value-bound facet
+validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
+in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
+`--MM--` lexical form. The schema-validity work brought invalid schemas accepted
+2461 to 1789; see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)

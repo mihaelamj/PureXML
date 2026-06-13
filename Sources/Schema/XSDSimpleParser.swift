@@ -27,20 +27,27 @@ extension PureXML.Schema {
                 facets.enumeration = nil
             }
             applyFacets(restriction, into: &facets)
-            for error in facetDefinitionErrors(restriction) {
+            for error in facetDefinitionErrors(restriction, base: baseType) {
                 context.diagnostics.report(error)
             }
             return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety)
         }
 
         /// Schema-validity findings for the constraining facets declared on one
-        /// `restriction` (XSD Part 2 Datatypes 4.3): each length-family facet value
-        /// must be a valid `nonNegativeInteger` (`totalDigits` a `positiveInteger`),
-        /// `length` may not co-occur with `minLength`/`maxLength`, and the integer
-        /// ranges must be ordered. Reads the raw lexical from the restriction, since
-        /// numeric facet parsing silently drops a malformed value. Limited to the
-        /// facets declared on this step, so an inherited facet is never flagged here.
-        static func facetDefinitionErrors(_ restriction: XSDTree) -> [String] {
+        /// `restriction` (XSD Part 2 Datatypes 4.3): the length-family rules plus
+        /// the value-bound rules, both limited to the facets declared on this step
+        /// so an inherited facet is never flagged here.
+        static func facetDefinitionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
+            countFacetErrors(restriction) + boundFacetErrors(restriction, base: base)
+        }
+
+        /// Length-family findings: `length`, `minLength`, `maxLength`,
+        /// `totalDigits`, and `fractionDigits` must be `nonNegativeInteger`
+        /// (`totalDigits` a `positiveInteger`), `length` may not co-occur with
+        /// `minLength`/`maxLength`, and `minLength` <= `maxLength`,
+        /// `fractionDigits` <= `totalDigits`. Reads the raw lexical, since numeric
+        /// facet parsing silently drops a malformed value.
+        private static func countFacetErrors(_ restriction: XSDTree) -> [String] {
             var errors: [String] = []
             var values: [String: String] = [:] // facet name -> canonical digit string
             let countFacets: Set = ["length", "minLength", "maxLength", "totalDigits", "fractionDigits"]
@@ -69,6 +76,62 @@ extension PureXML.Schema {
                 errors.append("facet 'fractionDigits' (\(fraction)) exceeds 'totalDigits' (\(total))")
             }
             return errors
+        }
+
+        /// Value-bound findings: each `minInclusive`/`maxInclusive`/`minExclusive`/
+        /// `maxExclusive` and `enumeration` value must be a valid value of the base
+        /// type; `minInclusive` excludes `minExclusive` and `maxInclusive` excludes
+        /// `maxExclusive`; and the lower bound may not exceed the upper bound (nor
+        /// equal it when either side is exclusive, which is an empty value space).
+        /// Ordering is compared in the base primitive's value space.
+        private static func boundFacetErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
+            var errors: [String] = []
+            var bounds: [String: String] = [:]
+            for facet in XSDNode.elementChildren(restriction) {
+                guard let name = XSDNode.localName(facet) else { continue }
+                let raw = XSDNode.attribute(facet, "value") ?? ""
+                switch name {
+                case "minInclusive", "maxInclusive", "minExclusive", "maxExclusive":
+                    if base.validate(raw) != nil {
+                        errors.append("facet '\(name)' value '\(raw)' is not a valid value of the base type")
+                    } else {
+                        bounds[name] = raw
+                    }
+                case "enumeration":
+                    if base.validate(raw) != nil {
+                        errors.append("enumeration value '\(raw)' is not a valid value of the base type")
+                    }
+                default:
+                    break
+                }
+            }
+            if bounds["minInclusive"] != nil, bounds["minExclusive"] != nil {
+                errors.append("facets 'minInclusive' and 'minExclusive' may not both be specified")
+            }
+            if bounds["maxInclusive"] != nil, bounds["maxExclusive"] != nil {
+                errors.append("facets 'maxInclusive' and 'maxExclusive' may not both be specified")
+            }
+            errors += boundOrderErrors(bounds, base: base)
+            return errors
+        }
+
+        /// The lower-versus-upper-bound ordering finding, if any, comparing in the
+        /// base primitive's value space. Skipped for an unordered primitive (the
+        /// `ordered` lookup returns nil), so only a defined order is checked.
+        private static func boundOrderErrors(_ bounds: [String: String], base: SimpleType) -> [String] {
+            guard let low = bounds["minInclusive"] ?? bounds["minExclusive"],
+                  let high = bounds["maxInclusive"] ?? bounds["maxExclusive"],
+                  let lowValue = base.base.primitive.ordered(low),
+                  let highValue = base.base.primitive.ordered(high)
+            else { return [] }
+            if lowValue > highValue {
+                return ["lower bound '\(low)' exceeds upper bound '\(high)'"]
+            }
+            let exclusive = bounds["minExclusive"] != nil || bounds["maxExclusive"] != nil
+            if lowValue == highValue, exclusive {
+                return ["bounds '\(low)' and '\(high)' describe an empty value space"]
+            }
+            return []
         }
 
         /// The canonical digit string of a lexical `nonNegativeInteger` (optional

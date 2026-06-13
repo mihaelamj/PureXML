@@ -61,6 +61,10 @@ struct XSDDatatypeTests {
     func test_gTypes() {
         #expect(valid("--02-29", .gMonthDay) && !valid("--02-30", .gMonthDay))
         #expect(valid("---31", .gDay) && valid("--12", .gMonth) && valid("2026", .gYear))
+        // gMonth accepts both the XSD 1.0 `--MM--` form and the `--MM` erratum form,
+        // with an optional timezone, and still rejects malformed or out-of-range ones.
+        #expect(valid("--02--", .gMonth) && valid("--02--Z", .gMonth) && valid("--02-05:00", .gMonth))
+        #expect(!valid("--13--", .gMonth) && !valid("--02-", .gMonth) && !valid("--02--x", .gMonth))
     }
 
     // MARK: Other primitives

@@ -71,6 +71,38 @@ struct SchemaFacetDefinitionTests {
         #expect(rejects(#"<xs:totalDigits value="2"/><xs:fractionDigits value="5"/>"#, base: "xs:decimal"))
     }
 
+    @Test("a value-bound facet value must be valid for the base type")
+    func test_boundValueValidity() throws {
+        try compile(#"<xs:maxInclusive value="5.55"/>"#, base: "xs:decimal")
+        try compile(#"<xs:minInclusive value="1"/><xs:maxInclusive value="10"/>"#, base: "xs:decimal")
+        #expect(rejects(#"<xs:maxInclusive value=""/>"#, base: "xs:decimal"))
+        #expect(rejects(#"<xs:minInclusive value="abc"/>"#, base: "xs:decimal"))
+        #expect(rejects(#"<xs:maxExclusive value="1.2.3"/>"#, base: "xs:decimal"))
+    }
+
+    @Test("an enumeration value must be valid for the base type")
+    func test_enumerationValueValidity() throws {
+        try compile(#"<xs:enumeration value="3.5"/>"#, base: "xs:decimal")
+        #expect(rejects(#"<xs:enumeration value=""/>"#, base: "xs:float"))
+        #expect(rejects(#"<xs:enumeration value="x"/>"#, base: "xs:decimal"))
+    }
+
+    @Test("inclusive and exclusive bounds on the same side may not co-occur")
+    func test_boundMutualExclusion() {
+        #expect(rejects(#"<xs:maxInclusive value="5.55"/><xs:maxExclusive value="5.55"/>"#, base: "xs:decimal"))
+        #expect(rejects(#"<xs:minInclusive value="1"/><xs:minExclusive value="1"/>"#, base: "xs:decimal"))
+    }
+
+    @Test("the lower bound may not exceed (or, if exclusive, equal) the upper bound")
+    func test_boundOrder() {
+        #expect(rejects(#"<xs:minInclusive value="7.7"/><xs:maxInclusive value="1.1"/>"#, base: "xs:decimal"))
+        #expect(rejects(#"<xs:minExclusive value="5"/><xs:maxExclusive value="5"/>"#, base: "xs:decimal"))
+        // An inclusive single-point range is valid.
+        do { try compile(#"<xs:minInclusive value="5"/><xs:maxInclusive value="5"/>"#, base: "xs:decimal") } catch {
+            Issue.record("a single-point inclusive range must be valid: \(error)")
+        }
+    }
+
     @Test("the rejection message names the offending facet")
     func test_locatedMessage() {
         do {

@@ -75,6 +75,9 @@ extension PureXML.Schema {
 
         private mutating func parseMonthOnly() -> DateTimeValue? {
             guard consume("--"), let month = readFixed(2), (1 ... 12).contains(month) else { return nil }
+            // XSD 1.0 gMonth is `--MM--`; the later erratum/1.1 form `--MM` is also
+            // accepted, so the trailing `--` is optional. A timezone may follow either.
+            _ = consume("--")
             return DateTimeValue(month: month)
         }
 
