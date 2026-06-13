@@ -1,0 +1,104 @@
+# Schema-validity burndown
+
+The standing plan for closing the largest XSTS conformance gap. **Autopilot
+contract:** follow this document iteration by iteration, each as its own PR with
+a critic pass, until `invalid-schemas-accepted` is driven down to its
+irreducible tail. Do not deviate to new features while this is open.
+
+## The problem (measured 2026-06-13, 2006-11-06 archive)
+
+| Bucket | Count | Reading |
+|---|---|---|
+| valid-schemas-rejected | 72 | we rarely reject a good schema |
+| **invalid-schemas-accepted** | **2461** | we rarely catch a bad one |
+| valid-instances-rejected | 233 | (instance side, separately tracked) |
+| invalid-instances-accepted | 165 | |
+
+One-sentence diagnosis: *the validator runs its instance-validity rules but not
+its schema-validity rules.* It compiles what it understands and ignores the
+rest, so ~18% of the invalid-schema corpus is accepted silently.
+
+Source split of the 2461: **2323 Microsoft, 138 Sun.** The Microsoft mass
+spreads across every category (DataTypes 703, ComplexType 262,
+IdentityConstraint 221, SimpleType 139, ModelGroups 137, Attribute 124,
+Particles 118, Wildcards 97, Element 96, Notations 84, Group 82, Regex 74,
+Schema 61, AttributeGroup 52, Additional 39, Annotations 30, Errata 4). No
+single root cause; this is a campaign of distinct schema-component constraints.
+
+## Where the checks belong
+
+Schema-validity findings are reported at **compile time**, through
+`PureXML.Validation.XSDSchema.consistencyErrors(...)` (called from
+`SchemaDocument.Document.init`), which already throws `SchemaError.inconsistent`
+when a named type violates a rule. New rule families are added there (or in a
+sibling validation composed into it), never at instance-validation time. The
+existing pattern: collect ALL findings, report them together.
+
+## Priority order (highest leverage first, measured)
+
+Each iteration targets one self-contained rule family with a clean root cause.
+
+1. **Facet-definition validity** (XSD Part 2 §4.3). Each constraining facet's
+   `value` must be a valid instance of the facet's own type (`length`,
+   `minLength`, `maxLength`, `totalDigits`, `fractionDigits` are
+   `nonNegativeInteger`; `positiveInteger` for `totalDigits`; `minInclusive`
+   etc. must be valid in the base value space); facet co-occurrence rules
+   (`length` excludes `minLength`/`maxLength`; `minInclusive` excludes
+   `minExclusive`; `maxInclusive` excludes `maxExclusive`; `minInclusive` <=
+   `maxInclusive`; `minLength` <= `maxLength`; `fractionDigits` <=
+   `totalDigits`); `whiteSpace` may not weaken an inherited value. Big chunk of
+   DataTypes (703) and SimpleType (139).
+2. **Resolvable references.** Every QName a schema names (`type`, element /
+   attribute / group `ref`, restriction / extension `base`, `itemType`,
+   `memberTypes`, `substitutionGroup`, keyref `refer`) must resolve to a
+   declaration at compile time. Machinery exists (`resolveReference`); it is not
+   run exhaustively at compile time. The `xsd0NN.e` "undeclared X" family.
+3. **Component-name uniqueness.** Identity-constraint names unique per schema;
+   type / element / attribute names unique per namespace; no duplicate attribute
+   uses on a type. Cheap graph checks (IdentityConstraint 221, name cases).
+4. **Particle / model-group structural rules.** `all`-group restrictions
+   (already partly enforced), Unique Particle Attribution, element-decl
+   consistency. (ModelGroups, Particles, Group.)
+5. **Schema-for-schemas structural validity** (child order, misplaced
+   annotation, illegal content). This is the largest, most tedious tail. The
+   altitude decision: validate the schema *document* against the normative
+   schema-for-schemas (one general mechanism) rather than hand-coding each rule.
+   Defer until 1-4 are done and measure what remains.
+
+## Per-iteration protocol (the PR-critic-loop)
+
+For each cluster, on a fresh branch off `main`:
+
+1. **Scope & measure.** Identify the cluster's cases in
+   `/tmp/xsts-failures.txt`; read a sample of the actual invalid schemas to pin
+   the exact rule(s). State the rule in one sentence (first principles).
+2. **Implement at the owning layer** (compile-time consistency check). Make
+   impossible states unrepresentable where it helps; no special-case bandaids.
+3. **Unit tests** for the rule: a valid schema passes, each invalid form is
+   rejected with a located, specific message. Swift Testing.
+4. **Gates** (all must pass): `bash scripts/check-style.sh`,
+   `bash scripts/check-namespacing.sh`, `swiftformat . --config .swiftformat
+   --lint`, `swiftlint --config .swiftlint.yml --strict`, `swift build`,
+   `swift test`, `bash scripts/check-wasm.sh`.
+5. **XSTS ratchet.** `XSTS_ROOT=/private/tmp/xsts/xmlschema2006-11-06 swift test
+   -c release --filter XSTS`. `invalid-schemas-accepted` must fall;
+   **no other bucket may rise** (hard gate). Update the pinned baselines in
+   `Tests/XSTSSuiteTests.swift` to the new numbers.
+6. **Critic pass (mandatory before merge).** Spawn an independent reviewer over
+   `git diff main...HEAD`: correctness (does the rule over- or under-reject?
+   spec citation), removed-behavior, cross-file impact, and altitude (is this a
+   bandaid or the real rule?). Treat findings adversarially; fix every real one
+   and re-run gates + XSTS. A finding that the rule is too aggressive (a valid
+   schema now rejected) is a release blocker.
+7. **Document & commit.** CHANGELOG entry with the before/after XSTS numbers;
+   update this file's priority table and `docs/xsts-deviations.md`. Commit
+   `<type>(schema): …`, then fast-forward merge to `main` (local only; never
+   push, per policy). Delete the branch.
+
+## Invariants
+
+- The ratchet only falls. A rising bucket is a regression and blocks the merge.
+- Disclosed limits are fine; silent debt is the violation. Until the schema side
+  is solid the README must state the conformance numbers and what is not yet
+  checked, and the package stays `0.x`.
+- Apple/Swift-native only; no external SwiftPM deps; macOS + Linux + WASI.
