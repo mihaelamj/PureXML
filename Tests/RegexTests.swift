@@ -112,4 +112,16 @@ struct RegexTests {
         #expect(try !matches("a{2,4}", "a"))
         #expect(try !matches("a{2,4}", "aaaaa"))
     }
+
+    @Test("Unicode block escapes match within their block and reject outside it")
+    func test_unicodeBlocks() throws {
+        // \u{0531} Armenian, \u{0B85} Tamil, \u{1100} Hangul Jamo.
+        #expect(try matches(#"\p{IsArmenian}+"#, "\u{0531}\u{0561}"))
+        #expect(try !matches(#"\p{IsArmenian}+"#, "abc"))
+        #expect(try matches(#"\p{IsTamil}+"#, "\u{0B85}"))
+        #expect(try matches(#"\p{IsHangulJamo}+"#, "\u{1100}"))
+        #expect(try !matches(#"\p{IsTamil}+"#, "\u{0531}")) // Armenian is not Tamil
+        // An unknown block name is still a compile error.
+        #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern(#"\p{IsNotARealBlock}"#) }
+    }
 }
