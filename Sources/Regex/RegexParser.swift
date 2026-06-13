@@ -197,9 +197,14 @@ extension PureXML.Regex {
                 add(member, to: &cls)
                 return
             }
-            if peek() == "-", peek(1) != "]" {
+            // A "-" immediately before "[" opens a class subtraction (`[abc-[b]]`),
+            // not a range, so it is left for parseClass; "-]" is a literal hyphen.
+            // Otherwise "-" introduces a range whose endpoints must be ordered: a
+            // reversed range like [z-a] is an error, not a trapping `low ... high`.
+            if peek() == "-", peek(1) != "]", peek(1) != "[" {
                 advance()
                 guard case let .scalar(high) = try nextClassMember() else { throw RegexError.badClass }
+                guard low <= high else { throw RegexError.badClass }
                 cls.ranges.append(low ... high)
             } else {
                 cls.ranges.append(low ... low)

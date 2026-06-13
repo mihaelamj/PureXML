@@ -29,18 +29,12 @@ extension PureXML.Schema {
         var accept: Int
 
         func matchesWhole(_ names: [PureXML.Model.QualifiedName]) -> Bool {
-            var current = closure([start])
+            var current = startStates()
             for name in names {
-                var next: Set<Int> = []
-                for state in current {
-                    if let label = states[state].label, let target = states[state].target, label.matches(name) {
-                        next.insert(target)
-                    }
-                }
-                if next.isEmpty { return false }
-                current = closure(next)
+                guard let next = step(current, over: name) else { return false }
+                current = next
             }
-            return current.contains(accept)
+            return isComplete(current)
         }
 
         /// After consuming `names`, the labels the automaton can accept next and
@@ -49,22 +43,53 @@ extension PureXML.Schema {
         /// whether something is still required. Returns an empty, not-complete
         /// result when the prefix is already invalid.
         func follow(after names: [PureXML.Model.QualifiedName]) -> (allowed: [TermLabel], complete: Bool) {
-            var current = closure([start])
+            var current = startStates()
             for name in names {
-                var next: Set<Int> = []
-                for state in current {
-                    if let label = states[state].label, let target = states[state].target, label.matches(name) {
-                        next.insert(target)
-                    }
-                }
-                if next.isEmpty { return ([], false) }
-                current = closure(next)
+                guard let next = step(current, over: name) else { return ([], false) }
+                current = next
             }
+            return (admissible(from: current), isComplete(current))
+        }
+
+        // MARK: Incremental matching
+
+        //
+        // The active set is the epsilon-closure of the states reachable after some
+        // prefix of children. Callers that scan a child sequence advance it one
+        // child at a time (`startStates` then `step` per child) rather than calling
+        // `follow(after:)` on a growing prefix, which re-walks the whole prefix each
+        // time and is quadratic in the child count over a content model (#129).
+
+        /// The active set before any child: the closure of the start state.
+        func startStates() -> Set<Int> {
+            closure([start])
+        }
+
+        /// The labels admissible from `current`, for diagnostics and completions.
+        func admissible(from current: Set<Int>) -> [TermLabel] {
             var labels: [TermLabel] = []
             for state in current where states[state].target != nil {
                 if let label = states[state].label { labels.append(label) }
             }
-            return (labels, current.contains(accept))
+            return labels
+        }
+
+        /// Advances `current` by consuming one element `name`, or nil when `name`
+        /// is not admissible there.
+        func step(_ current: Set<Int>, over name: PureXML.Model.QualifiedName) -> Set<Int>? {
+            var next: Set<Int> = []
+            for state in current {
+                if let label = states[state].label, let target = states[state].target, label.matches(name) {
+                    next.insert(target)
+                }
+            }
+            if next.isEmpty { return nil }
+            return closure(next)
+        }
+
+        /// Whether the content may legally end at `current`.
+        func isComplete(_ current: Set<Int>) -> Bool {
+            current.contains(accept)
         }
 
         private func closure(_ seed: Set<Int>) -> Set<Int> {
@@ -101,18 +126,38 @@ extension PureXML.Schema {
         /// (found by XSTS groupF009v, #129).
         private static let occursUnrollCap = 16384
 
+        /// The per-particle cap bounds one repetition, but nested particles
+        /// multiply: a sequence of 16384 holding a choice of 16384 is 2.7e8
+        /// states even though each particle is individually capped. So the
+        /// total state count is also capped; once an NFA reaches the ceiling
+        /// every further repetition degrades to star, the same posture the
+        /// per-particle cap already takes. Legitimate content models are tens
+        /// of states, so only the pathological XSTS particle schemas (the
+        /// msMeta Particles set, which OOM-killed the suite at 8 GB, #129)
+        /// reach it. The ceiling sits well above a single maxed particle
+        /// (~33k states) so capped-but-not-nested schemas are unaffected.
+        private static let totalStateCap = 1 << 20
+
+        private var stateBudgetExhausted: Bool {
+            states.count >= Self.totalStateCap
+        }
+
         private mutating func particle(_ particle: PureXML.Schema.Particle) -> (start: Int, accept: Int) {
             let start = addState()
             var current = start
             let boundedMin = Swift.min(particle.minOccurs, Self.occursUnrollCap)
+            var unrolledMin = 0
             for _ in 0 ..< boundedMin {
+                if stateBudgetExhausted { break }
                 let part = term(particle.term)
                 states[current].epsilon.append(part.start)
                 current = part.accept
+                unrolledMin += 1
             }
             let accept = addState()
-            if particle.minOccurs > Self.occursUnrollCap {
-                // The tail of an absurd minOccurs is approximated as star.
+            if stateBudgetExhausted || unrolledMin < boundedMin || particle.minOccurs > Self.occursUnrollCap {
+                // The tail of an absurd minOccurs, or a run that hit the total
+                // state ceiling mid-unroll, is approximated as star.
                 appendStar(particle.term, from: current, to: accept)
             } else if let maximum = particle.maxOccurs, maximum - boundedMin <= Self.occursUnrollCap {
                 appendOptional(particle.term, count: maximum - boundedMin, from: current, to: accept)
@@ -125,6 +170,12 @@ extension PureXML.Schema {
         private mutating func appendOptional(_ term: PureXML.Schema.Term, count: Int, from: Int, to accept: Int) {
             var current = from
             for _ in 0 ..< Swift.max(0, count) {
+                if stateBudgetExhausted {
+                    // Ran out of state budget: let the remainder repeat freely
+                    // (star) rather than keep allocating bounded optionals.
+                    appendStar(term, from: current, to: accept)
+                    return
+                }
                 let part = self.term(term)
                 states[current].epsilon.append(part.start)
                 states[current].epsilon.append(accept)

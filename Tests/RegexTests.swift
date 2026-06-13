@@ -54,6 +54,22 @@ struct RegexTests {
         #expect(try matches("[abc]{2}", "ca"))
     }
 
+    @Test("A '-[' opens class subtraction even after a class member")
+    func test_classSubtractionAfterMember() throws {
+        // `[abcd-[d]]` is {a,b,c,d} minus {d} = {a,b,c}; the `d-[` must read as
+        // subtraction, not a `d`..`[` range that traps on reversed bounds (#129,
+        // XSTS RegexTest_322).
+        #expect(try matches("[abcd-[d]]+", "abcabc"))
+        #expect(try !matches("[abcd-[d]]+", "dddaabbccddd"))
+        #expect(try matches("[a-z-[aeiou]]+", "bcdfg"))
+        #expect(try !matches("[a-z-[aeiou]]+", "bcde"))
+    }
+
+    @Test("A reversed range is rejected, not a trap")
+    func test_reversedRangeRejected() {
+        #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("[z-a]") }
+    }
+
     @Test("Class escapes \\d \\w \\s and their negations")
     func test_classEscapes() throws {
         #expect(try matches("\\d{4}", "2026"))
@@ -82,5 +98,18 @@ struct RegexTests {
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("a(b") }
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("*ab") }
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("") }
+    }
+
+    @Test("Pathological quantifiers compile bounded instead of exhausting memory")
+    func test_quantifierExplosionBounded() throws {
+        // `a{1000000000}` would unroll a billion automaton states without a
+        // ceiling; the nested form multiplies. Both must build and answer
+        // without the OOM that killed the XSTS msMeta Regex set (#129).
+        _ = try matches("a{1000000000}", String(repeating: "a", count: 64))
+        _ = try matches("(a{100000}){100000}", "aaaa")
+        // Ordinary bounded quantifiers keep their exact semantics.
+        #expect(try matches("a{2,4}", "aaa"))
+        #expect(try !matches("a{2,4}", "a"))
+        #expect(try !matches("a{2,4}", "aaaaa"))
     }
 }

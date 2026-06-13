@@ -313,19 +313,19 @@ extension PureXML.Schema.ComplexValidator {
     func sequenceStructureErrors(_ particle: PureXML.Schema.Particle, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
         let nfa = PureXML.Schema.ContentNFABuilder.build(particle)
         let steps = Self.childSteps(children)
-        var prefix: [PureXML.Model.QualifiedName] = []
+        // Advance one active state-set across the children rather than re-walking
+        // the prefix per child (which is quadratic over the content model, #129).
+        var current = nfa.startStates()
         for (index, child) in children.enumerated() {
-            let allowed = nfa.follow(after: prefix).allowed
-            if allowed.contains(where: { $0.matches(child.name) }) {
-                prefix.append(child.name)
-            } else {
+            guard let next = nfa.step(current, over: child.name) else {
+                let allowed = nfa.admissible(from: current)
                 errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here\(Self.expectation(allowed))", at: path + [steps[index]]))
                 return
             }
+            current = next
         }
-        let (allowed, complete) = nfa.follow(after: prefix)
-        if !complete {
-            errors.append(XSDFailure(reason: "content is incomplete\(Self.expectation(allowed))", at: path))
+        if !nfa.isComplete(current) {
+            errors.append(XSDFailure(reason: "content is incomplete\(Self.expectation(nfa.admissible(from: current)))", at: path))
         }
     }
 
