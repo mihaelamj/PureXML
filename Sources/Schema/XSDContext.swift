@@ -132,6 +132,9 @@ extension PureXML.Schema {
     struct XSDContext {
         var simpleTypes: [String: SimpleType]
         var attributeGroups: [String: XSDTree]
+        /// Top-level (global) attribute declaration nodes by name, so an
+        /// `<attribute ref="...">` resolves to the global declaration's type.
+        var globalAttributes: [String: XSDTree] = [:]
         var groups: [String: XSDTree]
         /// Named complex-type definition nodes, so a `complexContent` derivation can
         /// resolve and compose its base type's content model and attributes.
