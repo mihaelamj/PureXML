@@ -19,6 +19,13 @@ extension PureXML.Schema {
             // Restricting a user type inherits its base, facets, and variety.
             let baseType = simpleTypeReference(XSDNode.attribute(restriction, "base") ?? "string", context)
             var facets = baseType.facets
+            // A restriction's own `enumeration` replaces the inherited set (the new
+            // enumeration is the value space, not a union with the base's), whereas
+            // `pattern` accumulates across steps and is ANDed. So drop the inherited
+            // enumeration when this step declares its own.
+            if XSDNode.elementChildren(restriction).contains(where: { XSDNode.localName($0) == "enumeration" }) {
+                facets.enumeration = nil
+            }
             applyFacets(restriction, into: &facets)
             return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety)
         }
