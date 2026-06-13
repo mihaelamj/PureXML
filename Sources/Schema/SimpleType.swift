@@ -266,7 +266,7 @@ public extension PureXML.Schema {
         /// the ordered range), so an incomparable result is a violation.
         private func durationRangeError(_ value: String) -> String? {
             guard let actual = DurationValue(value) else { return nil }
-            func order(_ bound: String?) -> DurationValue.Order? {
+            func order(_ bound: String?) -> DurationOrder? {
                 bound.flatMap(DurationValue.init).map(actual.compare(to:))
             }
             if let order = order(facets.minInclusive), order == .lessThan || order == .incomparable {

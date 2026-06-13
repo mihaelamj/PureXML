@@ -1,4 +1,7 @@
 extension PureXML.Schema {
+    /// The outcome of comparing two durations, which form a partial order.
+    enum DurationOrder { case lessThan, equal, greaterThan, incomparable }
+
     /// An `xs:duration` as its two independent signed components, months and
     /// seconds, with the XSD 1.0 order relation. Because a month is 28 to 31
     /// days, the order is partial: P and Q compare by adding each to the four
@@ -10,14 +13,13 @@ extension PureXML.Schema {
         let months: Int
         let seconds: Double
 
-        enum Order { case lessThan, equal, greaterThan, incomparable }
-
-        /// The four reference dateTimes (year, month, day) at T00:00:00Z.
-        private static let references: [(year: Int, month: Int, day: Int)] = [
-            (1696, 9, 1), (1697, 2, 1), (1903, 3, 1), (1903, 7, 1),
+        /// The four reference points (year, month); each is the first of its
+        /// month at T00:00:00Z, so the day is always 1 and need not be carried.
+        private static let references: [(year: Int, month: Int)] = [
+            (1696, 9), (1697, 2), (1903, 3), (1903, 7),
         ]
 
-        func compare(to other: DurationValue) -> Order {
+        func compare(to other: DurationValue) -> DurationOrder {
             var sawLess = false
             var sawGreater = false
             var sawEqual = false
@@ -40,11 +42,11 @@ extension PureXML.Schema {
             return .incomparable
         }
 
-        /// The instant, in seconds, of `reference` + (months, seconds): add the
-        /// months with calendar rollover (clamping the day to the resulting
-        /// month's length, per the spec), then add the seconds component.
+        /// The instant, in seconds, of `reference` (day 1) + (months, seconds):
+        /// add the months with calendar rollover (clamping the day to the
+        /// resulting month's length, per the spec), then add the seconds.
         private static func instant(
-            _ reference: (year: Int, month: Int, day: Int),
+            _ reference: (year: Int, month: Int),
             addingMonths addMonths: Int,
             seconds: Double,
         ) -> Double {
@@ -52,7 +54,7 @@ extension PureXML.Schema {
             let yearsCarried = Int((Double(total) / 12.0).rounded(.down))
             let newYear = reference.year + yearsCarried
             let newMonth = total - yearsCarried * 12 + 1
-            let newDay = Swift.min(reference.day, DateTimeValue.daysInMonth(year: newYear, month: newMonth))
+            let newDay = Swift.min(1, DateTimeValue.daysInMonth(year: newYear, month: newMonth))
             let days = DateTimeValue.daysFromCivil(year: newYear, month: newMonth, day: newDay)
             return Double(days) * 86400 + seconds
         }

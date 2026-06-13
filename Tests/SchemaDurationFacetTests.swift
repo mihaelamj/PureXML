@@ -21,25 +21,25 @@ struct SchemaDurationFacetTests {
 
     @Test("minInclusive enforces the lower bound")
     func test_minInclusive() throws {
-        let s = try schema(#"<xs:minInclusive value="P1Y"/>"#)
-        #expect(try s.validate("<v>P1Y</v>").isEmpty) // equal
-        #expect(try s.validate("<v>P2Y</v>").isEmpty) // greater
-        #expect(try !s.validate("<v>P6M</v>").isEmpty) // less
+        let doc = try schema(#"<xs:minInclusive value="P1Y"/>"#)
+        #expect(try doc.validate("<v>P1Y</v>").isEmpty) // equal
+        #expect(try doc.validate("<v>P2Y</v>").isEmpty) // greater
+        #expect(try !doc.validate("<v>P6M</v>").isEmpty) // less
     }
 
     @Test("minExclusive rejects the bound itself")
     func test_minExclusive() throws {
-        let s = try schema(#"<xs:minExclusive value="P1Y"/>"#)
-        #expect(try !s.validate("<v>P1Y</v>").isEmpty) // equal: rejected
-        #expect(try s.validate("<v>P2Y</v>").isEmpty) // greater
+        let doc = try schema(#"<xs:minExclusive value="P1Y"/>"#)
+        #expect(try !doc.validate("<v>P1Y</v>").isEmpty) // equal: rejected
+        #expect(try doc.validate("<v>P2Y</v>").isEmpty) // greater
     }
 
     @Test("maxInclusive enforces the upper bound and rejects incomparable values")
     func test_maxInclusivePartialOrder() throws {
-        let s = try schema(#"<xs:maxInclusive value="P30D"/>"#)
-        #expect(try s.validate("<v>P20D</v>").isEmpty) // less
-        #expect(try !s.validate("<v>P40D</v>").isEmpty) // greater
+        let doc = try schema(#"<xs:maxInclusive value="P30D"/>"#)
+        #expect(try doc.validate("<v>P20D</v>").isEmpty) // less
+        #expect(try !doc.validate("<v>P40D</v>").isEmpty) // greater
         // P1M is incomparable to P30D (28..31 days) so it is not <= P30D.
-        #expect(try !s.validate("<v>P1M</v>").isEmpty)
+        #expect(try !doc.validate("<v>P1M</v>").isEmpty)
     }
 }
