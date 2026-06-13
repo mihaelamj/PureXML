@@ -163,6 +163,23 @@ struct SchemaStructureTests {
         try compile(#"<xs:complexType name="t"><xs:attribute name="x" type="xs:string"/></xs:complexType>"#)
     }
 
+    @Test("a named group must contain exactly one model group")
+    func test_namedGroupContent() throws {
+        try compile(#"<xs:group name="g"><xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence></xs:group>"#)
+        // Two compositors, or none, is invalid.
+        #expect(rejects(#"""
+        <xs:group name="g">
+          <xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence>
+          <xs:all><xs:element name="b" type="xs:string"/></xs:all>
+        </xs:group>
+        """#))
+        #expect(rejects(#"<xs:group name="g"><xs:annotation><xs:documentation>x</xs:documentation></xs:annotation></xs:group>"#))
+        // A group reference (no name) is not a definition and is not flagged here.
+        try compile(
+            #"<xs:group name="g"><xs:sequence><xs:element name="a" type="xs:string"/></xs:sequence></xs:group><xs:complexType name="t"><xs:group ref="g"/></xs:complexType>"#,
+        )
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""

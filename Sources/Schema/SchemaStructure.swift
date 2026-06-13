@@ -66,9 +66,12 @@ extension PureXML.Schema.XSDParser {
         if node.name?.namespaceURI == xsdNamespace {
             errors += attributeValueErrors(node)
             errors += occurrenceOrderErrors(node)
+            let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
             if let local, let allowed = allowedChildren[local] {
-                let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
                 errors += childErrors(local: local, children: names, allowed: allowed)
+            }
+            if local == "group", PureXML.Schema.XSDNode.attribute(node, "name") != nil {
+                errors += namedGroupErrors(names)
             }
         }
         for child in children {
@@ -218,5 +221,15 @@ extension PureXML.Schema.XSDParser {
             return ["'complexType' may have at most one model group"]
         }
         return []
+    }
+
+    /// The finding, if any, for a named model-group definition (`xs:group` with a
+    /// `name`): its content is exactly one of `all`/`choice`/`sequence` (XSD 1.0
+    /// Structures), so neither an empty group nor one with two compositors is
+    /// valid. (A `group` *reference* carries no compositor child and is excluded
+    /// by the caller.)
+    private static func namedGroupErrors(_ children: [String]) -> [String] {
+        let compositors = children.count { $0 == "all" || $0 == "choice" || $0 == "sequence" }
+        return compositors == 1 ? [] : ["a named group must contain exactly one of all, choice, or sequence"]
     }
 }
