@@ -180,6 +180,21 @@ struct SchemaStructureTests {
         )
     }
 
+    @Test("an attribute not admitted by a component is rejected")
+    func test_attributeApplicability() {
+        #expect(rejects(#"<xs:element name="a" type="xs:string" nullable="true"/>"#)) // typo for nillable
+        #expect(rejects(#"<xs:complexType name="t" foo="bar"><xs:sequence/></xs:complexType>"#))
+        #expect(rejects(#"<xs:sequence name="x"/>"#)) // sequence has no name
+        // A foreign-namespace attribute is allowed.
+        try? compile(#"<xs:element name="a" type="xs:string" xmlns:x="urn:x" x:note="hi"/>"#)
+    }
+
+    @Test("ref excludes name and type")
+    func test_refExclusions() {
+        #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element ref="g" name="h"/></xs:sequence></xs:complexType><xs:element name="g" type="xs:string"/>"#))
+        #expect(rejects(#"<xs:complexType name="t"><xs:sequence><xs:element ref="g" type="xs:string"/></xs:sequence></xs:complexType><xs:element name="g" type="xs:string"/>"#))
+    }
+
     @Test("an identity constraint requires a selector and field")
     func test_identityConstraintRequiresParts() {
         #expect(rejects(#"""
