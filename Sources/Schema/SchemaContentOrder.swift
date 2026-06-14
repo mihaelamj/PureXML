@@ -45,10 +45,60 @@ extension PureXML.Schema.XSDParser {
         return ["the content of a complexType must be a model group, then attributes, then anyAttribute: \(reason)"]
     }
 
+    /// Content-model order for a `simpleContent` derivation (XSD 1.0 Structures),
+    /// whose model has NO model group: a `restriction` is
+    /// `(annotation?, (simpleType?, facet*), (attribute | attributeGroup)*, anyAttribute?)`
+    /// and an `extension` is `(annotation?, (attribute | attributeGroup)*, anyAttribute?)`.
+    /// So a model group anywhere, a facet or `simpleType` in an extension, a facet
+    /// before its `simpleType`, an attribute before a facet, an attribute after
+    /// `anyAttribute`, or a second `anyAttribute` was accepted by the membership
+    /// table but is invalid (the ctD family).
+    static func simpleContentOrderErrors(_ simpleContent: XSDTree) -> [String] {
+        var errors: [String] = []
+        for derivation in PureXML.Schema.XSDNode.elementChildren(simpleContent) {
+            guard let local = PureXML.Schema.XSDNode.localName(derivation) else { continue }
+            let slots: [(members: Set<String>, max: Int?)]
+            switch local {
+            case "restriction": slots = simpleContentRestrictionSlots
+            case "extension": slots = simpleContentExtensionSlots
+            default: continue
+            }
+            let names = PureXML.Schema.XSDNode.elementChildren(derivation)
+                .filter { $0.name?.namespaceURI == xsdNamespace }
+                .compactMap(PureXML.Schema.XSDNode.localName)
+                .filter { $0 != "annotation" }
+            if let reason = slotOrderViolation(names, slots: slots) {
+                errors.append("the content of a simpleContent '\(local)' is malformed: \(reason)")
+            }
+        }
+        return errors
+    }
+
     /// The ordered slots of a `complexContent` derivation: each lists its admitted
     /// names and how many children may fill it (nil is unbounded).
     private static let complexDerivationSlots: [(members: Set<String>, max: Int?)] = [
         (["group", "all", "choice", "sequence"], 1),
+        (["attribute", "attributeGroup"], nil),
+        (["anyAttribute"], 1),
+    ]
+
+    private static let constrainingFacets: Set<String> = [
+        "minExclusive", "minInclusive", "maxExclusive", "maxInclusive", "totalDigits",
+        "fractionDigits", "length", "minLength", "maxLength", "enumeration", "whiteSpace", "pattern",
+    ]
+
+    /// The ordered slots of a `simpleContent` `restriction`: an optional `simpleType`,
+    /// then facets, then attributes, then an optional `anyAttribute`.
+    private static let simpleContentRestrictionSlots: [(members: Set<String>, max: Int?)] = [
+        (["simpleType"], 1),
+        (constrainingFacets, nil),
+        (["attribute", "attributeGroup"], nil),
+        (["anyAttribute"], 1),
+    ]
+
+    /// The ordered slots of a `simpleContent` `extension`: attributes, then an
+    /// optional `anyAttribute` (no facets, `simpleType`, or model group).
+    private static let simpleContentExtensionSlots: [(members: Set<String>, max: Int?)] = [
         (["attribute", "attributeGroup"], nil),
         (["anyAttribute"], 1),
     ]

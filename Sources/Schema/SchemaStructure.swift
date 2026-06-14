@@ -136,34 +136,44 @@ extension PureXML.Schema.XSDParser {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         let children = PureXML.Schema.XSDNode.elementChildren(node)
-        if node.name?.namespaceURI == xsdNamespace {
+        if node.name?.namespaceURI == xsdNamespace, let local {
             errors += attributeValueErrors(node)
             errors += occurrenceOrderErrors(node)
-            if let local { errors += attributeApplicabilityErrors(node, local: local) }
+            errors += attributeApplicabilityErrors(node, local: local)
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
-            if let local, let allowed = allowedChildren[local] {
-                errors += childErrors(local: local, children: names, allowed: allowed)
-            }
-            if local == "group", PureXML.Schema.XSDNode.attribute(node, "name") != nil {
-                errors += namedGroupErrors(names)
-            }
-            if local == "complexType" {
-                errors += elementDeclsConsistentErrors(node)
-                errors += complexTypeOrderErrors(node)
-            }
-            if local == "complexContent" {
-                errors += complexContentOrderErrors(node)
-            }
-            if let local, local == "selector" || local == "field" {
-                errors += identityXPathErrors(node, local: local)
-            }
-            if let local, local == "any" || local == "anyAttribute" {
-                errors += wildcardNamespaceErrors(node)
-            }
+            errors += componentSpecificErrors(node, local: local, names: names)
         }
         for child in children {
             collectStructure(child, into: &errors)
         }
+    }
+
+    /// The structural findings specific to one XSD component: its admitted children
+    /// (the content-model membership table) plus the per-component content-order,
+    /// identity-XPath, wildcard-namespace, and consistency rules.
+    private static func componentSpecificErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
+        var errors: [String] = []
+        if let allowed = allowedChildren[local] {
+            errors += childErrors(local: local, children: names, allowed: allowed)
+        }
+        switch local {
+        case "group" where PureXML.Schema.XSDNode.attribute(node, "name") != nil:
+            errors += namedGroupErrors(names)
+        case "complexType":
+            errors += elementDeclsConsistentErrors(node)
+            errors += complexTypeOrderErrors(node)
+        case "complexContent":
+            errors += complexContentOrderErrors(node)
+        case "simpleContent":
+            errors += simpleContentOrderErrors(node)
+        case "selector", "field":
+            errors += identityXPathErrors(node, local: local)
+        case "any", "anyAttribute":
+            errors += wildcardNamespaceErrors(node)
+        default:
+            break
+        }
+        return errors
     }
 
     /// The enumerated value space of the schema-vocabulary attributes that take a
