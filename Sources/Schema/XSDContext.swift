@@ -110,13 +110,21 @@ extension PureXML.Schema {
             }
             var closure: [String: [String]] = [:]
             for head in direct.keys {
+                // Breadth-first in document order: a `popLast()` stack would reverse the
+                // members, but the substitution-group expansion must stay in declaration
+                // order. The order-preserving RecurseLax restriction check relies on it
+                // (a base `choice(head, m1, m2)` must list `m1` before `m2` so a derived
+                // `choice(m1, m2)` maps in order).
                 var members: [String] = []
-                var stack = direct[head] ?? []
+                var queue = direct[head] ?? []
                 var seen: Set<String> = []
-                while let member = stack.popLast() {
+                var index = 0
+                while index < queue.count {
+                    let member = queue[index]
+                    index += 1
                     guard seen.insert(member).inserted else { continue }
                     members.append(member)
-                    stack += direct[member] ?? []
+                    queue += direct[member] ?? []
                 }
                 closure[head] = members
             }

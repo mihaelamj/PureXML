@@ -56,6 +56,15 @@ extension PureXML.Schema {
         /// `sequence(e1{1,3},...)` once the pointless single-member group is
         /// normalized to the bare `e1{2,3}` (`3 > 1` against the base sequence).
         static func valid(_ restricted: Particle, _ base: Particle, _ types: [String: ElementType], _ derivation: [String: TypeDerivation]) -> Bool {
+            // A restriction that can never contribute a child (its own `maxOccurs=0`,
+            // or a group whose every member is content-free) accepts only the empty
+            // sequence, so it is a valid restriction of any emptiable base. Checked
+            // before the structural cases, which would otherwise recurse into members
+            // that never occur and wrongly reject (e.g. a `maxOccurs="0"` sequence
+            // whose members have their own non-trivial occurrences).
+            if contentFree(restricted) {
+                return emptiable(base)
+            }
             switch (restricted.term, base.term) {
             case let (.element(restrictedName, _, restrictedTypeName), .element(baseName, _, baseTypeName)):
                 return rangeSubsumed(restricted, base)
@@ -89,14 +98,9 @@ extension PureXML.Schema {
                         wildcardMax: base.maxOccurs,
                     )
             case let (.group(restrictedGroup), .group(baseGroup)):
-                // If every member of the derived group is a pointless (maxOccurs=0)
-                // particle, the group accepts only the empty sequence; that is a valid
-                // restriction iff the base particle is itself emptiable (by structure
-                // or its own occurrence). `emptiable(base)` accounts for both, which a
-                // structural check inside `groupValid` could not.
-                if restrictedGroup.particles.allSatisfy({ $0.maxOccurs == 0 }) {
-                    return emptiable(base)
-                }
+                // A content-free derived group was already handled above; here the
+                // derived group can contribute content, so its outer occurrence must be
+                // subsumed and its members must map onto the base's.
                 return rangeSubsumed(restricted, base) && groupValid(restrictedGroup, baseGroup, types, derivation)
             case let (.group, .wildcard(wildcard)):
                 // NSRecurseCheckCardinality: every leaf the group can contain is
@@ -126,6 +130,10 @@ extension PureXML.Schema {
             case (.sequence, .sequence), (.all, .all):
                 return recurse(restrictedParticles, baseParticles, skippedMustBeEmptiable: true, types, derivation)
             case (.choice, .choice):
+                // RecurseLax: an order-preserving mapping (W3C requires it; a choice
+                // `(b|a)` is NOT a valid restriction of `(a|b)`), but skipped base
+                // branches need not be emptiable. The base's substitution-group
+                // expansion must therefore be in document order for this to be right.
                 return recurse(restrictedParticles, baseParticles, skippedMustBeEmptiable: false, types, derivation)
             case (.sequence, .choice):
                 // MapAndSum (simplified): each restricted particle fits some branch.
