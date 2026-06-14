@@ -49,7 +49,7 @@ public extension PureXML.Validation {
                 guard let derivation = context.subject.derivation, derivation.method == .restriction,
                       case let .complex(restricted)? = context.document.types[context.subject.name],
                       case let .complex(base)? = context.document.types[derivation.base],
-                      let reason = PureXML.Schema.ParticleRestriction.violation(restricted: restricted.content, base: base.content)
+                      let reason = PureXML.Schema.ParticleRestriction.violation(restricted: restricted.content, base: base.content, types: context.document.types)
                 else { return [] }
                 let text = "type '\(context.subject.name)' is not a valid restriction of '\(derivation.base)': \(reason)"
                 return [ValidationError(reason: text, at: context.codingPath)]

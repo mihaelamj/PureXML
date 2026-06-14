@@ -125,4 +125,24 @@ struct XSDParticleRestrictionTests {
         let failures = PureXML.Validation.Conformance.failures(in: cases)
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
+
+    @Test("NameAndTypeOK: a same-name element must keep a type that derives from the base's")
+    func test_elementTypeDerivation() {
+        // Renaming the element's type to an incompatible one (string -> int) is not a
+        // valid restriction: int does not derive from string.
+        #expect(!compiles(
+            base: "<xs:choice><xs:element name=\"c1\" type=\"xs:string\"/><xs:element name=\"c2\"/></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" type=\"xs:int\"/><xs:element name=\"c2\"/></xs:choice>",
+        ))
+        // Narrowing to a derived type (integer -> int) is valid.
+        #expect(compiles(
+            base: "<xs:choice><xs:element name=\"c1\" type=\"xs:integer\"/><xs:element name=\"c2\"/></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" type=\"xs:int\"/><xs:element name=\"c2\"/></xs:choice>",
+        ))
+        // Keeping the same type is valid.
+        #expect(compiles(
+            base: "<xs:sequence><xs:element name=\"a\" type=\"xs:string\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"a\" type=\"xs:string\"/></xs:sequence>",
+        ))
+    }
 }

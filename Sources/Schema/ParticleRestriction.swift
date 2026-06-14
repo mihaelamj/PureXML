@@ -9,8 +9,10 @@ extension PureXML.Schema {
     /// by per-particle checks, a documented simplification.
     enum ParticleRestriction {
         /// The reason a restriction's content is not a valid subset of its
-        /// base's, or nil when it is.
-        static func violation(restricted: ContentType, base: ContentType) -> String? {
+        /// base's, or nil when it is. `types` resolves an element's
+        /// ``ElementType/typeReference`` so element-vs-element pairs can check that
+        /// the restricting type derives from the base's (NameAndTypeOK).
+        static func violation(restricted: ContentType, base: ContentType, types: [String: ElementType]) -> String? {
             switch (restricted, base) {
             case (.empty, .empty), (.simpleContent, _), (_, .simpleContent):
                 nil
@@ -23,18 +25,18 @@ extension PureXML.Schema {
             case let (.elementOnly(restrictedParticle), .elementOnly(baseParticle)),
                  let (.elementOnly(restrictedParticle), .mixed(baseParticle)),
                  let (.mixed(restrictedParticle), .mixed(baseParticle)):
-                valid(restrictedParticle, baseParticle)
+                valid(restrictedParticle, baseParticle, types)
                     ? nil
                     : "the restricted content model is not a subset of the base's"
             }
         }
 
         /// Whether `restricted` accepts a subset of `base` (the pairwise check).
-        static func valid(_ restricted: Particle, _ base: Particle) -> Bool {
+        static func valid(_ restricted: Particle, _ base: Particle, _ types: [String: ElementType]) -> Bool {
             guard rangeSubsumed(restricted, base) else { return false }
             switch (restricted.term, base.term) {
-            case let (.element(restrictedName, _), .element(baseName, _)):
-                return sameName(restrictedName, baseName)
+            case let (.element(restrictedName, restrictedType), .element(baseName, baseType)):
+                return sameName(restrictedName, baseName) && elementTypeRestrictionOK(restrictedType, baseType, types)
             case let (.element(name, _), .wildcard(wildcard)):
                 return wildcard.admits(name)
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
@@ -42,9 +44,9 @@ extension PureXML.Schema {
             case let (.element, .group(baseGroup)):
                 // RecurseAsIfGroup: the lone element, as a one-particle sequence,
                 // against the base group.
-                return groupValid(Group(compositor: .sequence, particles: [restricted.withUnitRange()]), baseGroup)
+                return groupValid(Group(compositor: .sequence, particles: [restricted.withUnitRange()]), baseGroup, types)
             case let (.group(restrictedGroup), .group(baseGroup)):
-                return groupValid(restrictedGroup, baseGroup)
+                return groupValid(restrictedGroup, baseGroup, types)
             case let (.group(restrictedGroup), .wildcard(wildcard)):
                 // NSRecurseCheckCardinality, namespace part: every leaf element
                 // the group can contain must be admitted by the wildcard.
@@ -54,20 +56,20 @@ extension PureXML.Schema {
             }
         }
 
-        private static func groupValid(_ restricted: Group, _ base: Group) -> Bool {
+        private static func groupValid(_ restricted: Group, _ base: Group, _ types: [String: ElementType]) -> Bool {
             switch (restricted.compositor, base.compositor) {
             case (.sequence, .sequence), (.all, .all):
-                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: true)
+                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: true, types)
             case (.choice, .choice):
-                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: false)
+                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: false, types)
             case (.sequence, .choice):
                 // MapAndSum (simplified): each restricted particle fits some branch.
                 restricted.particles.allSatisfy { particle in
-                    base.particles.contains { valid(particle, $0) }
+                    base.particles.contains { valid(particle, $0, types) }
                 }
             case (.sequence, .all):
                 // RecurseUnordered: map onto distinct base particles in any order.
-                recurseUnordered(restricted.particles, base.particles)
+                recurseUnordered(restricted.particles, base.particles, types)
             default:
                 false
             }
@@ -76,14 +78,14 @@ extension PureXML.Schema {
         /// Order-preserving mapping of the restricted particles onto the base's.
         /// A skipped base particle must be emptiable for sequence/all (Recurse);
         /// for choice (RecurseLax) skipping is free.
-        private static func recurse(_ restricted: [Particle], _ base: [Particle], skippedMustBeEmptiable: Bool) -> Bool {
+        private static func recurse(_ restricted: [Particle], _ base: [Particle], skippedMustBeEmptiable: Bool, _ types: [String: ElementType]) -> Bool {
             var baseIndex = 0
             for particle in restricted {
                 var matched = false
                 while baseIndex < base.count {
                     let candidate = base[baseIndex]
                     baseIndex += 1
-                    if valid(particle, candidate) {
+                    if valid(particle, candidate, types) {
                         matched = true
                         break
                     }
@@ -102,15 +104,49 @@ extension PureXML.Schema {
 
         /// Any-order mapping onto distinct base particles; unmapped base
         /// particles must be emptiable.
-        private static func recurseUnordered(_ restricted: [Particle], _ base: [Particle]) -> Bool {
+        private static func recurseUnordered(_ restricted: [Particle], _ base: [Particle], _ types: [String: ElementType]) -> Bool {
             var used = [Bool](repeating: false, count: base.count)
             for particle in restricted {
-                guard let index = base.indices.first(where: { !used[$0] && valid(particle, base[$0]) }) else {
+                guard let index = base.indices.first(where: { !used[$0] && valid(particle, base[$0], types) }) else {
                     return false
                 }
                 used[index] = true
             }
             return base.indices.allSatisfy { used[$0] || emptiable(base[$0]) }
+        }
+
+        /// A conservative slice of NameAndTypeOK: when a restricting element and the
+        /// base element it maps onto both resolve to atomic simple types, the
+        /// restricting type's built-in base must derive from the base's, so renaming
+        /// an `xs:string` element to `xs:int` under restriction is rejected. Any other
+        /// pairing (complex content, a list/union variety, an unresolvable or ur-type
+        /// reference) is permitted here, so no valid restriction is rejected.
+        private static func elementTypeRestrictionOK(_ restricted: ElementType?, _ base: ElementType?, _ types: [String: ElementType]) -> Bool {
+            guard let restrictedSimple = resolvedAtomic(restricted, types),
+                  let baseSimple = resolvedAtomic(base, types)
+            else { return true }
+            return restrictedSimple.base.derives(from: baseSimple.base)
+        }
+
+        /// The atomic ``SimpleType`` an element type resolves to (following
+        /// ``ElementType/typeReference`` through `types`), or nil for a complex,
+        /// list/union, or unresolvable type.
+        private static func resolvedAtomic(_ type: ElementType?, _ types: [String: ElementType]) -> SimpleType? {
+            var current = type
+            var steps = 0
+            while let resolved = current, steps <= types.count {
+                switch resolved {
+                case let .simple(simple):
+                    guard case .atomic = simple.variety else { return nil }
+                    return simple
+                case .complex:
+                    return nil
+                case let .typeReference(key):
+                    current = types[key]
+                    steps += 1
+                }
+            }
+            return nil
         }
 
         /// Occurrence-range subsumption: the restriction may not occur less often
