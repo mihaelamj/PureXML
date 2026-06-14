@@ -57,6 +57,7 @@ extension PureXML.Schema.XSDParser {
         var errors: [String] = []
         collectStructure(schema, into: &errors)
         errors += simpleTypeVarietyFacetErrors(schema)
+        errors += valueConstraintErrors(schema)
         return errors
     }
 

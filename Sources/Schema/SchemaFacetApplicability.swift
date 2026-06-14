@@ -28,6 +28,38 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// A `default`/`fixed` value on an `element` or `attribute` must be a valid value
+    /// of its `type` (Attribute/Element Locally Valid, XSD 1.0). Only a type that
+    /// resolves to a built-in datatype is checked, since the check runs before the
+    /// types are compiled; a `fixed="abc"` on an `xs:integer` was wrongly accepted.
+    /// A named or inline user type, or a type in another namespace, is left alone, so
+    /// no valid value constraint is rejected.
+    static func valueConstraintErrors(_ schema: XSDTree) -> [String] {
+        let bindings = namespaceBindings(schema)
+        var errors: [String] = []
+        forEachValueConstrained(schema) { node in
+            guard let typeName = PureXML.Schema.XSDNode.attribute(node, "type") else { return }
+            let fixed = PureXML.Schema.XSDNode.attribute(node, "fixed")
+            guard let value = fixed ?? PureXML.Schema.XSDNode.attribute(node, "default") else { return }
+            let (prefix, local) = splitQName(typeName)
+            let uri = prefix.map { bindings[$0] } ?? bindings[""]
+            guard uri == xsdNamespace, let builtin = PureXML.Schema.BuiltinType(rawValue: local),
+                  !PureXML.Schema.SimpleType(base: builtin).isValid(value)
+            else { return }
+            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'")
+        }
+        return errors
+    }
+
+    private static func forEachValueConstrained(_ node: XSDTree, _ visit: (XSDTree) -> Void) {
+        let local = PureXML.Schema.XSDNode.localName(node)
+        if local == "appinfo" || local == "documentation" { return }
+        if local == "element" || local == "attribute" { visit(node) }
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            forEachValueConstrained(child, visit)
+        }
+    }
+
     private static let facetNames: Set<String> = [
         "minExclusive", "minInclusive", "maxExclusive", "maxInclusive", "totalDigits",
         "fractionDigits", "length", "minLength", "maxLength", "enumeration", "whiteSpace", "pattern",
