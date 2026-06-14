@@ -78,6 +78,11 @@ Each iteration targets one self-contained rule family with a clean root cause.
 
 ## Per-iteration protocol (the PR-critic-loop)
 
+**Read `docs/production-readiness.md` first, every iteration, and hold the change
+to its four stoppers and checklist.** The target for all four XSTS buckets is 0,
+both directions; valid-rejected is not an acceptable baseline. Durability
+(commit, ff-merge, push, mirror) is part of done.
+
 For each cluster, on a fresh branch off `main`:
 
 1. **Scope & measure.** Identify the cluster's cases in

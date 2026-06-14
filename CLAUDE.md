@@ -23,6 +23,7 @@ Non-negotiables:
 - `docs/rules/cross-platform.md`
 - `docs/rules/testing.md`
 - `docs/rules/verification.md`
+- `docs/production-readiness.md` (the bar for shipping this in an IDE; read every conformance iteration)
 
 Confirm rule loading with `rules-loaded`.
 
