@@ -156,6 +156,7 @@ extension PureXML.Schema.XSDParser {
         if let allowed = allowedChildren[local] {
             errors += childErrors(local: local, children: names, allowed: allowed)
         }
+        errors += derivationControlErrors(node, local: local)
         switch local {
         case "group" where PureXML.Schema.XSDNode.attribute(node, "name") != nil:
             errors += namedGroupErrors(names)
