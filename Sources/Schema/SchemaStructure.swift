@@ -290,6 +290,9 @@ extension PureXML.Schema.XSDParser {
         if local == "complexType" {
             errors += complexTypeContentErrors(children)
         }
+        if local == "simpleType" {
+            errors += simpleTypeContentErrors(children)
+        }
         return errors
     }
 

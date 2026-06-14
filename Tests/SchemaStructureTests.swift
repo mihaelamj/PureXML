@@ -288,4 +288,15 @@ struct SchemaStructureTests {
         </xs:complexType>
         """#))
     }
+
+    @Test("a simpleType must contain exactly one of restriction, list, or union")
+    func test_simpleTypeContent() {
+        // Two derivations, or a mix, is invalid (stB).
+        #expect(rejects(#"<xs:simpleType name="t"><xs:list itemType="xs:int"/><xs:list itemType="xs:int"/></xs:simpleType>"#))
+        #expect(rejects(#"<xs:simpleType name="t"><xs:union memberTypes="xs:int"/><xs:restriction base="xs:string"/></xs:simpleType>"#))
+        #expect(rejects(#"<xs:simpleType name="t"></xs:simpleType>"#))
+        // Exactly one compiles.
+        #expect(!rejects(#"<xs:simpleType name="t"><xs:restriction base="xs:string"/></xs:simpleType>"#))
+        #expect(!rejects(#"<xs:simpleType name="t"><xs:list itemType="xs:int"/></xs:simpleType>"#))
+    }
 }

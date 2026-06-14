@@ -1,4 +1,14 @@
 extension PureXML.Schema.XSDParser {
+    /// The finding, if any, for a `simpleType`: its content is exactly one of
+    /// `restriction`/`list`/`union` (XSD 1.0 Datatypes), so neither an empty
+    /// `simpleType` nor one combining two derivations (two unions, a union and a
+    /// list, ...) is valid. The `allowedChildren` membership check admits each name
+    /// but not the cardinality.
+    static func simpleTypeContentErrors(_ children: [String]) -> [String] {
+        let derivations = children.count { $0 == "restriction" || $0 == "list" || $0 == "union" }
+        return derivations == 1 ? [] : ["a simpleType must contain exactly one of restriction, list, or union"]
+    }
+
     /// Content-model order and cardinality for a `complexContent` derivation, the
     /// ordering complement to the set-membership `allowedChildren` check (which
     /// admits the right child names but not their sequence or count).
