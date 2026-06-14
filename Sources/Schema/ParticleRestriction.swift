@@ -31,26 +31,63 @@ extension PureXML.Schema {
             case let (.elementOnly(restrictedParticle), .elementOnly(baseParticle)),
                  let (.elementOnly(restrictedParticle), .mixed(baseParticle)),
                  let (.mixed(restrictedParticle), .mixed(baseParticle)):
-                valid(restrictedParticle, baseParticle, types, derivation)
+                // The W3C restriction algorithm is defined over the normalized content
+                // model (pointless particles eliminated): a `maxOccurs=0` member
+                // removed, a `{1,1}` single-member group unwrapped, a nested
+                // same-compositor `{1,1}` group spliced. Without this, e.g. a base
+                // `sequence(any{2,3})` is not seen as the wildcard it equals.
+                valid(restrictedParticle.normalized(), baseParticle.normalized(), types, derivation)
                     ? nil
                     : "the restricted content model is not a subset of the base's"
             }
         }
 
         /// Whether `restricted` accepts a subset of `base` (the pairwise check).
+        ///
+        /// Occurrence subsumption (`rangeSubsumed`) is applied only to the
+        /// same-kind pairings (element/element, wildcard/wildcard, group/group) and
+        /// element/wildcard, where the two particles' own occurrence ranges are
+        /// directly comparable. For the cross-kind pairings (element/group and
+        /// group/element via RecurseAsIfGroup; group/wildcard via
+        /// NSRecurseCheckCardinality) the occurrence is matched *inside* the case,
+        /// against a member or as an effective total range, never the derived
+        /// particle's own occurrence against the base group/wildcard's. Applying the
+        /// outer check there over-rejects: e.g. `sequence(e1{2,3})` restricting
+        /// `sequence(e1{1,3},...)` once the pointless single-member group is
+        /// normalized to the bare `e1{2,3}` (`3 > 1` against the base sequence).
         static func valid(_ restricted: Particle, _ base: Particle, _ types: [String: ElementType], _ derivation: [String: TypeDerivation]) -> Bool {
-            guard rangeSubsumed(restricted, base) else { return false }
             switch (restricted.term, base.term) {
             case let (.element(restrictedName, _, restrictedTypeName), .element(baseName, _, baseTypeName)):
-                return sameName(restrictedName, baseName) && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
+                return rangeSubsumed(restricted, base)
+                    && sameName(restrictedName, baseName)
+                    && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
             case let (.element(name, _, _), .wildcard(wildcard)):
-                return wildcard.admits(name)
+                return rangeSubsumed(restricted, base) && wildcard.admits(name)
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
-                return narrows(restrictedWildcard, baseWildcard)
+                return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
             case let (.element, .group(baseGroup)):
                 // RecurseAsIfGroup: the lone element, as a one-particle sequence,
-                // against the base group.
-                return groupValid(Group(compositor: .sequence, particles: [restricted.withUnitRange()]), baseGroup, types, derivation)
+                // against the base group. The element's occurrence is matched against
+                // a base member inside `groupValid`, not against the base group's own
+                // occurrence, so no outer `rangeSubsumed` here.
+                return groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
+            case let (.group, .element(baseName, _, baseTypeName)):
+                // The mirror of RecurseAsIfGroup, by the same cardinality argument as
+                // group/wildcard: a base element accepts only its own name, its own
+                // occurrence count of times. The derived group is a valid restriction
+                // iff every leaf it can contain is that element (same name, and a type
+                // that derives from the base's) AND the group's effective total
+                // occurrence range is within the base element's. Comparing the derived
+                // group's *own* occurrence to the element's would be wrong (a derived
+                // `sequence(a,a)` emits two a's at occurrence {1,1}); the effective
+                // range is the count that must be bounded.
+                return leavesRestrict(restricted, toElement: baseName, baseTypeName, types, derivation)
+                    && rangeWithinWildcard(
+                        derivedMin: restricted.effectiveOccurrenceMin(),
+                        derivedMax: restricted.effectiveOccurrenceMax(),
+                        wildcardMin: base.minOccurs,
+                        wildcardMax: base.maxOccurs,
+                    )
             case let (.group(restrictedGroup), .group(baseGroup)):
                 // If every member of the derived group is a pointless (maxOccurs=0)
                 // particle, the group accepts only the empty sequence; that is a valid
@@ -60,11 +97,19 @@ extension PureXML.Schema {
                 if restrictedGroup.particles.allSatisfy({ $0.maxOccurs == 0 }) {
                     return emptiable(base)
                 }
-                return groupValid(restrictedGroup, baseGroup, types, derivation)
-            case let (.group(restrictedGroup), .wildcard(wildcard)):
-                // NSRecurseCheckCardinality, namespace part: every leaf element
-                // the group can contain must be admitted by the wildcard.
-                return leafNames(of: restrictedGroup).allSatisfy { wildcard.admits($0) }
+                return rangeSubsumed(restricted, base) && groupValid(restrictedGroup, baseGroup, types, derivation)
+            case let (.group, .wildcard(wildcard)):
+                // NSRecurseCheckCardinality: every leaf the group can contain is
+                // admitted by the wildcard (an element by name, a nested wildcard by
+                // narrowing), AND the group's effective total occurrence range is
+                // within the wildcard's occurrence range.
+                return leavesAdmitted(restricted, by: wildcard)
+                    && rangeWithinWildcard(
+                        derivedMin: restricted.effectiveOccurrenceMin(),
+                        derivedMax: restricted.effectiveOccurrenceMax(),
+                        wildcardMin: base.minOccurs,
+                        wildcardMax: base.maxOccurs,
+                    )
             default:
                 return false
             }
@@ -271,22 +316,44 @@ extension PureXML.Schema {
             lhs.localName == rhs.localName && (lhs.namespaceURI ?? "") == (rhs.namespaceURI ?? "")
         }
 
-        /// Every element name a group can contain (its alphabet).
-        private static func leafNames(of group: Group) -> [PureXML.Model.QualifiedName] {
-            group.particles.flatMap { particle -> [PureXML.Model.QualifiedName] in
-                switch particle.term {
-                case let .element(name, _, _): [name]
-                case let .group(inner): leafNames(of: inner)
-                case .wildcard: []
-                }
+        /// Whether every leaf a particle can contain is admitted by `wildcard`: an
+        /// element by name, a nested wildcard by narrowing.
+        private static func leavesAdmitted(_ particle: Particle, by wildcard: Wildcard) -> Bool {
+            switch particle.term {
+            case let .element(name, _, _): wildcard.admits(name)
+            case let .wildcard(inner): narrows(inner, wildcard)
+            case let .group(group): group.particles.allSatisfy { leavesAdmitted($0, by: wildcard) }
             }
         }
-    }
-}
 
-private extension PureXML.Schema.Particle {
-    /// A copy occurring exactly once, for RecurseAsIfGroup's wrapping.
-    func withUnitRange() -> PureXML.Schema.Particle {
-        .init(minOccurs: minOccurs, maxOccurs: maxOccurs, term: term)
+        /// Whether every leaf a particle can contain is the named base element (same
+        /// name, and a type that derives from the base element's). A wildcard leaf is
+        /// rejected: it can match names other than the base element's, so it is not a
+        /// subset. Used when the base content model is a single element.
+        private static func leavesRestrict(
+            _ particle: Particle,
+            toElement baseName: PureXML.Model.QualifiedName,
+            _ baseTypeName: String?,
+            _ types: [String: ElementType],
+            _ derivation: [String: TypeDerivation],
+        ) -> Bool {
+            switch particle.term {
+            case let .element(name, _, typeName):
+                sameName(name, baseName) && elementTypeRestrictionOK(typeName, baseTypeName, types, derivation)
+            case .wildcard:
+                false
+            case let .group(group):
+                group.particles.allSatisfy { leavesRestrict($0, toElement: baseName, baseTypeName, types, derivation) }
+            }
+        }
+
+        /// Whether a derived effective total range fits within a base wildcard's
+        /// occurrence range: at least the wildcard's minimum, at most its maximum.
+        private static func rangeWithinWildcard(derivedMin: Int, derivedMax: Int?, wildcardMin: Int, wildcardMax: Int?) -> Bool {
+            guard derivedMin >= wildcardMin else { return false }
+            guard let wildcardMax else { return true }
+            guard let derivedMax else { return false }
+            return derivedMax <= wildcardMax
+        }
     }
 }

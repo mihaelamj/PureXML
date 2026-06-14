@@ -136,6 +136,76 @@ struct XSDParticleRestrictionTests {
         #expect(error?.contains("not a valid restriction") == true)
     }
 
+    @Test("A single-member derived sequence narrowing an occurrence restricts a wider base sequence")
+    func test_singleMemberSequenceNarrowsOccurrence() {
+        // particlesW008: the derived sequence has one member, so it normalizes to the
+        // bare element e1{2,3}; that must still be matched as a member of the base
+        // sequence (RecurseAsIfGroup), not have its {2,3} compared to the base
+        // sequence's own {1,1} occurrence.
+        #expect(compiles(
+            base: "<xs:sequence><xs:element name=\"e1\" maxOccurs=\"3\"/>"
+                + "<xs:element name=\"e2\" minOccurs=\"0\" maxOccurs=\"3\"/>"
+                + "<xs:element name=\"e3\" minOccurs=\"0\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"e1\" minOccurs=\"2\" maxOccurs=\"3\"/></xs:sequence>",
+        ))
+        // particlesM002: a derived single-branch choice normalizes to the bare element
+        // and still restricts a choice of sequences whose first branch begins with it.
+        #expect(compiles(
+            base: "<xs:choice><xs:sequence minOccurs=\"1\" maxOccurs=\"3\">"
+                + "<xs:element name=\"c1\" minOccurs=\"2\" maxOccurs=\"2\"/><xs:element name=\"c2\" minOccurs=\"0\"/></xs:sequence>"
+                + "<xs:sequence><xs:element name=\"d1\"/><xs:element name=\"d2\" minOccurs=\"0\"/></xs:sequence></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" minOccurs=\"2\" maxOccurs=\"2\"/></xs:choice>",
+        ))
+    }
+
+    @Test("A group restricting a wildcard is valid only when its effective count fits the wildcard's range")
+    func test_groupRestrictsWildcardCardinality() {
+        // particlesHa: a sequence of named elements restricts a wildcard when every leaf
+        // is admitted AND the effective total count lies within the wildcard's range.
+        #expect(compiles(
+            base: "<xs:sequence><xs:any namespace=\"##any\" processContents=\"lax\" minOccurs=\"2\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"a\"/><xs:element name=\"b\"/></xs:sequence>",
+        ))
+        // Too many leaves: three elements exceed the wildcard's maxOccurs of 2.
+        #expect(restrictionError(
+            base: "<xs:sequence><xs:any namespace=\"##any\" processContents=\"lax\" minOccurs=\"2\" maxOccurs=\"2\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"a\"/><xs:element name=\"b\"/><xs:element name=\"c\"/></xs:sequence>",
+        )?.contains("not a valid restriction") == true)
+        // Too few leaves: one element is below the wildcard's minOccurs of 2.
+        #expect(restrictionError(
+            base: "<xs:sequence><xs:any namespace=\"##any\" processContents=\"lax\" minOccurs=\"2\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"a\"/></xs:sequence>",
+        )?.contains("not a valid restriction") == true)
+    }
+
+    @Test("A group restricting a base that is a single element is bounded by that element's range")
+    func test_groupRestrictsSingleElement() {
+        // mgE014: base sequence(title?) normalizes to the bare element title{0,1};
+        // the derived sequence(title{0,0}) normalizes to the empty group, which
+        // accepts only the empty sequence, valid against an emptiable element.
+        #expect(compiles(
+            base: "<xs:sequence><xs:element name=\"title\" minOccurs=\"0\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"title\" minOccurs=\"0\" maxOccurs=\"0\"/></xs:sequence>",
+        ))
+        // A derived choice repeated within the element's range is valid (the base
+        // element, normalized from a single-member sequence, is compositor-agnostic).
+        #expect(compiles(
+            base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:choice maxOccurs=\"2\"><xs:element name=\"a\"/></xs:choice>",
+        ))
+        // A derived group whose effective count exceeds the base element's maxOccurs is
+        // rejected: sequence(a){1,10} emits up to ten a's, the base allows three.
+        #expect(restrictionError(
+            base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:sequence maxOccurs=\"10\"><xs:element name=\"a\"/></xs:sequence>",
+        )?.contains("not a valid restriction") == true)
+        // A derived leaf with a different name than the base element is rejected.
+        #expect(restrictionError(
+            base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
+            restriction: "<xs:choice maxOccurs=\"2\"><xs:element name=\"b\"/></xs:choice>",
+        )?.contains("not a valid restriction") == true)
+    }
+
     @Test("Conformance: the restriction corpus passes through the harness")
     func test_conformanceCases() {
         let valid = compiles(
