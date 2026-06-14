@@ -233,4 +233,43 @@ struct SchemaStructureTests {
         <xs:element name="a"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element>
         """#))
     }
+
+    @Test("a complexContent derivation's content must be ordered: model group, attributes, anyAttribute")
+    func test_complexContentDerivationOrder() {
+        func derive(_ kind: String, _ body: String) -> String {
+            #"""
+            <xs:complexType name="b"><xs:sequence><xs:element name="e" type="xs:string"/></xs:sequence></xs:complexType>
+            <xs:complexType name="t"><xs:complexContent><xs:\#(kind) base="b">\#(body)</xs:\#(kind)></xs:complexContent></xs:complexType>
+            """#
+        }
+        // Two model groups (ctG/ctH "X then Y").
+        #expect(rejects(derive("restriction", #"<xs:sequence/><xs:sequence/>"#)))
+        #expect(rejects(derive("extension", #"<xs:choice/><xs:all/>"#)))
+        // A model group after an attribute.
+        #expect(rejects(derive("restriction", #"<xs:attribute name="x"/><xs:sequence/>"#)))
+        // An attribute after anyAttribute, and two anyAttributes.
+        #expect(rejects(derive("extension", #"<xs:anyAttribute/><xs:attribute name="x"/>"#)))
+        #expect(rejects(derive("restriction", #"<xs:sequence/><xs:anyAttribute/><xs:anyAttribute/>"#)))
+    }
+
+    @Test("a well-ordered complexContent derivation compiles")
+    func test_complexContentDerivationValid() throws {
+        try compile(#"""
+        <xs:complexType name="b"><xs:sequence><xs:element name="e" type="xs:string"/></xs:sequence></xs:complexType>
+        <xs:complexType name="t"><xs:complexContent>
+          <xs:extension base="b">
+            <xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence>
+            <xs:attribute name="x" type="xs:string"/>
+            <xs:anyAttribute/>
+          </xs:extension>
+        </xs:complexContent></xs:complexType>
+        """#)
+        // No model group is fine (an extension that only adds attributes).
+        try compile(#"""
+        <xs:complexType name="b"><xs:sequence><xs:element name="e" type="xs:string"/></xs:sequence></xs:complexType>
+        <xs:complexType name="t"><xs:complexContent>
+          <xs:extension base="b"><xs:attribute name="x" type="xs:string"/></xs:extension>
+        </xs:complexContent></xs:complexType>
+        """#)
+    }
 }

@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 864** | we rarely catch a bad one (facet, id, structural content-model, and UPA determinism validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 785** | we rarely catch a bad one (facet, id, structural content-model, UPA determinism, and complexContent-derivation order validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 

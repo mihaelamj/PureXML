@@ -148,6 +148,9 @@ extension PureXML.Schema.XSDParser {
             if local == "complexType" {
                 errors += elementDeclsConsistentErrors(node)
             }
+            if local == "complexContent" {
+                errors += complexContentOrderErrors(node)
+            }
         }
         for child in children {
             collectStructure(child, into: &errors)
