@@ -48,6 +48,7 @@ extension PureXML.Schema.XSDParser {
         let structural = idAttributeErrors(schema) + structureErrors(schema) + componentNameErrors(schema)
         let determinism = PureXML.Schema.ContentModelDeterminism.violations(in: schema, context: context)
         let cycles = derivationCycleErrors(containers, context.namespaceBindings, context.targetNamespace)
+            + circularReferenceErrors(containers, context.namespaceBindings, context.targetNamespace)
         return structural + determinism + cycles
     }
 }

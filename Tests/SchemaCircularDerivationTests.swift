@@ -65,6 +65,41 @@ struct SchemaCircularDerivationTests {
         #expect((try? PureXML.Schema.Document(schema)) != nil)
     }
 
+    @Test("Circular model-group, attribute-group, and substitution-group references are rejected")
+    func test_referenceCyclesRejected() {
+        // A model group that directly contains itself (mg-props-correct.2).
+        #expect(!compiles(
+            "<xs:group name=\"g\"><xs:sequence><xs:group ref=\"g\"/></xs:sequence></xs:group>"
+                + "<xs:element name=\"r\"><xs:complexType><xs:group ref=\"g\"/></xs:complexType></xs:element>",
+        ))
+        // An attribute-group reference cycle a -> b -> a (ag-props-correct.3).
+        #expect(!compiles(
+            "<xs:attributeGroup name=\"a\"><xs:attributeGroup ref=\"b\"/></xs:attributeGroup>"
+                + "<xs:attributeGroup name=\"b\"><xs:attributeGroup ref=\"a\"/></xs:attributeGroup>",
+        ))
+        // A substitution-group affiliation loop x -> y -> x (e-props-correct.6).
+        #expect(!compiles(
+            "<xs:element name=\"x\" substitutionGroup=\"y\"/><xs:element name=\"y\" substitutionGroup=\"x\"/>",
+        ))
+    }
+
+    @Test("A group recursing through an element, and a substitution chain, are allowed")
+    func test_groupRecursionAndChainAccepted() {
+        // particlesZ010: a group referenced inside an element's content is a recursive
+        // data structure, not a group containing itself. (Must compile.)
+        #expect(compiles(
+            "<xs:group name=\"g\"><xs:sequence><xs:element name=\"e\">"
+                + "<xs:complexType><xs:sequence><xs:group ref=\"g\" minOccurs=\"0\"/></xs:sequence></xs:complexType>"
+                + "</xs:element></xs:sequence></xs:group>"
+                + "<xs:element name=\"r\"><xs:complexType><xs:group ref=\"g\"/></xs:complexType></xs:element>",
+        ))
+        // A non-cyclic substitution chain leaf -> mid -> head.
+        #expect(compiles(
+            "<xs:element name=\"head\"/><xs:element name=\"mid\" substitutionGroup=\"head\"/>"
+                + "<xs:element name=\"leaf\" substitutionGroup=\"mid\"/>",
+        ))
+    }
+
     @Test("A type redefining itself is allowed (the base names its former self)")
     func test_redefineSelfDerivationAccepted() {
         let base = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">"

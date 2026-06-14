@@ -190,15 +190,102 @@ extension PureXML.Schema.XSDParser {
     /// The names of types redefined in an `xs:redefine`, whose `base` legitimately
     /// names themselves.
     private static func redefinedTypeNames(_ containers: [XSDTree]) -> Set<String> {
+        redefinedNames(containers, "complexType").union(redefinedNames(containers, "simpleType"))
+    }
+
+    /// The names of components of `kind` redefined in an `xs:redefine`. A redefined
+    /// model group or attribute group legitimately references its own former self
+    /// once, so it is a chain end rather than a cycle.
+    private static func redefinedNames(_ containers: [XSDTree], _ kind: String) -> Set<String> {
         var names: Set<String> = []
         for container in containers where XSDDerivNode.localName(container) == "redefine" {
-            for kind in ["complexType", "simpleType"] {
-                for type in XSDDerivNode.children(container, named: kind) {
-                    if let name = XSDDerivNode.attribute(type, "name") { names.insert(name) }
-                }
+            for definition in XSDDerivNode.children(container, named: kind) {
+                if let name = XSDDerivNode.attribute(definition, "name") { names.insert(name) }
             }
         }
         return names
+    }
+
+    /// Rejects circular references among named model groups, attribute groups, and
+    /// substitution-group affiliations (XSD 1.0 `mg-props-correct.2`,
+    /// `ag-props-correct.3`, `e-props-correct.6`): a group may not contain itself, an
+    /// attribute group may not reference itself transitively, and a substitution
+    /// chain may not loop. A reference is followed only when it resolves to this
+    /// schema's own target namespace, and a redefined group/attribute group is a
+    /// chain end (its single self-reference is the legal redefinition).
+    static func circularReferenceErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+        substitutionCycleErrors(containers, bindings, target)
+            + referenceCycleErrors(containers, "group", "model group", bindings, target)
+            + referenceCycleErrors(containers, "attributeGroup", "attribute group", bindings, target)
+    }
+
+    private static func substitutionCycleErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+        var graph: [String: String] = [:]
+        for container in containers {
+            for element in descendants(container, named: "element") {
+                guard let name = XSDDerivNode.attribute(element, "name"),
+                      let head = XSDDerivNode.attribute(element, "substitutionGroup"),
+                      XSDDerivNode.referenceNamespace(head, bindings) == target else { continue }
+                graph[name] = XSDDerivNode.stripPrefix(head)
+            }
+        }
+        return graph.keys.sorted().compactMap { name in
+            derivesFromItself(name, graph, []) ? "element '\(name)' must not be a member of its own substitution group" : nil
+        }
+    }
+
+    /// A named-definition reference cycle: a `kind` definition (`group` /
+    /// `attributeGroup`) whose `kind`-references reach itself. Multi-edge, since a
+    /// definition may reference several others.
+    private static func referenceCycleErrors(_ containers: [XSDTree], _ kind: String, _ label: String, _ bindings: [String: String], _ target: String?) -> [String] {
+        let redefined = redefinedNames(containers, kind)
+        var adjacency: [String: [String]] = [:]
+        for container in containers {
+            for definition in descendants(container, named: kind) {
+                guard let name = XSDDerivNode.attribute(definition, "name") else { continue }
+                for ref in boundedReferences(definition, kind) where XSDDerivNode.referenceNamespace(ref, bindings) == target {
+                    adjacency[name, default: []].append(XSDDerivNode.stripPrefix(ref))
+                }
+            }
+        }
+        return adjacency.keys.sorted().compactMap { name in
+            guard !redefined.contains(name), reachesItself(name, adjacency, redefined) else { return nil }
+            return "\(label) '\(name)' must not reference itself"
+        }
+    }
+
+    /// The `kind`-references a definition contains *directly* in its own content,
+    /// not crossing an element or type boundary. A `<group ref>` reached through an
+    /// element's content model is the element's content (a recursive data
+    /// structure), not the group containing itself, so the descent stops at
+    /// `element`/`complexType`/`simpleType`/`attribute` scopes.
+    private static func boundedReferences(_ node: XSDTree, _ kind: String) -> [String] {
+        var references: [String] = []
+        for child in XSDDerivNode.elementChildren(node) {
+            switch XSDDerivNode.localName(child) {
+            case "element", "complexType", "simpleType", "attribute":
+                continue
+            case kind:
+                if let ref = XSDDerivNode.attribute(child, "ref") { references.append(ref) }
+            default:
+                references += boundedReferences(child, kind)
+            }
+        }
+        return references
+    }
+
+    /// Whether following `start`'s references (multi-edge) returns to `start`. A
+    /// sink (a redefined definition) is not expanded.
+    private static func reachesItself(_ start: String, _ adjacency: [String: [String]], _ sinks: Set<String>) -> Bool {
+        var visited: Set<String> = []
+        var stack = adjacency[start] ?? []
+        while let node = stack.popLast() {
+            if node == start { return true }
+            if sinks.contains(node) { continue }
+            guard visited.insert(node).inserted else { continue }
+            stack += adjacency[node] ?? []
+        }
+        return false
     }
 
     /// Throws when a type inside an `xs:redefine` does not derive from itself: a
