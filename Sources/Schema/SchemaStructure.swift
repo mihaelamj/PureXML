@@ -56,6 +56,7 @@ extension PureXML.Schema.XSDParser {
     static func structureErrors(_ schema: XSDTree) -> [String] {
         var errors: [String] = []
         collectStructure(schema, into: &errors)
+        errors += simpleTypeVarietyFacetErrors(schema)
         return errors
     }
 
