@@ -139,6 +139,22 @@ pick the defensible reading and accept the residual deviation.
   the 36+ NIST false rejections (valid documents wrongly rejected) is the more
   important direction.
 
+- **RecurseAsIfGroup for a repeating element against a repeating choice
+  (`particlesZ001`).** A derived `element{0,unbounded}` restricting a base
+  `choice{0,unbounded}(element, any)`. The Microsoft test marks it valid, and its
+  own documentation states the reason: "Particle Derivation OK (Elt:Choice --
+  RecurseAsIfGroup) rule is ambiguous." Under the literal §3.9.6 rule (which
+  Xerces follows) the element is wrapped as a one-member `{1,1}` synthetic group
+  whose member keeps the element's `{0,unbounded}` occurrence, and that member
+  must be a valid restriction of a `{1,1}` choice branch; `{0,unbounded}` does not
+  fit `{1,1}`, so the strict reading rejects it. We follow the strict reading
+  (matching the reference implementation), accepting this one residual "valid
+  schema rejected". Adopting the lenient reading would require a special case that
+  cannot be expressed without over-accepting genuinely invalid restrictions on
+  PureXML's content-model representation (an attempt to do so regressed roughly
+  thirty other cases). Tracked on #165. The sibling `particlesV003` (Sequence:Choice
+  MapAndSum) was a genuine bug, since fixed.
+
 ## How a fix lands
 
 Pick a Category A cluster, read 2-3 cases (schema + instance + expected) against

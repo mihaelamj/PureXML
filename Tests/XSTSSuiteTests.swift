@@ -28,8 +28,8 @@ struct XSTSSuiteTests {
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
-    private let knownSchemaValidRejected = 2
-    private let knownSchemaInvalidAccepted = 520
+    private let knownSchemaValidRejected = 1
+    private let knownSchemaInvalidAccepted = 519
     private let knownInstanceValidRejected = 180
     private let knownInstanceInvalidAccepted = 160
 

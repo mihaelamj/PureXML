@@ -97,6 +97,23 @@ extension PureXML.Schema {
                         wildcardMin: base.minOccurs,
                         wildcardMax: base.maxOccurs,
                     )
+            case let (.group(restrictedGroup), .group(baseGroup)) where restrictedGroup.compositor == .sequence && baseGroup.compositor == .choice:
+                // MapAndSum (Sequence:Choice, XSD 1.0 §3.9.6): each derived particle is
+                // a valid restriction of some base branch, AND the derived sequence's
+                // occurrence count times its number of particles is within the base
+                // choice's occurrence range. The outer occurrence subsumption used by
+                // the same-compositor cases is wrong here (it would compare a derived
+                // `sequence{2,4}` directly to a base `choice{3,9}`); the count-product
+                // is the spec's measure, deliberately stricter than a pure subset.
+                let members = restrictedGroup.particles.filter { $0.maxOccurs != 0 }
+                let branches = baseGroup.particles.filter { $0.maxOccurs != 0 }
+                return rangeWithinWildcard(
+                    derivedMin: restricted.minOccurs * members.count,
+                    derivedMax: restricted.maxOccurs.map { $0 * members.count },
+                    wildcardMin: base.minOccurs,
+                    wildcardMax: base.maxOccurs,
+                )
+                    && members.allSatisfy { member in branches.contains { valid(member, $0, types, derivation) } }
             case let (.group(restrictedGroup), .group(baseGroup)):
                 // A content-free derived group was already handled above; here the
                 // derived group can contribute content, so its outer occurrence must be
@@ -136,7 +153,11 @@ extension PureXML.Schema {
                 // expansion must therefore be in document order for this to be right.
                 return recurse(restrictedParticles, baseParticles, skippedMustBeEmptiable: false, types, derivation)
             case (.sequence, .choice):
-                // MapAndSum (simplified): each restricted particle fits some branch.
+                // RecurseAsIfGroup for an element against a base choice arrives here as a
+                // one-particle synthetic sequence: each derived particle fits some base
+                // branch. (A genuine multi-particle sequence restricting a choice is
+                // handled by MapAndSum at the particle level, where the occurrence
+                // count-product is available.)
                 return restrictedParticles.allSatisfy { particle in
                     baseParticles.contains { valid(particle, $0, types, derivation) }
                 }

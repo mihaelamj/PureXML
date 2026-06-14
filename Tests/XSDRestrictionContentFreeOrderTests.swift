@@ -55,3 +55,45 @@ struct XSDRestrictionContentFreeAndOrderTests {
         #expect(!compiles("<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">\(base)\(reordered)</xs:schema>"))
     }
 }
+
+@Suite("XSD restriction: MapAndSum (sequence restricting a choice)")
+struct XSDRestrictionMapAndSumTests {
+    private func wrap(_ base: String, _ restriction: String) -> String {
+        "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">"
+            + "<xs:complexType name=\"B\">\(base)</xs:complexType>"
+            + "<xs:complexType name=\"R\"><xs:complexContent><xs:restriction base=\"B\">\(restriction)"
+            + "</xs:restriction></xs:complexContent></xs:complexType></xs:schema>"
+    }
+
+    private func compiles(_ base: String, _ restriction: String) -> Bool {
+        (try? PureXML.Schema.Document(wrap(base, restriction))) != nil
+    }
+
+    @Test("A sequence restricts a choice when each member fits a branch and the count-product is in range")
+    func test_mapAndSum() {
+        // particlesV003: derived sequence{2,4}(e1,e2) emits 4..8 elements, within the
+        // base choice{3,9}'s range, each an e1/e2 the choice admits. Valid (MapAndSum).
+        #expect(compiles(
+            "<xs:choice minOccurs=\"3\" maxOccurs=\"9\"><xs:element name=\"e1\"/><xs:element name=\"e2\"/></xs:choice>",
+            "<xs:sequence minOccurs=\"2\" maxOccurs=\"4\"><xs:element name=\"e1\"/><xs:element name=\"e2\"/></xs:sequence>",
+        ))
+        // Count-product out of range: derived sequence{2,4}(e1,e2) emits up to 8, the
+        // base choice{3,7} allows at most 7. Invalid.
+        #expect(!compiles(
+            "<xs:choice minOccurs=\"3\" maxOccurs=\"7\"><xs:element name=\"e1\"/><xs:element name=\"e2\"/></xs:choice>",
+            "<xs:sequence minOccurs=\"2\" maxOccurs=\"4\"><xs:element name=\"e1\"/><xs:element name=\"e2\"/></xs:sequence>",
+        ))
+        // A multi-member sequence cannot restrict a single-occurrence choice: the base
+        // picks exactly one, the derived requires both (count 2 > max 1). Invalid
+        // (this is the over-acceptance the count-product check closes).
+        #expect(!compiles(
+            "<xs:choice><xs:element name=\"a\"/><xs:element name=\"b\"/></xs:choice>",
+            "<xs:sequence><xs:element name=\"a\"/><xs:element name=\"b\"/></xs:sequence>",
+        ))
+        // A member that fits no branch is rejected regardless of count.
+        #expect(!compiles(
+            "<xs:choice minOccurs=\"2\" maxOccurs=\"4\"><xs:element name=\"e1\"/><xs:element name=\"e2\"/></xs:choice>",
+            "<xs:sequence minOccurs=\"2\" maxOccurs=\"2\"><xs:element name=\"e1\"/><xs:element name=\"z\"/></xs:sequence>",
+        ))
+    }
+}
