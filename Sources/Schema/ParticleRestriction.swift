@@ -115,17 +115,42 @@ extension PureXML.Schema {
             return base.indices.allSatisfy { used[$0] || emptiable(base[$0]) }
         }
 
-        /// A conservative slice of NameAndTypeOK: when a restricting element and the
-        /// base element it maps onto both resolve to atomic simple types, the
-        /// restricting type's built-in base must derive from the base's, so renaming
-        /// an `xs:string` element to `xs:int` under restriction is rejected. Any other
-        /// pairing (complex content, a list/union variety, an unresolvable or ur-type
-        /// reference) is permitted here, so no valid restriction is rejected.
+        /// A conservative slice of NameAndTypeOK. Two checks, both over-rejection-safe:
+        /// restricting an element to an ur-type (`anyType`/`anySimpleType`) when the
+        /// base has a concrete type is always widening, hence invalid; and when both
+        /// elements resolve to atomic simple types, the restricting type's built-in
+        /// base must derive from the base's (so an `xs:string` element renamed to
+        /// `xs:int` is rejected). Any other pairing (complex content, a list/union
+        /// variety, a named user type whose derivation the flattened particle model
+        /// does not record) is permitted, so no valid restriction is rejected.
         private static func elementTypeRestrictionOK(_ restricted: ElementType?, _ base: ElementType?, _ types: [String: ElementType]) -> Bool {
+            if isUrTypeReference(restricted, types), isConcreteType(base) { return false }
             guard let restrictedSimple = resolvedAtomic(restricted, types),
                   let baseSimple = resolvedAtomic(base, types)
             else { return true }
             return restrictedSimple.base.derives(from: baseSimple.base)
+        }
+
+        private static let urTypeNames: Set<String> = ["anyType", "anySimpleType", "anyAtomicType"]
+
+        /// Whether an element type is a reference to one of the XSD ur-types (the
+        /// widest types, which nothing may be restricted *to* from a narrower base).
+        /// A genuine ur-type is not in the named-type table; a user type that merely
+        /// shares the local name (in another namespace) is, so checking absence keeps
+        /// the namespace-blind reference key from misclassifying it.
+        private static func isUrTypeReference(_ type: ElementType?, _ types: [String: ElementType]) -> Bool {
+            if case let .typeReference(key) = type { return urTypeNames.contains(key) && types[key] == nil }
+            return false
+        }
+
+        /// Whether an element type names a concrete type (a built-in or a non-ur user
+        /// type), as opposed to an ur-type or an absent/unknown type.
+        private static func isConcreteType(_ type: ElementType?) -> Bool {
+            switch type {
+            case .simple: true
+            case let .typeReference(key): !urTypeNames.contains(key)
+            case .complex, .none: false
+            }
         }
 
         /// The atomic ``SimpleType`` an element type resolves to (following

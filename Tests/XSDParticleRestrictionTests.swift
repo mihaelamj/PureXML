@@ -145,4 +145,33 @@ struct XSDParticleRestrictionTests {
             restriction: "<xs:sequence><xs:element name=\"a\" type=\"xs:string\"/></xs:sequence>",
         ))
     }
+
+    @Test("NameAndTypeOK: widening a concrete-typed element to the ur-type is rejected")
+    func test_elementUrTypeWidening() {
+        // Restricting a string element to anyType/anySimpleType is widening, invalid.
+        #expect(!compiles(
+            base: "<xs:choice><xs:element name=\"c1\" type=\"xs:string\"/><xs:element name=\"c2\"/></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" type=\"xs:anyType\"/><xs:element name=\"c2\"/></xs:choice>",
+        ))
+        #expect(!compiles(
+            base: "<xs:choice><xs:element name=\"c1\" type=\"xs:string\"/><xs:element name=\"c2\"/></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" type=\"xs:anySimpleType\"/><xs:element name=\"c2\"/></xs:choice>",
+        ))
+        // The reverse (base is the ur-type, restriction narrows it) is valid.
+        #expect(compiles(
+            base: "<xs:choice><xs:element name=\"c1\" type=\"xs:anyType\"/><xs:element name=\"c2\"/></xs:choice>",
+            restriction: "<xs:choice><xs:element name=\"c1\" type=\"xs:string\"/><xs:element name=\"c2\"/></xs:choice>",
+        ))
+        // A user type whose local name is "anyType" (not the XSD ur-type) must not be
+        // mistaken for it: this is a valid same-type restriction.
+        #expect((try? PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:t" xmlns:t="urn:t">
+          <xs:simpleType name="anyType"><xs:restriction base="xs:string"/></xs:simpleType>
+          <xs:complexType name="B"><xs:choice><xs:element name="c1" type="t:anyType"/></xs:choice></xs:complexType>
+          <xs:complexType name="R"><xs:complexContent><xs:restriction base="t:B">
+            <xs:choice><xs:element name="c1" type="t:anyType"/></xs:choice>
+          </xs:restriction></xs:complexContent></xs:complexType>
+        </xs:schema>
+        """)) != nil)
+    }
 }
