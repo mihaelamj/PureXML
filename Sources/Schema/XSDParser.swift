@@ -31,6 +31,7 @@ extension PureXML.Schema {
             )
             context.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"
             context.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
+            context.namespaceBindings = XSDNode.namespaceBindings(of: schema)
             context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
             context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
             let consistencyErrors = idAttributeErrors(schema) + structureErrors(schema)
@@ -275,19 +276,7 @@ extension PureXML.Schema {
 
         private static func elementParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle {
             if let ref = XSDNode.attribute(node, "ref") {
-                let name = XSDNode.stripPrefix(ref)
-                // An abstract head may not appear itself, only its members; a
-                // concrete head appears alongside them.
-                let head = context.abstractElements.contains(name) ? [] : [name]
-                let alternatives = head + (context.substitutions[name] ?? [])
-                if alternatives.count == 1 {
-                    return Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0], context))
-                }
-                // The reference admits its substitution-group members, so expand it
-                // to a choice over the head and every member, each carrying its own
-                // declared type.
-                let members = alternatives.map { Particle(term: elementReferenceTerm($0, context)) }
-                return Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(Group(compositor: .choice, particles: members)))
+                return referenceParticle(ref, minimum, maximum, context)
             }
             let name = XSDNode.attribute(node, "name") ?? ""
             return Particle(
@@ -315,14 +304,34 @@ extension PureXML.Schema {
 }
 
 extension PureXML.Schema.XSDParser {
-    /// The qualified name of a reference to a global element: globals are always in
-    /// the schema's target namespace.
-    static func elementReferenceTerm(_ name: String, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Term {
+    /// The particle for an `<xs:element ref="...">`. An abstract head may not appear
+    /// itself, only its substitution-group members; a concrete head appears alongside
+    /// them, the reference expanding to a choice over the head and every member.
+    static func referenceParticle(_ ref: String, _ minimum: Int, _ maximum: Int?, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Particle {
+        let name = PureXML.Schema.XSDNode.stripPrefix(ref)
+        // The reference's QName is resolved by standard XML namespace rules (a bound
+        // prefix gives its namespace, so an imported element lands in the imported
+        // namespace; an unprefixed name the default namespace, or none), as the W3C
+        // XSTS suite expects: a bare `ref="foo"` with no default namespace is in no
+        // namespace, which `##other` admits; forcing it to the target over-rejects
+        // those and masks a dangling reference. Members are this schema's globals.
+        let refNamespace = PureXML.Schema.XSDNode.referenceNamespace(ref, context.namespaceBindings)
+        let head: [(String, String?)] = context.abstractElements.contains(name) ? [] : [(name, refNamespace)]
+        let alternatives = head + (context.substitutions[name] ?? []).map { ($0, context.targetNamespace) }
+        if alternatives.count == 1 {
+            return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1))
+        }
+        let members = alternatives.map { PureXML.Schema.Particle(term: elementReferenceTerm($0.0, $0.1)) }
+        return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(.init(compositor: .choice, particles: members)))
+    }
+
+    /// The term for a reference to a global element, in the resolved `namespace`.
+    static func elementReferenceTerm(_ name: String, _ namespace: String?) -> PureXML.Schema.Term {
         // A reference's type is resolved indirectly through the element key, so its
         // derivation identity is not a plain type name; NameAndTypeOK over a ref
         // falls back to the structural check (typeName nil).
         .element(
-            name: PureXML.Model.QualifiedName(localName: name, namespaceURI: context.targetNamespace),
+            name: PureXML.Model.QualifiedName(localName: name, namespaceURI: namespace),
             type: .typeReference(elementKey(name)),
             typeName: nil,
         )

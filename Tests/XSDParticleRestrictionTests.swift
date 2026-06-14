@@ -302,3 +302,54 @@ struct XSDParticleRestrictionTests {
         #expect(doc("xs:string", base: "u", types: userTypes) != nil)
     }
 }
+
+@Suite("XSD element-reference namespace resolution")
+struct XSDElementRefNamespaceTests {
+    @Test("An element reference resolves to its prefix's namespace, not the target namespace")
+    func test_elementRefNamespaceResolution() {
+        // particlesJj001: a ref to an imported element (imp -> http://importedXSD)
+        // restricts a `##other` wildcard. `##other` admits any namespace but the
+        // target, so an imported element is admitted and the restriction is valid;
+        // resolving the ref into the target namespace would make `##other` reject it.
+        let imported = "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:x=\"http://xsdtesting\""
+            + " targetNamespace=\"http://xsdtesting\" xmlns:imp=\"http://importedXSD\">"
+            + "<xsd:import namespace=\"http://importedXSD\"/>"
+            + "<xsd:complexType name=\"B\"><xsd:sequence><xsd:any namespace=\"##other\" minOccurs=\"0\"/></xsd:sequence></xsd:complexType>"
+            + "<xsd:complexType name=\"R\"><xsd:complexContent><xsd:restriction base=\"x:B\">"
+            + "<xsd:sequence><xsd:element ref=\"imp:impElem1\" minOccurs=\"0\"/></xsd:sequence>"
+            + "</xsd:restriction></xsd:complexContent></xsd:complexType></xsd:schema>"
+        #expect((try? PureXML.Schema.Document(imported)) != nil)
+        // The same shape with a ref into the TARGET namespace (a declared global) is
+        // invalid: `##other` forbids the target namespace, so the element is not
+        // admitted. This proves the resolved namespace is actually checked.
+        let targetNs = "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns:x=\"http://xsdtesting\""
+            + " targetNamespace=\"http://xsdtesting\" elementFormDefault=\"qualified\">"
+            + "<xsd:element name=\"tElem\" type=\"xsd:string\"/>"
+            + "<xsd:complexType name=\"B\"><xsd:sequence><xsd:any namespace=\"##other\" minOccurs=\"0\"/></xsd:sequence></xsd:complexType>"
+            + "<xsd:complexType name=\"R\"><xsd:complexContent><xsd:restriction base=\"x:B\">"
+            + "<xsd:sequence><xsd:element ref=\"x:tElem\" minOccurs=\"0\"/></xsd:sequence>"
+            + "</xsd:restriction></xsd:complexContent></xsd:complexType></xsd:schema>"
+        #expect((try? PureXML.Schema.Document(targetNs)) == nil)
+    }
+
+    @Test("An unprefixed ref resolves through the default namespace, qualifying an instance element")
+    func test_unprefixedRefUsesDefaultNamespace() {
+        // The spec-faithful common idiom: the target namespace is also the default
+        // xmlns, so a bare ref="child" resolves to the target namespace and a
+        // target-namespace instance element validates against it.
+        let schema = "<xsd:schema xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" xmlns=\"urn:T\""
+            + " targetNamespace=\"urn:T\" elementFormDefault=\"qualified\">"
+            + "<xsd:element name=\"child\" type=\"xsd:string\"/>"
+            + "<xsd:element name=\"root\"><xsd:complexType><xsd:sequence>"
+            + "<xsd:element ref=\"child\"/></xsd:sequence></xsd:complexType></xsd:element></xsd:schema>"
+        guard let document = try? PureXML.Schema.Document(schema) else {
+            Issue.record("schema should compile")
+            return
+        }
+        #expect((try? document.validate("<root xmlns=\"urn:T\"><child>x</child></root>"))?.isEmpty == true)
+        // A child in the wrong namespace is rejected (the resolution is real, not a
+        // blanket accept).
+        let wrong = "<root xmlns=\"urn:T\"><child xmlns=\"urn:OTHER\">x</child></root>"
+        #expect((try? document.validate(wrong))?.isEmpty != true)
+    }
+}

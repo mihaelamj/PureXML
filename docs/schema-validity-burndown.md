@@ -9,10 +9,10 @@ irreducible tail. Do not deviate to new features while this is open.
 
 | Bucket | Count | Reading |
 |---|---|---|
-| valid-schemas-rejected | **72 -> 32** | production target is 0: rejecting a correct schema is the most user-hostile defect (#148). Particle-restriction over-rejection fixed: pointless `maxOccurs=0` particles removed, content-free restriction of an EMPTY base, empty-derived emptiable-base, and (#163) the pairwise check over the normalized content model with occurrence subsumption applied only to same-kind pairings (cross-kind element/group, group/element, group/wildcard match occurrence inside, by effective total range / member). Remaining 32 are mostly element-ref namespace resolution (`particlesJj/Jk/Jm`, #164). |
-| **invalid-schemas-accepted** | **2461 -> 526** | we rarely catch a bad one (facet, default/fixed value, particle-restriction name+type, id, structural content-model, UPA determinism, content order, identity-constraint XPath-subset, wildcard-namespace, final/block, simpleType content, group/wildcard and group/element cardinality landed). |
-| valid-instances-rejected | 233 | (instance side, separately tracked) |
-| invalid-instances-accepted | 165 | |
+| valid-schemas-rejected | **72 -> 4** | production target is 0: rejecting a correct schema is the most user-hostile defect (#148). Particle-restriction over-rejection fixed: pointless `maxOccurs=0` particles removed, content-free restriction of an EMPTY base, empty-derived emptiable-base, and (#163) the pairwise check over the normalized content model with occurrence subsumption applied only to same-kind pairings (cross-kind element/group, group/element, group/wildcard match occurrence inside, by effective total range / member). #164 resolved element-ref namespaces by prefix binding (the `particlesJj/Jk/Jm/Jn/Js`, `particlesQ/R` cluster, -28). Remaining 4 (`elemZ027_a`, `particlesV003`, `particlesW006`, `particlesZ001`). |
+| **invalid-schemas-accepted** | **2461 -> 520** | we rarely catch a bad one (facet, default/fixed value, particle-restriction name+type, id, structural content-model, UPA determinism, content order, identity-constraint XPath-subset, wildcard-namespace, final/block, simpleType content, group/wildcard and group/element cardinality, element-ref namespace landed). |
+| valid-instances-rejected | **233 -> 180** | (instance side; #164's element-ref namespace fix is shared with instance validation, -34) |
+| invalid-instances-accepted | 160 | |
 
 One-sentence diagnosis: *the validator runs its instance-validity rules but not
 its schema-validity rules.* It compiles what it understands and ignores the

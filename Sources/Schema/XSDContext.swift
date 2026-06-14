@@ -29,6 +29,36 @@ extension PureXML.Schema {
             qualified.split(separator: ":").last.map(String.init) ?? qualified
         }
 
+        /// The prefix part of a QName (`p` in `p:local`), or nil when unprefixed.
+        static func prefix(_ qualified: String) -> String? {
+            let parts = qualified.split(separator: ":", maxSplits: 1)
+            return parts.count == 2 ? String(parts[0]) : nil
+        }
+
+        /// The namespace prefix bindings declared on a schema-root element:
+        /// `xmlns:p="..."` keyed by `p`, the default `xmlns="..."` under the empty key.
+        static func namespaceBindings(of schema: XSDTree) -> [String: String] {
+            var bindings: [String: String] = [:]
+            for attribute in schema.attributes {
+                if attribute.name.prefix == "xmlns" {
+                    bindings[attribute.name.localName] = attribute.value
+                } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
+                    bindings[""] = attribute.value
+                }
+            }
+            return bindings
+        }
+
+        /// The namespace URI a reference QName resolves to, given the schema's prefix
+        /// bindings: a prefixed name uses its prefix's binding, an unprefixed name the
+        /// default-namespace binding (nil when none is declared).
+        static func referenceNamespace(_ qualified: String, _ bindings: [String: String]) -> String? {
+            if let prefix = prefix(qualified) {
+                return bindings[prefix]
+            }
+            return bindings[""]
+        }
+
         static func occurrence(_ node: XSDTree) -> (min: Int, max: Int?) {
             let minimum = attribute(node, "minOccurs").flatMap(Int.init) ?? 1
             let maximumText = attribute(node, "maxOccurs")
@@ -167,6 +197,11 @@ extension PureXML.Schema {
         /// in wildcard constraints and qualifying global and qualified-form local
         /// declarations.
         var targetNamespace: String?
+        /// Namespace prefix bindings declared on the schema root (`xmlns:p="..."`,
+        /// the default namespace under the empty key), so an `xs:element ref="p:foo"`
+        /// resolves to the namespace `p` is bound to rather than assuming the target
+        /// namespace. An imported element reference is in the imported namespace.
+        var namespaceBindings: [String: String] = [:]
         /// Whether `elementFormDefault="qualified"`: local element declarations are
         /// in the target namespace unless their own `form` overrides it.
         var elementFormQualified: Bool = false
