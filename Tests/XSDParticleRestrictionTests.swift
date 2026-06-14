@@ -174,4 +174,33 @@ struct XSDParticleRestrictionTests {
         </xs:schema>
         """)) != nil)
     }
+
+    @Test("NameAndTypeOK over named user and union types")
+    func test_elementUserTypeDerivation() {
+        func doc(_ elementC1: String, base baseC1: String, types: String) -> PureXML.Schema.Document? {
+            try? PureXML.Schema.Document("""
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+              \(types)
+              <xs:complexType name="B"><xs:choice><xs:element name="c1" type="\(baseC1)"/></xs:choice></xs:complexType>
+              <xs:complexType name="R"><xs:complexContent><xs:restriction base="B">
+                <xs:choice><xs:element name="c1" type="\(elementC1)"/></xs:choice>
+              </xs:restriction></xs:complexContent></xs:complexType>
+            </xs:schema>
+            """)
+        }
+        let userTypes = """
+        <xs:simpleType name="foo"><xs:restriction base="xs:string"/></xs:simpleType>
+        <xs:simpleType name="bar"><xs:restriction base="foo"><xs:maxLength value="3"/></xs:restriction></xs:simpleType>
+        <xs:simpleType name="other"><xs:restriction base="xs:integer"/></xs:simpleType>
+        <xs:simpleType name="u"><xs:union memberTypes="xs:decimal xs:string"/></xs:simpleType>
+        """
+        // bar restricts foo: a valid narrowing of a user type.
+        #expect(doc("bar", base: "foo", types: userTypes) != nil)
+        // foo restricting bar widens (foo is bar's base): invalid.
+        #expect(doc("foo", base: "bar", types: userTypes) == nil)
+        // two unrelated user types: invalid.
+        #expect(doc("other", base: "foo", types: userTypes) == nil)
+        // a union member (xs:string) validly restricts the union-typed base element.
+        #expect(doc("xs:string", base: "u", types: userTypes) != nil)
+    }
 }

@@ -15,7 +15,7 @@ struct XSDLocatedContentTests {
     }
 
     private func sequence(_ names: [String]) -> Schema.ComplexType {
-        let particles = names.map { Schema.Particle(term: .element(name: Name(localName: $0), type: nil)) }
+        let particles = names.map { Schema.Particle(term: .element(name: Name(localName: $0), type: nil, typeName: nil)) }
         return Schema.ComplexType(content: .elementOnly(Schema.Particle(term: .group(Schema.Group(compositor: .sequence, particles: particles)))))
     }
 
@@ -47,7 +47,7 @@ struct XSDLocatedContentTests {
     @Test("An xs:all group reports every stray child and every missing member (recovery)")
     func test_allRecovery() {
         let members = ["a", "b"].map {
-            Schema.Particle(minOccurs: 1, maxOccurs: 1, term: .element(name: Name(localName: $0), type: nil))
+            Schema.Particle(minOccurs: 1, maxOccurs: 1, term: .element(name: Name(localName: $0), type: nil, typeName: nil))
         }
         let type = Schema.ComplexType(content: .elementOnly(Schema.Particle(term: .group(Schema.Group(compositor: .all, particles: members)))))
         // Two stray children, and member b never appears: three located problems.

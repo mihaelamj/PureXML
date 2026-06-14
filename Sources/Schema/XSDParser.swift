@@ -126,6 +126,20 @@ extension PureXML.Schema {
 
         // MARK: Element and type references
 
+        /// The derivation identity of an element's type: the resolved local name of
+        /// its `type` reference, `anyType` when the type is absent (the implied type),
+        /// or nil when the type is an inline anonymous definition (no name to derive
+        /// against).
+        static func elementTypeName(_ node: XSDTree) -> String? {
+            if let typeName = XSDNode.attribute(node, "type") {
+                return XSDNode.stripPrefix(typeName)
+            }
+            if XSDNode.firstChild(node, named: "simpleType") != nil || XSDNode.firstChild(node, named: "complexType") != nil {
+                return nil
+            }
+            return "anyType"
+        }
+
         private static func elementType(_ node: XSDTree, _ context: XSDContext) -> ElementType {
             if let typeName = XSDNode.attribute(node, "type") {
                 return typeReference(typeName)
@@ -279,7 +293,11 @@ extension PureXML.Schema {
             return Particle(
                 minOccurs: minimum,
                 maxOccurs: maximum,
-                term: .element(name: localElementName(name, XSDNode.attribute(node, "form"), context), type: elementType(node, context)),
+                term: .element(
+                    name: localElementName(name, XSDNode.attribute(node, "form"), context),
+                    type: elementType(node, context),
+                    typeName: elementTypeName(node),
+                ),
             )
         }
 
@@ -300,9 +318,13 @@ extension PureXML.Schema.XSDParser {
     /// The qualified name of a reference to a global element: globals are always in
     /// the schema's target namespace.
     static func elementReferenceTerm(_ name: String, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Term {
+        // A reference's type is resolved indirectly through the element key, so its
+        // derivation identity is not a plain type name; NameAndTypeOK over a ref
+        // falls back to the structural check (typeName nil).
         .element(
             name: PureXML.Model.QualifiedName(localName: name, namespaceURI: context.targetNamespace),
             type: .typeReference(elementKey(name)),
+            typeName: nil,
         )
     }
 

@@ -15,10 +15,12 @@ public extension PureXML.Schema {
     /// table and each type's `final` controls.
     struct CompiledSchemaFacts {
         public let types: [String: ElementType]
+        public let typeDerivation: [String: TypeDerivation]
         public let typeFinal: [String: Set<DerivationMethod>]
 
-        public init(types: [String: ElementType], typeFinal: [String: Set<DerivationMethod>]) {
+        public init(types: [String: ElementType], typeDerivation: [String: TypeDerivation], typeFinal: [String: Set<DerivationMethod>]) {
             self.types = types
+            self.typeDerivation = typeDerivation
             self.typeFinal = typeFinal
         }
     }
@@ -49,7 +51,12 @@ public extension PureXML.Validation {
                 guard let derivation = context.subject.derivation, derivation.method == .restriction,
                       case let .complex(restricted)? = context.document.types[context.subject.name],
                       case let .complex(base)? = context.document.types[derivation.base],
-                      let reason = PureXML.Schema.ParticleRestriction.violation(restricted: restricted.content, base: base.content, types: context.document.types)
+                      let reason = PureXML.Schema.ParticleRestriction.violation(
+                          restricted: restricted.content,
+                          base: base.content,
+                          types: context.document.types,
+                          derivation: context.document.typeDerivation,
+                      )
                 else { return [] }
                 let text = "type '\(context.subject.name)' is not a valid restriction of '\(derivation.base)': \(reason)"
                 return [ValidationError(reason: text, at: context.codingPath)]
@@ -63,7 +70,7 @@ public extension PureXML.Validation {
             typeDerivation: [String: PureXML.Schema.TypeDerivation],
             typeFinal: [String: Set<PureXML.Schema.DerivationMethod>],
         ) -> [ValidationError] {
-            let facts = PureXML.Schema.CompiledSchemaFacts(types: types, typeFinal: typeFinal)
+            let facts = PureXML.Schema.CompiledSchemaFacts(types: types, typeDerivation: typeDerivation, typeFinal: typeFinal)
             let rules = [finalRespected, restrictionsAreSubsets]
             return typeDerivation.keys.sorted().flatMap { name -> [ValidationError] in
                 let fact = PureXML.Schema.SchemaTypeFact(name: name, derivation: typeDerivation[name])

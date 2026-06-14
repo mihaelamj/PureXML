@@ -11,7 +11,7 @@ import Testing
 @Suite("Content NFA state budget")
 struct ContentNFAStateBudgetTests {
     private func element(_ name: String, min: Int, max: Int?) -> PureXML.Schema.Particle {
-        .init(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: nil))
+        .init(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: nil, typeName: nil))
     }
 
     /// A sequence repeated `min` times, each repeat holding an element repeated

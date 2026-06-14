@@ -55,7 +55,7 @@ struct XSDSchemaValidationTests {
     @Test("finalRespected reports a derivation the base declares final, and only that")
     func test_finalRespectedRule() throws {
         let compiled = try compile(finalViolationSchema)
-        let facts = Facts(types: compiled.types, typeFinal: compiled.typeFinal)
+        let facts = Facts(types: compiled.types, typeDerivation: compiled.typeDerivation, typeFinal: compiled.typeFinal)
         let rule = PureXML.Validation.XSDSchema.finalRespected
         let bad = Fact(name: "CircleT", derivation: compiled.typeDerivation["CircleT"])
         let errors = rule.apply(to: bad, at: [.element("CircleT")], in: facts)
@@ -69,7 +69,7 @@ struct XSDSchemaValidationTests {
     @Test("restrictionsAreSubsets reports an unfaithful restriction with the violation reason")
     func test_restrictionRule() throws {
         let compiled = try compile(badRestrictionSchema)
-        let facts = Facts(types: compiled.types, typeFinal: compiled.typeFinal)
+        let facts = Facts(types: compiled.types, typeDerivation: compiled.typeDerivation, typeFinal: compiled.typeFinal)
         let rule = PureXML.Validation.XSDSchema.restrictionsAreSubsets
         let bad = Fact(name: "R", derivation: compiled.typeDerivation["R"])
         let errors = rule.apply(to: bad, at: [.element("R")], in: facts)
@@ -92,7 +92,7 @@ struct XSDSchemaValidationTests {
         </xs:schema>
         """
         let good = try compile(faithful)
-        let goodFacts = Facts(types: good.types, typeFinal: good.typeFinal)
+        let goodFacts = Facts(types: good.types, typeDerivation: good.typeDerivation, typeFinal: good.typeFinal)
         let goodFact = Fact(name: "R", derivation: good.typeDerivation["R"])
         #expect(rule.apply(to: goodFact, at: [.element("R")], in: goodFacts).isEmpty)
     }

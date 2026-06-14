@@ -28,11 +28,28 @@ extension PureXML.Schema.XSDParser {
             for type in descendants(container, named: "complexType") {
                 gatherType(type, into: &tables)
             }
+            for type in descendants(container, named: "simpleType") {
+                gatherSimpleType(type, into: &tables)
+            }
             for element in descendants(container, named: "element") {
                 gatherElement(element, into: &tables)
             }
         }
         return tables
+    }
+
+    /// Records a named `simpleType`'s restriction derivation and `final` controls.
+    /// A `simpleType` derives from its `restriction`'s `base`; a `list`/`union`
+    /// constructs a new type (deriving from `anySimpleType`), so it is left
+    /// unrecorded, which keeps two independent list/union types correctly
+    /// non-derivable from one another.
+    private static func gatherSimpleType(_ type: XSDTree, into tables: inout DerivationTables) {
+        guard let name = XSDDerivNode.attribute(type, "name") else { return }
+        let finalSet = methodSet(XSDDerivNode.attribute(type, "final"))
+        if !finalSet.isEmpty { tables.typeFinal[name] = finalSet }
+        guard let restriction = XSDDerivNode.firstChild(type, named: "restriction"),
+              let base = XSDDerivNode.attribute(restriction, "base") else { return }
+        tables.typeDerivation[name] = PureXML.Schema.TypeDerivation(base: XSDDerivNode.stripPrefix(base), method: .restriction)
     }
 
     private static func gatherType(_ type: XSDTree, into tables: inout DerivationTables) {

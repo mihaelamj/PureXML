@@ -14,7 +14,7 @@ struct ContentMatcherDifferentialTests {
     }
 
     private func element(_ name: String, min: Int = 1, max: Int? = 1) -> PureXML.Schema.Particle {
-        .init(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: nil))
+        .init(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: nil, typeName: nil))
     }
 
     private func group(_ compositor: PureXML.Schema.Compositor, _ particles: [PureXML.Schema.Particle], min: Int = 1, max: Int? = 1) -> PureXML.Schema.Particle {

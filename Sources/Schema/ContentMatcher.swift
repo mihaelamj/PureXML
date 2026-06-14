@@ -194,7 +194,7 @@ extension PureXML.Schema {
 
         private mutating func term(_ term: PureXML.Schema.Term) -> (start: Int, accept: Int) {
             switch term {
-            case let .element(name, _):
+            case let .element(name, _, _):
                 labeled(.name(name))
             case let .wildcard(wildcard):
                 labeled(.wildcard(wildcard))

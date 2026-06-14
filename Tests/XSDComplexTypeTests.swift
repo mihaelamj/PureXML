@@ -6,7 +6,7 @@ struct XSDComplexTypeTests {
     private typealias Schema = PureXML.Schema
 
     private func element(_ name: String, type: Schema.ElementType? = nil, min: Int = 1, max: Int? = 1) -> Schema.Particle {
-        Schema.Particle(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: type))
+        Schema.Particle(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: type, typeName: nil))
     }
 
     private func parse(_ xml: String) throws -> PureXML.Model.Element {

@@ -68,7 +68,7 @@ struct XSDCategoryTests {
     @Test("Content: a child outside the content model is located with an expected hint")
     func test_contentModelMismatch() {
         let particle = Schema.Particle(term: .group(Schema.Group(compositor: .sequence, particles: [
-            Schema.Particle(term: .element(name: Name("b"), type: nil)),
+            Schema.Particle(term: .element(name: Name("b"), type: nil, typeName: nil)),
         ])))
         let type = Schema.ComplexType(content: .elementOnly(particle))
         #expect(validate(element("a", children: [.element(element("b"))]), type).isEmpty)

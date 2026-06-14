@@ -65,7 +65,11 @@ public extension PureXML.Schema {
     /// The term of a particle: an element declaration, a nested model group, or a
     /// wildcard.
     indirect enum Term: Sendable {
-        case element(name: PureXML.Model.QualifiedName, type: ElementType?)
+        /// `typeName` is the resolved local name of the element's `type` reference
+        /// (a built-in, a user type, or `anyType` for an absent type), or nil when
+        /// the type is an inline anonymous definition. It preserves the derivation
+        /// identity the flattened `type` (`ElementType`) loses, for NameAndTypeOK.
+        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?)
         case group(Group)
         case wildcard(Wildcard)
     }

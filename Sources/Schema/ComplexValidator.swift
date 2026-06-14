@@ -356,7 +356,7 @@ extension PureXML.Schema.ComplexValidator {
             counts[position] += 1
         }
         for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
-            if case let .element(name, _) = member.term {
+            if case let .element(name, _, _) = member.term {
                 errors.append(XSDFailure(reason: "element '\(name.localName)' is required but missing", at: path))
             }
         }
@@ -364,7 +364,7 @@ extension PureXML.Schema.ComplexValidator {
 
     static func memberMatches(_ term: PureXML.Schema.Term, _ name: PureXML.Model.QualifiedName) -> Bool {
         switch term {
-        case let .element(declared, _): declared.localName == name.localName && declared.namespaceURI == name.namespaceURI
+        case let .element(declared, _, _): declared.localName == name.localName && declared.namespaceURI == name.namespaceURI
         case let .wildcard(wildcard): wildcard.admits(name)
         case .group: false
         }
