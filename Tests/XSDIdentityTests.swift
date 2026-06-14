@@ -160,8 +160,8 @@ struct XSDIdentityTests {
         #expect(try validate(xsd, dangling).contains { $0.reason.contains("no matching key 'pk'") })
     }
 
-    @Test("A malformed field XPath is a located error, not a silently disabled constraint")
-    func test_malformedFieldReported() throws {
+    @Test("A malformed field XPath is rejected at compile time, not silently disabled")
+    func test_malformedFieldReported() {
         let xsd = """
         \(head)
           <xs:element name="list">
@@ -172,12 +172,11 @@ struct XSDIdentityTests {
           </xs:element>
         </xs:schema>
         """
-        let errors = try validate(xsd, "<list><item id=\"1\"/><item id=\"1\"/></list>")
-        #expect(errors.contains { $0.reason.contains("invalid field XPath '@id['") }, "\(errors.map(\.reason))")
+        #expect(rejectsIdentityXPath(xsd), "a field xpath with a predicate bracket is not in the XSD subset")
     }
 
-    @Test("A malformed selector XPath is a located error")
-    func test_malformedSelectorReported() throws {
+    @Test("A malformed selector XPath is rejected at compile time")
+    func test_malformedSelectorReported() {
         let xsd = """
         \(head)
           <xs:element name="list">
@@ -188,8 +187,18 @@ struct XSDIdentityTests {
           </xs:element>
         </xs:schema>
         """
-        let errors = try validate(xsd, "<list><item id=\"1\"/></list>")
-        #expect(errors.contains { $0.reason.contains("invalid selector XPath 'item['") }, "\(errors.map(\.reason))")
+        #expect(rejectsIdentityXPath(xsd), "a selector xpath with a predicate bracket is not in the XSD subset")
+    }
+
+    /// Whether compiling `xsd` is rejected for an out-of-subset identity-constraint
+    /// XPath (the malformed path is caught at compile time, not silently disabled).
+    private func rejectsIdentityXPath(_ xsd: String) -> Bool {
+        do {
+            _ = try PureXML.Schema.Document(xsd)
+            return false
+        } catch {
+            return "\(error)".contains("is not a valid identity-constraint path")
+        }
     }
 
     @Test("A child-element field locates the error at that child")

@@ -151,6 +151,9 @@ extension PureXML.Schema.XSDParser {
             if local == "complexContent" {
                 errors += complexContentOrderErrors(node)
             }
+            if let local, local == "selector" || local == "field" {
+                errors += identityXPathErrors(node, local: local)
+            }
         }
         for child in children {
             collectStructure(child, into: &errors)
