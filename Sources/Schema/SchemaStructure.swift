@@ -154,6 +154,9 @@ extension PureXML.Schema.XSDParser {
             if let local, local == "selector" || local == "field" {
                 errors += identityXPathErrors(node, local: local)
             }
+            if let local, local == "any" || local == "anyAttribute" {
+                errors += wildcardNamespaceErrors(node)
+            }
         }
         for child in children {
             collectStructure(child, into: &errors)
