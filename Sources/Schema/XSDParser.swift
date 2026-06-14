@@ -34,9 +34,7 @@ extension PureXML.Schema {
             context.namespaceBindings = XSDNode.namespaceBindings(of: schema)
             context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
             context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
-            let consistencyErrors = idAttributeErrors(schema) + structureErrors(schema)
-                + componentNameErrors(schema) + ContentModelDeterminism.violations(in: schema, context: context)
-            for error in consistencyErrors {
+            for error in consistencyErrors(schema, context, containers) {
                 context.diagnostics.report(error)
             }
             var types = namedTypes(containers, into: &context)

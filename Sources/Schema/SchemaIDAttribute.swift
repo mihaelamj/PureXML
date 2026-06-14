@@ -38,4 +38,16 @@ extension PureXML.Schema.XSDParser {
     private static func unprefixedID(_ node: XSDTree) -> String? {
         node.attributes.first { $0.name.prefix == nil && $0.name.localName == "id" }?.value
     }
+
+    /// All compile-time schema-consistency findings, collected together so they are
+    /// reported in one pass: `id` validity, schema-for-schemas structure, global
+    /// component-name uniqueness, content-model determinism (UPA), and circular
+    /// type derivation. The explicit return type keeps the type-checker from
+    /// inferring a long concatenation.
+    static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
+        let structural = idAttributeErrors(schema) + structureErrors(schema) + componentNameErrors(schema)
+        let determinism = PureXML.Schema.ContentModelDeterminism.violations(in: schema, context: context)
+        let cycles = derivationCycleErrors(containers, context.namespaceBindings, context.targetNamespace)
+        return structural + determinism + cycles
+    }
 }

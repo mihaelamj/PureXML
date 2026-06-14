@@ -121,6 +121,86 @@ extension PureXML.Schema.XSDParser {
         return methods
     }
 
+    /// Rejects circular type derivation (XSD 1.0 `ct-props-correct.3` /
+    /// `st-props-correct.2`): a complex or simple type may not derive, transitively
+    /// through its `{base type definition}`, from itself. Only the base chain is
+    /// followed, so a type whose *element content* recurses (an element of its own
+    /// type, the normal recursive-data-structure case) is correctly permitted.
+    ///
+    /// A type redefined in `xs:redefine` legitimately names itself as its base (the
+    /// redefinition derives from its former self), so redefined types are treated as
+    /// chain ends rather than self-cycles, matching the suite's "circular ref is
+    /// allowed if parent is redefine".
+    static func derivationCycleErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+        let redefined = redefinedTypeNames(containers)
+        var graph: [String: String] = [:]
+        for container in containers {
+            for kind in ["complexType", "simpleType"] {
+                for type in descendants(container, named: kind) {
+                    guard let name = XSDDerivNode.attribute(type, "name"), let base = rawBase(of: type) else { continue }
+                    // Follow a base only when it resolves to this schema's own target
+                    // namespace. A foreign-namespace base is resolved separately, so
+                    // following it by local name would report a false self-cycle when the
+                    // local names collide (a `local:X` extending an imported `other:X`).
+                    guard XSDDerivNode.referenceNamespace(base, bindings) == target else { continue }
+                    graph[name] = XSDDerivNode.stripPrefix(base)
+                }
+            }
+        }
+        return graph.keys.sorted().compactMap { name in
+            guard !redefined.contains(name), derivesFromItself(name, graph, redefined) else { return nil }
+            return "type '\(name)' must not be derived from itself"
+        }
+    }
+
+    /// The raw (prefixed) base a type declares: a complex type's
+    /// `complexContent`/`simpleContent` extension/restriction base, or a simple
+    /// type's restriction base.
+    private static func rawBase(of type: XSDTree) -> String? {
+        if let derivation = XSDDerivNode.firstChild(type, named: "complexContent") ?? XSDDerivNode.firstChild(type, named: "simpleContent") {
+            let node = XSDDerivNode.firstChild(derivation, named: "extension") ?? XSDDerivNode.firstChild(derivation, named: "restriction")
+            return node.flatMap { XSDDerivNode.attribute($0, "base") }
+        }
+        return XSDDerivNode.firstChild(type, named: "restriction").flatMap { XSDDerivNode.attribute($0, "base") }
+    }
+
+    /// Whether following `start`'s base chain returns to `start`. A redefined type
+    /// is a chain end (its self-naming base is the redefinition, not a cycle); a
+    /// base outside the graph (a built-in, an unresolved or foreign type) ends the
+    /// chain. A cycle not passing through `start` ends the walk without a match (it
+    /// is reported when its own members are the start).
+    private static func derivesFromItself(_ start: String, _ graph: [String: String], _ redefined: Set<String>) -> Bool {
+        guard !urTypeNames.contains(start) else { return false }
+        var current = start
+        var seen: Set<String> = []
+        while !redefined.contains(current), !urTypeNames.contains(current), let base = graph[current] {
+            if base == start { return true }
+            guard seen.insert(base).inserted else { return false }
+            current = base
+        }
+        return false
+    }
+
+    /// The roots of the type hierarchy. They terminate every derivation chain, so
+    /// they are never part of a cycle. The schema-for-schemas declares them in the
+    /// XSD namespace with bootstrap definitions that name each other; following
+    /// those would report a spurious `anySimpleType`/`string` cycle.
+    private static let urTypeNames: Set<String> = ["anyType", "anySimpleType", "anyAtomicType"]
+
+    /// The names of types redefined in an `xs:redefine`, whose `base` legitimately
+    /// names themselves.
+    private static func redefinedTypeNames(_ containers: [XSDTree]) -> Set<String> {
+        var names: Set<String> = []
+        for container in containers where XSDDerivNode.localName(container) == "redefine" {
+            for kind in ["complexType", "simpleType"] {
+                for type in XSDDerivNode.children(container, named: kind) {
+                    if let name = XSDDerivNode.attribute(type, "name") { names.insert(name) }
+                }
+            }
+        }
+        return names
+    }
+
     /// Throws when a type inside an `xs:redefine` does not derive from itself: a
     /// redefinition's `base` must name the type being redefined.
     static func checkRedefine(_ containers: [XSDTree]) throws {
