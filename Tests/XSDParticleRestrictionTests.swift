@@ -49,6 +49,34 @@ struct XSDParticleRestrictionTests {
             base: "<xs:sequence><xs:element name=\"a\" type=\"xs:string\" minOccurs=\"0\" maxOccurs=\"unbounded\"/></xs:sequence>",
             restriction: "<xs:sequence><xs:element name=\"a\" type=\"xs:string\" maxOccurs=\"2\"/></xs:sequence>",
         ))
+        // A maxOccurs=0 particle never occurs (pointless particle); it is removed
+        // before mapping, so it must not consume the base wildcard the next element
+        // restricts (particlesJd).
+        #expect(compiles(
+            base: "<xs:sequence><xs:any namespace=\"##any\" minOccurs=\"0\" maxOccurs=\"unbounded\"/></xs:sequence>",
+            restriction: "<xs:sequence><xs:element name=\"e1\" minOccurs=\"0\" maxOccurs=\"0\"/><xs:element name=\"e2\"/></xs:sequence>",
+        ))
+        // A content-free restriction (an empty sequence) of an EMPTY base is valid:
+        // both accept only the empty sequence (addB079).
+        #expect(compiles(
+            base: "<xs:complexContent><xs:restriction base=\"xs:anyType\"/></xs:complexContent>",
+            restriction: "<xs:sequence/>",
+        ))
+    }
+
+    @Test("An all-maxOccurs=0 derived sequence does not vacuously restrict a required base")
+    func test_emptyDerivedRequiredBase() {
+        // After pointless-particle removal the derived sequence is empty (accepts only
+        // the empty sequence); restricting a required choice {a|b} is invalid.
+        #expect(restrictionError(
+            base: "<xs:choice><xs:element name=\"a\" type=\"xs:string\"/><xs:element name=\"b\" type=\"xs:string\"/></xs:choice>",
+            restriction: "<xs:sequence><xs:element name=\"x\" minOccurs=\"0\" maxOccurs=\"0\"/></xs:sequence>",
+        )?.contains("not a valid restriction") == true)
+        // But restricting an emptiable base choice {a?|b} is valid.
+        #expect(compiles(
+            base: "<xs:choice><xs:element name=\"a\" type=\"xs:string\" minOccurs=\"0\"/><xs:element name=\"b\" type=\"xs:string\"/></xs:choice>",
+            restriction: "<xs:sequence><xs:element name=\"x\" minOccurs=\"0\" maxOccurs=\"0\"/></xs:sequence>",
+        ))
     }
 
     @Test("A restriction widening the occurrence range is rejected")

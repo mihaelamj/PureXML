@@ -20,7 +20,13 @@ extension PureXML.Schema {
                 emptiable(baseParticle) ? nil : "the base content is required, so the restriction cannot be EMPTY"
             case (.mixed, .elementOnly):
                 "a restriction cannot add mixed content to an element-only base"
-            case (.elementOnly, .empty), (.mixed, .empty):
+            case let (.elementOnly(restrictedParticle), .empty):
+                // A content-free particle (an empty group, or one whose members all
+                // have maxOccurs=0) accepts only the empty sequence, so it is a valid
+                // restriction of EMPTY; only a particle that can contribute a child is
+                // adding content.
+                contentFree(restrictedParticle) ? nil : "the base content is EMPTY, so the restriction cannot add content"
+            case (.mixed, .empty):
                 "the base content is EMPTY, so the restriction cannot add content"
             case let (.elementOnly(restrictedParticle), .elementOnly(baseParticle)),
                  let (.elementOnly(restrictedParticle), .mixed(baseParticle)),
@@ -46,6 +52,14 @@ extension PureXML.Schema {
                 // against the base group.
                 return groupValid(Group(compositor: .sequence, particles: [restricted.withUnitRange()]), baseGroup, types, derivation)
             case let (.group(restrictedGroup), .group(baseGroup)):
+                // If every member of the derived group is a pointless (maxOccurs=0)
+                // particle, the group accepts only the empty sequence; that is a valid
+                // restriction iff the base particle is itself emptiable (by structure
+                // or its own occurrence). `emptiable(base)` accounts for both, which a
+                // structural check inside `groupValid` could not.
+                if restrictedGroup.particles.allSatisfy({ $0.maxOccurs == 0 }) {
+                    return emptiable(base)
+                }
                 return groupValid(restrictedGroup, baseGroup, types, derivation)
             case let (.group(restrictedGroup), .wildcard(wildcard)):
                 // NSRecurseCheckCardinality, namespace part: every leaf element
@@ -57,21 +71,40 @@ extension PureXML.Schema {
         }
 
         private static func groupValid(_ restricted: Group, _ base: Group, _ types: [String: ElementType], _ derivation: [String: TypeDerivation]) -> Bool {
+            // A particle that can never occur (maxOccurs=0) contributes nothing to the
+            // language, so it is removed before mapping (a "pointless particle"). Left
+            // in, it would wrongly consume a base particle and starve the particles
+            // after it (e.g. `(e1 maxOccurs=0, e2)` restricting `(any)`).
+            let restrictedParticles = restricted.particles.filter { $0.maxOccurs != 0 }
+            let baseParticles = base.particles.filter { $0.maxOccurs != 0 }
             switch (restricted.compositor, base.compositor) {
             case (.sequence, .sequence), (.all, .all):
-                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: true, types, derivation)
+                return recurse(restrictedParticles, baseParticles, skippedMustBeEmptiable: true, types, derivation)
             case (.choice, .choice):
-                recurse(restricted.particles, base.particles, skippedMustBeEmptiable: false, types, derivation)
+                return recurse(restrictedParticles, baseParticles, skippedMustBeEmptiable: false, types, derivation)
             case (.sequence, .choice):
                 // MapAndSum (simplified): each restricted particle fits some branch.
-                restricted.particles.allSatisfy { particle in
-                    base.particles.contains { valid(particle, $0, types, derivation) }
+                return restrictedParticles.allSatisfy { particle in
+                    baseParticles.contains { valid(particle, $0, types, derivation) }
                 }
             case (.sequence, .all):
                 // RecurseUnordered: map onto distinct base particles in any order.
-                recurseUnordered(restricted.particles, base.particles, types, derivation)
+                return recurseUnordered(restrictedParticles, baseParticles, types, derivation)
             default:
-                false
+                return false
+            }
+        }
+
+        /// Whether a particle can never contribute a child element or wildcard: it
+        /// has `maxOccurs=0`, or is a group all of whose members are content-free
+        /// (an empty group included). Its only legal content is the empty sequence.
+        private static func contentFree(_ particle: Particle) -> Bool {
+            if particle.maxOccurs == 0 { return true }
+            switch particle.term {
+            case .element, .wildcard:
+                return false
+            case let .group(group):
+                return group.particles.allSatisfy(contentFree)
             }
         }
 

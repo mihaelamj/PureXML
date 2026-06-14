@@ -9,8 +9,8 @@ irreducible tail. Do not deviate to new features while this is open.
 
 | Bucket | Count | Reading |
 |---|---|---|
-| valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 527** | we rarely catch a bad one (facet definition + applicability, default/fixed value validity, particle-restriction name+type, id, structural content-model, UPA determinism, complexContent + complexType content order, identity-constraint XPath-subset, and wildcard-namespace validity landed) |
+| valid-schemas-rejected | **72 -> 45** | production target is 0: rejecting a correct schema is the most user-hostile defect (#148). Particle-restriction over-rejection fixed: pointless `maxOccurs=0` particles removed, content-free restriction of an EMPTY base, empty-derived emptiable-base. |
+| **invalid-schemas-accepted** | **2461 -> 528** | we rarely catch a bad one (facet, default/fixed value, particle-restriction name+type, id, structural content-model, UPA determinism, content order, identity-constraint XPath-subset, wildcard-namespace, final/block, simpleType content landed). The 527->528 step is `addB32`, invalid only via a malformed import (#161), unmasked by removing a wrong restriction rejection. |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
