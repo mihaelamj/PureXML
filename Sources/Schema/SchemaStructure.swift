@@ -147,6 +147,7 @@ extension PureXML.Schema.XSDParser {
             }
             if local == "complexType" {
                 errors += elementDeclsConsistentErrors(node)
+                errors += complexTypeOrderErrors(node)
             }
             if local == "complexContent" {
                 errors += complexContentOrderErrors(node)

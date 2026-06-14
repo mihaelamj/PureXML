@@ -272,4 +272,20 @@ struct SchemaStructureTests {
         </xs:complexContent></xs:complexType>
         """#)
     }
+
+    @Test("a complexType's shorthand content must be ordered: model group, attributes, anyAttribute")
+    func test_complexTypeShorthandOrder() {
+        // A model group after an attribute, two anyAttributes, an attribute after anyAttribute (ctB).
+        #expect(rejects(#"<xs:complexType name="t"><xs:attribute name="x"/><xs:sequence/></xs:complexType>"#))
+        #expect(rejects(#"<xs:complexType name="t"><xs:all/><xs:anyAttribute/><xs:anyAttribute/></xs:complexType>"#))
+        #expect(rejects(#"<xs:complexType name="t"><xs:anyAttribute/><xs:attribute name="x"/></xs:complexType>"#))
+        // A well-ordered shorthand complexType compiles.
+        #expect(!rejects(#"""
+        <xs:complexType name="t">
+          <xs:sequence><xs:element name="e" type="xs:string"/></xs:sequence>
+          <xs:attribute name="x" type="xs:string"/>
+          <xs:anyAttribute/>
+        </xs:complexType>
+        """#))
+    }
 }

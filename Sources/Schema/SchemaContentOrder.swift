@@ -29,6 +29,22 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// Content-model order for a complexType's shorthand form (no `simpleContent`/
+    /// `complexContent`), which shares the derivation's slot model: an optional model
+    /// group, then `attribute`/`attributeGroup`, then an optional `anyAttribute`.
+    /// `complexTypeContentErrors` already checks cardinality and the exclusivity of a
+    /// content spec with model groups/attributes; this adds the ordering (a model
+    /// group after an attribute, an attribute after `anyAttribute`, a second
+    /// `anyAttribute`). `annotation` and the content specs are not part of the slots.
+    static func complexTypeOrderErrors(_ complexType: XSDTree) -> [String] {
+        let names = PureXML.Schema.XSDNode.elementChildren(complexType)
+            .filter { $0.name?.namespaceURI == xsdNamespace }
+            .compactMap(PureXML.Schema.XSDNode.localName)
+            .filter { $0 != "annotation" && $0 != "simpleContent" && $0 != "complexContent" }
+        guard let reason = slotOrderViolation(names, slots: complexDerivationSlots) else { return [] }
+        return ["the content of a complexType must be a model group, then attributes, then anyAttribute: \(reason)"]
+    }
+
     /// The ordered slots of a `complexContent` derivation: each lists its admitted
     /// names and how many children may fill it (nil is unbounded).
     private static let complexDerivationSlots: [(members: Set<String>, max: Int?)] = [
