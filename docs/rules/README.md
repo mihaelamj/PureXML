@@ -8,6 +8,7 @@ Load these rules before changing code:
 - `testing.md`
 - `verification.md`
 - `commits.md`
+- `research-first.md`
 
 Project-specific overrides:
 

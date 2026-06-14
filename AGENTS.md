@@ -16,6 +16,7 @@ For code changes, load at minimum:
 - `docs/rules/testing.md`
 - `docs/rules/verification.md`
 - `docs/rules/commits.md`
+- `docs/rules/research-first.md` (when stuck: read the research repo and the literature before guessing)
 
 ## What PureXML Is
 
