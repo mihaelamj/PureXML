@@ -19,7 +19,36 @@ extension PureXML.Schema.XSDParser {
         errors += duplicateNames(of: ["group"], in: globals, label: "model group")
         errors += duplicateNames(of: ["attributeGroup"], in: globals, label: "attribute group")
         errors += identityConstraintNameErrors(schema)
+        errors += keyrefReferErrors(schema)
         return errors
+    }
+
+    /// Findings for a `keyref` whose `refer` does not name a `key` or `unique` in
+    /// the document. Skipped when the document pulls in external definitions
+    /// (`import`/`include`/`redefine`), which the default compile does not load,
+    /// so a `refer` into them is never flagged.
+    private static func keyrefReferErrors(_ schema: XSDTree) -> [String] {
+        if hasExternalReference(schema) { return [] }
+        var names: Set<String> = []
+        var refers: [String] = []
+        collectKeysAndRefers(schema, names: &names, refers: &refers)
+        return refers.filter { !names.contains($0) }
+            .map { "keyref refers to undeclared key or unique '\($0)'" }
+    }
+
+    private static func collectKeysAndRefers(_ node: XSDTree, names: inout Set<String>, refers: inout [String]) {
+        if let local = PureXML.Schema.XSDNode.localName(node), local == "appinfo" || local == "documentation" { return }
+        if node.name?.namespaceURI == xsdNamespace, let local = PureXML.Schema.XSDNode.localName(node) {
+            if local == "key" || local == "unique", let name = PureXML.Schema.XSDNode.attribute(node, "name")?.trimmingXMLWhitespace() {
+                names.insert(name)
+            }
+            if local == "keyref", let refer = PureXML.Schema.XSDNode.attribute(node, "refer")?.trimmingXMLWhitespace() {
+                refers.append(PureXML.Schema.XSDNode.stripPrefix(refer))
+            }
+        }
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            collectKeysAndRefers(child, names: &names, refers: &refers)
+        }
     }
 
     /// Duplicate `name` values among the `kinds` components in `nodes`.

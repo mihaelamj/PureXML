@@ -10,7 +10,7 @@ irreducible tail. Do not deviate to new features while this is open.
 | Bucket | Count | Reading |
 |---|---|---|
 | valid-schemas-rejected | 72 | we rarely reject a good schema |
-| **invalid-schemas-accepted** | **2461 -> 891** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
+| **invalid-schemas-accepted** | **2461 -> 884** | we rarely catch a bad one (facet, id, and structural content-model validity landed) |
 | valid-instances-rejected | 233 | (instance side, separately tracked) |
 | invalid-instances-accepted | 165 | |
 
@@ -59,7 +59,7 @@ Each iteration targets one self-contained rule family with a clean root cause.
    `id` as the component identifier. Broad reach (idA-idK, attgA, attB, ctA).
 3. **Component-name uniqueness.** _Done (909 -> 891)._ Global type (one space for
    simpleType+complexType), element, attribute, model-group, attribute-group names
-   unique; identity-constraint names unique per document (`SchemaNameUniqueness.swift`).
+   unique; identity-constraint names unique per document; keyref `refer` resolves to a key/unique (`SchemaNameUniqueness.swift`).
 4. **Resolvable references.** _Done (1092 -> 1051)._ `type`/`base`/`itemType`/
    `memberTypes` types, `element`/`attribute`/`group`/`attributeGroup` `ref`, and
    element `substitutionGroup` must resolve to a declared component or a built-in

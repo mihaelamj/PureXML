@@ -33,7 +33,7 @@ extension PureXML.Schema.XSDParser {
     /// Whether the document declares an `import`, `include`, or `redefine`, so its
     /// component pools may be completed by an external document the default compile
     /// does not load.
-    private static func hasExternalReference(_ schema: XSDTree) -> Bool {
+    static func hasExternalReference(_ schema: XSDTree) -> Bool {
         var found = false
         func walk(_ node: XSDTree) {
             if isExternalDefinition(node) {
