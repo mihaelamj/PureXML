@@ -204,10 +204,11 @@ struct SchemaStructureTests {
           <xs:element name="a" type="xs:integer"/>
         </xs:sequence></xs:complexType>
         """#))
-        // Same name, same type is fine.
+        // Same name, same type is consistent (separated so it stays unambiguous).
         try compile(#"""
         <xs:complexType name="t"><xs:sequence>
-          <xs:element name="a" type="xs:string" minOccurs="0"/>
+          <xs:element name="a" type="xs:string"/>
+          <xs:element name="b" type="xs:string"/>
           <xs:element name="a" type="xs:string"/>
         </xs:sequence></xs:complexType>
         """#)
