@@ -29,15 +29,24 @@ extension PureXML.Schema.XSDParser {
     }
 
     /// A `default`/`fixed` value on an `element` or `attribute` must be a valid value
-    /// of its `type` (Attribute/Element Locally Valid, XSD 1.0). Only a type that
-    /// resolves to a built-in datatype is checked, since the check runs before the
-    /// types are compiled; a `fixed="abc"` on an `xs:integer` was wrongly accepted.
-    /// A named or inline user type, or a type in another namespace, is left alone, so
-    /// no valid value constraint is rejected.
+    /// of its `type` (Attribute/Element Locally Valid, XSD 1.0), and the two are
+    /// mutually exclusive (`src-element.1` / `src-attribute.1`: `default` and `fixed`
+    /// must not both be present). Only a type that resolves to a built-in datatype is
+    /// value-checked, since the check runs before the types are compiled; a
+    /// `fixed="abc"` on an `xs:integer` was wrongly accepted. A named or inline user
+    /// type, or a type in another namespace, is left alone, so no valid value
+    /// constraint is rejected.
     static func valueConstraintErrors(_ schema: XSDTree) -> [String] {
         let bindings = namespaceBindings(schema)
         var errors: [String] = []
         forEachValueConstrained(schema) { node in
+            // The value constraint attributes are the unprefixed, no-namespace
+            // `default`/`fixed` on an XSD-namespace declaration; a foreign same-local
+            // attribute is not the value constraint and is not structurally checked.
+            if hasBothValueConstraints(node) {
+                errors.append("a '\(PureXML.Schema.XSDNode.localName(node) ?? "")' declaration may not have both a 'default' and a 'fixed' value constraint")
+                return
+            }
             guard let typeName = PureXML.Schema.XSDNode.attribute(node, "type") else { return }
             let fixed = PureXML.Schema.XSDNode.attribute(node, "fixed")
             guard let value = fixed ?? PureXML.Schema.XSDNode.attribute(node, "default") else { return }
@@ -58,6 +67,19 @@ extension PureXML.Schema.XSDParser {
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
             forEachValueConstrained(child, visit)
         }
+    }
+
+    /// Whether `node` carries the unprefixed (no-namespace) attribute named `local`.
+    private static func hasUnprefixedAttribute(_ node: XSDTree, _ local: String) -> Bool {
+        node.attributes.contains { $0.name.prefix == nil && $0.name.localName == local }
+    }
+
+    /// Whether an XSD-namespace declaration carries both a `default` and a `fixed`
+    /// value constraint, which `src-element.1` / `src-attribute.1` forbid.
+    private static func hasBothValueConstraints(_ node: XSDTree) -> Bool {
+        node.name?.namespaceURI == xsdNamespace
+            && hasUnprefixedAttribute(node, "default")
+            && hasUnprefixedAttribute(node, "fixed")
     }
 
     private static let facetNames: Set<String> = [
