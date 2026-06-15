@@ -52,4 +52,21 @@ extension PureXML.Schema.XSDParser {
         let placement = allGroupReferencePlacementErrors(containers, context.namespaceBindings, context.targetNamespace)
         return structural + determinism + cycles + placement
     }
+
+    /// Consistency findings that depend on the resolved named types, collected after
+    /// `namedTypes` has populated them: unresolved references, attribute-use
+    /// uniqueness and single-ID, ID-typed value constraints, and substitution-group
+    /// member type derivation (`e-props-correct.4`).
+    static func postNamedTypeErrors(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ containers: [XSDTree],
+        _ derivation: DerivationTables,
+        typeMaps: (global: [String: PureXML.Schema.ElementType], named: [String: PureXML.Schema.ElementType]),
+    ) -> [String] {
+        referenceErrors(schema, in: context, elements: typeMaps.global)
+            + attributeUseErrors(containers, context)
+            + idValueConstraintErrors(schema, context)
+            + substitutionTypeErrors(schema, derivation, typeMaps.named)
+    }
 }

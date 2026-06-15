@@ -285,7 +285,7 @@ extension PureXML.Schema {
         /// continues it. Names are compared as the compiler resolves them (by local
         /// name), so an unrelated pair (`xs:string` restricting a user type, two
         /// independent list types) is correctly not derivable.
-        private static func typeDerivesOrEqual(_ derived: String, _ base: String, _ derivation: [String: TypeDerivation], _ types: [String: ElementType]) -> Bool {
+        static func typeDerivesOrEqual(_ derived: String, _ base: String, _ derivation: [String: TypeDerivation], _ types: [String: ElementType]) -> Bool {
             if isUrTypeName(base, types) { return true }
             var current = derived
             var visited: Set<String> = []

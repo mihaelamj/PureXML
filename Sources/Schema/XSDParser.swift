@@ -41,7 +41,7 @@ extension PureXML.Schema {
             let elements = globalElements(containers, context, into: &types)
             // Attribute-use uniqueness / single-ID run here, after `namedTypes`
             // populated `simpleTypes`, so a named user type derived from `xs:ID` counts.
-            for error in referenceErrors(schema, in: context, elements: elements) + attributeUseErrors(containers, context) + idValueConstraintErrors(schema, context) {
+            for error in postNamedTypeErrors(schema, context, containers, derivation, typeMaps: (elements, types)) {
                 context.diagnostics.report(error)
             }
             let (nillable, elementConstraints) = elementMetadata(containers)
