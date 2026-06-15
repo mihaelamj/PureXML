@@ -2,6 +2,10 @@
 
 Guidance for anyone writing code in PureXML.
 
+> Working in **Google Antigravity** (Gemini)? Start with `GEMINI.md` (always-on
+> rules) and `docs/onboarding-antigravity.md` (the full, literal, step-by-step
+> procedure for the schema-conformance work).
+
 ## Rule Loading
 
 At the start of a session, read this file and the rules under `docs/rules/` that
