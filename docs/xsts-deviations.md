@@ -29,12 +29,12 @@ which is an astral math capital); agreeing or disagreeing with a contested
 expectation is not meaningful, so the runner skips them. Excluding the queried
 entries removed about 70 apparent deviations that were never bugs.
 
-## Baseline (settled expectations; after twelve fixes)
+## Baseline (settled expectations; synced 2026-06-16)
 
 | Kind | First measurement | Now |
 |---|---|---|
 | valid schema rejected | 75 | 1 |
-| invalid schema accepted | 2467 | 296 |
+| invalid schema accepted | 2467 | 266 |
 | valid instance rejected | 604 | 171 |
 | invalid instance accepted | 582 | 155 |
 
@@ -65,7 +65,7 @@ validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
 in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
 `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
-accepted 2461 to 296 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references, plus substitution group exclusions based on element final and schema finalDefault attributes, duplicate schema container validation across separate files with identical content, schema element order, and import constraints validation); see `schema-validity-burndown.md`.
+accepted 2461 to 266 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references, plus substitution group exclusions based on element final and schema finalDefault attributes, duplicate schema container validation across separate files with identical content, schema element order, and import constraints validation); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)

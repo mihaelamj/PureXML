@@ -138,4 +138,63 @@ extension PureXML.Schema.XSDParser {
         }
         return errors
     }
+
+    static func elementChildrenErrors(_: XSDTree, names: [String]) -> [String] {
+        var errors: [String] = []
+        let simpleTypes = names.count { $0 == "simpleType" }
+        let complexTypes = names.count { $0 == "complexType" }
+        if (simpleTypes + complexTypes) > 1 {
+            errors.append("element may have at most one inline type definition (simpleType or complexType)")
+        }
+        var seenIdentityConstraint = false
+        for name in names {
+            if name == "annotation" { continue }
+            if name == "simpleType" || name == "complexType" {
+                if seenIdentityConstraint {
+                    errors.append("inline type definition must appear before identity constraints in element")
+                }
+            } else if ["unique", "key", "keyref"].contains(name) {
+                seenIdentityConstraint = true
+            }
+        }
+        return errors
+    }
+
+    static func attributeChildrenErrors(_: XSDTree, names: [String]) -> [String] {
+        var errors: [String] = []
+        let simpleTypes = names.count { $0 == "simpleType" }
+        if simpleTypes > 1 {
+            errors.append("attribute may have at most one inline simpleType")
+        }
+        return errors
+    }
+
+    static func attributeGroupChildrenErrors(_: XSDTree, names: [String]) -> [String] {
+        var errors: [String] = []
+        let anyAttributes = names.count { $0 == "anyAttribute" }
+        if anyAttributes > 1 {
+            errors.append("attributeGroup may have at most one anyAttribute")
+        }
+        var seenAnyAttribute = false
+        for name in names {
+            if name == "annotation" { continue }
+            if name == "attribute" || name == "attributeGroup" {
+                if seenAnyAttribute {
+                    errors.append("attribute and attributeGroup references must appear before anyAttribute in attributeGroup")
+                }
+            } else if name == "anyAttribute" {
+                seenAnyAttribute = true
+            }
+        }
+        return errors
+    }
+
+    static func groupChildrenErrors(_: XSDTree, names: [String]) -> [String] {
+        var errors: [String] = []
+        let compositors = names.count { $0 == "all" || $0 == "choice" || $0 == "sequence" }
+        if compositors > 1 {
+            errors.append("group may have at most one compositor (all, choice, or sequence)")
+        }
+        return errors
+    }
 }

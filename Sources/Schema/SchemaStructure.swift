@@ -133,6 +133,14 @@ extension PureXML.Schema.XSDParser {
             errors += schemaChildrenOrderErrors(names)
         case "import":
             errors += importErrors(node)
+        case "element":
+            errors += elementChildrenErrors(node, names: names)
+        case "attribute":
+            errors += attributeChildrenErrors(node, names: names)
+        case "attributeGroup":
+            errors += attributeGroupChildrenErrors(node, names: names)
+        case "group":
+            errors += groupChildrenErrors(node, names: names)
         default:
             break
         }

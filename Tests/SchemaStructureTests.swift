@@ -276,3 +276,99 @@ struct SchemaStructureTests {
         }
     }
 }
+
+@Suite("Schema structural order and cardinality validity")
+struct SchemaStructureOrderTests {
+    private func compile(_ body: String) throws {
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+        \(body)
+        </xs:schema>
+        """)
+    }
+
+    private func rejects(_ body: String) -> Bool {
+        do {
+            try compile(body)
+            return false
+        } catch {
+            return true
+        }
+    }
+
+    @Test("element child order and type exclusivity constraints")
+    func test_elementChildOrderAndExclusivity() throws {
+        // More than one type definition is rejected
+        #expect(rejects(#"""
+        <xs:element name="root">
+          <xs:simpleType><xs:restriction base="xs:string"/></xs:simpleType>
+          <xs:complexType><xs:sequence/></xs:complexType>
+        </xs:element>
+        """#))
+
+        // Type definition after identity constraints is rejected
+        #expect(rejects(#"""
+        <xs:element name="root">
+          <xs:key name="k"><xs:selector xpath="a"/><xs:field xpath="@id"/></xs:key>
+          <xs:complexType><xs:sequence/></xs:complexType>
+        </xs:element>
+        """#))
+
+        // Correct order compiles successfully
+        try compile(#"""
+        <xs:element name="root">
+          <xs:complexType><xs:sequence/></xs:complexType>
+          <xs:key name="k"><xs:selector xpath="a"/><xs:field xpath="@id"/></xs:key>
+        </xs:element>
+        """#)
+    }
+
+    @Test("attribute child cardinality constraints")
+    func test_attributeChildCardinality() {
+        // More than one simpleType is rejected
+        #expect(rejects(#"""
+        <xs:attribute name="a">
+          <xs:simpleType><xs:restriction base="xs:string"/></xs:simpleType>
+          <xs:simpleType><xs:restriction base="xs:integer"/></xs:simpleType>
+        </xs:attribute>
+        """#))
+    }
+
+    @Test("attributeGroup child order and cardinality constraints")
+    func test_attributeGroupChildOrderAndCardinality() throws {
+        // More than one anyAttribute is rejected
+        #expect(rejects(#"""
+        <xs:attributeGroup name="myGroup">
+          <xs:anyAttribute namespace="##any"/>
+          <xs:anyAttribute namespace="##other"/>
+        </xs:attributeGroup>
+        """#))
+
+        // Attribute reference after anyAttribute is rejected
+        #expect(rejects(#"""
+        <xs:attributeGroup name="myGroup">
+          <xs:anyAttribute namespace="##any"/>
+          <xs:attribute name="x" type="xs:string"/>
+        </xs:attributeGroup>
+        """#))
+
+        // Correct order compiles successfully
+        try compile(#"""
+        <xs:attributeGroup name="myGroup">
+          <xs:attribute name="x" type="xs:string"/>
+          <xs:anyAttribute namespace="##any"/>
+        </xs:attributeGroup>
+        """#)
+    }
+
+    @Test("group compositor cardinality constraints")
+    func test_groupCompositorCardinality() {
+        // More than one compositor is rejected
+        #expect(rejects(#"""
+        <xs:group name="myGroup">
+          <xs:sequence/>
+          <xs:choice/>
+        </xs:group>
+        """#))
+    }
+}

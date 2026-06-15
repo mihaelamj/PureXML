@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-16
+
+Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-schemas-accepted 394 → 266** (settled expectations), **valid-instances-rejected 180 → 171**, **invalid-instances-accepted 158 → 155**, **valid-schemas-rejected held at 1** (`particlesZ001`, spec-ambiguous). Not yet 1.0: see `docs/production-readiness.md`.
+
 ### Fixed
+
+- Enforce element, attribute, attributeGroup, and group child-content shape (schema-for-schemas cardinality and order): at most one inline type per element/attribute, inline type before identity constraints, at most one compositor per group, at most one `anyAttribute` per attributeGroup with attribute references preceding it (`SchemaStructureHelpers.swift`).
 
 - Enforce facet applicability per base type, fractionDigits constraints on integer types, ordered duration range bounds, and built-in list non-emptiness constraints (XSD 1.0 Datatypes §4.3). Ensure that built-in list types (xs:IDREFS, xs:ENTITIES, xs:NMTOKENS) are validated as non-empty unless restricted with an explicit minLength. Resolve type references namespace-aware to avoid prefix conflation with user types of the same name. Ignore foreign elements matching facet names inside xs:restriction. XSTS: invalid schemas accepted 296 to 266, no other bucket raised.
 
