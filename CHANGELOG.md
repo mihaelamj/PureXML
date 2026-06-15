@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-15
+
+First tagged pre-release. A pure-Swift XML parser/emitter with an XSD 1.0 schema
+engine, XPath/XSLT support, and a WASI-compatible build. The W3C XSTS conformance
+campaign has driven invalid-schemas-accepted from 2461 to 394 with
+valid-schemas-rejected held at its floor of 1. Not yet 1.0: see
+`docs/production-readiness.md` for the remaining gates.
+
 ### Added
 
 - A generative robustness fuzz harness for the schema engine and parser (#167, production-readiness stopper 4). A reproducible seeded generator builds structurally varied XSD schemas and XML instances that deliberately reach the crash- and hang-prone shapes (deep nesting, large/unbounded/inverted occurrences, pointless `maxOccurs="0"` particles, wildcards, element and group reference cycles, substitution-group chains, `simpleType` restriction cycles, `complexContent` restrictions, pathological regex patterns), and asserts the validator never crashes and always terminates. It is a regression gate against interactive-safety failures on hostile input, not a verdict-correctness oracle; counts are sized to stay fast on every `swift test` (the native `.timeLimit` hang guard is omitted under the single-threaded WASI runtime). No crashes or hangs were found over the current corpus.
