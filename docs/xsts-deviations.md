@@ -34,7 +34,7 @@ entries removed about 70 apparent deviations that were never bugs.
 | Kind | First measurement | Now |
 |---|---|---|
 | valid schema rejected | 75 | 1 |
-| invalid schema accepted | 2467 | 333 |
+| invalid schema accepted | 2467 | 327 |
 | valid instance rejected | 604 | 171 |
 | invalid instance accepted | 582 | 155 |
 

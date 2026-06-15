@@ -7,6 +7,13 @@ extension PureXML.Schema.XSDParser {
         return names
     }()
 
+    private struct ResolutionContext {
+        let types: Set<String>
+        let pools: [String: Set<String>]
+        let bindings: [String: String]
+        let targetNamespace: String?
+    }
+
     /// Schema-validity findings for unresolvable references: every QName a schema
     /// names (a `type`/`base`/`itemType`/`memberTypes` type, an `element`/
     /// `attribute`/`group`/`attributeGroup` `ref`, an element `substitutionGroup`)
@@ -17,7 +24,9 @@ extension PureXML.Schema.XSDParser {
     /// `import`/`include`/`redefine`: the default compile does not load them, so
     /// the pools would be incomplete and a reference into them must not be flagged.
     static func referenceErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext, elements: [String: PureXML.Schema.ElementType]) -> [String] {
-        if hasExternalReference(schema) { return [] }
+        let xsdErrors = xsdNamespaceReferenceErrors(schema)
+        let simpleContentErrors = simpleContentBaseErrors(schema, in: context)
+        if hasExternalReference(schema) { return xsdErrors + simpleContentErrors }
         let types = referenceBuiltins.union(context.simpleTypes.keys).union(context.complexTypeNodes.keys)
         let pools: [String: Set<String>] = [
             "element": Set(elements.keys),
@@ -25,9 +34,12 @@ extension PureXML.Schema.XSDParser {
             "group": Set(context.groups.keys),
             "attributeGroup": Set(context.attributeGroups.keys),
         ]
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+        let targetNamespace = context.targetNamespace
         var errors: [String] = []
-        collectReferenceErrors(schema, types: types, pools: pools, into: &errors)
-        return errors
+        let resolutionContext = ResolutionContext(types: types, pools: pools, bindings: bindings, targetNamespace: targetNamespace)
+        collectReferenceErrors(schema, in: resolutionContext, into: &errors)
+        return xsdErrors + simpleContentErrors + errors
     }
 
     /// Whether the document declares an `import`, `include`, or `redefine`, so its
@@ -59,37 +71,73 @@ extension PureXML.Schema.XSDParser {
 
     private static func collectReferenceErrors(
         _ node: XSDTree,
-        types: Set<String>,
-        pools: [String: Set<String>],
+        in resolutionContext: ResolutionContext,
         into errors: inout [String],
     ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         if node.name?.namespaceURI == xsdNamespace, let local {
-            errors += referenceErrors(at: node, local: local, types: types, pools: pools)
+            errors += referenceErrors(at: node, local: local, in: resolutionContext)
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectReferenceErrors(child, types: types, pools: pools, into: &errors)
+            collectReferenceErrors(child, in: resolutionContext, into: &errors)
         }
     }
 
-    private static func referenceErrors(at node: XSDTree, local: String, types: Set<String>, pools: [String: Set<String>]) -> [String] {
+    private static func referenceErrors(
+        at node: XSDTree,
+        local: String,
+        in resolutionContext: ResolutionContext,
+    ) -> [String] {
         var errors: [String] = []
+
+        func isUndeclaredType(_ qname: String) -> Bool {
+            let prefix = PureXML.Schema.XSDNode.prefix(qname)
+            let uri = prefix.flatMap { resolutionContext.bindings[$0] } ?? resolutionContext.bindings[""]
+            let localPart = localName(qname)
+            if uri == xsdNamespace {
+                if resolutionContext.targetNamespace == xsdNamespace {
+                    return !referenceBuiltins.contains(localPart) && !resolutionContext.types.contains(localPart)
+                } else {
+                    return !referenceBuiltins.contains(localPart)
+                }
+            }
+            if uri == resolutionContext.targetNamespace || uri == nil || uri == "" {
+                return !resolutionContext.types.contains(localPart)
+            }
+            return true
+        }
+
+        func isUndeclaredRef(_ qname: String, _ poolName: String) -> Bool {
+            let prefix = PureXML.Schema.XSDNode.prefix(qname)
+            let uri = prefix.flatMap { resolutionContext.bindings[$0] } ?? resolutionContext.bindings[""]
+            let localPart = localName(qname)
+            if uri == resolutionContext.targetNamespace || uri == nil || uri == "" {
+                return resolutionContext.pools[poolName]?.contains(localPart) != true
+            }
+            return true
+        }
+
         for attribute in ["type", "base", "itemType"] {
-            if let qname = PureXML.Schema.XSDNode.attribute(node, attribute), !types.contains(localName(qname)) {
+            if let qname = PureXML.Schema.XSDNode.attribute(node, attribute), isUndeclaredType(qname) {
                 errors.append("\(attribute) references undeclared type '\(qname)'")
             }
         }
         if let members = PureXML.Schema.XSDNode.attribute(node, "memberTypes") {
-            for token in members.split(whereSeparator: \.isWhitespace) where !types.contains(localName(String(token))) {
-                errors.append("memberTypes references undeclared type '\(token)'")
+            for token in members.split(whereSeparator: \.isWhitespace) {
+                let qname = String(token)
+                if isUndeclaredType(qname) {
+                    errors.append("memberTypes references undeclared type '\(qname)'")
+                }
             }
         }
-        if let head = PureXML.Schema.XSDNode.attribute(node, "substitutionGroup"), pools["element"]?.contains(localName(head)) != true {
+        if let head = PureXML.Schema.XSDNode.attribute(node, "substitutionGroup"), isUndeclaredRef(head, "element") {
             errors.append("substitutionGroup references undeclared element '\(head)'")
         }
-        if let reference = PureXML.Schema.XSDNode.attribute(node, "ref"), let pool = pools[local], !pool.contains(localName(reference)) {
-            errors.append("\(local) ref references undeclared '\(reference)'")
+        if let reference = PureXML.Schema.XSDNode.attribute(node, "ref"), resolutionContext.pools[local] != nil {
+            if isUndeclaredRef(reference, local) {
+                errors.append("\(local) ref references undeclared '\(reference)'")
+            }
         }
         return errors
     }
@@ -112,7 +160,11 @@ extension PureXML.Schema.XSDParser {
             let uri = prefix.flatMap { bindings[$0] } ?? bindings[""]
             let local = PureXML.Schema.XSDNode.stripPrefix(trimmed)
             if uri == xsdNamespace {
-                return local == "anyType"
+                if targetNamespace == xsdNamespace {
+                    return local == "anyType" || context.complexTypeNodes[local] != nil
+                } else {
+                    return local == "anyType"
+                }
             }
             if uri == targetNamespace || uri == nil || uri == "" {
                 return context.complexTypeNodes[local] != nil
@@ -164,5 +216,90 @@ extension PureXML.Schema.XSDParser {
                 errors.append("memberType '\(token)' of union must be a simple type, not a complex type")
             }
         }
+    }
+
+    private static func xsdNamespaceReferenceErrors(_ schema: XSDTree) -> [String] {
+        let targetNamespace = PureXML.Schema.XSDNode.attribute(schema, "targetNamespace")
+        if targetNamespace == xsdNamespace {
+            return []
+        }
+        var errors: [String] = []
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+
+        func isUndeclaredBuiltin(_ qname: String) -> Bool {
+            let prefix = PureXML.Schema.XSDNode.prefix(qname)
+            let uri = prefix.flatMap { bindings[$0] } ?? bindings[""]
+            if uri == xsdNamespace {
+                let localName = PureXML.Schema.XSDNode.stripPrefix(qname)
+                return !referenceBuiltins.contains(localName)
+            }
+            return false
+        }
+
+        func check(_ node: XSDTree) {
+            let local = PureXML.Schema.XSDNode.localName(node)
+            if local == "appinfo" || local == "documentation" { return }
+
+            if node.name?.namespaceURI == xsdNamespace {
+                for attribute in ["type", "base", "itemType"] {
+                    if let qname = PureXML.Schema.XSDNode.attribute(node, attribute), isUndeclaredBuiltin(qname) {
+                        errors.append("\(attribute) references undeclared type '\(qname)'")
+                    }
+                }
+                if let members = PureXML.Schema.XSDNode.attribute(node, "memberTypes") {
+                    for token in members.split(whereSeparator: \.isWhitespace) {
+                        let qname = String(token)
+                        if isUndeclaredBuiltin(qname) {
+                            errors.append("memberTypes references undeclared type '\(qname)'")
+                        }
+                    }
+                }
+            }
+
+            for child in PureXML.Schema.XSDNode.elementChildren(node) {
+                check(child)
+            }
+        }
+        check(schema)
+        return errors
+    }
+
+    private static func simpleContentBaseErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext) -> [String] {
+        var errors: [String] = []
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+        let targetNamespace = context.targetNamespace
+
+        func check(_ node: XSDTree) {
+            let local = PureXML.Schema.XSDNode.localName(node)
+            if local == "appinfo" || local == "documentation" { return }
+
+            let isSimpleContentRestriction = node.name?.namespaceURI == xsdNamespace && local == "restriction"
+                && node.parent?.name?.namespaceURI == xsdNamespace
+                && node.parent.flatMap { PureXML.Schema.XSDNode.localName($0) } == "simpleContent"
+            if isSimpleContentRestriction {
+                if let base = PureXML.Schema.XSDNode.attribute(node, "base") {
+                    let prefix = PureXML.Schema.XSDNode.prefix(base)
+                    let uri = prefix.flatMap { bindings[$0] } ?? bindings[""]
+                    let localPart = PureXML.Schema.XSDNode.stripPrefix(base)
+                    if uri == targetNamespace || uri == nil || uri == "" {
+                        if let baseNode = context.complexTypeNodes[localPart] {
+                            let children = PureXML.Schema.XSDNode.elementChildren(baseNode)
+                            let hasSimpleContent = children.contains { child in
+                                child.name?.namespaceURI == xsdNamespace && PureXML.Schema.XSDNode.localName(child) == "simpleContent"
+                            }
+                            if !hasSimpleContent {
+                                errors.append("base type '\(base)' of simpleContent restriction must be a simple type or complex type with simpleContent")
+                            }
+                        }
+                    }
+                }
+            }
+
+            for child in PureXML.Schema.XSDNode.elementChildren(node) {
+                check(child)
+            }
+        }
+        check(schema)
+        return errors
     }
 }
