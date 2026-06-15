@@ -71,9 +71,10 @@ are all shipped (summarized above). The beyond-parity libxml2 conformance audit
 (#71), its parser-breadth sub-epic (#74), and the parity-frontier epic (#105:
 output encodings, streaming validation, the last encodings, the analysis
 findings, and the first W3C-suite pass) are all **complete**. Feature parity is
-done; the remaining distance is corpus-clean parity, tracked under two epics:
-**#121** (the rest of the W3C xmlconf archive, including the DTD-validity layer)
-and **#122** (the official spec suites for the schema and transform stack).
+done; the remaining distance is **production readiness for IDE use**, tracked under
+epic **#167** (schema authority, differential oracle, located diagnostics). Conformance
+suite maintenance (**#122**, closed) leaves **#130** (XSLT xalan burn-down) as the only
+active runner work; see `docs/roadmap.md`.
 
 ```mermaid
 flowchart TB
@@ -98,9 +99,9 @@ flowchart TB
   NSConstraints["#136 namespace constraints: complete"]:::done
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
-  Epic122["#122 official spec suites"]:::epic
-  XSTS["#129 W3C XSD test suite (XSTS): runner shipped; settled deviations 1/266/171/155 (#145–#148)"]:::review
-  XSLTTS["#130 XSLT 1.0 suite (xalan-test): runner + baselines in, burning down (~126)"]:::review
+  Epic122["#122 conformance suite maintenance: complete (#130 survivor)"]:::epic
+  XSTS["#129 XSTS runner shipped; gates #145-#148 at 1/266/171/155 (v0.2.0)"]:::review
+  XSLTTS["#130 XSLT 1.0 suite (xalan-test): ~126 baseline failures"]:::review
   Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
   Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
   Audit140["#140 XSLT validation-framework audit"]:::todo
@@ -108,6 +109,11 @@ flowchart TB
   Epic139 --> Audit140
   RNGTS["#131 RELAX NG spec suite: complete, one documented class"]:::done
   C14NTS["#132 C14N spec vectors: complete"]:::done
+  Epic167["#167 production readiness for IDE use (v0.2.0)"]:::epic
+  Oracle171["#171 schema differential harness"]:::todo
+  CrossDoc161["#161 cross-document composition"]:::todo
+  Gates145["#145-#148 XSTS gates: burn-down to 0"]:::review
+  Loc169["#169 located schema diagnostics"]:::todo
   Epic105 --> Epic121
   Epic105 --> Epic122
   Epic121 --> Oasis
@@ -124,9 +130,16 @@ flowchart TB
   Epic122 --> XSLTTS
   Epic122 --> RNGTS
   Epic122 --> C14NTS
+  Epic122 --> Epic167
+  Epic167 --> Oracle171
+  Epic167 --> CrossDoc161
+  Epic167 --> Gates145
+  Epic167 --> Loc169
 ```
 
 ## Status
+
+**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (v0.2.0): **1 / 266 / 171 / 155**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
