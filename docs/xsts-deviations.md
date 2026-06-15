@@ -34,7 +34,7 @@ entries removed about 70 apparent deviations that were never bugs.
 | Kind | First measurement | Now |
 |---|---|---|
 | valid schema rejected | 75 | 1 |
-| invalid schema accepted | 2467 | 325 |
+| invalid schema accepted | 2467 | 323 |
 | valid instance rejected | 604 | 171 |
 | invalid instance accepted | 582 | 155 |
 
@@ -47,7 +47,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (thirty root causes, ~2253 deviations cleared)
+### Fixed (thirty-one root causes, ~2255 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -65,7 +65,7 @@ validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
 in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
 `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
-accepted 2461 to 884 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes); see `schema-validity-burndown.md`.
+accepted 2461 to 884 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)

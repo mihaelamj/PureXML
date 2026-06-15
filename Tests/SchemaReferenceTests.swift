@@ -53,4 +53,57 @@ struct SchemaReferenceTests {
         <xs:element name="a" type="other:Foo" xmlns:other="urn:other"/>
         """#)
     }
+
+    @Test("references are checked strictly against the targetNamespace")
+    func test_referenceNamespaceChecking() throws {
+        // Without targetNamespace, unprefixed ref resolves to no namespace and is accepted
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+            <xs:attribute name="number" type="xs:integer"/>
+            <xs:element name="elementWithAttr">
+                <xs:complexType>
+                    <xs:attribute ref="number" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+        """)
+
+        // With targetNamespace, unprefixed ref without default namespace resolves to no namespace but declaration is in targetNamespace -> rejected
+        #expect(throws: Error.self) {
+            _ = try PureXML.Schema.Document("""
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="AttrUse/attrDecl" xmlns:tn="AttrUse/attrDecl">
+                <xs:attribute name="number" type="xs:integer"/>
+                <xs:element name="elementWithAttr">
+                    <xs:complexType>
+                        <xs:attribute ref="number" use="required"/>
+                    </xs:complexType>
+                </xs:element>
+            </xs:schema>
+            """)
+        }
+
+        // With targetNamespace, prefix matching targetNamespace is accepted
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="AttrUse/attrDecl" xmlns:tn="AttrUse/attrDecl">
+            <xs:attribute name="number" type="xs:integer"/>
+            <xs:element name="elementWithAttr">
+                <xs:complexType>
+                    <xs:attribute ref="tn:number" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+        """)
+
+        // With targetNamespace, default namespace matching targetNamespace is accepted
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="AttrUse/attrDecl" xmlns="AttrUse/attrDecl">
+            <xs:attribute name="number" type="xs:integer"/>
+            <xs:element name="elementWithAttr">
+                <xs:complexType>
+                    <xs:attribute ref="number" use="required"/>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+        """)
+    }
 }

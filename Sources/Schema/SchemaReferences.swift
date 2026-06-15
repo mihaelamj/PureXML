@@ -102,7 +102,8 @@ extension PureXML.Schema.XSDParser {
                     return !referenceBuiltins.contains(localPart)
                 }
             }
-            if uri == resolutionContext.targetNamespace || uri == nil || uri == "" {
+            let target = resolutionContext.targetNamespace
+            if uri == target || ((uri == nil || uri == "") && (target == nil || target == "")) {
                 return !resolutionContext.types.contains(localPart)
             }
             return true
@@ -112,7 +113,8 @@ extension PureXML.Schema.XSDParser {
             let prefix = PureXML.Schema.XSDNode.prefix(qname)
             let uri = prefix.flatMap { resolutionContext.bindings[$0] } ?? resolutionContext.bindings[""]
             let localPart = localName(qname)
-            if uri == resolutionContext.targetNamespace || uri == nil || uri == "" {
+            let target = resolutionContext.targetNamespace
+            if uri == target || ((uri == nil || uri == "") && (target == nil || target == "")) {
                 return resolutionContext.pools[poolName]?.contains(localPart) != true
             }
             return true
