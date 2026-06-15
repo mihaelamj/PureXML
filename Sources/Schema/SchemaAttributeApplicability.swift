@@ -113,6 +113,8 @@ extension PureXML.Schema.XSDParser {
     private static let topLevelForbidden: [String: [String]] = [
         "attribute": ["use", "form", "ref"],
         "element": ["ref", "form", "minOccurs", "maxOccurs"],
+        "group": ["ref", "minOccurs", "maxOccurs"],
+        "attributeGroup": ["ref"],
     ]
 
     private static let namedTopLevelKinds: Set<String> = [
