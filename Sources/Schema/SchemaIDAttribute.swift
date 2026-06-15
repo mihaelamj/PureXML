@@ -45,7 +45,8 @@ extension PureXML.Schema.XSDParser {
     /// type derivation. The explicit return type keeps the type-checker from
     /// inferring a long concatenation.
     static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
-        let structural = idAttributeErrors(schema) + structureErrors(schema) + componentNameErrors(schema)
+        let structural = idAttributeErrors(schema) + structureErrors(schema)
+            + componentNameErrors(schema, containers, context.targetNamespace)
             + simpleTypeFinalErrors(schema)
         let determinism = PureXML.Schema.ContentModelDeterminism.violations(in: schema, context: context)
         let cycles = derivationCycleErrors(containers, context.namespaceBindings, context.targetNamespace)

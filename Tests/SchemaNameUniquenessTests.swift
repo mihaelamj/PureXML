@@ -109,4 +109,63 @@ struct SchemaNameUniquenessTests {
         <xs:element name="a"><xs:complexType><xs:attribute name="id" type="xs:string"/><xs:attribute name="k" type="xs:string"/></xs:complexType></xs:element>
         """#))
     }
+
+    @Test("duplicate identity-constraint names across included files are rejected")
+    func test_duplicateIdentityConstraintAcrossIncluded() {
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="roota">
+            <xs:complexType><xs:sequence/></xs:complexType>
+            <xs:key name="KEY">
+              <xs:selector xpath="person"/>
+              <xs:field xpath="."/>
+            </xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:include schemaLocation="sub.xsd"/>
+          <xs:element name="root">
+            <xs:complexType><xs:sequence/></xs:complexType>
+            <xs:key name="KEY">
+              <xs:selector xpath="person"/>
+              <xs:field xpath="."/>
+            </xs:key>
+          </xs:element>
+        </xs:schema>
+        """
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "sub.xsd" ? imported : nil })) == nil)
+    }
+
+    @Test("duplicate global element names across included files are rejected")
+    func test_duplicateGlobalElementAcrossIncluded() {
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="dup" type="xs:string"/>
+        </xs:schema>
+        """
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:include schemaLocation="sub.xsd"/>
+          <xs:element name="dup" type="xs:int"/>
+        </xs:schema>
+        """
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "sub.xsd" ? imported : nil })) == nil)
+    }
+
+    @Test("debug name00101m2")
+    func test_debugName() {
+        let path = "/private/tmp/xsts/xmlschema2006-11-06/sunData/IdConstrDefs/name/name00101m/name00101m2.xsd"
+        guard let source = try? String(contentsOfFile: path) else {
+            print("unreadable file")
+            return
+        }
+        do {
+            _ = try PureXML.Schema.Document(source)
+            print("COMPILE SUCCESS")
+        } catch {
+            print("COMPILE FAILURE: \(error)")
+        }
+    }
 }
