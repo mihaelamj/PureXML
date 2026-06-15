@@ -134,7 +134,7 @@ top of that file:
 | Constant | Meaning | Current value | Direction |
 |---|---|---|---|
 | `knownSchemaValidRejected`   | valid schemas we wrongly **reject**   | **1**   | must NEVER rise; drive toward 0 |
-| `knownSchemaInvalidAccepted` | invalid schemas we wrongly **accept** | **394** | drive DOWN |
+| `knownSchemaInvalidAccepted` | invalid schemas we wrongly **accept** | **390** | drive DOWN |
 | `knownInstanceValidRejected` | valid instances we wrongly **reject** | **180** | must not rise; drive toward 0 |
 | `knownInstanceInvalidAccepted`| invalid instances we wrongly accept  | **160→158** (158) | drive down |
 
@@ -330,6 +330,21 @@ schema-vocabulary attribute (`name`, `use`, `form`, `ref`, `default`, `fixed`,
 (`node.name?.namespaceURI == xsdNamespace`) and never descend into
 `xs:appinfo` / `xs:documentation` (foreign content).
 
+### Trap F, comparing values must be value-space, never lexical
+
+When a rule compares two `default`/`fixed`/`enumeration` values (for example to
+check that a restriction keeps a base attribute's fixed value), you must compare
+them in the **value space of the type**, not as raw strings. Two lexically
+different strings can be the **same value**: a list-typed value `"1   2  3"` and
+`"1 2 3"` are both `[1, 2, 3]`; a `token` collapses whitespace; `"01"` and `"1"`
+are the same integer. A string `==` over-rejects valid schemas (this caused a
+real false positive: a list-of-int fixed value differing only in whitespace).
+Also remember a `use="prohibited"` attribute is **removed** from the type's
+attribute uses, so per-attribute clauses (fixed, required-equality) do not apply
+to it. If you do not have a reliable value-space comparison for the type, **do
+not enforce the value clause** (disclosed under-rejection) rather than risk a
+false positive.
+
 ---
 
 ## 9. Where the checks live (file map)
@@ -391,10 +406,12 @@ Representative existing checks to imitate (read these as templates):
 
 ---
 
-## 11. Current state (snapshot at v0.1.0)
+## 11. Current state (snapshot, post v0.1.0)
 
 - Pinned baselines: **valid-schemas-rejected 1**, **invalid-schemas-accepted
-  394**, **valid-instances-rejected 180**, **invalid-instances-accepted 158**.
+  390**, **valid-instances-rejected 180**, **invalid-instances-accepted 158**.
+  (v0.1.0 was tagged at invalid-accepted 394; the count has since dropped to
+  390. Always read the live constants in `Tests/XSTSSuiteTests.swift`.)
 - The clean structural / applicability rule families are largely **done**:
   facet validity, structural content-model, UPA determinism, content order,
   identity-constraint XPath subset, wildcard namespace, final/block value space,
@@ -403,8 +420,16 @@ Representative existing checks to imitate (read these as templates):
   namespaces, particle-restriction (MapAndSum etc.), substitution-member type,
   default/fixed exclusion, default/use, value-against-user-type, top-level and
   ref applicability, whiteSpace restriction direction, simpleType final
-  list/union, all-group-in-extension, nested-named-definition.
+  list/union, all-group-in-extension, nested-named-definition, attribute-use
+  restriction (required-relaxation half).
 - **What remains (each is a deliberate subproject, not a one-line rule):**
+  - **The fixed/default value-restriction clauses** (the most concrete next
+    task): a restriction must keep a base attribute's (and element's) fixed
+    value, compared in the type's **value space** (see Trap F, §8). This needs a
+    value-space comparison helper (whitespace + list/union + lexical-to-value
+    normalization). The required-relaxation half is already done in
+    `SchemaAttributeRestriction.swift`; add the fixed clause there once you have a
+    correct value comparison. Do NOT compare fixed values as raw strings.
   - **Regex-engine fidelity** (`RegexTest` family, ~22): make the pattern
     compiler correctly reject genuinely-invalid patterns *without* rejecting
     valid ones. **High over-rejection risk**, be very careful.
