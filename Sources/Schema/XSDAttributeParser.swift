@@ -28,7 +28,8 @@ extension PureXML.Schema.XSDParser {
             let refName = PureXML.Schema.XSDNode.stripPrefix(ref)
             guard let declaration = context.globalAttributes[refName],
                   var use = attributeUse(declaration, context) else { return nil }
-            use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: context.targetNamespace)
+            let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, context.namespaceBindings)
+            use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace)
             if PureXML.Schema.XSDNode.attribute(node, "use") == "required" { use.required = true }
             if let constraint = valueConstraint(of: node) { use.valueConstraint = constraint }
             return use

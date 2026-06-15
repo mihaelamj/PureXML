@@ -108,4 +108,140 @@ struct SchemaAttributeRestrictionTests {
         let unionDef = "<xs:simpleType name=\"U\"><xs:union memberTypes=\"xs:integer xs:string\"/></xs:simpleType>"
         #expect(compiles(unionDef + derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"U\"/>")))
     }
+
+    @Test("Attributes are inherited, overridden, or prohibited correctly in complexContent restriction during instance validation")
+    func test_attributeInheritanceAndProhibitionInInstanceValidation() throws {
+        let schemaSource = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   targetNamespace="urn:foo" xmlns="urn:foo" elementFormDefault="qualified">
+          <xs:complexType name="Base">
+            <xs:attribute name="a" type="xs:integer"/>
+            <xs:attribute name="b" type="xs:string"/>
+            <xs:attribute name="c" type="xs:string"/>
+          </xs:complexType>
+
+          <xs:element name="prohibit">
+            <xs:complexType>
+              <xs:complexContent>
+                <xs:restriction base="Base">
+                  <xs:attribute name="c" use="prohibited"/>
+                </xs:restriction>
+              </xs:complexContent>
+            </xs:complexType>
+          </xs:element>
+
+          <xs:element name="override">
+            <xs:complexType>
+              <xs:complexContent>
+                <xs:restriction base="Base">
+                  <xs:attribute name="a" type="xs:int"/>
+                </xs:restriction>
+              </xs:complexContent>
+            </xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """
+
+        let doc = try PureXML.Schema.Document(schemaSource)
+
+        // 1. Prohibit element: a and b are inherited, c is prohibited.
+        // - Valid instance: only has a and b.
+        #expect(try doc.validate("<prohibit xmlns=\"urn:foo\" a=\"123\" b=\"y\"/>").isEmpty)
+        // - Invalid instance: has prohibited c.
+        let invalidProhibit = try doc.validate("<prohibit xmlns=\"urn:foo\" a=\"123\" c=\"z\"/>")
+        #expect(!invalidProhibit.isEmpty)
+
+        // 2. Override element: a is overridden to xs:int, b and c are inherited.
+        // - Valid instance: a is an integer, b and c are strings.
+        #expect(try doc.validate("<override xmlns=\"urn:foo\" a=\"123\" b=\"y\" c=\"z\"/>").isEmpty)
+        // - Invalid instance: a is not an integer.
+        let invalidOverride = try doc.validate("<override xmlns=\"urn:foo\" a=\"abc\"/>")
+        #expect(!invalidOverride.isEmpty)
+    }
+
+    @Test("Attributes in restriction with different namespaces are resolved correctly")
+    func test_multiNamespaceAttributeRestriction() throws {
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   targetNamespace="urn:imported"
+                   elementFormDefault="qualified">
+          <xs:attribute name="attr" type="xs:string"/>
+        </xs:schema>
+        """
+
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   targetNamespace="urn:main"
+                   xmlns:imp="urn:imported"
+                   xmlns:tns="urn:main"
+                   elementFormDefault="qualified">
+          <xs:import namespace="urn:imported" schemaLocation="imported.xsd"/>
+
+          <xs:complexType name="Base">
+            <xs:attribute ref="imp:attr" use="required"/>
+            <xs:attribute name="attr" type="xs:int" use="optional"/>
+          </xs:complexType>
+
+          <xs:element name="doc">
+            <xs:complexType>
+              <xs:complexContent>
+                <xs:restriction base="tns:Base">
+                  <xs:attribute ref="imp:attr" use="required"/>
+                  <xs:attribute name="attr" type="xs:int" use="prohibited"/>
+                </xs:restriction>
+              </xs:complexContent>
+            </xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """
+
+        let loader: (String) -> String? = { $0 == "imported.xsd" ? imported : nil }
+        let doc = try PureXML.Schema.Document(main, schemaLoader: loader)
+
+        let xml = """
+        <tns:doc xmlns:tns="urn:main" xmlns:imp="urn:imported" imp:attr="hello"/>
+        """
+        #expect(try doc.validate(xml).isEmpty)
+    }
+
+    @Test("Prohibiting an attribute defined in an attributeGroup works correctly")
+    func test_attributeGroupProhibition() throws {
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   targetNamespace="urn:main"
+                   xmlns:tns="urn:main"
+                   elementFormDefault="qualified">
+
+          <xs:attributeGroup name="Group">
+            <xs:attribute name="attr" type="xs:string" use="optional"/>
+          </xs:attributeGroup>
+
+          <xs:complexType name="Base">
+            <xs:attributeGroup ref="tns:Group"/>
+          </xs:complexType>
+
+          <xs:element name="doc">
+            <xs:complexType>
+              <xs:complexContent>
+                <xs:restriction base="tns:Base">
+                  <xs:attribute name="attr" use="prohibited"/>
+                </xs:restriction>
+              </xs:complexContent>
+            </xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """
+
+        let doc = try PureXML.Schema.Document(main)
+
+        let xml = """
+        <doc xmlns="urn:main"/>
+        """
+        #expect(try doc.validate(xml).isEmpty)
+
+        let invalidXML = """
+        <doc xmlns="urn:main" attr="hello"/>
+        """
+        #expect(try !doc.validate(invalidXML).isEmpty)
+    }
 }

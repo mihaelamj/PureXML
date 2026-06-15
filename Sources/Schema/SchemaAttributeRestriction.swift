@@ -129,7 +129,8 @@ extension PureXML.Schema.XSDParser {
     private static func attributeName(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Model.QualifiedName? {
         if let ref = AttrRestrictNode.attribute(node, "ref") {
             let refName = AttrRestrictNode.stripPrefix(ref)
-            return PureXML.Model.QualifiedName(localName: refName, namespaceURI: context.targetNamespace)
+            let namespace = AttrRestrictNode.referenceNamespace(ref, context.namespaceBindings)
+            return PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace)
         }
         guard let name = AttrRestrictNode.attribute(node, "name") else { return nil }
         let qualified = AttrRestrictNode.attribute(node, "form") == "qualified"
