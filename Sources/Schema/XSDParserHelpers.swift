@@ -57,4 +57,36 @@ extension PureXML.Schema.XSDParser {
         let qualified = form == "qualified" || (form == nil && context.elementFormQualified)
         return PureXML.Model.QualifiedName(localName: name, namespaceURI: qualified ? context.targetNamespace : nil)
     }
+
+    static func elementKey(_ name: String) -> String {
+        "element:\(name)"
+    }
+
+    static func indexByName(_ nodes: [XSDTree]) -> [String: XSDTree] {
+        var index: [String: XSDTree] = [:]
+        for node in nodes {
+            if let name = PureXML.Schema.XSDNode.attribute(node, "name") { index[name] = node }
+        }
+        return index
+    }
+
+    static func elementTypeName(_ node: XSDTree) -> String? {
+        if let typeName = PureXML.Schema.XSDNode.attribute(node, "type") {
+            return PureXML.Schema.XSDNode.stripPrefix(typeName)
+        }
+        if PureXML.Schema.XSDNode.firstChild(node, named: "simpleType") != nil || PureXML.Schema.XSDNode.firstChild(node, named: "complexType") != nil {
+            return nil
+        }
+        return "anyType"
+    }
+
+    static func derivation(_ node: XSDTree) -> XSDTree? {
+        PureXML.Schema.XSDNode.firstChild(node, named: "restriction") ?? PureXML.Schema.XSDNode.firstChild(node, named: "extension")
+    }
+
+    static func valueConstraint(of node: XSDTree) -> PureXML.Schema.ValueConstraint? {
+        if let fixed = PureXML.Schema.XSDNode.attribute(node, "fixed") { return .fixed(fixed) }
+        if let value = PureXML.Schema.XSDNode.attribute(node, "default") { return .default(value) }
+        return nil
+    }
 }

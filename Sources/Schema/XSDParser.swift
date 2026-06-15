@@ -171,37 +171,11 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
-    static func elementKey(_ name: String) -> String {
-        "element:\(name)"
-    }
-
-    private static func indexByName(_ nodes: [XSDTree]) -> [String: XSDTree] {
-        var index: [String: XSDTree] = [:]
-        for node in nodes {
-            if let name = XSDNode.attribute(node, "name") { index[name] = node }
-        }
-        return index
-    }
-
     // MARK: Element and type references
-
-    /// The derivation identity of an element's type: the resolved local name of
-    /// its `type` reference, `anyType` when the type is absent (the implied type),
-    /// or nil when the type is an inline anonymous definition (no name to derive
-    /// against).
-    static func elementTypeName(_ node: XSDTree) -> String? {
-        if let typeName = XSDNode.attribute(node, "type") {
-            return XSDNode.stripPrefix(typeName)
-        }
-        if XSDNode.firstChild(node, named: "simpleType") != nil || XSDNode.firstChild(node, named: "complexType") != nil {
-            return nil
-        }
-        return "anyType"
-    }
 
     private static func elementType(_ node: XSDTree, _ context: XSDContext) -> ElementType {
         if let typeName = XSDNode.attribute(node, "type") {
-            return typeReference(typeName)
+            return typeReference(typeName, context)
         }
         if let inline = XSDNode.firstChild(node, named: "simpleType") {
             return .simple(XSDSimpleParser.simpleType(inline, context))
@@ -212,13 +186,16 @@ extension PureXML.Schema.XSDParser {
         return .complex(anyType)
     }
 
-    private static func typeReference(_ typeName: String) -> ElementType {
+    private static func typeReference(_ typeName: String, _ context: XSDContext) -> ElementType {
         let local = XSDNode.stripPrefix(typeName)
-        if let builtin = BuiltinType(rawValue: local) {
-            return .simple(SimpleType(base: builtin))
-        }
-        if let item = XSDSimpleParser.listBuiltinItem(local) {
-            return .simple(.list(item: SimpleType(base: item)))
+        let uri = XSDNode.referenceNamespace(typeName, context.namespaceBindings)
+        if uri == PureXML.Schema.XSDParser.xsdNamespace {
+            if let builtin = BuiltinType(rawValue: local) {
+                return .simple(SimpleType(base: builtin))
+            }
+            if let item = XSDSimpleParser.listBuiltinItem(local) {
+                return .simple(.list(item: SimpleType(base: item), isBuiltinList: true))
+            }
         }
         return .typeReference(local)
     }
@@ -258,28 +235,27 @@ extension PureXML.Schema.XSDParser {
         return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: mixed ? .mixed(particle) : .elementOnly(particle))
     }
 
-    private static func derivation(_ node: XSDTree) -> XSDTree? {
-        XSDNode.firstChild(node, named: "restriction") ?? XSDNode.firstChild(node, named: "extension")
-    }
-
     private static func simpleContentType(_ node: XSDTree, _ context: XSDContext) -> SimpleType {
         guard let inner = derivation(node) else { return SimpleType(base: .string) }
-        let baseName = XSDNode.stripPrefix(XSDNode.attribute(inner, "base") ?? "string")
-        let base = BuiltinType(rawValue: baseName) ?? context.simpleTypes[baseName]?.base ?? .string
-        var facets = context.simpleTypes[baseName]?.facets ?? Facets()
+        let rawBase = XSDNode.attribute(inner, "base") ?? "string"
+        let baseName = XSDNode.stripPrefix(rawBase)
+        let uri = XSDNode.referenceNamespace(rawBase, context.namespaceBindings)
+
+        let base: BuiltinType
+        let inheritedFacets: Facets
+        if uri == PureXML.Schema.XSDParser.xsdNamespace {
+            base = BuiltinType(rawValue: baseName) ?? .string
+            inheritedFacets = Facets()
+        } else {
+            base = context.simpleTypes[baseName]?.base ?? .string
+            inheritedFacets = context.simpleTypes[baseName]?.facets ?? Facets()
+        }
+        var facets = inheritedFacets
         XSDSimpleParser.applyFacets(inner, into: &facets)
         return SimpleType(base: base, facets: facets)
     }
 
     // MARK: Attribute uses and groups
-
-    /// The `default` or `fixed` value constraint declared on an attribute or
-    /// element node, if any (`fixed` takes precedence).
-    static func valueConstraint(of node: XSDTree) -> PureXML.Schema.ValueConstraint? {
-        if let fixed = XSDNode.attribute(node, "fixed") { return .fixed(fixed) }
-        if let value = XSDNode.attribute(node, "default") { return .default(value) }
-        return nil
-    }
 
     // MARK: Model groups
 

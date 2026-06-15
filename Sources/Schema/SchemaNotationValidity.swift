@@ -67,7 +67,7 @@ extension PureXML.Schema.XSDParser {
             return
         }
         let baseType = PureXML.Schema.XSDSimpleParser.simpleTypeReference(baseAttr, context)
-        guard baseType.base == .notation else { return }
+        guard baseType.base == PureXML.Schema.BuiltinType.notation else { return }
 
         let bindings = collectBindings(from: node)
         for child in PureXML.Schema.XSDNode.elementChildren(node) where child.name?.namespaceURI == xsdNamespace && PureXML.Schema.XSDNode.localName(child) == "enumeration" {

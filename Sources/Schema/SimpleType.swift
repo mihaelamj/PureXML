@@ -74,17 +74,25 @@ public extension PureXML.Schema {
         public var facets: Facets
         public var variety: Variety
         public var isAnySimpleType: Bool
+        public var isBuiltinList: Bool
 
-        public init(base: BuiltinType, facets: Facets = Facets(), variety: Variety = .atomic, isAnySimpleType: Bool = false) {
+        public init(
+            base: BuiltinType,
+            facets: Facets = Facets(),
+            variety: Variety = .atomic,
+            isAnySimpleType: Bool = false,
+            isBuiltinList: Bool = false,
+        ) {
             self.base = base
             self.facets = facets
             self.variety = variety
             self.isAnySimpleType = isAnySimpleType
+            self.isBuiltinList = isBuiltinList
         }
 
         /// A list type whose items are `item`, carrying its own (list) facets.
-        public static func list(item: SimpleType, facets: Facets = Facets()) -> SimpleType {
-            SimpleType(base: .string, facets: facets, variety: .list(item))
+        public static func list(item: SimpleType, facets: Facets = Facets(), isBuiltinList: Bool = false) -> SimpleType {
+            SimpleType(base: .string, facets: facets, variety: .list(item), isBuiltinList: isBuiltinList)
         }
 
         /// A union of `members`: a value is valid if any member admits it.
@@ -116,6 +124,11 @@ public extension PureXML.Schema {
             if let exact = facets.length, tokens.count != exact { return "list length \(tokens.count) is not \(exact)" }
             if let minimum = facets.minLength, tokens.count < minimum { return "list length \(tokens.count) is below \(minimum)" }
             if let maximum = facets.maxLength, tokens.count > maximum { return "list length \(tokens.count) is above \(maximum)" }
+            if facets.minLength == nil, facets.length == nil {
+                if isBuiltinList, tokens.isEmpty {
+                    return "list must not be empty"
+                }
+            }
             if let error = patternError(normalized) { return error }
             if let enumeration = facets.enumeration, !enumeration.contains(normalized) {
                 return "'\(normalized)' is not in the enumeration"

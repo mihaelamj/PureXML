@@ -112,4 +112,84 @@ struct SchemaFacetDefinitionTests {
             #expect(String(describing: error).contains("length"))
         }
     }
+
+    @Test("fractionDigits on integer types must be zero")
+    func test_fractionDigitsOnInteger() throws {
+        try compile(#"<xs:fractionDigits value="0"/>"#, base: "xs:integer")
+        #expect(rejects(#"<xs:fractionDigits value="1"/>"#, base: "xs:integer"))
+        #expect(rejects(#"<xs:fractionDigits value="5"/>"#, base: "xs:int"))
+    }
+
+    @Test("duration range bounds must be ordered")
+    func test_durationBoundOrdering() throws {
+        // minInclusive <= maxInclusive is valid
+        try compile(#"<xs:minInclusive value="P1Y"/><xs:maxInclusive value="P2Y"/>"#, base: "xs:duration")
+        // minInclusive > maxInclusive is invalid
+        #expect(rejects(#"<xs:minInclusive value="P2Y3MT2H"/><xs:maxInclusive value="P1Y1MT1H"/>"#, base: "xs:duration"))
+        #expect(rejects(#"<xs:minExclusive value="P2Y3MT2H"/><xs:maxExclusive value="P1Y1MT1H"/>"#, base: "xs:duration"))
+        #expect(rejects(#"<xs:minExclusive value="P1Y"/><xs:maxExclusive value="P1Y"/>"#, base: "xs:duration"))
+    }
+
+    @Test("built-in list types require minLength of 1")
+    func test_listBuiltinMinLength() {
+        #expect(rejects(#"<xs:enumeration value=""/>"#, base: "xs:IDREFS"))
+        #expect(rejects(#"<xs:enumeration value=""/>"#, base: "xs:NMTOKENS"))
+    }
+
+    @Test("facet applicability per base type")
+    func test_facetApplicabilityPerBase() {
+        #expect(rejects(#"<xs:fractionDigits value="1"/>"#, base: "xs:string"))
+        #expect(rejects(#"<xs:totalDigits value="5"/>"#, base: "xs:boolean"))
+        #expect(rejects(#"<xs:length value="5"/>"#, base: "xs:decimal"))
+    }
+
+    @Test("foreign elements inside restriction matching facet names are ignored")
+    func test_foreignElementsInRestriction() throws {
+        let xml = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+            <xs:simpleType name="mySimple">
+                <xs:restriction base="xs:string" xmlns:ext="http://example.com/ext">
+                    <ext:metadata info="extra"/>
+                    <ext:maxInclusive value="10"/>
+                    <xs:minLength value="1"/>
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:schema>
+        """
+        _ = try PureXML.Schema.Document(xml)
+    }
+
+    @Test("namespace prefix conflation: user-defined type named decimal is not conflated with built-in decimal")
+    func test_userTypeNamedDecimal() throws {
+        let xml = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                   xmlns:tns="http://example.com/ns"
+                   targetNamespace="http://example.com/ns">
+            <xs:simpleType name="decimal">
+                <xs:restriction base="xs:string"/>
+            </xs:simpleType>
+            <xs:simpleType name="myDecimal">
+                <xs:restriction base="tns:decimal">
+                    <xs:length value="5"/>
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:schema>
+        """
+        _ = try PureXML.Schema.Document(xml)
+    }
+
+    @Test("incomparable duration bounds are valid")
+    func test_incomparableDurationBounds() throws {
+        let xml = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+            <xs:simpleType name="myDuration">
+                <xs:restriction base="xs:duration">
+                    <xs:minInclusive value="P1M"/>
+                    <xs:maxInclusive value="P30D"/>
+                </xs:restriction>
+            </xs:simpleType>
+        </xs:schema>
+        """
+        _ = try PureXML.Schema.Document(xml)
+    }
 }

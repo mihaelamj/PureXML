@@ -1,3 +1,9 @@
+private typealias XSDNode = PureXML.Schema.XSDNode
+private typealias SimpleType = PureXML.Schema.SimpleType
+private typealias XSDContext = PureXML.Schema.XSDContext
+private typealias BuiltinType = PureXML.Schema.BuiltinType
+private typealias Facets = PureXML.Schema.Facets
+
 extension PureXML.Schema {
     /// Parses XSD simple types: atomic restrictions with the full facet set, and
     /// the `list` and `union` varieties. Kept beside ``XSDParser``, sharing its
@@ -39,7 +45,7 @@ extension PureXML.Schema {
             for error in facetDefinitionErrors(restriction, base: baseType) + patternErrors(restriction) {
                 context.diagnostics.report(error)
             }
-            return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety)
+            return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety, isBuiltinList: baseType.isBuiltinList)
         }
 
         /// Schema-validity findings for the `pattern` facets declared on one
@@ -52,6 +58,7 @@ extension PureXML.Schema {
         static func patternErrors(_ restriction: XSDTree) -> [String] {
             var errors: [String] = []
             for facet in XSDNode.elementChildren(restriction) where XSDNode.localName(facet) == "pattern" {
+                guard facet.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
                 let value = XSDNode.attribute(facet, "value") ?? ""
                 do {
                     _ = try PureXML.Regex.Pattern(value)
@@ -83,9 +90,11 @@ extension PureXML.Schema {
         /// the value-bound rules, both limited to the facets declared on this step
         /// so an inherited facet is never flagged here.
         static func facetDefinitionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
-            countFacetErrors(restriction) + boundFacetErrors(restriction, base: base)
-                + whiteSpaceRestrictionErrors(restriction, base: base)
-                + facetRestrictionErrors(restriction, base: base)
+            var errors = countFacetErrors(restriction) + boundFacetErrors(restriction, base: base)
+            errors += whiteSpaceRestrictionErrors(restriction, base: base)
+            errors += facetRestrictionErrors(restriction, base: base)
+            errors += facetApplicabilityErrors(restriction, base: base)
+            return errors
         }
 
         /// The `length`, `minLength`, `maxLength`, `totalDigits`, and `fractionDigits`
@@ -106,10 +115,42 @@ extension PureXML.Schema {
             if let baseTotalDigits = base.facets.totalDigits, let localTotalDigits = localFacets.totalDigits, localTotalDigits > baseTotalDigits {
                 errors.append("facet 'totalDigits' (\(localTotalDigits)) cannot be greater than base 'totalDigits' (\(baseTotalDigits))")
             }
-            if let baseFractionDigits = base.facets.fractionDigits, let localFractionDigits = localFacets.fractionDigits, localFractionDigits > baseFractionDigits {
+            let baseFractionDigits = base.facets.fractionDigits ?? (base.base.derives(from: .integer) ? 0 : nil)
+            if let baseFractionDigits, let localFractionDigits = localFacets.fractionDigits, localFractionDigits > baseFractionDigits {
                 errors.append("facet 'fractionDigits' (\(localFractionDigits)) cannot be greater than base 'fractionDigits' (\(baseFractionDigits))")
             }
             return errors
+        }
+
+        private static func facetApplicabilityErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
+            guard case .atomic = base.variety else { return [] }
+            var errors: [String] = []
+            let allowed = allowedFacets(for: base.base.primitive)
+            let facetNames: Set = [
+                "length", "minLength", "maxLength", "pattern", "enumeration", "whiteSpace",
+                "maxInclusive", "maxExclusive", "minInclusive", "minExclusive", "totalDigits", "fractionDigits",
+            ]
+            for child in XSDNode.elementChildren(restriction) {
+                guard child.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
+                guard let name = XSDNode.localName(child), facetNames.contains(name) else { continue }
+                if !allowed.contains(name) {
+                    errors.append("facet '\(name)' does not apply to base type '\(base.base.rawValue)'")
+                }
+            }
+            return errors
+        }
+
+        private static func allowedFacets(for primitive: Primitive) -> Set<String> {
+            switch primitive {
+            case .string, .anyURI, .hexBinary, .base64Binary, .name, .ncName, .nmtoken, .language, .qName, .notation:
+                ["length", "minLength", "maxLength", "pattern", "enumeration", "whiteSpace"]
+            case .boolean:
+                ["pattern", "whiteSpace"]
+            case .decimal, .integer:
+                ["totalDigits", "fractionDigits", "pattern", "whiteSpace", "enumeration", "maxInclusive", "maxExclusive", "minInclusive", "minExclusive"]
+            case .double, .float, .duration, .dateKind:
+                ["pattern", "whiteSpace", "enumeration", "maxInclusive", "maxExclusive", "minInclusive", "minExclusive"]
+            }
         }
 
         /// The `whiteSpace` facet may only strengthen, never relax, the base type's
@@ -129,6 +170,7 @@ extension PureXML.Schema {
 
         private static func declaredWhiteSpace(_ restriction: XSDTree) -> WhiteSpace? {
             for facet in XSDNode.elementChildren(restriction) where XSDNode.localName(facet) == "whiteSpace" {
+                guard facet.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
                 return whiteSpace(XSDNode.attribute(facet, "value"))
             }
             return nil
@@ -161,6 +203,7 @@ extension PureXML.Schema {
             var values: [String: String] = [:] // facet name -> canonical digit string
             let countFacets: Set = ["length", "minLength", "maxLength", "totalDigits", "fractionDigits"]
             for facet in XSDNode.elementChildren(restriction) {
+                guard facet.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
                 guard let name = XSDNode.localName(facet), countFacets.contains(name) else { continue }
                 let raw = XSDNode.attribute(facet, "value")
                 guard let canonical = raw.flatMap(canonicalNonNegativeInteger) else {
@@ -197,6 +240,7 @@ extension PureXML.Schema {
             var errors: [String] = []
             var bounds: [String: String] = [:]
             for facet in XSDNode.elementChildren(restriction) {
+                guard facet.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
                 guard let name = XSDNode.localName(facet) else { continue }
                 let raw = XSDNode.attribute(facet, "value") ?? ""
                 switch name {
@@ -229,8 +273,23 @@ extension PureXML.Schema {
         /// `ordered` lookup returns nil), so only a defined order is checked.
         private static func boundOrderErrors(_ bounds: [String: String], base: SimpleType) -> [String] {
             guard let low = bounds["minInclusive"] ?? bounds["minExclusive"],
-                  let high = bounds["maxInclusive"] ?? bounds["maxExclusive"],
-                  let lowValue = base.base.primitive.ordered(low),
+                  let high = bounds["maxInclusive"] ?? bounds["maxExclusive"]
+            else { return [] }
+            if case .duration = base.base.primitive {
+                guard let lowDuration = DurationValue(low), let highDuration = DurationValue(high) else { return [] }
+                let order = lowDuration.compare(to: highDuration)
+                if order == .greaterThan {
+                    return ["lower bound '\(low)' exceeds upper bound '\(high)'"]
+                }
+                let exclusive = bounds["minExclusive"] != nil || bounds["maxExclusive"] != nil
+                if exclusive {
+                    if order == .equal {
+                        return ["bounds '\(low)' and '\(high)' describe an empty value space"]
+                    }
+                }
+                return []
+            }
+            guard let lowValue = base.base.primitive.ordered(low),
                   let highValue = base.base.primitive.ordered(high)
             else { return [] }
             if lowValue > highValue {
@@ -241,109 +300,6 @@ extension PureXML.Schema {
                 return ["bounds '\(low)' and '\(high)' describe an empty value space"]
             }
             return []
-        }
-
-        /// The canonical digit string of a lexical `nonNegativeInteger` (optional
-        /// leading `+`, ASCII digits, surrounding whitespace tolerated), with the
-        /// sign and leading zeros stripped (`"0"` for zero), or nil when the lexical
-        /// is not one (`-1`, ``, `a`, `1e2`). Independent of machine-integer range,
-        /// so a huge but well-formed value is canonicalized, not misreported as
-        /// malformed; the canonical form orders two values by length then lexically.
-        private static func canonicalNonNegativeInteger(_ lexical: String) -> String? {
-            var digits = Substring(lexical.trimmingXMLWhitespace())
-            if digits.first == "+" { digits = digits.dropFirst() }
-            guard !digits.isEmpty, digits.allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
-            let trimmed = digits.drop { $0 == "0" }
-            return trimmed.isEmpty ? "0" : String(trimmed)
-        }
-
-        /// Whether canonical nonNegativeInteger `lhs` is greater than `rhs`: a longer
-        /// digit string is larger, and same-length strings compare lexicographically.
-        private static func greater(_ lhs: String, than rhs: String) -> Bool {
-            lhs.count != rhs.count ? lhs.count > rhs.count : lhs > rhs
-        }
-
-        static func simpleTypeReference(_ typeName: String, _ context: XSDContext) -> SimpleType {
-            let local = XSDNode.stripPrefix(typeName)
-            if local == "anySimpleType" { return SimpleType(base: .string, isAnySimpleType: true) }
-            if let builtin = BuiltinType(rawValue: local) { return SimpleType(base: builtin) }
-            if let item = listBuiltinItem(local) { return .list(item: SimpleType(base: item)) }
-            return context.simpleTypes[local] ?? SimpleType(base: .string)
-        }
-
-        /// The item type of a built-in list datatype (`IDREFS`, `ENTITIES`,
-        /// `NMTOKENS`), each a whitespace-separated list of its singular form.
-        static func listBuiltinItem(_ name: String) -> BuiltinType? {
-            switch name {
-            case "IDREFS": .idref
-            case "ENTITIES": .entity
-            case "NMTOKENS": .nmtoken
-            default: nil
-            }
-        }
-
-        static func applyFacets(_ restriction: XSDTree, into facets: inout Facets) {
-            for facet in XSDNode.elementChildren(restriction) {
-                let value = XSDNode.attribute(facet, "value")
-                applyStringFacet(XSDNode.localName(facet), value, into: &facets)
-                applyNumericFacet(XSDNode.localName(facet), value, into: &facets)
-            }
-        }
-
-        private static func listType(_ node: XSDTree, _ context: XSDContext) -> SimpleType {
-            let item: SimpleType = if let itemType = XSDNode.attribute(node, "itemType") {
-                simpleTypeReference(itemType, context)
-            } else if let inline = XSDNode.firstChild(node, named: "simpleType") {
-                simpleType(inline, context)
-            } else {
-                SimpleType(base: .string)
-            }
-            return .list(item: item)
-        }
-
-        private static func unionType(_ node: XSDTree, _ context: XSDContext) -> SimpleType {
-            var members: [SimpleType] = []
-            if let names = XSDNode.attribute(node, "memberTypes") {
-                members += names.split(whereSeparator: \.isWhitespace).map { simpleTypeReference(String($0), context) }
-            }
-            members += XSDNode.children(node, named: "simpleType").map { simpleType($0, context) }
-            return .union(members)
-        }
-    }
-}
-
-extension PureXML.Schema.XSDSimpleParser {
-    private static func applyStringFacet(_ name: String?, _ value: String?, into facets: inout PureXML.Schema.Facets) {
-        switch name {
-        case "pattern": if let value { facets.patterns.append(value) }
-        case "enumeration": if let value { facets.enumeration = (facets.enumeration ?? []) + [value] }
-        case "minInclusive": facets.minInclusive = value
-        case "maxInclusive": facets.maxInclusive = value
-        case "minExclusive": facets.minExclusive = value
-        case "maxExclusive": facets.maxExclusive = value
-        case "whiteSpace": facets.whiteSpace = whiteSpace(value)
-        default: break
-        }
-    }
-
-    private static func applyNumericFacet(_ name: String?, _ value: String?, into facets: inout PureXML.Schema.Facets) {
-        let number = value.flatMap(Int.init)
-        switch name {
-        case "length": facets.length = number
-        case "minLength": facets.minLength = number
-        case "maxLength": facets.maxLength = number
-        case "totalDigits": facets.totalDigits = number
-        case "fractionDigits": facets.fractionDigits = number
-        default: break
-        }
-    }
-
-    private static func whiteSpace(_ value: String?) -> PureXML.Schema.WhiteSpace? {
-        switch value {
-        case "preserve": .preserve
-        case "replace": .replace
-        case "collapse": .collapse
-        default: nil
         }
     }
 }
