@@ -68,6 +68,20 @@ extension PureXML.Schema.XSDParser {
         if present.contains("ref"), present.contains("type") {
             errors.append("'\(local)' may not have both 'ref' and 'type'")
         }
+        // src-element.2.2: an element `ref` is a use of a global declaration, not a
+        // declaration, so beyond name/type it may not carry the other
+        // declaration-only properties (`minOccurs`/`maxOccurs`, the particle's own,
+        // stay allowed).
+        if local == "element", present.contains("ref") {
+            for excluded in ["nillable", "default", "fixed", "form", "block"] where present.contains(excluded) {
+                errors.append("'element' with a 'ref' may not also specify '\(excluded)'")
+            }
+        }
+        // A `ref` likewise excludes an inline type definition: the type comes from the
+        // referenced declaration.
+        if present.contains("ref"), local == "element" || local == "attribute", hasInlineType(node, local) {
+            errors.append("'\(local)' with a 'ref' may not have an inline type definition")
+        }
         // src-element.3 / src-attribute.3-4: a `type` attribute and an inline
         // anonymous type definition are mutually exclusive. An attribute may carry
         // only an inline `simpleType`; an element may carry a `simpleType` or
