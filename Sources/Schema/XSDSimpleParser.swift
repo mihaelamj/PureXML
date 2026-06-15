@@ -84,6 +84,45 @@ extension PureXML.Schema {
         /// so an inherited facet is never flagged here.
         static func facetDefinitionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
             countFacetErrors(restriction) + boundFacetErrors(restriction, base: base)
+                + whiteSpaceRestrictionErrors(restriction, base: base)
+        }
+
+        /// The `whiteSpace` facet may only strengthen, never relax, the base type's
+        /// effective whiteSpace (XSD Part 2 §4.3.6, the facet's valid-restriction
+        /// rule): the order is `preserve` < `replace` < `collapse`, so a base fixed
+        /// to `collapse` admits only `collapse`, and a base of `replace` admits
+        /// `replace` or `collapse`. Checked for an atomic base only; the base's
+        /// effective whiteSpace is its own facet, falling back to its built-in
+        /// intrinsic. If the base type has not resolved its own whiteSpace the check
+        /// can only under-detect, never reject a valid restriction.
+        private static func whiteSpaceRestrictionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
+            guard case .atomic = base.variety, let declared = declaredWhiteSpace(restriction) else { return [] }
+            let baseWhiteSpace = base.facets.whiteSpace ?? base.base.whiteSpace
+            guard whiteSpaceStrength(declared) < whiteSpaceStrength(baseWhiteSpace) else { return [] }
+            return ["whiteSpace '\(whiteSpaceName(declared))' may not relax the base type's whiteSpace '\(whiteSpaceName(baseWhiteSpace))'"]
+        }
+
+        private static func declaredWhiteSpace(_ restriction: XSDTree) -> WhiteSpace? {
+            for facet in XSDNode.elementChildren(restriction) where XSDNode.localName(facet) == "whiteSpace" {
+                return whiteSpace(XSDNode.attribute(facet, "value"))
+            }
+            return nil
+        }
+
+        private static func whiteSpaceStrength(_ whiteSpace: WhiteSpace) -> Int {
+            switch whiteSpace {
+            case .preserve: 0
+            case .replace: 1
+            case .collapse: 2
+            }
+        }
+
+        private static func whiteSpaceName(_ whiteSpace: WhiteSpace) -> String {
+            switch whiteSpace {
+            case .preserve: "preserve"
+            case .replace: "replace"
+            case .collapse: "collapse"
+            }
         }
 
         /// Length-family findings: `length`, `minLength`, `maxLength`,
