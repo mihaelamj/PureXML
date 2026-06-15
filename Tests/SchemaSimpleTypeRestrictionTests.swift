@@ -40,12 +40,18 @@ struct SchemaSimpleTypeRestrictionTests {
         """)
     }
 
-    @Test("using xs:anySimpleType as list itemType or union memberTypes is accepted")
-    func test_anySimpleTypeInListOrUnion() throws {
-        try compile("""
+    @Test("using xs:anySimpleType as list itemType is rejected")
+    func test_anySimpleTypeInList() {
+        #expect(rejects("""
         <xs:simpleType name="list">
             <xs:list itemType="xs:anySimpleType"/>
         </xs:simpleType>
+        """))
+    }
+
+    @Test("using xs:anySimpleType as union memberTypes is accepted")
+    func test_anySimpleTypeInUnion() throws {
+        try compile("""
         <xs:simpleType name="union">
             <xs:union memberTypes="xs:anySimpleType xs:int"/>
         </xs:simpleType>

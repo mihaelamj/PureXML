@@ -74,5 +74,6 @@ extension PureXML.Schema.XSDParser {
             + extensionAllGroupErrors(schema, context, typeMaps.named)
             + attributeRestrictionErrors(schema, context, typeMaps.named)
             + simpleTypeBaseNotComplexErrors(schema, in: context)
+            + simpleTypeVarietyErrors(schema, context)
     }
 }
