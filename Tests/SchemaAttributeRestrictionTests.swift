@@ -84,4 +84,28 @@ struct SchemaAttributeRestrictionTests {
             + "<xs:attribute name=\"a\" type=\"xs:integer\" default=\"1\"/></xs:restriction></xs:complexContent></xs:complexType>"
         #expect(!compiles(intBase + derivedDefaultConstraint))
     }
+
+    @Test("A restriction may not change an attribute's type to a non-derived type")
+    func test_attributeTypeRestriction() {
+        let base = "<xs:attribute name=\"a\" type=\"xs:integer\"/>"
+        // integer -> string (unrelated): invalid
+        #expect(!compiles(derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"xs:string\"/>")))
+        // integer -> int (valid restriction): valid
+        #expect(compiles(derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"xs:int\"/>")))
+        // integer -> union(float, integer): invalid
+        let unionDef = "<xs:simpleType name=\"U\"><xs:union memberTypes=\"xs:float xs:integer\"/></xs:simpleType>"
+        #expect(!compiles(unionDef + derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"U\"/>")))
+    }
+
+    @Test("Restricting an untyped (anySimpleType) attribute to list and union types is valid")
+    func test_anySimpleTypeRestrictedToListAndUnion() {
+        let base = "<xs:attribute name=\"a\"/>" // untyped, defaults to xs:anySimpleType
+        // anySimpleType -> atomic (xs:integer): valid
+        #expect(compiles(derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"xs:integer\"/>")))
+        // anySimpleType -> list (xs:NMTOKENS): valid
+        #expect(compiles(derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"xs:NMTOKENS\"/>")))
+        // anySimpleType -> union: valid
+        let unionDef = "<xs:simpleType name=\"U\"><xs:union memberTypes=\"xs:integer xs:string\"/></xs:simpleType>"
+        #expect(compiles(unionDef + derive(base: base, restricted: "<xs:attribute name=\"a\" type=\"U\"/>")))
+    }
 }

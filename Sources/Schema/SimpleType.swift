@@ -73,11 +73,13 @@ public extension PureXML.Schema {
         public var base: BuiltinType
         public var facets: Facets
         public var variety: Variety
+        public var isAnySimpleType: Bool
 
-        public init(base: BuiltinType, facets: Facets = Facets(), variety: Variety = .atomic) {
+        public init(base: BuiltinType, facets: Facets = Facets(), variety: Variety = .atomic, isAnySimpleType: Bool = false) {
             self.base = base
             self.facets = facets
             self.variety = variety
+            self.isAnySimpleType = isAnySimpleType
         }
 
         /// A list type whose items are `item`, carrying its own (list) facets.

@@ -40,7 +40,7 @@ extension PureXML.Schema.XSDParser {
         } else if let inline = PureXML.Schema.XSDNode.firstChild(node, named: "simpleType") {
             PureXML.Schema.XSDSimpleParser.simpleType(inline, context)
         } else {
-            PureXML.Schema.SimpleType(base: .string)
+            PureXML.Schema.SimpleType(base: .string, isAnySimpleType: true)
         }
         let qualified = PureXML.Schema.XSDNode.attribute(node, "form") == "qualified"
             || (PureXML.Schema.XSDNode.attribute(node, "form") == nil && context.attributeFormQualified)

@@ -265,6 +265,7 @@ extension PureXML.Schema {
 
         static func simpleTypeReference(_ typeName: String, _ context: XSDContext) -> SimpleType {
             let local = XSDNode.stripPrefix(typeName)
+            if local == "anySimpleType" { return SimpleType(base: .string, isAnySimpleType: true) }
             if let builtin = BuiltinType(rawValue: local) { return SimpleType(base: builtin) }
             if let item = listBuiltinItem(local) { return .list(item: SimpleType(base: item)) }
             return context.simpleTypes[local] ?? SimpleType(base: .string)

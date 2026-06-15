@@ -53,6 +53,9 @@ extension PureXML.Schema.XSDParser {
         if base.required, !derived.required {
             return "attribute '\(derived.name.localName)' is required in the base type and a restriction may not make it optional or prohibited"
         }
+        if !isSimpleTypeRestrictionOK(derived: derived.type, base: base.type) {
+            return "attribute '\(derived.name.localName)' has type '\(derived.type.base.rawValue)' which is not a valid restriction of base type '\(base.type.base.rawValue)'"
+        }
         if let baseFixed = base.valueConstraint?.fixedValue {
             if isProhibited(derived.name, under: restrictionNode, context) {
                 return nil
@@ -67,6 +70,34 @@ extension PureXML.Schema.XSDParser {
             }
         }
         return nil
+    }
+
+    private static func isSimpleTypeRestrictionOK(derived: PureXML.Schema.SimpleType, base: PureXML.Schema.SimpleType) -> Bool {
+        if base.isAnySimpleType {
+            return true
+        }
+        switch (derived.variety, base.variety) {
+        case (.atomic, .atomic):
+            return derived.base.derives(from: base.base)
+        case let (.list(derivedItem), .list(baseItem)):
+            return isSimpleTypeRestrictionOK(derived: derivedItem, base: baseItem)
+        case (.union, .union):
+            guard case let .union(derivedMembers) = derived.variety,
+                  case let .union(baseMembers) = base.variety
+            else { return false }
+            return derivedMembers.allSatisfy { derivedMember in
+                baseMembers.contains { baseMember in
+                    isSimpleTypeRestrictionOK(derived: derivedMember, base: baseMember)
+                }
+            }
+        case (_, .union):
+            guard case let .union(baseMembers) = base.variety else { return false }
+            return baseMembers.contains { baseMember in
+                isSimpleTypeRestrictionOK(derived: derived, base: baseMember)
+            }
+        default:
+            return false
+        }
     }
 
     private static func isProhibited(_ name: PureXML.Model.QualifiedName, under node: XSDTree, _ context: PureXML.Schema.XSDContext, visited: Set<String> = []) -> Bool {
