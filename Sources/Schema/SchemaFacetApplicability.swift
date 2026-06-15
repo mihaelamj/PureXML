@@ -229,4 +229,39 @@ extension PureXML.Schema.XSDParser {
         }
         return bindings
     }
+
+    /// Reject any restriction (in the XSD namespace) whose `base`
+    /// attribute resolves to `xs:anySimpleType` in the XSD namespace when defined directly under a simpleType.
+    static func anySimpleTypeRestrictionErrors(_ schema: XSDTree) -> [String] {
+        let targetNamespace = schema.attributes.first { $0.name.prefix == nil && $0.name.localName == "targetNamespace" }?.value ?? ""
+        if targetNamespace == xsdNamespace {
+            return []
+        }
+        let bindings = namespaceBindings(schema)
+        var errors: [String] = []
+        forEachRestrictionInSimpleType(schema) { node in
+            guard let base = PureXML.Schema.XSDNode.attribute(node, "base") else { return }
+            let (prefix, local) = splitQName(base)
+            let uri = prefix.map { bindings[$0] } ?? bindings[""]
+            if uri == xsdNamespace, local == "anySimpleType" {
+                errors.append("derivation by restriction of 'xs:anySimpleType' is not allowed")
+            }
+        }
+        return errors
+    }
+
+    private static func forEachRestrictionInSimpleType(_ node: XSDTree, _ visit: (XSDTree) -> Void) {
+        let local = PureXML.Schema.XSDNode.localName(node)
+        if local == "appinfo" || local == "documentation" { return }
+        if node.name?.namespaceURI == xsdNamespace, local == "simpleType" {
+            for child in PureXML.Schema.XSDNode.elementChildren(node) {
+                if child.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(child) == "restriction" {
+                    visit(child)
+                }
+            }
+        }
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            forEachRestrictionInSimpleType(child, visit)
+        }
+    }
 }

@@ -60,6 +60,7 @@ extension PureXML.Schema.XSDParser {
         errors += valueConstraintErrors(schema)
         errors += topLevelDeclarationErrors(schema)
         errors += nestedNamedDefinitionErrors(schema)
+        errors += anySimpleTypeRestrictionErrors(schema)
         return errors
     }
 

@@ -115,14 +115,22 @@ extension PureXML.Schema.XSDParser {
         "element": ["ref", "form", "minOccurs", "maxOccurs"],
     ]
 
+    private static let namedTopLevelKinds: Set<String> = [
+        "simpleType", "complexType", "group", "attributeGroup", "element", "attribute", "notation",
+    ]
+
     private static func collectTopLevelDeclarationErrors(in container: XSDTree, into errors: inout [String]) {
         for child in PureXML.Schema.XSDNode.elementChildren(container) {
             guard child.name?.namespaceURI == xsdNamespace,
-                  let kind = PureXML.Schema.XSDNode.localName(child),
-                  let forbidden = topLevelForbidden[kind]
+                  let kind = PureXML.Schema.XSDNode.localName(child)
             else { continue }
-            for attribute in forbidden where hasUnprefixed(child, attribute) {
-                errors.append("a top-level '\(kind)' declaration may not specify '\(attribute)'")
+            if namedTopLevelKinds.contains(kind), !hasUnprefixed(child, "name") {
+                errors.append("a top-level '\(kind)' definition must have a 'name' attribute")
+            }
+            if let forbidden = topLevelForbidden[kind] {
+                for attribute in forbidden where hasUnprefixed(child, attribute) {
+                    errors.append("a top-level '\(kind)' declaration may not specify '\(attribute)'")
+                }
             }
         }
     }

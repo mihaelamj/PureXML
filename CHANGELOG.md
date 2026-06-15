@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A complexContent restriction must keep a base attribute's required use and its fixed value constraint (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2` / `derivation-ok-restriction.4`). A restriction redeclaring a base `required` attribute may not make it optional or prohibited, and if a base attribute use has a `fixed` value constraint, the restriction must also make it `fixed` with the same value. The fixed values are compared in the attribute type's value space (supporting lists and unions) to avoid over-rejecting valid schemas. A prohibited attribute is removed, so the fixed clause does not apply to it. XSTS: invalid schemas accepted 390 to 387, no other bucket raised.
+- Enforce top-level declaration naming, block xs:anySimpleType derivation, and restrict simpleType facets. Top-level definitions must specify a `name` attribute. Derivation by restriction or extension of `xs:anySimpleType` is disallowed. Restriction facets (`length`, `minLength`, `maxLength`, `totalDigits`, `fractionDigits`) must be tighter than or equal to the base type's facets. XSTS: invalid schemas accepted 387 to 383, no other bucket raised.
 
 ## [0.1.0] - 2026-06-15
 

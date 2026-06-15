@@ -85,6 +85,31 @@ extension PureXML.Schema {
         static func facetDefinitionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
             countFacetErrors(restriction) + boundFacetErrors(restriction, base: base)
                 + whiteSpaceRestrictionErrors(restriction, base: base)
+                + facetRestrictionErrors(restriction, base: base)
+        }
+
+        /// The `length`, `minLength`, `maxLength`, `totalDigits`, and `fractionDigits`
+        /// facets on a restriction must restrict or equal the base type's facets.
+        private static func facetRestrictionErrors(_ restriction: XSDTree, base: SimpleType) -> [String] {
+            var errors: [String] = []
+            var localFacets = Facets()
+            applyFacets(restriction, into: &localFacets)
+            if let baseLength = base.facets.length, let localLength = localFacets.length, localLength != baseLength {
+                errors.append("facet 'length' (\(localLength)) must equal base 'length' (\(baseLength))")
+            }
+            if let baseMinLength = base.facets.minLength, let localMinLength = localFacets.minLength, localMinLength < baseMinLength {
+                errors.append("facet 'minLength' (\(localMinLength)) cannot be less than base 'minLength' (\(baseMinLength))")
+            }
+            if let baseMaxLength = base.facets.maxLength, let localMaxLength = localFacets.maxLength, localMaxLength > baseMaxLength {
+                errors.append("facet 'maxLength' (\(localMaxLength)) cannot be greater than base 'maxLength' (\(baseMaxLength))")
+            }
+            if let baseTotalDigits = base.facets.totalDigits, let localTotalDigits = localFacets.totalDigits, localTotalDigits > baseTotalDigits {
+                errors.append("facet 'totalDigits' (\(localTotalDigits)) cannot be greater than base 'totalDigits' (\(baseTotalDigits))")
+            }
+            if let baseFractionDigits = base.facets.fractionDigits, let localFractionDigits = localFacets.fractionDigits, localFractionDigits > baseFractionDigits {
+                errors.append("facet 'fractionDigits' (\(localFractionDigits)) cannot be greater than base 'fractionDigits' (\(baseFractionDigits))")
+            }
+            return errors
         }
 
         /// The `whiteSpace` facet may only strengthen, never relax, the base type's
@@ -283,39 +308,41 @@ extension PureXML.Schema {
             members += XSDNode.children(node, named: "simpleType").map { simpleType($0, context) }
             return .union(members)
         }
+    }
+}
 
-        private static func applyStringFacet(_ name: String?, _ value: String?, into facets: inout Facets) {
-            switch name {
-            case "pattern": if let value { facets.patterns.append(value) }
-            case "enumeration": if let value { facets.enumeration = (facets.enumeration ?? []) + [value] }
-            case "minInclusive": facets.minInclusive = value
-            case "maxInclusive": facets.maxInclusive = value
-            case "minExclusive": facets.minExclusive = value
-            case "maxExclusive": facets.maxExclusive = value
-            case "whiteSpace": facets.whiteSpace = whiteSpace(value)
-            default: break
-            }
+extension PureXML.Schema.XSDSimpleParser {
+    private static func applyStringFacet(_ name: String?, _ value: String?, into facets: inout PureXML.Schema.Facets) {
+        switch name {
+        case "pattern": if let value { facets.patterns.append(value) }
+        case "enumeration": if let value { facets.enumeration = (facets.enumeration ?? []) + [value] }
+        case "minInclusive": facets.minInclusive = value
+        case "maxInclusive": facets.maxInclusive = value
+        case "minExclusive": facets.minExclusive = value
+        case "maxExclusive": facets.maxExclusive = value
+        case "whiteSpace": facets.whiteSpace = whiteSpace(value)
+        default: break
         }
+    }
 
-        private static func applyNumericFacet(_ name: String?, _ value: String?, into facets: inout Facets) {
-            let number = value.flatMap(Int.init)
-            switch name {
-            case "length": facets.length = number
-            case "minLength": facets.minLength = number
-            case "maxLength": facets.maxLength = number
-            case "totalDigits": facets.totalDigits = number
-            case "fractionDigits": facets.fractionDigits = number
-            default: break
-            }
+    private static func applyNumericFacet(_ name: String?, _ value: String?, into facets: inout PureXML.Schema.Facets) {
+        let number = value.flatMap(Int.init)
+        switch name {
+        case "length": facets.length = number
+        case "minLength": facets.minLength = number
+        case "maxLength": facets.maxLength = number
+        case "totalDigits": facets.totalDigits = number
+        case "fractionDigits": facets.fractionDigits = number
+        default: break
         }
+    }
 
-        private static func whiteSpace(_ value: String?) -> WhiteSpace? {
-            switch value {
-            case "preserve": .preserve
-            case "replace": .replace
-            case "collapse": .collapse
-            default: nil
-            }
+    private static func whiteSpace(_ value: String?) -> PureXML.Schema.WhiteSpace? {
+        switch value {
+        case "preserve": .preserve
+        case "replace": .replace
+        case "collapse": .collapse
+        default: nil
         }
     }
 }
