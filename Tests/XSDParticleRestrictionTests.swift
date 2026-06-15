@@ -300,6 +300,18 @@ struct XSDParticleRestrictionTests {
         #expect(doc("other", base: "foo", types: userTypes) == nil)
         // a union member (xs:string) validly restricts the union-typed base element.
         #expect(doc("xs:string", base: "u", types: userTypes) != nil)
+
+        // a union restricting another union (subset members): valid.
+        let unions = """
+        <xs:simpleType name="U1"><xs:union memberTypes="xs:integer xs:string"/></xs:simpleType>
+        <xs:simpleType name="U2"><xs:union memberTypes="xs:integer xs:string xs:boolean"/></xs:simpleType>
+        <xs:simpleType name="L1"><xs:list itemType="xs:string"/></xs:simpleType>
+        """
+        #expect(doc("U1", base: "U2", types: unions) != nil)
+        // a union restricting another union but adding/having unmatching members: invalid.
+        #expect(doc("U2", base: "U1", types: unions) == nil)
+        // a list type restricting a union type: invalid.
+        #expect(doc("L1", base: "U1", types: unions) == nil)
     }
 }
 

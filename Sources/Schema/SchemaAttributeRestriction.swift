@@ -53,13 +53,13 @@ extension PureXML.Schema.XSDParser {
         if base.required, !derived.required {
             return "attribute '\(derived.name.localName)' is required in the base type and a restriction may not make it optional or prohibited"
         }
+        if isProhibited(derived.name, under: restrictionNode, context) {
+            return nil
+        }
         if !isSimpleTypeRestrictionOK(derived: derived.type, base: base.type) {
             return "attribute '\(derived.name.localName)' has type '\(derived.type.base.rawValue)' which is not a valid restriction of base type '\(base.type.base.rawValue)'"
         }
         if let baseFixed = base.valueConstraint?.fixedValue {
-            if isProhibited(derived.name, under: restrictionNode, context) {
-                return nil
-            }
             guard let derivedConstraint = derived.valueConstraint,
                   let derivedFixed = derivedConstraint.fixedValue
             else {
@@ -72,9 +72,12 @@ extension PureXML.Schema.XSDParser {
         return nil
     }
 
-    private static func isSimpleTypeRestrictionOK(derived: PureXML.Schema.SimpleType, base: PureXML.Schema.SimpleType) -> Bool {
+    static func isSimpleTypeRestrictionOK(derived: PureXML.Schema.SimpleType, base: PureXML.Schema.SimpleType) -> Bool {
         if base.isAnySimpleType {
             return true
+        }
+        if derived.isAnySimpleType {
+            return false
         }
         switch (derived.variety, base.variety) {
         case (.atomic, .atomic):
