@@ -34,6 +34,7 @@ extension PureXML.Schema {
         case ncName
         case nmtoken
         case language
+        case notation
 
         func isValid(_ value: String) -> Bool {
             stringValidity(value) ?? numericValidity(value)
@@ -45,7 +46,7 @@ extension PureXML.Schema {
             switch self {
             case .string, .anyURI: true
             case .boolean: Lexical.isBoolean(value)
-            case .qName: Lexical.isQName(value)
+            case .qName, .notation: Lexical.isQName(value)
             case .name: Lexical.isName(value)
             case .ncName: Lexical.isNCName(value)
             case .nmtoken: Lexical.isNMToken(value)

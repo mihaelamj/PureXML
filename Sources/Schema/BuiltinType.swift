@@ -50,6 +50,7 @@ public extension PureXML.Schema {
         case base64Binary
         case anyURI
         case qName = "QName"
+        case notation = "NOTATION"
 
         var whiteSpace: WhiteSpace {
             switch self {
@@ -122,6 +123,7 @@ public extension PureXML.Schema {
             case .base64Binary: .base64Binary
             case .anyURI: .anyURI
             case .qName: .qName
+            case .notation: .notation
             default: .string
             }
         }

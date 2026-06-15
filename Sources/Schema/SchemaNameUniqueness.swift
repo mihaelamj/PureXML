@@ -217,7 +217,7 @@ extension PureXML.Schema.XSDParser {
         return true
     }
 
-    private static func resolveContainerNamespaces(_ containers: [XSDTree], mainTargetNamespace: String?) -> [Int: String?] {
+    static func resolveContainerNamespaces(_ containers: [XSDTree], mainTargetNamespace: String?) -> [Int: String?] {
         var resolved: [Int: String?] = [:]
         guard !containers.isEmpty else { return resolved }
         let mainIndex = containers.count - 1
