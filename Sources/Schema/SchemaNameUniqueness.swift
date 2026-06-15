@@ -9,21 +9,26 @@ extension PureXML.Schema.XSDParser {
     /// Only the document's own globals are examined (`xs:redefine` children and
     /// included documents are not direct globals here), so a redefinition is not
     /// mistaken for a clash.
-    static func componentNameErrors(_ schema: XSDTree, _ containers: [XSDTree], _ mainTargetNamespace: String?) -> [String] {
-        let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: mainTargetNamespace)
-        let uniqueIndices = findUniqueIndices(in: containers, namespaceMap: namespaceMap, mainTargetNamespace: mainTargetNamespace)
+    static func componentNameErrors(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String] {
+        let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: context.targetNamespace)
+        let uniqueIndices = findUniqueIndices(
+            in: containers,
+            containerLocations: context.containerLocations,
+            namespaceMap: namespaceMap,
+            mainTargetNamespace: context.targetNamespace,
+        )
 
         var errors = checkDuplicateGlobals(
             in: containers,
             indices: uniqueIndices,
             namespaceMap: namespaceMap,
-            mainTargetNamespace: mainTargetNamespace,
+            mainTargetNamespace: context.targetNamespace,
         )
         errors += identityConstraintNameErrors(
             containers,
             uniqueIndices,
             namespaceMap: namespaceMap,
-            mainTargetNamespace: mainTargetNamespace,
+            mainTargetNamespace: context.targetNamespace,
         )
         errors += keyrefReferErrors(schema)
         return errors
@@ -31,6 +36,7 @@ extension PureXML.Schema.XSDParser {
 
     private static func findUniqueIndices(
         in containers: [XSDTree],
+        containerLocations: [ObjectIdentifier: String?],
         namespaceMap: [Int: String?],
         mainTargetNamespace: String?,
     ) -> [Int] {
@@ -38,9 +44,11 @@ extension PureXML.Schema.XSDParser {
         for index in containers.indices {
             let container = containers[index]
             let namespaceURI = namespaceMap[index] ?? mainTargetNamespace
+            let location = containerLocations[ObjectIdentifier(container)] ?? nil
             let alreadyExists = uniqueIndices.contains { prevIndex in
                 let prevNS = namespaceMap[prevIndex] ?? mainTargetNamespace
-                return prevNS == namespaceURI && isStructurallyEqual(containers[prevIndex], container)
+                let prevLocation = containerLocations[ObjectIdentifier(containers[prevIndex])] ?? nil
+                return prevNS == namespaceURI && prevLocation == location && isStructurallyEqual(containers[prevIndex], container)
             }
             if !alreadyExists {
                 uniqueIndices.append(index)

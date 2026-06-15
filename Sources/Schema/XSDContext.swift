@@ -76,8 +76,9 @@ extension PureXML.Schema {
             _ schema: XSDTree,
             _ loader: (String) -> String?,
             _ visited: inout Set<String>,
-        ) -> [XSDTree] {
-            var containers: [XSDTree] = []
+            currentLocation: String? = nil,
+        ) -> [(location: String?, tree: XSDTree)] {
+            var containers: [(location: String?, tree: XSDTree)] = []
             for child in elementChildren(schema) {
                 let kind = localName(child)
                 guard kind == "include" || kind == "import" || kind == "redefine",
@@ -88,10 +89,14 @@ extension PureXML.Schema {
                 visited.insert(location)
                 let sub = loader(location).flatMap { try? PureXML.parseTree($0) }
                     .flatMap { root in elementChildren(root).first { localName($0) == "schema" } }
-                if let sub { containers += collectContainers(sub, loader, &visited) }
-                if kind == "redefine" { containers.append(child) }
+                if let sub {
+                    containers += collectContainers(sub, loader, &visited, currentLocation: location)
+                }
+                if kind == "redefine" {
+                    containers.append((location: location, tree: child))
+                }
             }
-            containers.append(schema)
+            containers.append((location: currentLocation, tree: schema))
             return containers
         }
 
@@ -226,6 +231,8 @@ extension PureXML.Schema {
         /// Named complex types being resolved up the current `complexContent`
         /// derivation chain, a guard against a cyclic base reference.
         var visitingTypes: Set<String> = []
+        /// The location of each container schema document.
+        var containerLocations: [ObjectIdentifier: String?] = [:]
         /// The shared schema-validity finding collector. A reference type, so the
         /// value-type context's copies all report into the one place.
         let diagnostics = SchemaDiagnostics()

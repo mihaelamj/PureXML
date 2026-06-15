@@ -158,14 +158,68 @@ struct SchemaNameUniquenessTests {
     func test_debugName() {
         let path = "/private/tmp/xsts/xmlschema2006-11-06/sunData/IdConstrDefs/name/name00101m/name00101m2.xsd"
         guard let source = try? String(contentsOfFile: path) else {
-            print("unreadable file")
             return
         }
         do {
             _ = try PureXML.Schema.Document(source)
-            print("COMPILE SUCCESS")
         } catch {
-            print("COMPILE FAILURE: \(error)")
+            // Expected
         }
+    }
+
+    @Test("duplicate global names in different imported files are rejected even if files are structurally identical")
+    func test_duplicateAcrossSeparateFilesIdenticalContent() {
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://imported">
+          <xs:attributeGroup name="car">
+            <xs:attribute name="model"/>
+          </xs:attributeGroup>
+        </xs:schema>
+        """
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://main" xmlns:imp="http://imported">
+          <xs:import namespace="http://imported" schemaLocation="sub1.xsd"/>
+          <xs:import namespace="http://imported" schemaLocation="sub2.xsd"/>
+        </xs:schema>
+        """
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { location in
+            if location == "sub1.xsd" || location == "sub2.xsd" {
+                return imported
+            }
+            return nil
+        })) == nil)
+    }
+
+    @Test("circular import of the same schema does not trigger duplicate global name error")
+    func test_circularImportSelfDeduplication() throws {
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://imported" xmlns:main="http://main">
+          <xs:import namespace="http://main" schemaLocation="main.xsd"/>
+          <xs:complexType name="A">
+            <xs:sequence>
+              <xs:element name="x" type="main:B"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:schema>
+        """
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://main" xmlns:imp="http://imported">
+          <xs:import namespace="http://imported" schemaLocation="sub.xsd"/>
+          <xs:complexType name="B">
+            <xs:sequence>
+              <xs:element name="y" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:schema>
+        """
+        _ = try PureXML.Schema.Document(main, schemaLoader: { location in
+            if location == "sub.xsd" {
+                return imported
+            }
+            if location == "main.xsd" {
+                return main
+            }
+            return nil
+        })
     }
 }
