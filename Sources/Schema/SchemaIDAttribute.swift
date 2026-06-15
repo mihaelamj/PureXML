@@ -55,8 +55,9 @@ extension PureXML.Schema.XSDParser {
 
     /// Consistency findings that depend on the resolved named types, collected after
     /// `namedTypes` has populated them: unresolved references, attribute-use
-    /// uniqueness and single-ID, ID-typed value constraints, and substitution-group
-    /// member type derivation (`e-props-correct.4`).
+    /// uniqueness and single-ID, ID-typed value constraints, substitution-group
+    /// member type derivation (`e-props-correct.4`), and value constraints valid
+    /// against a user type (`e-props-correct.2` / `a-props-correct.2`).
     static func postNamedTypeErrors(
         _ schema: XSDTree,
         _ context: PureXML.Schema.XSDContext,
@@ -68,5 +69,6 @@ extension PureXML.Schema.XSDParser {
             + attributeUseErrors(containers, context)
             + idValueConstraintErrors(schema, context)
             + substitutionTypeErrors(schema, derivation, typeMaps.named)
+            + userTypeValueConstraintErrors(schema, context, typeMaps.named)
     }
 }

@@ -65,6 +65,55 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// A `default`/`fixed` value on an `element` or `attribute` whose `type` names a
+    /// user-declared type in this schema's own target namespace must be a valid value
+    /// of that type (Element/Attribute Locally Valid, `e-props-correct.2` /
+    /// `a-props-correct.2`). This runs after the named types are compiled, so it
+    /// complements the built-in-only structure-time check: a `fixed="false"` on a
+    /// type restricting `xs:boolean` by `pattern="true"`, or a `default="Yes"` on a
+    /// complex type whose simple content extends `xs:boolean`, is now rejected.
+    ///
+    /// The type name is resolved namespace-aware; only a type in the schema's own
+    /// target namespace (looked up in the compiled `types`) is checked. A built-in
+    /// (handled at structure time), an imported or otherwise foreign type, or an
+    /// inline anonymous type is left alone, so no valid value constraint is rejected.
+    /// The compiled `SimpleType` validator is the same one instance validation uses,
+    /// so its whitespace and facet handling match.
+    static func userTypeValueConstraintErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        forEachValueConstrained(schema) { node in
+            guard node.name?.namespaceURI == xsdNamespace,
+                  let typeName = unprefixedValue(node, "type")
+            else { return }
+            let fixed = unprefixedValue(node, "fixed")
+            guard let value = fixed ?? unprefixedValue(node, "default") else { return }
+            let (prefix, local) = splitQName(typeName)
+            let uri = prefix.map { bindings[$0] } ?? bindings[""]
+            guard uri == context.targetNamespace, let resolved = types[local],
+                  let simple = simpleContentType(of: resolved), !simple.isValid(value)
+            else { return }
+            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'")
+        }
+        return errors
+    }
+
+    /// The simple type a value constraint is validated against: a simple type
+    /// directly, or the simple content of a complex type. A complex type with
+    /// element-only, mixed, or empty content carries no simple value space here, so
+    /// it is not value-checked (a disclosed under-rejection).
+    private static func simpleContentType(of type: PureXML.Schema.ElementType) -> PureXML.Schema.SimpleType? {
+        switch type {
+        case let .simple(simple):
+            return simple
+        case let .complex(complex):
+            if case let .simpleContent(simple) = complex.content { return simple }
+            return nil
+        case .typeReference:
+            return nil
+        }
+    }
+
     private static func forEachValueConstrained(_ node: XSDTree, _ visit: (XSDTree) -> Void) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }

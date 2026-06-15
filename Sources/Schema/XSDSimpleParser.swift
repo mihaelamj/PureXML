@@ -16,8 +16,17 @@ extension PureXML.Schema {
             // Resolve the base through simpleTypeReference so the built-in list
             // datatypes (NMTOKENS, IDREFS, ENTITIES) keep their list variety: a
             // length facet on one of them counts list items, not characters (#146).
-            // Restricting a user type inherits its base, facets, and variety.
-            let baseType = simpleTypeReference(XSDNode.attribute(restriction, "base") ?? "string", context)
+            // Restricting a user type inherits its base, facets, and variety. When the
+            // `base` attribute is absent the base is the inline `<simpleType>` child
+            // (an anonymous base); resolving it likewise preserves its list/union
+            // variety, so a length facet over an inline list base counts items.
+            let baseType: SimpleType = if let baseName = XSDNode.attribute(restriction, "base") {
+                simpleTypeReference(baseName, context)
+            } else if let inlineBase = XSDNode.firstChild(restriction, named: "simpleType") {
+                simpleType(inlineBase, context)
+            } else {
+                SimpleType(base: .string)
+            }
             var facets = baseType.facets
             // A restriction's own `enumeration` replaces the inherited set (the new
             // enumeration is the value space, not a union with the base's), whereas
