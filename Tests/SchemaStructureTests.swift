@@ -106,7 +106,8 @@ struct SchemaStructureTests {
 
     @Test("valid enumerated and occurrence attribute values compile")
     func test_validAttributeValues() throws {
-        try compile(#"<xs:attribute name="a" type="xs:string" use="required"/>"#)
+        // `use` is valid on a local attribute use, not on a top-level declaration.
+        try compile(#"<xs:complexType name="t"><xs:attribute name="a" type="xs:string" use="required"/></xs:complexType>"#)
         try compile(#"<xs:complexType name="t" mixed="true"><xs:sequence/></xs:complexType>"#)
         try compile(#"<xs:complexType name="t" abstract="false"><xs:sequence/></xs:complexType>"#)
     }

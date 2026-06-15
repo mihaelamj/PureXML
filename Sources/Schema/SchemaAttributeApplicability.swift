@@ -78,6 +78,35 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// A top-level `attribute` declaration (a direct child of `schema`, or of a
+    /// `redefine`) admits only `default`/`fixed`/`id`/`name`/`type` (the
+    /// schema-for-schemas `topLevelAttribute`): `use`, `form`, and `ref` belong to a
+    /// local attribute use, not a global declaration, so they are rejected here. The
+    /// per-component applicability table is the permissive global/local union and so
+    /// cannot make this distinction; this scan supplies the global-only constraint.
+    static func topLevelAttributeErrors(_ schema: XSDTree) -> [String] {
+        var errors: [String] = []
+        collectTopLevelAttributeErrors(in: schema, into: &errors)
+        for redefine in PureXML.Schema.XSDNode.elementChildren(schema) {
+            guard PureXML.Schema.XSDNode.localName(redefine) == "redefine" else { continue }
+            collectTopLevelAttributeErrors(in: redefine, into: &errors)
+        }
+        return errors
+    }
+
+    private static func collectTopLevelAttributeErrors(in container: XSDTree, into errors: inout [String]) {
+        for attribute in PureXML.Schema.XSDNode.elementChildren(container) {
+            guard PureXML.Schema.XSDNode.localName(attribute) == "attribute", attribute.name?.namespaceURI == xsdNamespace else { continue }
+            for forbidden in ["use", "form", "ref"] where hasUnprefixed(attribute, forbidden) {
+                errors.append("a top-level 'attribute' declaration may not specify '\(forbidden)'")
+            }
+        }
+    }
+
+    private static func hasUnprefixed(_ node: XSDTree, _ local: String) -> Bool {
+        node.attributes.contains { $0.name.prefix == nil && $0.name.localName == local }
+    }
+
     private static func hasInlineType(_ node: XSDTree, _ local: String) -> Bool {
         PureXML.Schema.XSDNode.elementChildren(node).contains { child in
             // Only an inline type in the XSD namespace counts; a foreign-namespace
