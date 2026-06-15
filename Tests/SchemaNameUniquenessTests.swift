@@ -72,6 +72,32 @@ struct SchemaNameUniquenessTests {
         """#))
     }
 
+    @Test("a keyref arity must match its referenced key or unique")
+    func test_keyrefArityMismatch() {
+        // keyref and key have different arities (1 vs 2): must be rejected.
+        #expect(rejects(#"""
+        <xs:element name="root">
+          <xs:complexType><xs:sequence><xs:element ref="a"/></xs:sequence></xs:complexType>
+          <xs:key name="k">
+            <xs:selector xpath="a"/>
+            <xs:field xpath="@id1"/>
+            <xs:field xpath="@id2"/>
+          </xs:key>
+          <xs:keyref name="r" refer="k">
+            <xs:selector xpath="a"/>
+            <xs:field xpath="@ref"/>
+          </xs:keyref>
+        </xs:element>
+        <xs:element name="a">
+          <xs:complexType>
+            <xs:attribute name="id1" type="xs:string"/>
+            <xs:attribute name="id2" type="xs:string"/>
+            <xs:attribute name="ref" type="xs:string"/>
+          </xs:complexType>
+        </xs:element>
+        """#))
+    }
+
     @Test("a duplicate identity-constraint name is rejected")
     func test_duplicateIdentityConstraint() {
         #expect(rejects(#"""

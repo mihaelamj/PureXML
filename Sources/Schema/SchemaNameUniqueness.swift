@@ -23,31 +23,61 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    private struct KeyrefInfo {
+        let name: String
+        let refer: String
+        let arity: Int
+    }
+
     /// Findings for a `keyref` whose `refer` does not name a `key` or `unique` in
-    /// the document. Skipped when the document pulls in external definitions
+    /// the document, or whose field arity does not match the referenced key/unique's.
+    /// Skipped when the document pulls in external definitions
     /// (`import`/`include`/`redefine`), which the default compile does not load,
     /// so a `refer` into them is never flagged.
     private static func keyrefReferErrors(_ schema: XSDTree) -> [String] {
         if hasExternalReference(schema) { return [] }
-        var names: Set<String> = []
-        var refers: [String] = []
-        collectKeysAndRefers(schema, names: &names, refers: &refers)
-        return refers.filter { !names.contains($0) }
-            .map { "keyref refers to undeclared key or unique '\($0)'" }
+        var keyArities: [String: Int] = [:]
+        var keyrefs: [KeyrefInfo] = []
+        collectKeysAndRefers(schema, keyArities: &keyArities, keyrefs: &keyrefs)
+
+        var errors: [String] = []
+        for keyref in keyrefs {
+            if let keyArity = keyArities[keyref.refer] {
+                if keyArity != keyref.arity {
+                    errors.append("keyref '\(keyref.name)' and its referenced key/unique '\(keyref.refer)' must have the same number of fields")
+                }
+            } else {
+                errors.append("keyref refers to undeclared key or unique '\(keyref.refer)'")
+            }
+        }
+        return errors
     }
 
-    private static func collectKeysAndRefers(_ node: XSDTree, names: inout Set<String>, refers: inout [String]) {
+    private static func collectKeysAndRefers(
+        _ node: XSDTree,
+        keyArities: inout [String: Int],
+        keyrefs: inout [KeyrefInfo],
+    ) {
         if let local = PureXML.Schema.XSDNode.localName(node), local == "appinfo" || local == "documentation" { return }
         if node.name?.namespaceURI == xsdNamespace, let local = PureXML.Schema.XSDNode.localName(node) {
             if local == "key" || local == "unique", let name = PureXML.Schema.XSDNode.attribute(node, "name")?.trimmingXMLWhitespace() {
-                names.insert(name)
+                let arity = PureXML.Schema.XSDNode.elementChildren(node)
+                    .count(where: { $0.name?.namespaceURI == xsdNamespace && PureXML.Schema.XSDNode.localName($0) == "field" })
+
+                keyArities[name] = arity
             }
-            if local == "keyref", let refer = PureXML.Schema.XSDNode.attribute(node, "refer")?.trimmingXMLWhitespace() {
-                refers.append(PureXML.Schema.XSDNode.stripPrefix(refer))
+            if local == "keyref" {
+                let name = PureXML.Schema.XSDNode.attribute(node, "name")?.trimmingXMLWhitespace()
+                let refer = PureXML.Schema.XSDNode.attribute(node, "refer")?.trimmingXMLWhitespace()
+                if let name, let refer {
+                    let arity = PureXML.Schema.XSDNode.elementChildren(node)
+                        .count(where: { $0.name?.namespaceURI == xsdNamespace && PureXML.Schema.XSDNode.localName($0) == "field" })
+                    keyrefs.append(KeyrefInfo(name: name, refer: PureXML.Schema.XSDNode.stripPrefix(refer), arity: arity))
+                }
             }
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectKeysAndRefers(child, names: &names, refers: &refers)
+            collectKeysAndRefers(child, keyArities: &keyArities, keyrefs: &keyrefs)
         }
     }
 
