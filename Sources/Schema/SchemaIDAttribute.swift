@@ -46,6 +46,7 @@ extension PureXML.Schema.XSDParser {
     /// inferring a long concatenation.
     static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
         let structural = idAttributeErrors(schema) + structureErrors(schema) + componentNameErrors(schema)
+            + simpleTypeFinalErrors(schema)
         let determinism = PureXML.Schema.ContentModelDeterminism.violations(in: schema, context: context)
         let cycles = derivationCycleErrors(containers, context.namespaceBindings, context.targetNamespace)
             + circularReferenceErrors(containers, context.namespaceBindings, context.targetNamespace)
