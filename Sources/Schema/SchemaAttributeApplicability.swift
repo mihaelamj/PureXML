@@ -92,27 +92,37 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
-    /// A top-level `attribute` declaration (a direct child of `schema`, or of a
-    /// `redefine`) admits only `default`/`fixed`/`id`/`name`/`type` (the
-    /// schema-for-schemas `topLevelAttribute`): `use`, `form`, and `ref` belong to a
-    /// local attribute use, not a global declaration, so they are rejected here. The
-    /// per-component applicability table is the permissive global/local union and so
-    /// cannot make this distinction; this scan supplies the global-only constraint.
-    static func topLevelAttributeErrors(_ schema: XSDTree) -> [String] {
+    /// A top-level declaration (a direct child of `schema`, or of a `redefine`) is a
+    /// global component, not a local use, so the attributes that belong only to a
+    /// local use are rejected: the schema-for-schemas `topLevelAttribute` excludes
+    /// `use`/`form`/`ref`, and `topLevelElement` excludes `ref`/`form`/`minOccurs`/
+    /// `maxOccurs` (a global element is a declaration, never a particle or a
+    /// reference). The per-component applicability table is the permissive
+    /// global/local union and cannot make this distinction; this scan supplies the
+    /// global-only constraint.
+    static func topLevelDeclarationErrors(_ schema: XSDTree) -> [String] {
         var errors: [String] = []
-        collectTopLevelAttributeErrors(in: schema, into: &errors)
+        collectTopLevelDeclarationErrors(in: schema, into: &errors)
         for redefine in PureXML.Schema.XSDNode.elementChildren(schema) {
             guard PureXML.Schema.XSDNode.localName(redefine) == "redefine" else { continue }
-            collectTopLevelAttributeErrors(in: redefine, into: &errors)
+            collectTopLevelDeclarationErrors(in: redefine, into: &errors)
         }
         return errors
     }
 
-    private static func collectTopLevelAttributeErrors(in container: XSDTree, into errors: inout [String]) {
-        for attribute in PureXML.Schema.XSDNode.elementChildren(container) {
-            guard PureXML.Schema.XSDNode.localName(attribute) == "attribute", attribute.name?.namespaceURI == xsdNamespace else { continue }
-            for forbidden in ["use", "form", "ref"] where hasUnprefixed(attribute, forbidden) {
-                errors.append("a top-level 'attribute' declaration may not specify '\(forbidden)'")
+    private static let topLevelForbidden: [String: [String]] = [
+        "attribute": ["use", "form", "ref"],
+        "element": ["ref", "form", "minOccurs", "maxOccurs"],
+    ]
+
+    private static func collectTopLevelDeclarationErrors(in container: XSDTree, into errors: inout [String]) {
+        for child in PureXML.Schema.XSDNode.elementChildren(container) {
+            guard child.name?.namespaceURI == xsdNamespace,
+                  let kind = PureXML.Schema.XSDNode.localName(child),
+                  let forbidden = topLevelForbidden[kind]
+            else { continue }
+            for attribute in forbidden where hasUnprefixed(child, attribute) {
+                errors.append("a top-level '\(kind)' declaration may not specify '\(attribute)'")
             }
         }
     }
