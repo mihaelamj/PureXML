@@ -29,9 +29,10 @@ extension PureXML.Schema.XSDParser {
     }
 
     /// A `default`/`fixed` value on an `element` or `attribute` must be a valid value
-    /// of its `type` (Attribute/Element Locally Valid, XSD 1.0), and the two are
+    /// of its `type` (Attribute/Element Locally Valid, XSD 1.0); the two are
     /// mutually exclusive (`src-element.1` / `src-attribute.1`: `default` and `fixed`
-    /// must not both be present). Only a type that resolves to a built-in datatype is
+    /// must not both be present); and an `attribute` carrying a `default` must have
+    /// `use="optional"` (`src-attribute.2`). Only a type that resolves to a built-in datatype is
     /// value-checked, since the check runs before the types are compiled; a
     /// `fixed="abc"` on an `xs:integer` was wrongly accepted. A named or inline user
     /// type, or a type in another namespace, is left alone, so no valid value
@@ -45,6 +46,10 @@ extension PureXML.Schema.XSDParser {
             // attribute is not the value constraint and is not structurally checked.
             if hasBothValueConstraints(node) {
                 errors.append("a '\(PureXML.Schema.XSDNode.localName(node) ?? "")' declaration may not have both a 'default' and a 'fixed' value constraint")
+                return
+            }
+            if hasDefaultWithNonOptionalUse(node) {
+                errors.append("an 'attribute' with a 'default' value constraint must have use='optional'")
                 return
             }
             guard let typeName = PureXML.Schema.XSDNode.attribute(node, "type") else { return }
@@ -69,9 +74,14 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
+    /// The value of the unprefixed (no-namespace) attribute named `local`, or nil.
+    private static func unprefixedValue(_ node: XSDTree, _ local: String) -> String? {
+        node.attributes.first { $0.name.prefix == nil && $0.name.localName == local }?.value
+    }
+
     /// Whether `node` carries the unprefixed (no-namespace) attribute named `local`.
     private static func hasUnprefixedAttribute(_ node: XSDTree, _ local: String) -> Bool {
-        node.attributes.contains { $0.name.prefix == nil && $0.name.localName == local }
+        unprefixedValue(node, local) != nil
     }
 
     /// Whether an XSD-namespace declaration carries both a `default` and a `fixed`
@@ -80,6 +90,19 @@ extension PureXML.Schema.XSDParser {
         node.name?.namespaceURI == xsdNamespace
             && hasUnprefixedAttribute(node, "default")
             && hasUnprefixedAttribute(node, "fixed")
+    }
+
+    /// Whether an XSD-namespace `attribute` use carries a `default` together with a
+    /// `use` other than `optional`, which `src-attribute.2` forbids: a default value
+    /// makes the attribute optional, so `use="required"` or `use="prohibited"` is a
+    /// contradiction.
+    private static func hasDefaultWithNonOptionalUse(_ node: XSDTree) -> Bool {
+        guard node.name?.namespaceURI == xsdNamespace,
+              PureXML.Schema.XSDNode.localName(node) == "attribute",
+              hasUnprefixedAttribute(node, "default"),
+              let use = unprefixedValue(node, "use")
+        else { return false }
+        return use == "required" || use == "prohibited"
     }
 
     private static let facetNames: Set<String> = [
