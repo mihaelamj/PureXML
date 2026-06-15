@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A complexContent restriction may no longer relax a required base attribute (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2`, #170). When a restriction redeclares an attribute that the base type marks `use="required"`, the redeclaration may not make it optional or prohibited; such schemas were accepted. Only attributes the restriction explicitly redeclares that also exist in the base are checked (an omitted attribute is inherited unchanged); the base reference must resolve to the schema's own target namespace, and the check stands down for a schema that composes other documents. XSTS: invalid schemas accepted 394 to 390, no other bucket raised. Disclosed under-rejection: the matching fixed-value clause (a base attribute fixed to a value must keep that value) is not enforced, because it requires comparing fixed values in the attribute type's value space rather than lexically.
+
 ## [0.1.0] - 2026-06-15
 
 First tagged pre-release. A pure-Swift XML parser/emitter with an XSD 1.0 schema
