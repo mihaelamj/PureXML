@@ -85,4 +85,77 @@ struct SchemaSubstitutionTypeTests {
             + "<xs:element name=\"member\" substitutionGroup=\"imp:head\" type=\"xs:int\"/></xs:schema>"
         #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "imp.xsd" ? imported : nil })) != nil)
     }
+
+    @Test("Substitution group member is blocked if type derivation method is final on the head element")
+    func test_finalSubstitutionExclusion() {
+        // Direct extension derivation rejected when final="extension"
+        #expect(!compiles(
+            "<xs:complexType name=\"Base\"><xs:sequence/></xs:complexType>"
+                + "<xs:complexType name=\"Ext\"><xs:complexContent><xs:extension base=\"Base\"><xs:sequence/></xs:extension></xs:complexContent></xs:complexType>"
+                + "<xs:element name=\"head\" type=\"Base\" final=\"extension\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"Ext\"/>",
+        ))
+
+        // Direct restriction derivation accepted when final="extension"
+        #expect(compiles(
+            "<xs:complexType name=\"Base\"><xs:sequence/></xs:complexType>"
+                + "<xs:complexType name=\"Res\"><xs:complexContent><xs:restriction base=\"Base\"><xs:sequence/></xs:restriction></xs:complexContent></xs:complexType>"
+                + "<xs:element name=\"head\" type=\"Base\" final=\"extension\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"Res\"/>",
+        ))
+
+        // Indirect extension derivation rejected when final="extension"
+        #expect(!compiles(
+            "<xs:complexType name=\"Base\"><xs:sequence/></xs:complexType>"
+                + "<xs:complexType name=\"Mid\"><xs:complexContent><xs:extension base=\"Base\"><xs:sequence/></xs:extension></xs:complexContent></xs:complexType>"
+                + "<xs:complexType name=\"Derived\"><xs:complexContent><xs:restriction base=\"Mid\"><xs:sequence/></xs:restriction></xs:complexContent></xs:complexType>"
+                + "<xs:element name=\"head\" type=\"Base\" final=\"extension\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"Derived\"/>",
+        ))
+
+        // Schema finalDefault="extension" rejects extension derivation
+        #expect((try? PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" finalDefault="extension">
+            <xs:complexType name="Base"><xs:sequence/></xs:complexType>
+            <xs:complexType name="Ext"><xs:complexContent><xs:extension base="Base"><xs:sequence/></xs:extension></xs:complexContent></xs:complexType>
+            <xs:element name="head" type="Base"/>
+            <xs:element name="member" substitutionGroup="head" type="Ext"/>
+        </xs:schema>
+        """)) == nil)
+
+        // final="#all" rejects both extension and restriction
+        #expect(!compiles(
+            "<xs:complexType name=\"Base\"><xs:sequence/></xs:complexType>"
+                + "<xs:complexType name=\"Ext\"><xs:complexContent><xs:extension base=\"Base\"><xs:sequence/></xs:extension></xs:complexContent></xs:complexType>"
+                + "<xs:element name=\"head\" type=\"Base\" final=\"#all\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"Ext\"/>",
+        ))
+    }
+
+    @Test("Substitution group member final exclusions: local name collisions and built-ins")
+    func test_finalSubstitutionExclusionEdgeCases() {
+        // Local element name collision: local element does not overwrite global final setting
+        #expect((try? PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" finalDefault="extension">
+            <xs:element name="head" type="Base" final="restriction"/>
+            <xs:element name="member" substitutionGroup="head" type="Ext"/>
+            <xs:complexType name="Base"><xs:sequence/></xs:complexType>
+            <xs:complexType name="Ext">
+                <xs:complexContent>
+                    <xs:extension base="Base">
+                        <xs:sequence>
+                            <xs:element name="head" type="xs:string"/>
+                        </xs:sequence>
+                    </xs:extension>
+                </xs:complexContent>
+            </xs:complexType>
+        </xs:schema>
+        """)) != nil)
+
+        // Built-in simple type restriction rejected when final="restriction"
+        #expect(!compiles(
+            "<xs:element name=\"head\" type=\"xs:decimal\" final=\"restriction\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"xs:int\"/>",
+        ))
+    }
 }

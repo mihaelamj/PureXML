@@ -19,6 +19,7 @@ extension PureXML.Schema.XSDParser {
         var typeFinal: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
         var abstractElements: Set<String> = []
         var elementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
+        var elementFinal: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
         var elementTypeNames: [String: String] = [:]
     }
 
@@ -67,6 +68,32 @@ extension PureXML.Schema.XSDParser {
         if XSDDerivNode.attribute(element, "abstract") == "true" { tables.abstractElements.insert(name) }
         let block = methodSet(XSDDerivNode.attribute(element, "block"))
         if !block.isEmpty { tables.elementBlock[name] = block }
+
+        let isGlobal = element.parent.map {
+            $0.name?.namespaceURI == xsdNamespace && XSDDerivNode.localName($0) == "schema"
+        } ?? false
+        if isGlobal {
+            var schemaFinalDefault: String?
+            var current: XSDTree? = element
+            while let parentSchema = current {
+                if parentSchema.name?.namespaceURI == xsdNamespace, XSDDerivNode.localName(parentSchema) == "schema" {
+                    schemaFinalDefault = XSDDerivNode.attribute(parentSchema, "finalDefault")
+                    break
+                }
+                current = parentSchema.parent
+            }
+
+            let finalAttr = XSDDerivNode.attribute(element, "final")
+            let finalSet: Set<PureXML.Schema.DerivationMethod> = if let finalAttr {
+                methodSet(finalAttr).intersection([.extension, .restriction])
+            } else if let schemaFinalDefault {
+                methodSet(schemaFinalDefault).intersection([.extension, .restriction])
+            } else {
+                []
+            }
+            if !finalSet.isEmpty { tables.elementFinal[name] = finalSet }
+        }
+
         if let type = XSDDerivNode.attribute(element, "type") {
             tables.elementTypeNames[name] = XSDDerivNode.stripPrefix(type)
         }
@@ -333,14 +360,6 @@ extension PureXML.Schema.XSDParser {
             }
         }
         return result
-    }
-
-    private static func methodName(_ method: PureXML.Schema.DerivationMethod) -> String {
-        switch method {
-        case .extension: "extension"
-        case .restriction: "restriction"
-        case .substitution: "substitution"
-        }
     }
 
     /// Throws when any `xs:all` group violates its XSD 1.0 constraints: its members

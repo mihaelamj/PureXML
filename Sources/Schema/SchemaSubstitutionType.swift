@@ -50,7 +50,55 @@ extension PureXML.Schema.XSDParser {
             guard !isListOrUnion(memberType, types), !isListOrUnion(headType, types) else { continue }
             if !PureXML.Schema.ParticleRestriction.typeDerivesOrEqual(memberType, headType, tables.typeDerivation, types) {
                 errors.append("element '\(member)' may not be in the substitution group of '\(head)': its type '\(memberType)' is not derived from '\(headType)'")
+            } else {
+                errors += checkExclusions(
+                    member: member,
+                    memberType: memberType,
+                    head: head,
+                    headType: headType,
+                    tables: tables,
+                )
             }
+        }
+        return errors
+    }
+
+    private static func checkExclusions(
+        member: String,
+        memberType: String,
+        head: String,
+        headType: String,
+        tables: DerivationTables,
+    ) -> [String] {
+        guard let exclusions = tables.elementFinal[head] else { return [] }
+        var errors: [String] = []
+        var currentType = memberType
+        var pathMethods: Set<PureXML.Schema.DerivationMethod> = []
+        while currentType != headType {
+            guard let derivation = tables.typeDerivation[currentType] else {
+                break
+            }
+            pathMethods.insert(derivation.method)
+            currentType = derivation.base
+        }
+        if currentType != headType {
+            let member = PureXML.Schema.BuiltinType(rawValue: currentType)
+            let head = PureXML.Schema.BuiltinType(rawValue: headType)
+            if let member, let head, member.derives(from: head) {
+                pathMethods.insert(.restriction)
+            }
+        }
+        if exclusions.contains(.extension), pathMethods.contains(.extension) {
+            errors.append(
+                "element '\(member)' may not be in the substitution group of '\(head)': "
+                    + "its type '\(memberType)' is derived by extension from '\(headType)' which is excluded by the head element",
+            )
+        }
+        if exclusions.contains(.restriction), pathMethods.contains(.restriction) {
+            errors.append(
+                "element '\(member)' may not be in the substitution group of '\(head)': "
+                    + "its type '\(memberType)' is derived by restriction from '\(headType)' which is excluded by the head element",
+            )
         }
         return errors
     }
