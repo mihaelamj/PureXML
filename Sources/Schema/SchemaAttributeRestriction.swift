@@ -30,7 +30,7 @@ extension PureXML.Schema.XSDParser {
                   case let .complex(complex)? = types[AttrRestrictNode.stripPrefix(base)]
             else { continue }
             for derived in attributeUses(under: restriction, context) {
-                if let message = attributeRestrictionViolation(derived, complex.attributes) {
+                if let message = attributeRestrictionViolation(derived, complex.attributes, restriction, context) {
                     errors.append(message)
                 }
             }
@@ -42,11 +42,64 @@ extension PureXML.Schema.XSDParser {
     /// its base counterpart, or nil when it is a valid restriction of it (or has no
     /// base counterpart). A base `required` attribute may not be made optional or
     /// prohibited (a prohibited use has `required == false`).
-    private static func attributeRestrictionViolation(_ derived: PureXML.Schema.AttributeUse, _ baseAttributes: [PureXML.Schema.AttributeUse]) -> String? {
+    /// Also checks that fixed attributes keep their fixed values.
+    private static func attributeRestrictionViolation(
+        _ derived: PureXML.Schema.AttributeUse,
+        _ baseAttributes: [PureXML.Schema.AttributeUse],
+        _ restrictionNode: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+    ) -> String? {
         guard let base = baseAttributes.first(where: { $0.name == derived.name }) else { return nil }
         if base.required, !derived.required {
             return "attribute '\(derived.name.localName)' is required in the base type and a restriction may not make it optional or prohibited"
         }
+        if let baseFixed = base.valueConstraint?.fixedValue {
+            if isProhibited(derived.name, under: restrictionNode, context) {
+                return nil
+            }
+            guard let derivedConstraint = derived.valueConstraint,
+                  let derivedFixed = derivedConstraint.fixedValue
+            else {
+                return "attribute '\(derived.name.localName)' is fixed in the base type and a restriction must also make it fixed"
+            }
+            if !derived.type.valueMatches(derivedFixed, literal: baseFixed) {
+                return "attribute '\(derived.name.localName)' has fixed value '\(derivedFixed)' which does not match base fixed value '\(baseFixed)' in the type's value space"
+            }
+        }
         return nil
+    }
+
+    private static func isProhibited(_ name: PureXML.Model.QualifiedName, under node: XSDTree, _ context: PureXML.Schema.XSDContext, visited: Set<String> = []) -> Bool {
+        for child in AttrRestrictNode.elementChildren(node) {
+            switch AttrRestrictNode.localName(child) {
+            case "attribute":
+                if let attrName = attributeName(child, context), attrName == name {
+                    if AttrRestrictNode.attribute(child, "use") == "prohibited" {
+                        return true
+                    }
+                }
+            case "attributeGroup":
+                guard let ref = AttrRestrictNode.attribute(child, "ref") else { break }
+                let refName = AttrRestrictNode.stripPrefix(ref)
+                guard !visited.contains(refName), let group = context.attributeGroups[refName] else { break }
+                if isProhibited(name, under: group, context, visited: visited.union([refName])) {
+                    return true
+                }
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    private static func attributeName(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Model.QualifiedName? {
+        if let ref = AttrRestrictNode.attribute(node, "ref") {
+            let refName = AttrRestrictNode.stripPrefix(ref)
+            return PureXML.Model.QualifiedName(localName: refName, namespaceURI: context.targetNamespace)
+        }
+        guard let name = AttrRestrictNode.attribute(node, "name") else { return nil }
+        let qualified = AttrRestrictNode.attribute(node, "form") == "qualified"
+            || (AttrRestrictNode.attribute(node, "form") == nil && context.attributeFormQualified)
+        return PureXML.Model.QualifiedName(localName: name, namespaceURI: qualified ? context.targetNamespace : nil)
     }
 }

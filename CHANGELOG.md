@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- A complexContent restriction may no longer relax a required base attribute (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2`, #170). When a restriction redeclares an attribute that the base type marks `use="required"`, the redeclaration may not make it optional or prohibited; such schemas were accepted. Only attributes the restriction explicitly redeclares that also exist in the base are checked (an omitted attribute is inherited unchanged); the base reference must resolve to the schema's own target namespace, and the check stands down for a schema that composes other documents. XSTS: invalid schemas accepted 394 to 390, no other bucket raised. Disclosed under-rejection: the matching fixed-value clause (a base attribute fixed to a value must keep that value) is not enforced, because it requires comparing fixed values in the attribute type's value space rather than lexically.
+- A complexContent restriction must keep a base attribute's required use and its fixed value constraint (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2` / `derivation-ok-restriction.4`). A restriction redeclaring a base `required` attribute may not make it optional or prohibited, and if a base attribute use has a `fixed` value constraint, the restriction must also make it `fixed` with the same value. The fixed values are compared in the attribute type's value space (supporting lists and unions) to avoid over-rejecting valid schemas. A prohibited attribute is removed, so the fixed clause does not apply to it. XSTS: invalid schemas accepted 390 to 387, no other bucket raised.
 
 ## [0.1.0] - 2026-06-15
 

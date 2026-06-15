@@ -129,6 +129,27 @@ public extension PureXML.Schema {
         /// whitespace-normalized lexical form. (Durations and binary types fall
         /// under the lexical rule, so only their normalized forms compare equal.)
         public func valueMatches(_ instance: String, literal: String) -> Bool {
+            switch variety {
+            case .atomic:
+                return atomicValueMatches(instance, literal)
+            case let .list(item):
+                let whitespaceProcessing = facets.whiteSpace ?? .collapse
+                let leftNorm = Self.process(instance, whiteSpace: whitespaceProcessing)
+                let rightNorm = Self.process(literal, whiteSpace: whitespaceProcessing)
+                let leftTokens = leftNorm.isEmpty ? [] : leftNorm.split(separator: " ").map(String.init)
+                let rightTokens = rightNorm.isEmpty ? [] : rightNorm.split(separator: " ").map(String.init)
+                guard leftTokens.count == rightTokens.count else { return false }
+                return zip(leftTokens, rightTokens).allSatisfy { item.valueMatches($0, literal: $1) }
+            case let .union(members):
+                guard let leftMember = members.first(where: { $0.isValid(instance) }),
+                      let rightMember = members.first(where: { $0.isValid(literal) }),
+                      leftMember.base == rightMember.base
+                else { return false }
+                return leftMember.valueMatches(instance, literal: literal)
+            }
+        }
+
+        private func atomicValueMatches(_ instance: String, _ literal: String) -> Bool {
             let whiteSpace = facets.whiteSpace ?? base.whiteSpace
             let left = Self.process(instance, whiteSpace: whiteSpace)
             let right = Self.process(literal, whiteSpace: whiteSpace)

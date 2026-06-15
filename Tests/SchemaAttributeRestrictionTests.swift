@@ -48,13 +48,40 @@ struct SchemaAttributeRestrictionTests {
     /// not lexical, comparison). A list-typed fixed value that differs only in
     /// whitespace is the same value and must compile; and, for now, even a genuinely
     /// changed fixed value is accepted rather than risk a lexical false positive.
-    @Test("Fixed-value differences on a restricted attribute are not (yet) rejected")
-    func test_fixedClauseDeferred() {
+    @Test("Fixed-value differences on a restricted attribute: matching values compile, mismatched values are rejected")
+    func test_fixedClauseRestrictions() {
         let listBase = "<xs:simpleType name=\"L\"><xs:list itemType=\"xs:int\"/></xs:simpleType>"
             + "<xs:complexType name=\"Base\"><xs:attribute name=\"a\" type=\"L\" fixed=\"1   2  3\"/></xs:complexType>"
-        let derived = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
-            + "<xs:attribute name=\"a\" type=\"L\" fixed=\"1 2 3\"/></xs:restriction></xs:complexContent></xs:complexType>"
+
         // Same list value, different whitespace: valid, must compile.
-        #expect(compiles(listBase + derived))
+        let derivedValidWS = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"L\" fixed=\"1 2 3\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(compiles(listBase + derivedValidWS))
+
+        // Same integer values, different padding: valid, must compile.
+        let intBase = "<xs:complexType name=\"Base\"><xs:attribute name=\"a\" type=\"xs:integer\" fixed=\"01\"/></xs:complexType>"
+        let derivedValidInt = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"xs:integer\" fixed=\"1\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(compiles(intBase + derivedValidInt))
+
+        // Mismatched list values: invalid, must be rejected.
+        let derivedInvalidList = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"L\" fixed=\"1 2 4\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(!compiles(listBase + derivedInvalidList))
+
+        // Mismatched integer values: invalid, must be rejected.
+        let derivedInvalidInt = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"xs:integer\" fixed=\"2\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(!compiles(intBase + derivedInvalidInt))
+
+        // Missing value constraint when base is fixed: invalid, must be rejected.
+        let derivedMissingConstraint = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"xs:integer\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(!compiles(intBase + derivedMissingConstraint))
+
+        // Default value constraint when base is fixed: invalid, must be rejected.
+        let derivedDefaultConstraint = "<xs:complexType name=\"D\"><xs:complexContent><xs:restriction base=\"Base\">"
+            + "<xs:attribute name=\"a\" type=\"xs:integer\" default=\"1\"/></xs:restriction></xs:complexContent></xs:complexType>"
+        #expect(!compiles(intBase + derivedDefaultConstraint))
     }
 }
