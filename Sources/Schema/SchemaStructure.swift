@@ -55,7 +55,8 @@ extension PureXML.Schema.XSDParser {
     /// Walks the one document rooted at `schema`, skipping foreign content.
     static func structureErrors(_ schema: XSDTree) -> [String] {
         var errors: [String] = []
-        collectStructure(schema, into: &errors)
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+        collectStructure(schema, bindings: bindings, into: &errors)
         errors += simpleTypeVarietyFacetErrors(schema)
         errors += valueConstraintErrors(schema)
         errors += topLevelDeclarationErrors(schema)
@@ -64,19 +65,27 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
-    private static func collectStructure(_ node: XSDTree, into errors: inout [String]) {
+    private static func collectStructure(_ node: XSDTree, bindings: [String: String], into errors: inout [String]) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         let children = PureXML.Schema.XSDNode.elementChildren(node)
+        var currentBindings = bindings
+        for attribute in node.attributes {
+            if attribute.name.prefix == "xmlns" {
+                currentBindings[attribute.name.localName] = attribute.value
+            } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
+                currentBindings[""] = attribute.value
+            }
+        }
         if node.name?.namespaceURI == xsdNamespace, let local {
-            errors += attributeValueErrors(node)
+            errors += attributeValueErrors(node, bindings: currentBindings)
             errors += occurrenceOrderErrors(node)
             errors += attributeApplicabilityErrors(node, local: local)
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
             errors += componentSpecificErrors(node, local: local, names: names)
         }
         for child in children {
-            collectStructure(child, into: &errors)
+            collectStructure(child, bindings: currentBindings, into: &errors)
         }
     }
 
@@ -85,7 +94,7 @@ extension PureXML.Schema.XSDParser {
     /// identity-XPath, wildcard-namespace, and consistency rules.
     private static func componentSpecificErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
         var errors: [String] = []
-        if let allowed = allowedChildren[local] {
+        if let allowed = allowedChildren(for: local, node: node) {
             errors += childErrors(local: local, children: names, allowed: allowed)
         }
         errors += derivationControlErrors(node, local: local)
@@ -103,10 +112,22 @@ extension PureXML.Schema.XSDParser {
             errors += identityXPathErrors(node, local: local)
         case "any", "anyAttribute":
             errors += wildcardNamespaceErrors(node)
+        case "restriction":
+            errors += restrictionErrors(node, names: names)
+        case "list":
+            errors += listErrors(node, names: names)
         default:
             break
         }
         return errors
+    }
+
+    private static func allowedChildren(for local: String, node: XSDTree) -> Set<String>? {
+        guard let allowed = allowedChildren[local] else { return nil }
+        if local == "restriction", let parent = node.parent, parent.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(parent) == "simpleType" {
+            return simpleTypeRestrictionAllowedChildren
+        }
+        return allowed
     }
 
     /// The enumerated value space of the schema-vocabulary attributes that take a
@@ -128,9 +149,20 @@ extension PureXML.Schema.XSDParser {
     /// unknown token, or `minOccurs`/`maxOccurs` that is not a `nonNegativeInteger`
     /// (`maxOccurs` also admits `unbounded`). A prefixed (foreign) attribute is the
     /// schema author's own and is not checked.
-    private static func attributeValueErrors(_ node: XSDTree) -> [String] {
+    private static func attributeValueErrors(_ node: XSDTree, bindings: [String: String]) -> [String] {
         node.attributes.filter { $0.name.prefix == nil }.compactMap { attribute in
-            attributeValueError(attribute.name.localName, attribute.value)
+            let name = attribute.name.localName
+            let value = attribute.value
+            if let err = attributeValueError(name, value) {
+                return err
+            }
+            if qnameAttributes.contains(name) {
+                return checkQNamePrefix(value, bindings: bindings)
+            }
+            if name == "memberTypes" {
+                return checkMemberTypesPrefixes(value, bindings: bindings)
+            }
+            return nil
         }
     }
 
@@ -162,45 +194,6 @@ extension PureXML.Schema.XSDParser {
         default:
             return nil
         }
-    }
-
-    /// Whether `value` is a lexical `nonNegativeInteger` (optional `+`, ASCII
-    /// digits), independent of machine-integer range.
-    private static func isNonNegativeInteger(_ value: String) -> Bool {
-        var digits = Substring(value)
-        if digits.first == "+" { digits = digits.dropFirst() }
-        return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
-    }
-
-    /// The finding, if any, for a particle whose `minOccurs` exceeds its
-    /// `maxOccurs`. `unbounded` is never exceeded, and a malformed value is left
-    /// to ``attributeValueError``; the comparison is by canonical magnitude, so it
-    /// holds for occurrence counts beyond a machine integer.
-    private static func occurrenceOrderErrors(_ node: XSDTree) -> [String] {
-        guard let minRaw = PureXML.Schema.XSDNode.attribute(node, "minOccurs"),
-              let maxRaw = PureXML.Schema.XSDNode.attribute(node, "maxOccurs")
-        else { return [] }
-        let minimum = minRaw.trimmingXMLWhitespace()
-        let maximum = maxRaw.trimmingXMLWhitespace()
-        guard maximum != "unbounded", isNonNegativeInteger(minimum), isNonNegativeInteger(maximum),
-              exceeds(minimum, maximum)
-        else { return [] }
-        return ["minOccurs (\(minRaw)) exceeds maxOccurs (\(maxRaw))"]
-    }
-
-    /// Whether nonNegativeInteger lexical `lhs` is strictly greater than `rhs`,
-    /// comparing canonical magnitude (sign and leading zeros stripped) by length
-    /// then lexically, so it is independent of machine-integer range.
-    private static func exceeds(_ lhs: String, _ rhs: String) -> Bool {
-        let left = canonicalMagnitude(lhs), right = canonicalMagnitude(rhs)
-        return left.count != right.count ? left.count > right.count : left > right
-    }
-
-    private static func canonicalMagnitude(_ value: String) -> Substring {
-        var digits = Substring(value)
-        if digits.first == "+" { digits = digits.dropFirst() }
-        let trimmed = digits.drop { $0 == "0" }
-        return trimmed.isEmpty ? "0" : trimmed
     }
 
     private static func childErrors(local: String, children: [String], allowed: Set<String>) -> [String] {

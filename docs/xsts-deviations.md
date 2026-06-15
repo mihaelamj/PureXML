@@ -33,10 +33,10 @@ entries removed about 70 apparent deviations that were never bugs.
 
 | Kind | First measurement | Now |
 |---|---|---|
-| valid schema rejected | 75 | 72 |
-| invalid schema accepted | 2467 | 2461 |
-| valid instance rejected | 604 | 308 |
-| invalid instance accepted | 582 | 165 |
+| valid schema rejected | 75 | 1 |
+| invalid schema accepted | 2467 | 333 |
+| valid instance rejected | 604 | 171 |
+| invalid instance accepted | 582 | 155 |
 
 Counts are against *settled* W3C expectations (queried/disputed entries excluded).
 

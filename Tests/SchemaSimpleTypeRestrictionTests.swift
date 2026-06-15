@@ -142,4 +142,114 @@ struct SchemaSimpleTypeRestrictionTests {
             }
         }
     }
+
+    @Test("restricting xs:anyType directly in simpleType is rejected")
+    func test_anyTypeRestrictionSimple() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:restriction base="xs:anyType"/>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("unbound QName prefix in simpleType restriction base is rejected")
+    func test_unboundPrefixRestrictionBase() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:restriction base="foo:string"/>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("unbound QName prefix in list itemType is rejected")
+    func test_unboundPrefixListItemType() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:list itemType="foo:integer"/>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("multiple inline simpleType base definitions in restriction is rejected")
+    func test_multipleInlineSimpleTypeRestriction() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:restriction>
+                <xs:simpleType>
+                    <xs:restriction base="xs:string"/>
+                </xs:simpleType>
+                <xs:simpleType>
+                    <xs:restriction base="xs:integer"/>
+                </xs:simpleType>
+            </xs:restriction>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("both base attribute and inline simpleType in restriction is rejected")
+    func test_baseAndInlineSimpleTypeRestriction() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:restriction base="xs:string">
+                <xs:simpleType>
+                    <xs:restriction base="xs:string"/>
+                </xs:simpleType>
+            </xs:restriction>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("anyAttribute inside simpleType restriction is rejected")
+    func test_anyAttributeInSimpleTypeRestriction() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:restriction base="xs:integer">
+                <xs:anyAttribute processContents="lax"/>
+            </xs:restriction>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("list with multiple inline simpleTypes is rejected")
+    func test_listWithMultipleInlineSimpleTypes() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:list>
+                <xs:simpleType>
+                    <xs:restriction base="xs:integer"/>
+                </xs:simpleType>
+                <xs:simpleType>
+                    <xs:restriction base="xs:string"/>
+                </xs:simpleType>
+            </xs:list>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("list with both itemType and inline simpleType is rejected")
+    func test_listWithItemTypeAndInlineSimpleType() {
+        #expect(rejects("""
+        <xs:simpleType name="t1">
+            <xs:list itemType="xs:integer">
+                <xs:simpleType>
+                    <xs:restriction base="xs:integer"/>
+                </xs:simpleType>
+            </xs:list>
+        </xs:simpleType>
+        """))
+    }
+
+    @Test("list itemType referencing a complex type is rejected")
+    func test_listItemTypeComplexType() {
+        #expect(rejects("""
+        <xs:complexType name="myComplex">
+            <xs:simpleContent>
+                <xs:extension base="xs:string"/>
+            </xs:simpleContent>
+        </xs:complexType>
+        <xs:simpleType name="t1">
+            <xs:list itemType="myComplex"/>
+        </xs:simpleType>
+        """))
+    }
 }

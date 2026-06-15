@@ -100,4 +100,69 @@ extension PureXML.Schema.XSDParser {
     private static func localName(_ qname: String) -> String {
         PureXML.Schema.XSDNode.stripPrefix(qname.trimmingXMLWhitespace())
     }
+
+    static func simpleTypeBaseNotComplexErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext) -> [String] {
+        var errors: [String] = []
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+        let targetNamespace = context.targetNamespace
+
+        func isComplex(_ qname: String) -> Bool {
+            let trimmed = qname.trimmingXMLWhitespace()
+            let prefix = PureXML.Schema.XSDNode.prefix(trimmed)
+            let uri = prefix.flatMap { bindings[$0] } ?? bindings[""]
+            let local = PureXML.Schema.XSDNode.stripPrefix(trimmed)
+            if uri == xsdNamespace {
+                return local == "anyType"
+            }
+            if uri == targetNamespace || uri == nil || uri == "" {
+                return context.complexTypeNodes[local] != nil
+            }
+            return false
+        }
+
+        func check(_ node: XSDTree) {
+            let local = PureXML.Schema.XSDNode.localName(node)
+            if local == "appinfo" || local == "documentation" { return }
+
+            if node.name?.namespaceURI == xsdNamespace {
+                switch local {
+                case "restriction":
+                    Self.checkRestrictionUnderSimpleType(node, isComplex: isComplex, errors: &errors)
+                case "list":
+                    Self.checkList(node, isComplex: isComplex, errors: &errors)
+                case "union":
+                    Self.checkUnion(node, isComplex: isComplex, errors: &errors)
+                default:
+                    break
+                }
+            }
+
+            for child in PureXML.Schema.XSDNode.elementChildren(node) {
+                check(child)
+            }
+        }
+        check(schema)
+        return errors
+    }
+
+    private static func checkRestrictionUnderSimpleType(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+        guard let parent = node.parent, parent.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(parent) == "simpleType" else { return }
+        if let base = PureXML.Schema.XSDNode.attribute(node, "base"), isComplex(base) {
+            errors.append("base type '\(base)' of simpleType restriction must be a simple type, not a complex type")
+        }
+    }
+
+    private static func checkList(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+        if let itemType = PureXML.Schema.XSDNode.attribute(node, "itemType"), isComplex(itemType) {
+            errors.append("itemType '\(itemType)' of list must be a simple type, not a complex type")
+        }
+    }
+
+    private static func checkUnion(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+        if let members = PureXML.Schema.XSDNode.attribute(node, "memberTypes") {
+            for token in members.split(whereSeparator: \.isWhitespace) where isComplex(String(token)) {
+                errors.append("memberType '\(token)' of union must be a simple type, not a complex type")
+            }
+        }
+    }
 }
