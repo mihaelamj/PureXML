@@ -172,7 +172,7 @@ extension PureXML.Schema {
         /// Whether a particle can never contribute a child element or wildcard: it
         /// has `maxOccurs=0`, or is a group all of whose members are content-free
         /// (an empty group included). Its only legal content is the empty sequence.
-        private static func contentFree(_ particle: Particle) -> Bool {
+        static func contentFree(_ particle: Particle) -> Bool {
             if particle.maxOccurs == 0 { return true }
             switch particle.term {
             case .element, .wildcard:
