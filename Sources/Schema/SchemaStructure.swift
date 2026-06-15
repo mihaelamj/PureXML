@@ -67,7 +67,6 @@ extension PureXML.Schema.XSDParser {
 
     private static func collectStructure(_ node: XSDTree, bindings: [String: String], into errors: inout [String]) {
         let local = PureXML.Schema.XSDNode.localName(node)
-        if local == "appinfo" || local == "documentation" { return }
         let children = PureXML.Schema.XSDNode.elementChildren(node)
         var currentBindings = bindings
         for attribute in node.attributes {
@@ -84,6 +83,7 @@ extension PureXML.Schema.XSDParser {
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
             errors += componentSpecificErrors(node, local: local, names: names)
         }
+        if local == "appinfo" || local == "documentation" { return }
         for child in children {
             collectStructure(child, bindings: currentBindings, into: &errors)
         }
@@ -150,17 +150,28 @@ extension PureXML.Schema.XSDParser {
     /// (`maxOccurs` also admits `unbounded`). A prefixed (foreign) attribute is the
     /// schema author's own and is not checked.
     private static func attributeValueErrors(_ node: XSDTree, bindings: [String: String]) -> [String] {
-        node.attributes.filter { $0.name.prefix == nil }.compactMap { attribute in
+        node.attributes.compactMap { attribute -> String? in
+            let prefix = attribute.name.prefix
             let name = attribute.name.localName
             let value = attribute.value
-            if let err = attributeValueError(name, value) {
-                return err
-            }
-            if qnameAttributes.contains(name) {
-                return checkQNamePrefix(value, bindings: bindings)
-            }
-            if name == "memberTypes" {
-                return checkMemberTypesPrefixes(value, bindings: bindings)
+            if prefix == nil {
+                if let err = attributeValueError(name, value) {
+                    return err
+                }
+                if qnameAttributes.contains(name) {
+                    return checkQNamePrefix(value, bindings: bindings)
+                }
+                if name == "memberTypes" {
+                    return checkMemberTypesPrefixes(value, bindings: bindings)
+                }
+            } else if prefix == "xml" {
+                if name == "lang" {
+                    let trimmed = value.trimmingXMLWhitespace()
+                    return PureXML.Schema.Lexical.isLanguage(trimmed) ? nil : "attribute 'xml:lang' has invalid value '\(value)'"
+                } else if name == "space" {
+                    let trimmed = value.trimmingXMLWhitespace()
+                    return (trimmed == "default" || trimmed == "preserve") ? nil : "attribute 'xml:space' has invalid value '\(value)'"
+                }
             }
             return nil
         }
