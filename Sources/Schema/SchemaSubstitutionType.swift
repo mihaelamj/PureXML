@@ -32,75 +32,156 @@ extension PureXML.Schema.XSDParser {
                 globalElementType[name] = SubTypeNode.stripPrefix(type)
             }
         }
-        var errors: [String] = []
-        for element in globals {
-            guard let member = SubTypeNode.attribute(element, "name"),
-                  let headReference = SubTypeNode.attribute(element, "substitutionGroup"),
-                  // An element with no `type` attribute has an inline or absent type:
-                  // an untyped member inherits the head's type and derives trivially,
-                  // so it is correctly skipped.
-                  let memberType = SubTypeNode.attribute(element, "type").map(SubTypeNode.stripPrefix)
-            else { continue }
-            let head = SubTypeNode.stripPrefix(headReference)
-            // No entry means an untyped head (the ur-type, which admits any member) or
-            // an unresolved head; either way there is nothing to reject here.
-            guard let headType = globalElementType[head] else { continue }
-            // List/union derivation is not modelled; stand down to avoid rejecting a
-            // valid member (e.g. an integer member of a union-typed head).
-            guard !isListOrUnion(memberType, types), !isListOrUnion(headType, types) else { continue }
-            if !PureXML.Schema.ParticleRestriction.typeDerivesOrEqual(memberType, headType, tables.typeDerivation, types) {
-                errors.append("element '\(member)' may not be in the substitution group of '\(head)': its type '\(memberType)' is not derived from '\(headType)'")
-            } else {
-                errors += checkExclusions(
-                    member: member,
-                    memberType: memberType,
-                    head: head,
-                    headType: headType,
-                    tables: tables,
-                )
-            }
+        return globals.flatMap { element in
+            checkSingleElement(element, globalElementType, tables, types)
         }
-        return errors
+    }
+
+    private static func checkSingleElement(
+        _ element: XSDTree,
+        _ globalElementType: [String: String],
+        _ tables: DerivationTables,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> [String] {
+        guard let member = SubTypeNode.attribute(element, "name"),
+              let headReference = SubTypeNode.attribute(element, "substitutionGroup")
+        else { return [] }
+        let head = SubTypeNode.stripPrefix(headReference)
+        guard let headType = globalElementType[head] else { return [] }
+        if isInlineListOrUnion(element) { return [] }
+        let inlineDeriv = inlineTypeDerivation(element)
+        let isDerived: Bool
+        let memberType: String
+        if let inlineDeriv {
+            memberType = "anonymous"
+            isDerived = inlineDeriv.base == headType || PureXML.Schema.ParticleRestriction.typeDerivesOrEqual(inlineDeriv.base, headType, tables.typeDerivation, types)
+        } else if let typeAttr = SubTypeNode.attribute(element, "type").map(SubTypeNode.stripPrefix) {
+            memberType = typeAttr
+            isDerived = PureXML.Schema.ParticleRestriction.typeDerivesOrEqual(memberType, headType, tables.typeDerivation, types)
+        } else {
+            memberType = headType
+            isDerived = true
+        }
+        guard !isListOrUnion(memberType, types), !isListOrUnion(headType, types) else { return [] }
+        if !isDerived {
+            return ["element '\(member)' may not be in the substitution group of '\(head)': its type is not derived from '\(headType)'"]
+        }
+        return checkExclusions(
+            member: member,
+            memberType: memberType,
+            inlineDeriv: inlineDeriv,
+            headInfo: (head, headType),
+            tables: tables,
+        )
     }
 
     private static func checkExclusions(
         member: String,
         memberType: String,
-        head: String,
-        headType: String,
+        inlineDeriv: PureXML.Schema.TypeDerivation?,
+        headInfo: (head: String, headType: String),
         tables: DerivationTables,
     ) -> [String] {
-        guard let exclusions = tables.elementFinal[head] else { return [] }
+        guard let exclusions = tables.elementFinal[headInfo.head] else { return [] }
         var errors: [String] = []
-        var currentType = memberType
         var pathMethods: Set<PureXML.Schema.DerivationMethod> = []
-        while currentType != headType {
+        var currentType: String
+        if let inlineDeriv {
+            pathMethods.insert(inlineDeriv.method)
+            currentType = inlineDeriv.base
+        } else {
+            currentType = memberType
+        }
+        var visited: Set<String> = [currentType]
+        while currentType != headInfo.headType {
             guard let derivation = tables.typeDerivation[currentType] else {
                 break
             }
             pathMethods.insert(derivation.method)
+            guard visited.insert(derivation.base).inserted else {
+                break
+            }
             currentType = derivation.base
         }
-        if currentType != headType {
+        if currentType != headInfo.headType {
             let member = PureXML.Schema.BuiltinType(rawValue: currentType)
-            let head = PureXML.Schema.BuiltinType(rawValue: headType)
+            let head = PureXML.Schema.BuiltinType(rawValue: headInfo.headType)
             if let member, let head, member.derives(from: head) {
                 pathMethods.insert(.restriction)
             }
         }
         if exclusions.contains(.extension), pathMethods.contains(.extension) {
             errors.append(
-                "element '\(member)' may not be in the substitution group of '\(head)': "
-                    + "its type '\(memberType)' is derived by extension from '\(headType)' which is excluded by the head element",
+                "element '\(member)' may not be in the substitution group of '\(headInfo.head)': "
+                    + "its type '\(memberType)' is derived by extension from '\(headInfo.headType)' which is excluded by the head element",
             )
         }
         if exclusions.contains(.restriction), pathMethods.contains(.restriction) {
             errors.append(
-                "element '\(member)' may not be in the substitution group of '\(head)': "
-                    + "its type '\(memberType)' is derived by restriction from '\(headType)' which is excluded by the head element",
+                "element '\(member)' may not be in the substitution group of '\(headInfo.head)': "
+                    + "its type '\(memberType)' is derived by restriction from '\(headInfo.headType)' which is excluded by the head element",
             )
         }
         return errors
+    }
+
+    private static func inlineTypeDerivation(_ element: XSDTree) -> PureXML.Schema.TypeDerivation? {
+        if let complex = SubTypeNode.elementChildren(element).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "complexType"
+        }) {
+            if let info = derivationInfo(complex) {
+                return info
+            }
+            return PureXML.Schema.TypeDerivation(base: "anyType", method: .restriction)
+        }
+        if let simple = SubTypeNode.elementChildren(element).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "simpleType"
+        }) {
+            return simpleTypeNodeDerivation(simple)
+        }
+        return nil
+    }
+
+    private static func simpleTypeNodeDerivation(_ simple: XSDTree) -> PureXML.Schema.TypeDerivation? {
+        if let restriction = SubTypeNode.elementChildren(simple).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "restriction"
+        }) {
+            if let base = SubTypeNode.attribute(restriction, "base") {
+                return PureXML.Schema.TypeDerivation(base: SubTypeNode.stripPrefix(base), method: .restriction)
+            }
+            if let inlineBase = SubTypeNode.elementChildren(restriction).first(where: {
+                $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "simpleType"
+            }) {
+                return simpleTypeNodeDerivation(inlineBase)
+            }
+        }
+        return PureXML.Schema.TypeDerivation(base: "anySimpleType", method: .restriction)
+    }
+
+    private static func isInlineListOrUnion(_ element: XSDTree) -> Bool {
+        guard let simple = SubTypeNode.elementChildren(element).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "simpleType"
+        }) else { return false }
+        return isSimpleNodeListOrUnion(simple)
+    }
+
+    private static func isSimpleNodeListOrUnion(_ simple: XSDTree) -> Bool {
+        if SubTypeNode.elementChildren(simple).contains(where: {
+            let local = SubTypeNode.localName($0)
+            return $0.name?.namespaceURI == xsdNamespace && (local == "list" || local == "union")
+        }) {
+            return true
+        }
+        if let restriction = SubTypeNode.elementChildren(simple).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "restriction"
+        }) {
+            if let inlineBase = SubTypeNode.elementChildren(restriction).first(where: {
+                $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "simpleType"
+            }) {
+                return isSimpleNodeListOrUnion(inlineBase)
+            }
+        }
+        return false
     }
 
     /// Whether the named type is a list- or union-variety simple type, whose

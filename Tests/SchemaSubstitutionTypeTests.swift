@@ -158,4 +158,58 @@ struct SchemaSubstitutionTypeTests {
                 + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"xs:int\"/>",
         ))
     }
+
+    @Test("Substitution group member is blocked if inline complexType derivation method is final on the head element")
+    func test_finalSubstitutionExclusionInlineType() {
+        // Member3 derives by extension from HeadType inline, but Head has final="extension" -> rejected
+        #expect(!compiles(
+            "<xs:complexType name=\"HeadType\"><xs:sequence/></xs:complexType>"
+                + "<xs:element name=\"Head\" type=\"HeadType\" final=\"extension\"/>"
+                + "<xs:element name=\"Member3\" substitutionGroup=\"Head\">"
+                + "  <xs:complexType><xs:complexContent>"
+                + "    <xs:extension base=\"HeadType\"><xs:sequence/></xs:extension>"
+                + "  </xs:complexContent></xs:complexType>"
+                + "</xs:element>",
+        ))
+
+        // Member3 derives by extension from HeadType inline, Head has final="restriction" -> accepted
+        #expect(compiles(
+            "<xs:complexType name=\"HeadType\"><xs:sequence/></xs:complexType>"
+                + "<xs:element name=\"Head\" type=\"HeadType\" final=\"restriction\"/>"
+                + "<xs:element name=\"Member3\" substitutionGroup=\"Head\">"
+                + "  <xs:complexType><xs:complexContent>"
+                + "    <xs:extension base=\"HeadType\"><xs:sequence/></xs:extension>"
+                + "  </xs:complexContent></xs:complexType>"
+                + "</xs:element>",
+        ))
+    }
+
+    @Test("Adversarial Critic: member with inline simpleType restricting another type")
+    func test_inlineSimpleTypeRestrictingAnotherType() {
+        #expect(compiles(
+            "<xs:element name=\"head\" type=\"xs:integer\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\">"
+                + "  <xs:simpleType>"
+                + "    <xs:restriction>"
+                + "      <xs:simpleType>"
+                + "        <xs:restriction base=\"xs:int\"/>"
+                + "      </xs:simpleType>"
+                + "    </xs:restriction>"
+                + "  </xs:simpleType>"
+                + "</xs:element>",
+        ))
+    }
+
+    @Test("Adversarial Critic: member with inline simpleType restricting a named list type")
+    func test_inlineSimpleTypeRestrictingNamedList() {
+        #expect(compiles(
+            "<xs:simpleType name=\"MyList\"><xs:list itemType=\"xs:int\"/></xs:simpleType>"
+                + "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\">"
+                + "  <xs:simpleType>"
+                + "    <xs:restriction base=\"MyList\"/>"
+                + "  </xs:simpleType>"
+                + "</xs:element>",
+        ))
+    }
 }
