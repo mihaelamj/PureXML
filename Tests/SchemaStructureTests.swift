@@ -234,4 +234,45 @@ struct SchemaStructureTests {
         <xs:element name="a"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element>
         """#))
     }
+
+    @Test("schema elements must follow order: imports/includes/redefines before declarations")
+    func test_schemaChildrenOrder() throws {
+        // Redefine after element is rejected
+        #expect(rejects(#"""
+        <xs:element name="t" type="xs:string" />
+        <xs:redefine schemaLocation="redefinebug.red">
+            <xs:complexType name="tabletype"><xs:sequence/></xs:complexType>
+        </xs:redefine>
+        """#))
+        // Import after element is rejected
+        #expect(rejects(#"""
+        <xs:element name="t" type="xs:string" />
+        <xs:import namespace="http://example.com/other" schemaLocation="some.imp" />
+        """#))
+        // Include after element is rejected
+        #expect(rejects(#"""
+        <xs:element name="t" type="xs:string" />
+        <xs:include schemaLocation="some.inc" />
+        """#))
+        // Correct order is compiled successfully
+        try compile(#"""
+        <xs:import namespace="http://example.com/other" schemaLocation="some.imp" />
+        <xs:element name="t" type="xs:string" />
+        """#)
+    }
+
+    @Test("import constraints: namespace attribute presence and matching targetNamespace")
+    func test_importConstraints() throws {
+        // Import without namespace attribute in a schema with NO targetNamespace is rejected
+        #expect(rejects(#"<xs:import schemaLocation="test.imp" />"#))
+
+        // Import whose namespace is the same as the targetNamespace is rejected
+        #expect(throws: Error.self) {
+            _ = try PureXML.Schema.Document(#"""
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://example.com">
+                <xs:import namespace="http://example.com" schemaLocation="test.imp" />
+            </xs:schema>
+            """#)
+        }
+    }
 }

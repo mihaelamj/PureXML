@@ -89,15 +89,19 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
-    /// The structural findings specific to one XSD component: its admitted children
-    /// (the content-model membership table) plus the per-component content-order,
-    /// identity-XPath, wildcard-namespace, and consistency rules.
     private static func componentSpecificErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
         var errors: [String] = []
         if let allowed = allowedChildren(for: local, node: node) {
             errors += childErrors(local: local, children: names, allowed: allowed)
         }
         errors += derivationControlErrors(node, local: local)
+        errors += typeAndGroupErrors(node, local: local, names: names)
+        errors += structuralErrors(node, local: local, names: names)
+        return errors
+    }
+
+    private static func typeAndGroupErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
+        var errors: [String] = []
         switch local {
         case "group" where PureXML.Schema.XSDNode.attribute(node, "name") != nil:
             errors += namedGroupErrors(names)
@@ -110,12 +114,25 @@ extension PureXML.Schema.XSDParser {
             errors += simpleContentOrderErrors(node)
         case "selector", "field":
             errors += identityXPathErrors(node, local: local)
+        default:
+            break
+        }
+        return errors
+    }
+
+    private static func structuralErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
+        var errors: [String] = []
+        switch local {
         case "any", "anyAttribute":
             errors += wildcardNamespaceErrors(node)
         case "restriction":
             errors += restrictionErrors(node, names: names)
         case "list":
             errors += listErrors(node, names: names)
+        case "schema":
+            errors += schemaChildrenOrderErrors(names)
+        case "import":
+            errors += importErrors(node)
         default:
             break
         }

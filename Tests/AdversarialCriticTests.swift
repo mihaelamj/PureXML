@@ -89,4 +89,59 @@ struct AdversarialCriticTests {
         </schema>
         """)
     }
+
+    @Test("schema element order: accepts foreign elements interspersed and before imports/includes/redefines")
+    func test_schemaChildrenOrder_foreignElements() throws {
+        // 1. Foreign elements before imports
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ext="http://example.com/ext">
+            <ext:meta info="1"/>
+            <xs:import namespace="http://example.com/other" schemaLocation="some.xsd"/>
+            <xs:element name="myElement" type="xs:string"/>
+        </xs:schema>
+        """)
+
+        // 2. Foreign elements interspersed
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ext="http://example.com/ext">
+            <xs:import namespace="http://example.com/other" schemaLocation="some.xsd"/>
+            <ext:meta info="1"/>
+            <xs:element name="myElement" type="xs:string"/>
+        </xs:schema>
+        """)
+
+        // 3. Foreign elements with same local names as global declarations (e.g. element/attribute)
+        // should not trigger seenDeclaration = true for the schemaChildrenOrderErrors check.
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ext="http://example.com/ext">
+            <ext:element name="fake"/>
+            <xs:import namespace="http://example.com/other" schemaLocation="some.xsd"/>
+            <xs:element name="myElement" type="xs:string"/>
+        </xs:schema>
+        """)
+    }
+
+    @Test("import constraints: valid import cases")
+    func test_importConstraints_valid() throws {
+        // 1. Importing a namespace with a schema that has a targetNamespace (different from imported namespace)
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://example.com/main">
+            <xs:import namespace="http://example.com/other" schemaLocation="other.xsd"/>
+        </xs:schema>
+        """)
+
+        // 2. Importing a namespace with a schema that has NO targetNamespace
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+            <xs:import namespace="http://example.com/other" schemaLocation="other.xsd"/>
+        </xs:schema>
+        """)
+
+        // 3. Importing no-namespace schema with a schema that HAS targetNamespace
+        _ = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://example.com/main">
+            <xs:import schemaLocation="no-namespace.xsd"/>
+        </xs:schema>
+        """)
+    }
 }

@@ -34,7 +34,7 @@ entries removed about 70 apparent deviations that were never bugs.
 | Kind | First measurement | Now |
 |---|---|---|
 | valid schema rejected | 75 | 1 |
-| invalid schema accepted | 2467 | 318 |
+| invalid schema accepted | 2467 | 296 |
 | valid instance rejected | 604 | 171 |
 | invalid instance accepted | 582 | 155 |
 
@@ -65,7 +65,7 @@ validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
 in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
 `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
-accepted 2461 to 318 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references, plus substitution group exclusions based on element final and schema finalDefault attributes); see `schema-validity-burndown.md`.
+accepted 2461 to 296 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references, plus substitution group exclusions based on element final and schema finalDefault attributes, duplicate schema container validation across separate files with identical content, schema element order, and import constraints validation); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).
 
 ### Remaining, root-caused (the hard tail)

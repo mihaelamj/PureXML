@@ -98,4 +98,44 @@ extension PureXML.Schema.XSDParser {
         }
         return errors
     }
+
+    static func schemaChildrenOrderErrors(_ names: [String]) -> [String] {
+        var errors: [String] = []
+        var seenDeclaration = false
+        for name in names {
+            if ["simpleType", "complexType", "group", "attributeGroup", "element", "attribute", "notation"].contains(name) {
+                seenDeclaration = true
+            } else if ["include", "import", "redefine"].contains(name) {
+                if seenDeclaration {
+                    errors.append("schema element '\(name)' must appear before any global declarations")
+                }
+            }
+        }
+        return errors
+    }
+
+    static func importErrors(_ node: XSDTree) -> [String] {
+        var errors: [String] = []
+        let namespaceAttr = node.attributes.first { $0.name.prefix == nil && $0.name.localName == "namespace" }?.value
+        var current: XSDTree? = node.parent
+        var schemaNode: XSDTree?
+        while let ancestor = current {
+            if ancestor.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(ancestor) == "schema" {
+                schemaNode = ancestor
+                break
+            }
+            current = ancestor.parent
+        }
+        if let schemaNode {
+            let targetNamespace = schemaNode.attributes.first { $0.name.prefix == nil && $0.name.localName == "targetNamespace" }?.value
+            if namespaceAttr == nil {
+                if targetNamespace == nil {
+                    errors.append("import element without namespace attribute requires targetNamespace on the schema element")
+                }
+            } else if let namespaceAttr, namespaceAttr == targetNamespace {
+                errors.append("import element's namespace attribute must not be the same as the targetNamespace of the importing schema")
+            }
+        }
+        return errors
+    }
 }
