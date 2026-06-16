@@ -14,6 +14,9 @@ public extension PureXML.Validation {
         /// The `<!DOCTYPE name ...>` name the root element must match
         /// (VC: Root Element Type).
         let doctypeName: String?
+        /// Parse-time DTD validity findings (entity/PE references, group nesting),
+        /// collected as advisories separate from declaration hard errors.
+        let parseAdvisories: [PureXML.Validation.ValidationError]
         /// Validity findings about the declarations themselves (duplicate
         /// element types, repeated mixed-content names, multiple ID attributes,
         /// undeclared notations in NOTATION lists, illegal attribute defaults),
@@ -43,13 +46,15 @@ public extension PureXML.Validation {
                 parsedAttributes[name] = AttributeListParser.parse(body)
             }
             attributes = parsedAttributes
-            let scanned = documentType.validityFindings.map { finding in
+            let advisories = documentType.validityFindings.map { finding in
                 PureXML.Validation.ValidationError(
                     reason: finding.reason,
                     at: finding.subject.map { [PureXML.Validation.PathKey.element($0)] } ?? [],
+                    severity: .warning,
                 )
             }
-            declarationErrors = scanned + Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
+            parseAdvisories = advisories
+            declarationErrors = Self.declarationFindings(documentType, attributes: parsedAttributes, notations: notations)
             self.standalone = standalone
             externalElementModels = Set(documentType.elementModels.keys).subtracting(documentType.internalElementModels)
             var external: [String: [AttributeDeclaration]] = [:]

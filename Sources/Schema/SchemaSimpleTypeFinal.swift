@@ -14,9 +14,9 @@ extension PureXML.Schema.XSDParser {
     /// where the single target namespace makes the names resolved by local name
     /// unambiguous; with external definitions the check stands down (a disclosed
     /// under-rejection).
-    static func simpleTypeFinalErrors(_ schema: XSDTree) -> [String] {
-        guard !hasExternalReference(schema) else { return [] }
-        let finalOf = simpleTypeFinalMap(schema)
+    static func simpleTypeFinalErrors(_ schema: XSDTree, compositionLoaded: Bool, containers: [XSDTree]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: compositionLoaded) else { return [] }
+        let finalOf = compositionLoaded ? mergedSimpleTypeFinalMap(containers) : simpleTypeFinalMap(schema)
         guard finalOf.values.contains(where: { !$0.isEmpty }) else { return [] }
         // The `final` map is keyed by local name; an `itemType`/`memberTypes`
         // reference must resolve to this schema's own target namespace before it is
@@ -26,6 +26,16 @@ extension PureXML.Schema.XSDParser {
         let target = FinalNode.attribute(schema, "targetNamespace")
         return listItemFinalErrors(schema, finalOf, bindings, target)
             + unionMemberFinalErrors(schema, finalOf, bindings, target)
+    }
+
+    private static func mergedSimpleTypeFinalMap(_ containers: [XSDTree]) -> [String: Set<String>] {
+        var finalOf: [String: Set<String>] = [:]
+        for container in containers where FinalNode.localName(container) != "redefine" {
+            for (name, tokens) in simpleTypeFinalMap(container) {
+                finalOf[name] = tokens
+            }
+        }
+        return finalOf
     }
 
     /// Each named simple type mapped to the derivation tokens its `final` forbids.

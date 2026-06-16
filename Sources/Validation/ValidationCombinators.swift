@@ -110,3 +110,19 @@ func unwrap<T: Validatable, U: Validatable, D>(
 func all<T: Validatable, D>(_ validations: VRule<T, D>...) -> (VContext<T, D>) -> [VError] {
     { context in validations.flatMap { $0.apply(to: context.subject, at: context.codingPath, in: context.document) } }
 }
+
+/// Resolve a named value from the document, error if missing, else validate the resolved value.
+func lookup<T: Validatable, U: Validatable, D>(
+    _ path: KeyPath<D, [String: U]>,
+    name: KeyPath<T, String>,
+    missing: @escaping (String) -> String,
+    into validations: VRule<U, D>...,
+) -> (VContext<T, D>) -> [VError] {
+    { context in
+        let key = context.subject[keyPath: name]
+        guard let resolved = context.document[keyPath: path][key] else {
+            return [VError(reason: missing(key), at: context.codingPath)]
+        }
+        return validations.flatMap { $0.apply(to: resolved, at: context.codingPath, in: context.document) }
+    }
+}

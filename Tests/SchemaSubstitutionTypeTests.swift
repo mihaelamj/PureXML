@@ -73,17 +73,24 @@ struct SchemaSubstitutionTypeTests {
         ))
     }
 
-    /// A self-contained schema is required: with an import the head's type may live
-    /// in an unloaded document, so the check stands down and a genuinely-unrelated
-    /// member is not flagged here (a disclosed under-rejection).
-    @Test("With an import present the check stands down")
-    func test_importStandsDown() {
+    /// With an import but no loader the check stands down; once the import is
+    /// loaded through a `schemaLoader` the member type is checked against the head.
+    @Test("With an unloaded import the check stands down")
+    func test_importWithoutLoaderStandsDown() {
+        let main = "<xs:schema \(xsd) xmlns:imp=\"urn:imp\">"
+            + "<xs:import namespace=\"urn:imp\" schemaLocation=\"imp.xsd\"/>"
+            + "<xs:element name=\"member\" substitutionGroup=\"imp:head\" type=\"xs:int\"/></xs:schema>"
+        #expect((try? PureXML.Schema.Document(main)) != nil)
+    }
+
+    @Test("With a loaded import an unrelated member type is rejected")
+    func test_loadedImportChecksMemberType() {
         let imported = "<xs:schema \(xsd) targetNamespace=\"urn:imp\">"
             + "<xs:element name=\"head\" type=\"xs:string\"/></xs:schema>"
         let main = "<xs:schema \(xsd) xmlns:imp=\"urn:imp\">"
             + "<xs:import namespace=\"urn:imp\" schemaLocation=\"imp.xsd\"/>"
             + "<xs:element name=\"member\" substitutionGroup=\"imp:head\" type=\"xs:int\"/></xs:schema>"
-        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "imp.xsd" ? imported : nil })) != nil)
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "imp.xsd" ? imported : nil })) == nil)
     }
 
     @Test("Substitution group member is blocked if type derivation method is final on the head element")

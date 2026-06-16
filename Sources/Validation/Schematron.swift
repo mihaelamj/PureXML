@@ -36,7 +36,7 @@ public extension PureXML.Validation {
         public func validate(_ xml: String, phase: String? = nil, documentLoader: @escaping (String) -> String? = { _ in nil }) throws -> [ValidationError] {
             let node = try PureXML.parse(xml)
             let validation = Self.rule(activePatterns(phase: phase), schemaLets: schema.lets, diagnostics: schema.diagnostics, keys: schema.keys, loader: documentLoader)
-            return Validator<Void>.blank.validating(validation).errors(for: node, in: ())
+            return Validator<Void>.blank.validating(validation).findings(for: node, in: ())
         }
 
         /// The patterns active in the requested phase, falling back to the schema's

@@ -30,6 +30,29 @@ struct XSDIdentityTests {
         #expect(try validate(xsd, "<list><item/><item/></list>").isEmpty)
     }
 
+    @Test("Streaming validation reports identity constraints like the tree path")
+    func test_streamingIdentity() throws {
+        let xsd = """
+        \(head)
+          <xs:element name="list">
+            <xs:complexType>
+              <xs:sequence><xs:element name="item" maxOccurs="unbounded"><xs:complexType><xs:attribute name="id" type="xs:string"/></xs:complexType></xs:element></xs:sequence>
+            </xs:complexType>
+            <xs:unique name="byId">
+              <xs:selector xpath="item"/>
+              <xs:field xpath="@id"/>
+            </xs:unique>
+          </xs:element>
+        </xs:schema>
+        """
+        let xml = "<list><item id=\"1\"/><item id=\"1\"/></list>"
+        let document = try PureXML.Schema.Document(xsd)
+        let tree = try document.validate(xml).map(\.reason).sorted()
+        let streamed = try document.validate(streaming: xml).map(\.reason).sorted()
+        #expect(tree == streamed)
+        #expect(!streamed.isEmpty)
+    }
+
     @Test("xs:key requires every field to be present and distinct")
     func test_key() throws {
         let xsd = """

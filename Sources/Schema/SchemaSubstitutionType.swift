@@ -21,25 +21,52 @@ extension PureXML.Schema.XSDParser {
     ///   2.3 and 2.4: a type derives from a union if it derives from one of the
     ///   union's member types). When either type is a list or union the check stands
     ///   down rather than reject a valid member, a disclosed under-rejection.
-    static func substitutionTypeErrors(_ schema: XSDTree, _ tables: DerivationTables, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
-        guard !hasExternalDocuments(schema) else { return [] }
-        let globals = SubTypeNode.elementChildren(schema).filter {
-            SubTypeNode.localName($0) == "element" && $0.name?.namespaceURI == xsdNamespace
-        }
-        var globalElementType: [String: String] = [:]
-        for global in globals {
-            if let name = SubTypeNode.attribute(global, "name"), let type = SubTypeNode.attribute(global, "type") {
-                globalElementType[name] = SubTypeNode.stripPrefix(type)
+    static func substitutionTypeErrors(
+        _ schema: XSDTree,
+        _ containers: [XSDTree],
+        _ tables: DerivationTables,
+        _ types: [String: PureXML.Schema.ElementType],
+        _ context: PureXML.Schema.XSDContext,
+    ) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let sources = context.compositionLoaded ? containers : [schema]
+        let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: context.targetNamespace)
+        var globalElementType: [GlobalElementKey: String] = [:]
+        for index in sources.indices {
+            let source = sources[index]
+            guard SubTypeNode.localName(source) != "redefine" else { continue }
+            let namespaceURI = context.compositionLoaded
+                ? (namespaceMap[index] ?? context.targetNamespace)
+                : context.targetNamespace
+            for global in SubTypeNode.elementChildren(source).filter({
+                SubTypeNode.localName($0) == "element" && $0.name?.namespaceURI == xsdNamespace
+            }) {
+                if let name = SubTypeNode.attribute(global, "name"), let type = SubTypeNode.attribute(global, "type") {
+                    globalElementType[GlobalElementKey(namespaceURI: namespaceURI, name: name)] = SubTypeNode.stripPrefix(type)
+                }
             }
         }
-        return globals.flatMap { element in
-            checkSingleElement(element, globalElementType, tables, types)
+        return sources.indices.flatMap { index -> [String] in
+            let source = sources[index]
+            guard SubTypeNode.localName(source) != "redefine" else { return [] }
+            let bindings = SubTypeNode.namespaceBindings(of: source)
+            return SubTypeNode.elementChildren(source).filter {
+                SubTypeNode.localName($0) == "element" && $0.name?.namespaceURI == xsdNamespace
+            }.flatMap { element in
+                checkSingleElement(element, bindings, globalElementType, tables, types)
+            }
         }
+    }
+
+    private struct GlobalElementKey: Hashable {
+        let namespaceURI: String?
+        let name: String
     }
 
     private static func checkSingleElement(
         _ element: XSDTree,
-        _ globalElementType: [String: String],
+        _ bindings: [String: String],
+        _ globalElementType: [GlobalElementKey: String],
         _ tables: DerivationTables,
         _ types: [String: PureXML.Schema.ElementType],
     ) -> [String] {
@@ -47,7 +74,9 @@ extension PureXML.Schema.XSDParser {
               let headReference = SubTypeNode.attribute(element, "substitutionGroup")
         else { return [] }
         let head = SubTypeNode.stripPrefix(headReference)
-        guard let headType = globalElementType[head] else { return [] }
+        let headNamespace = SubTypeNode.referenceNamespace(headReference, bindings)
+        let headKey = GlobalElementKey(namespaceURI: headNamespace, name: head)
+        guard let headType = globalElementType[headKey] else { return [] }
         if isInlineListOrUnion(element) { return [] }
         let inlineDeriv = inlineTypeDerivation(element)
         let isDerived: Bool
@@ -192,15 +221,6 @@ extension PureXML.Schema.XSDParser {
         switch simple.variety {
         case .atomic: return false
         case .list, .union: return true
-        }
-    }
-
-    /// Whether the schema document composes other documents, so a referenced
-    /// definition may live outside the loaded derivation table.
-    private static func hasExternalDocuments(_ schema: XSDTree) -> Bool {
-        SubTypeNode.elementChildren(schema).contains { child in
-            let kind = SubTypeNode.localName(child)
-            return kind == "import" || kind == "include" || kind == "redefine"
         }
     }
 }

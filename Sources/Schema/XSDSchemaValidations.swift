@@ -71,10 +71,22 @@ public extension PureXML.Validation {
             typeFinal: [String: Set<PureXML.Schema.DerivationMethod>],
         ) -> [ValidationError] {
             let facts = PureXML.Schema.CompiledSchemaFacts(types: types, typeDerivation: typeDerivation, typeFinal: typeFinal)
-            let rules = [finalRespected, restrictionsAreSubsets]
-            return typeDerivation.keys.sorted().flatMap { name -> [ValidationError] in
-                let fact = PureXML.Schema.SchemaTypeFact(name: name, derivation: typeDerivation[name])
-                return rules.flatMap { $0.apply(to: fact, at: [.element(name)], in: facts) }
+            return namedTypeErrors(in: facts)
+        }
+
+        /// The default schema-consistency validator over named types.
+        static func validator() -> Validator<PureXML.Schema.CompiledSchemaFacts> {
+            Validator<PureXML.Schema.CompiledSchemaFacts>.defaults(
+                nonReference: [AnyValidation(finalRespected)],
+                reference: [AnyValidation(restrictionsAreSubsets)],
+            )
+        }
+
+        /// Applies every named-type consistency rule to `facts`.
+        static func namedTypeErrors(in facts: PureXML.Schema.CompiledSchemaFacts) -> [ValidationError] {
+            facts.typeDerivation.keys.sorted().flatMap { name -> [ValidationError] in
+                let fact = PureXML.Schema.SchemaTypeFact(name: name, derivation: facts.typeDerivation[name])
+                return validator().errors(for: fact, at: [.element(name)], in: facts)
             }
         }
 

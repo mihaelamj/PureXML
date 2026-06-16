@@ -100,7 +100,7 @@ flowchart TB
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
   Epic122["#122 conformance suite maintenance: complete (#130 survivor)"]:::epic
-  XSTS["#129 XSTS runner shipped; gates #145-#148 at 1/266/171/155 (v0.2.0)"]:::review
+  XSTS["#129 XSTS runner shipped; gates #145-#148 at 1/264/173/155 (v0.2.0)"]:::review
   XSLTTS["#130 XSLT 1.0 suite (xalan-test): ~126 baseline failures"]:::review
   Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
   Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
@@ -139,7 +139,7 @@ flowchart TB
 
 ## Status
 
-**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (v0.2.0): **1 / 266 / 171 / 155**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
+**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (v0.2.0): **1 / 264 / 173 / 155**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite

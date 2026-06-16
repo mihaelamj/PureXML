@@ -1,0 +1,65 @@
+# validation-rules.md field coverage registry.
+# Each MODEL names a validation document or subject type. FIELD lines map stored
+# properties (or Node enum cases) to rule ids or layer rule names. IGNORE lines
+# document computed or out-of-scope constructs excluded from the coverage law.
+# The meta-test in ValidationFieldCoverageTests must stay in sync with this file.
+
+MODEL PureXML.Validation.DTDSchema
+FIELD models dtdContentModel,dtdUndeclaredElement,dtdStandaloneElementWhitespace
+FIELD attributes dtdRequiredAttributes,dtdFixedAttributeValues,dtdEnumeratedAttributeValues,dtdTokenizedAttributeTypes,dtdNotationAttributes,dtdUndeclaredAttributes,dtdStandaloneAttributes
+FIELD notations dtdNotationAttributes,dtdDeclarationValidity
+FIELD unparsedEntities dtdTokenizedAttributeTypes
+FIELD doctypeName dtdRootElementType
+FIELD declarationErrors dtdDeclarationValidity
+FIELD standalone dtdStandaloneAttributes,dtdStandaloneElementWhitespace
+FIELD externalElementModels dtdStandaloneElementWhitespace
+FIELD externalAttributes dtdStandaloneAttributes
+FIELD parseAdvisories dtdParseAdvisories
+IGNORE isEmpty derived summary; no independent constraint
+
+MODEL PureXML.Validation.XSDContext
+FIELD types xsdContentValidity,xsdStreamingShallowValidity
+FIELD constraints xsdIdentityConstraints
+FIELD rootDeclaration xsdContentValidity
+FIELD nillableElements xsdContentValidity
+FIELD elementConstraints xsdContentValidity
+FIELD abstractTypes xsdContentValidity
+FIELD typeBlock xsdContentValidity
+FIELD elementBlock xsdContentValidity
+FIELD typeDerivation xsdContentValidity
+
+MODEL PureXML.Model.Element
+FIELD name dtdContentModel,dtdUndeclaredElement,dtdUndeclaredAttributes,htmlRequiredParent,htmlVoidElementsAreEmpty,xsdContentValidity
+FIELD attributes uniqueAttributes,dtdRequiredAttributes,dtdFixedAttributeValues,dtdEnumeratedAttributeValues,dtdTokenizedAttributeTypes,dtdNotationAttributes,dtdUndeclaredAttributes,dtdStandaloneAttributes
+FIELD children dtdContentModel,htmlVoidElementsAreEmpty,htmlRequiredParent,xsdContentValidity
+IGNORE text derived from direct text and CDATA children
+
+MODEL PureXML.Model.Attribute
+FIELD name uniqueAttributes,dtdUndeclaredAttributes,dtdRequiredAttributes,dtdFixedAttributeValues,dtdEnumeratedAttributeValues,dtdTokenizedAttributeTypes,dtdNotationAttributes
+FIELD value dtdFixedAttributeValues,dtdEnumeratedAttributeValues,dtdTokenizedAttributeTypes,dtdNotationAttributes,dtdIdentifierIntegrity
+
+MODEL PureXML.Model.Node
+CASE document dtdDeclarationValidity,dtdRootElementType,dtdIdentifierIntegrity,htmlUniqueIdentifiers,xsdContentValidity,xsdIdentityConstraints
+CASE element uniqueAttributes,dtdContentModel,dtdRequiredAttributes,dtdFixedAttributeValues,dtdEnumeratedAttributeValues,dtdTokenizedAttributeTypes,dtdNotationAttributes,dtdUndeclaredElement,dtdUndeclaredAttributes,dtdStandaloneAttributes,dtdStandaloneElementWhitespace,htmlVoidElementsAreEmpty,htmlRequiredParent,xsdContentValidity
+CASE text dtdContentModel
+CASE cdata dtdContentModel
+IGNORE comment no DTD or XSD constraints on comments
+IGNORE processingInstruction no DTD or XSD constraints on processing instructions
+
+MODEL PureXML.Validation.ConformanceCase
+FIELD name conformanceMatchesExpected
+FIELD actual conformanceMatchesExpected
+FIELD expected conformanceMatchesExpected
+
+MODEL PureXML.Schema.SchemaTypeFact
+FIELD name xsdFinalRespected,xsdRestrictionsAreSubsets
+FIELD derivation xsdFinalRespected,xsdRestrictionsAreSubsets
+
+MODEL PureXML.Schema.CompiledSchemaFacts
+FIELD types xsdFinalRespected,xsdRestrictionsAreSubsets
+FIELD typeDerivation xsdFinalRespected,xsdRestrictionsAreSubsets
+FIELD typeFinal xsdFinalRespected
+
+MODEL PureXML.Schema.ResolvedElement
+FIELD element xsdStreamingShallowValidity
+FIELD type xsdStreamingShallowValidity

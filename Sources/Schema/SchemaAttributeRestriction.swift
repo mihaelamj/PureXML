@@ -20,7 +20,7 @@ extension PureXML.Schema.XSDParser {
     /// lexically (e.g. a list type's `"1   2  3"` and `"1 2 3"` are the same value),
     /// which a string comparison gets wrong; that clause is left for a later change.
     static func attributeRestrictionErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
-        guard !hasExternalReference(schema) else { return [] }
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
         var errors: [String] = []
         for content in descendants(schema, named: "complexContent") {

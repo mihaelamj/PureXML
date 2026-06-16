@@ -13,7 +13,7 @@ extension PureXML.Schema.XSDParser {
     /// makes the `all` the whole content, which is valid), a simple-content base, or
     /// an unresolved/foreign base is left alone. Checked for a self-contained schema.
     static func extensionAllGroupErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
-        guard !hasExternalReference(schema) else { return [] }
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
         var errors: [String] = []
         for content in descendants(schema, named: "complexContent") {

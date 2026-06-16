@@ -106,6 +106,19 @@ public extension PureXML.Validation {
             values.map(\.description).joined(separator: "\n")
         }
     }
+
+    /// Splits findings into error- and warning-severity buckets.
+    static func splitFindings(_ findings: [ValidationError]) -> (errors: [ValidationError], warnings: [ValidationError]) {
+        var errors: [ValidationError] = []
+        var warnings: [ValidationError] = []
+        for finding in findings {
+            switch finding.severity {
+            case .error: errors.append(finding)
+            case .warning: warnings.append(finding)
+            }
+        }
+        return (errors, warnings)
+    }
 }
 
 extension PureXML.Model.Node: PureXML.Validation.Validatable {}

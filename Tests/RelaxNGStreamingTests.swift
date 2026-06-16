@@ -60,4 +60,14 @@ struct RelaxNGStreamingTests {
         // A disallowed child element fails even in mixed content.
         try check(mixedGrammar, "<note>text <i>no</i></note>", expected: false)
     }
+
+    @Test("Streaming errors fall back to located tree diagnostics when invalid")
+    func test_streamingErrors() throws {
+        let schema = try PureXML.Schema.RelaxNG(compact: grammar)
+        let bad = "<library><book id=\"1\"><author>A</author></book></library>"
+        #expect(try schema.validate(streaming: bad) == false)
+        let errors = try schema.errors(streaming: bad)
+        #expect(!errors.isEmpty)
+        #expect(try schema.errors(streaming: "<library><book id=\"1\"><title>T</title><author>A</author></book></library>").isEmpty)
+    }
 }

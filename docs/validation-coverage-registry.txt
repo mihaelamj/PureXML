@@ -1,0 +1,35 @@
+# PureXML validation coverage registry (validation-rules.md).
+# Each public type is either a SUBJECT (validated by named rule sets) or EXCLUDE
+# (with reason). Namespace prefixes EXCLUDE_NS auto-exclude infrastructure types.
+# WATCH_NS requires every newly discovered type in that namespace be listed here.
+
+SUBJECT PureXML.Model.Node structural,dtd,xsd,html,schematron,relaxng
+SUBJECT PureXML.Model.Element structural,dtd,xsd,html
+SUBJECT PureXML.Model.Attribute structural,dtd,xsd
+SUBJECT PureXML.Validation.ConformanceCase conformance
+SUBJECT PureXML.Schema.SchemaTypeFact xsd-schema-consistency
+SUBJECT PureXML.Schema.ResolvedElement xsd-streaming-shallow
+
+EXCLUDE PureXML.Model.QualifiedName value type; lexical invariants at construction
+EXCLUDE PureXML.Model.TreeNode mutable editor view of Node; validated via Node
+EXCLUDE PureXML.Model.TreeNodeKind tag enum; no invariants
+EXCLUDE PureXML.LintDiagnostic editor output; not user input
+
+EXCLUDE_NS PureXML.Parsing parser and scanner; Model.Node is the validation subject
+EXCLUDE_NS PureXML.Emitting serializer; output not validated as input model
+EXCLUDE_NS PureXML.Decoding typed decoding helpers; not document models
+EXCLUDE_NS PureXML.Encoding encoding helpers; not document models
+EXCLUDE_NS PureXML.Stream streaming adapters; events validate via schemas
+EXCLUDE_NS PureXML.Validation validation framework and compiled schemas; Node is the subject
+EXCLUDE_NS PureXML.Schema schema compiler and internal engine; Document validates Node
+EXCLUDE_NS PureXML.XPath query engine; not a document model
+EXCLUDE_NS PureXML.Pattern regex/pattern engine; not a document model
+EXCLUDE_NS PureXML.XPointer pointer engine; not a document model
+EXCLUDE_NS PureXML.Catalog catalog resolver; not a document model
+EXCLUDE_NS PureXML.XInclude inclusion processor; not a document model
+EXCLUDE_NS PureXML.Canonical canonicalization; not a document model
+EXCLUDE_NS PureXML.Regex regex engine; not a document model
+EXCLUDE_NS PureXML.XSLT transform engine; not a document model
+EXCLUDE_NS PureXML.HTML tokenizer/builder; Node/HTML rules validate output trees
+
+WATCH_NS PureXML.Model

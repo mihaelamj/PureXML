@@ -100,6 +100,14 @@ extension PureXML.Schema {
             return containers
         }
 
+        /// True when at least one external schema document was loaded (not merely
+        /// referenced or a `redefine` wrapper without its included target).
+        static func compositionLoaded(from containerTuples: [(location: String?, tree: XSDTree)]) -> Bool {
+            containerTuples.contains { tuple in
+                tuple.location != nil && localName(tuple.tree) == "schema"
+            }
+        }
+
         /// The transitive substitution-group membership across all definition
         /// containers: each head element maps to every element that may substitute
         /// for it, directly or through a chain of heads.
@@ -231,6 +239,10 @@ extension PureXML.Schema {
         /// Named complex types being resolved up the current `complexContent`
         /// derivation chain, a guard against a cyclic base reference.
         var visitingTypes: Set<String> = []
+        /// Whether `include`/`import`/`redefine` targets were loaded through a
+        /// `schemaLoader`, so cross-document rules may run over the merged component
+        /// set instead of standing down.
+        var compositionLoaded: Bool = false
         /// The location of each container schema document.
         var containerLocations: [ObjectIdentifier: String?] = [:]
         /// The shared schema-validity finding collector. A reference type, so the

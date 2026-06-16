@@ -41,24 +41,30 @@ extension PureXML.Schema {
             let derivation = derivationTables(containers)
             try checkRedefine(containers)
             try checkAllGroups(containers)
-            var containerLocations: [ObjectIdentifier: String?] = [:]
-            for (loc, tree) in containerTuples {
-                let actualLoc = loc ?? rootLocation
-                containerLocations[ObjectIdentifier(tree)] = actualLoc
-            }
+            let containerLocations = containerLocationMap(containerTuples, rootLocation: rootLocation)
+            let compositionLoaded = XSDNode.compositionLoaded(from: containerTuples)
             var context = createContext(
                 schema: schema,
                 containers: containers,
                 derivation: derivation,
                 containerLocations: containerLocations,
+                compositionLoaded: compositionLoaded,
             )
-            for error in consistencyErrors(schema, context, containers) {
-                context.diagnostics.report(error)
+            for error in PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers) {
+                context.diagnostics.report(error.reason)
             }
             var types = namedTypes(containers, into: &context)
             let elements = globalElements(containers, context, into: &types)
-            for error in postNamedTypeErrors(schema, context, containers, derivation, typeMaps: (elements, types)) {
-                context.diagnostics.report(error)
+            let postCompileDocument = PureXML.Schema.SchemaCompileContext(
+                schema: schema,
+                context: context,
+                containers: containers,
+                derivation: derivation,
+                globalElements: elements,
+                namedTypes: types,
+            )
+            for error in PureXML.Validation.SchemaCompile.postCompileErrors(in: postCompileDocument) {
+                context.diagnostics.report(error.reason)
             }
             return buildCompiled(
                 elements: elements,
@@ -72,6 +78,17 @@ extension PureXML.Schema {
 }
 
 extension PureXML.Schema.XSDParser {
+    private static func containerLocationMap(
+        _ containerTuples: [(location: String?, tree: XSDTree)],
+        rootLocation: String?,
+    ) -> [ObjectIdentifier: String?] {
+        var containerLocations: [ObjectIdentifier: String?] = [:]
+        for (loc, tree) in containerTuples {
+            containerLocations[ObjectIdentifier(tree)] = loc ?? rootLocation
+        }
+        return containerLocations
+    }
+
     private static func buildCompiled(
         elements: [String: ElementType],
         types: [String: ElementType],
@@ -102,6 +119,7 @@ extension PureXML.Schema.XSDParser {
         containers: [XSDTree],
         derivation: DerivationTables,
         containerLocations: [ObjectIdentifier: String?],
+        compositionLoaded: Bool,
     ) -> XSDContext {
         var context = XSDContext(
             simpleTypes: [:],
@@ -110,6 +128,7 @@ extension PureXML.Schema.XSDParser {
             targetNamespace: XSDNode.attribute(schema, "targetNamespace"),
             substitutions: filterSubstitutions(XSDNode.substitutionMembers(containers), derivation),
             abstractElements: derivation.abstractElements,
+            compositionLoaded: compositionLoaded,
             containerLocations: containerLocations,
         )
         context.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"

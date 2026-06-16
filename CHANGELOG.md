@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-06-16
+### Added
+
+- OpenAPIKit-style validation framework completion: `BuiltinValidation` registry (23 rules), exhaustive fail/succeed isolation tests, configuration pins, public-type and field coverage gates (`scripts/check-validation-coverage.sh`, `scripts/check-validation-fields.sh`), warnings channel with `strict:` promotion, two-tier `Validator` defaults, XSD schema compile rules as composable validations (`SchemaCompileValidation`), and `ValidationOutcome` non-throwing accessor.
+
+### Changed
+
+- DTD parse-time validity findings are warnings until strict validation promotes them; `validateAgainstInternalDTD` returns full findings (errors and warnings).
+ - 2026-06-16
 
 Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-schemas-accepted 394 → 266** (settled expectations), **valid-instances-rejected 180 → 171**, **invalid-instances-accepted 158 → 155**, **valid-schemas-rejected held at 1** (`particlesZ001`, spec-ambiguous). Not yet 1.0: see `docs/production-readiness.md`.
 

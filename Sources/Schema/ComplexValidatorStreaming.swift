@@ -43,16 +43,69 @@ public extension PureXML.Schema.ComplexValidator {
         return type
     }
 
-    /// The declared element type of a child `name` in `parent`'s content model, or
-    /// nil when the parent has no element content or no such child (an undeclared
-    /// child is flagged by the parent's own structure check).
+    /// The declared element type of a child `name` in `parent`'s content model: a
+    /// named particle member, or a global declaration reached through a matching
+    /// wildcard's `processContents`. Returns nil when the parent has no element
+    /// content, when `processContents="skip"`, or when the child is not declared
+    /// and no wildcard admits it (the parent's structure check reports that).
     func childType(of parent: PureXML.Schema.ElementType, child name: PureXML.Model.QualifiedName) -> PureXML.Schema.ElementType? {
         guard case let .complex(complex) = parent else { return nil }
         switch complex.content {
         case let .elementOnly(particle), let .mixed(particle):
-            return Self.elementTypes(in: particle.term)[Self.key(name)]
+            if let type = Self.elementTypes(in: particle.term)[Self.key(name)] {
+                return type
+            }
+            return wildcardChildType(for: name, in: particle.term)
         case .empty, .simpleContent:
             return nil
+        }
+    }
+
+    /// The error when a strict wildcard admits a child but no global declaration
+    /// exists for it, matching the tree validator's ``validateWildcardChild``.
+    func strictWildcardError(
+        for child: PureXML.Model.QualifiedName,
+        in parent: PureXML.Schema.ElementType,
+        at path: [PureXML.Validation.PathKey],
+    ) -> PureXML.Validation.ValidationError? {
+        guard case let .complex(complex) = parent else { return nil }
+        switch complex.content {
+        case let .elementOnly(particle), let .mixed(particle):
+            if Self.elementTypes(in: particle.term)[Self.key(child)] != nil { return nil }
+            guard Self.wildcardMatch(for: child, in: particle.term) == .strict,
+                  types["element:\(child.localName)"] == nil
+            else { return nil }
+            return PureXML.Validation.ValidationError(
+                reason: "no declaration for wildcard-matched element '\(child.localName)'",
+                at: path,
+            )
+        case .empty, .simpleContent:
+            return nil
+        }
+    }
+
+    /// The `processContents` of a wildcard in `term` that admits `name`, if any.
+    static func wildcardMatch(for name: PureXML.Model.QualifiedName, in term: PureXML.Schema.Term) -> PureXML.Schema.ProcessContents? {
+        switch term {
+        case let .wildcard(wildcard):
+            return wildcard.admits(name) ? wildcard.processContents : nil
+        case .element:
+            return nil
+        case let .group(group):
+            for member in group.particles {
+                if let match = wildcardMatch(for: name, in: member.term) { return match }
+            }
+            return nil
+        }
+    }
+
+    private func wildcardChildType(for name: PureXML.Model.QualifiedName, in term: PureXML.Schema.Term) -> PureXML.Schema.ElementType? {
+        guard let process = Self.wildcardMatch(for: name, in: term) else { return nil }
+        switch process {
+        case .skip:
+            return nil
+        case .lax, .strict:
+            return types["element:\(name.localName)"]
         }
     }
 
@@ -97,9 +150,11 @@ public extension PureXML.Schema.ComplexValidator {
         if !element.children.compactMap(\.element).isEmpty {
             errors.append(XSDFailure(reason: "'\(element.name.localName)' must not have children", at: path))
         }
-        if let error = simple.validate(Self.textContent(element)) {
+        let text = Self.rawTextContent(element)
+        if let error = simple.validate(text) {
             errors.append(XSDFailure(reason: "'\(element.name.localName)': \(error)", at: path))
         }
+        recordIDs(simple, value: text, at: path)
         errors += elementFixedErrors(element, at: path)
     }
 
@@ -111,9 +166,11 @@ public extension PureXML.Schema.ComplexValidator {
             rejectText(element, at: path, into: &errors)
         case let .simpleContent(type):
             if !children.isEmpty { errors.append(XSDFailure(reason: "element must not have children", at: path)) }
-            if let error = type.validate(Self.textContent(element)) {
+            let text = Self.rawTextContent(element)
+            if let error = type.validate(text) {
                 errors.append(XSDFailure(reason: "content: \(error)", at: path))
             }
+            recordIDs(type, value: text, at: path)
         case let .elementOnly(particle):
             rejectText(element, at: path, into: &errors)
             shallowStructure(particle, children: children, at: path, into: &errors)

@@ -51,4 +51,20 @@ struct SchemaMultiDocumentTests {
         let doc = try PureXML.Schema.Document(mainXSD)
         #expect(try !doc.validate(instance).isEmpty)
     }
+
+    @Test("Streaming validation honors xsi:schemaLocation the same as the tree path")
+    func test_streamingResolvesAcrossDocuments() throws {
+        let doc = try PureXML.Schema.Document(mainXSD)
+        let loader: (String) -> String? = { [otherXSD] in $0 == "other.xsd" ? otherXSD : nil }
+        let tree = try doc.validate(instance, schemaLoader: loader).map(\.reason).sorted()
+        let streamed = try doc.validate(streaming: instance, schemaLoader: loader).map(\.reason).sorted()
+        #expect(tree == streamed)
+        #expect(tree.isEmpty)
+    }
+
+    @Test("Streaming strict wildcard fails without the loader")
+    func test_streamingStrictUnresolvedWithoutLoader() throws {
+        let doc = try PureXML.Schema.Document(mainXSD)
+        #expect(try !doc.validate(streaming: instance).isEmpty)
+    }
 }

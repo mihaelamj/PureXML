@@ -10,18 +10,39 @@ public extension PureXML.Validation {
     /// and ID/IDREF integrity is checked once over the whole tree. Replaces the
     /// imperative walk with declared ``Validation`` values.
     enum DTD {
+        /// Parse-time DTD advisories are surfaced for inspection. Under strict
+        /// validation they promote to errors; otherwise they remain warnings.
+        static var parseAdvisories: Validation<PureXML.Model.Node, DTDSchema> {
+            .init(
+                description: "Parse-time DTD advisories are reviewed",
+                check: { context in context.document.parseAdvisories },
+                when: { $0.codingPath.isEmpty },
+            )
+        }
+
         /// A validator for a ``DTDSchema``. In strict mode every element must also
         /// be declared.
         static func validator(strict: Bool) -> Validator<DTDSchema> {
-            var validator = Validator<DTDSchema>.blank
-                .validating(contentModel)
-                .validating(requiredAttributes, fixedAttributeValues, enumeratedAttributeValues)
-                .validating(tokenizedAttributeTypes, notationAttributes)
-                .validating(identifierIntegrity)
-                .validating(declarationValidity, rootElementType)
-                .validating(standaloneAttributes, standaloneElementWhitespace)
-            if strict { validator = validator.validating(undeclaredElement, undeclaredAttributes) }
-            return validator
+            let nonReference: [AnyValidation<DTDSchema>] = [
+                AnyValidation(contentModel),
+                AnyValidation(requiredAttributes),
+                AnyValidation(fixedAttributeValues),
+                AnyValidation(enumeratedAttributeValues),
+                AnyValidation(tokenizedAttributeTypes),
+                AnyValidation(notationAttributes),
+                AnyValidation(declarationValidity),
+                AnyValidation(rootElementType),
+                AnyValidation(standaloneAttributes),
+                AnyValidation(standaloneElementWhitespace),
+                AnyValidation(parseAdvisories),
+            ]
+            var reference: [AnyValidation<DTDSchema>] = [
+                AnyValidation(identifierIntegrity),
+            ]
+            if strict {
+                reference += [AnyValidation(undeclaredElement), AnyValidation(undeclaredAttributes)]
+            }
+            return Validator<DTDSchema>.defaults(nonReference: nonReference, reference: reference)
         }
 
         /// Each element's content matches its `<!ELEMENT>` model.

@@ -86,7 +86,7 @@ public extension PureXML {
     ) throws -> [Validation.ValidationError] {
         let parsed = try Parsing.Parser().parseWithDocumentType(xml, limits: limits, resolver: resolver)
         let schema = Validation.DTDSchema(parsed.documentType, standalone: parsed.declaration?.standalone == true)
-        return Validation.DTD.validator(strict: strict).errors(for: parsed.node, in: schema)
+        return Validation.DTD.validator(strict: strict).findings(for: parsed.node, in: schema)
     }
 
     /// The XML declaration (`version`, `encoding`, `standalone`) at the start of
@@ -209,5 +209,22 @@ public extension PureXML {
         using validator: Validation.Validator<Void> = .init(),
     ) throws {
         try validator.validate(node)
+    }
+
+    /// The HTML5 content-model validation errors for a parsed node; empty when the
+    /// tree satisfies the intrinsic rules (void elements, required parents, unique
+    /// `id` values). Built on ``Validation/HTML``.
+    static func validateHTML(_ node: Model.Node) -> [Validation.ValidationError] {
+        HTML.validationErrors(in: node)
+    }
+
+    /// Lints a possibly-invalid document against an XSD schema, merging parse
+    /// diagnostics and schema validation findings into source-ranged
+    /// ``LintDiagnostic``s. See ``lint(_:validate:)``.
+    static func lint(
+        _ xml: String,
+        schema: Schema.Document,
+    ) -> [LintDiagnostic] {
+        lint(xml, validate: schema.validate)
     }
 }

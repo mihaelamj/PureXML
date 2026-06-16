@@ -20,6 +20,24 @@ extension PureXML.Schema.XSDParser {
         return uses
     }
 
+    /// Prefix bindings in effect on `node`: the enclosing schema's `xmlns` declarations
+    /// merged along the ancestor path (used for `ref` QNames inside included documents).
+    static func namespaceBindingsInScope(of node: XSDTree, defaultBindings: [String: String]) -> [String: String] {
+        var path: [XSDTree] = []
+        var current: XSDTree? = node
+        while let currentNode = current {
+            path.append(currentNode)
+            current = currentNode.parent
+        }
+        path.reverse()
+        let schemaRoot = path.first { PureXML.Schema.XSDNode.localName($0) == "schema" }
+        var bindings = schemaRoot.map { PureXML.Schema.XSDNode.namespaceBindings(of: $0) } ?? defaultBindings
+        for ancestor in path {
+            bindings = mergedNamespaceBindings(on: ancestor, inherited: bindings)
+        }
+        return bindings
+    }
+
     static func attributeUse(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.AttributeUse? {
         // An `<attribute ref="...">` references a global attribute declaration:
         // take its name (always target-namespace qualified) and type from the
@@ -28,7 +46,8 @@ extension PureXML.Schema.XSDParser {
             let refName = PureXML.Schema.XSDNode.stripPrefix(ref)
             guard let declaration = context.globalAttributes[refName],
                   var use = attributeUse(declaration, context) else { return nil }
-            let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, context.namespaceBindings)
+            let bindings = namespaceBindingsInScope(of: node, defaultBindings: context.namespaceBindings)
+            let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, bindings)
             use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace)
             if PureXML.Schema.XSDNode.attribute(node, "use") == "required" { use.required = true }
             if let constraint = valueConstraint(of: node) { use.valueConstraint = constraint }

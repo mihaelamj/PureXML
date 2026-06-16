@@ -30,7 +30,7 @@ extension PureXML.Schema.XSDParser {
             namespaceMap: namespaceMap,
             mainTargetNamespace: context.targetNamespace,
         )
-        errors += keyrefReferErrors(schema)
+        errors += keyrefReferErrors(schema, containers, context)
         return errors
     }
 
@@ -48,7 +48,16 @@ extension PureXML.Schema.XSDParser {
             let alreadyExists = uniqueIndices.contains { prevIndex in
                 let prevNS = namespaceMap[prevIndex] ?? mainTargetNamespace
                 let prevLocation = containerLocations[ObjectIdentifier(containers[prevIndex])] ?? nil
-                return prevNS == namespaceURI && prevLocation == location && isStructurallyEqual(containers[prevIndex], container)
+                guard prevNS == namespaceURI,
+                      isStructurallyEqual(containers[prevIndex], container)
+                else {
+                    return false
+                }
+                if prevLocation == location { return true }
+                // A circular import reloads the root schema under a schemaLocation while
+                // the compile root is appended last; treat that as one document, not a clash.
+                let rootIndex = containers.count - 1
+                return index == rootIndex || prevIndex == rootIndex
             }
             if !alreadyExists {
                 uniqueIndices.append(index)
@@ -118,11 +127,14 @@ extension PureXML.Schema.XSDParser {
     /// Skipped when the document pulls in external definitions
     /// (`import`/`include`/`redefine`), which the default compile does not load,
     /// so a `refer` into them is never flagged.
-    private static func keyrefReferErrors(_ schema: XSDTree) -> [String] {
-        if hasExternalReference(schema) { return [] }
+    private static func keyrefReferErrors(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String] {
+        if skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) { return [] }
         var keyArities: [String: Int] = [:]
         var keyrefs: [KeyrefInfo] = []
-        collectKeysAndRefers(schema, keyArities: &keyArities, keyrefs: &keyrefs)
+        let sources = context.compositionLoaded ? containers : [schema]
+        for source in sources where PureXML.Schema.XSDNode.localName(source) != "redefine" {
+            collectKeysAndRefers(source, keyArities: &keyArities, keyrefs: &keyrefs)
+        }
 
         var errors: [String] = []
         for keyref in keyrefs {
@@ -227,11 +239,14 @@ extension PureXML.Schema.XSDParser {
 
     static func resolveContainerNamespaces(_ containers: [XSDTree], mainTargetNamespace: String?) -> [Int: String?] {
         var resolved: [Int: String?] = [:]
+        var resolvedIndices = Set<Int>()
         guard !containers.isEmpty else { return resolved }
         let mainIndex = containers.count - 1
         resolved[mainIndex] = mainTargetNamespace
+        resolvedIndices.insert(mainIndex)
         for parentIndex in containers.indices.reversed() {
-            guard let parentNamespace = resolved[parentIndex] else { continue }
+            guard resolvedIndices.contains(parentIndex) else { continue }
+            let parentNamespace = resolvedNamespace(at: parentIndex, in: resolved, fallback: mainTargetNamespace)
             let parent = containers[parentIndex]
             for child in PureXML.Schema.XSDNode.elementChildren(parent) {
                 let kind = PureXML.Schema.XSDNode.localName(child)
@@ -251,22 +266,65 @@ extension PureXML.Schema.XSDParser {
                     before: parentIndex,
                     kind: childKind,
                     namespaces: (parent: parentNamespace, expected: expectedAttrNamespace),
-                    resolved: resolved,
+                    resolvedIndices: resolvedIndices,
                 )
                 if let foundIndex {
                     resolved[foundIndex] = targetNamespaceURI
+                    resolvedIndices.insert(foundIndex)
                 }
             }
         }
-        for index in containers.indices where resolved[index] == nil {
+        for index in containers.indices where !resolvedIndices.contains(index) {
             let container = containers[index]
             if let attrNS = PureXML.Schema.XSDNode.attribute(container, "targetNamespace") {
                 resolved[index] = attrNS
             } else {
                 resolved[index] = mainTargetNamespace
             }
+            resolvedIndices.insert(index)
         }
         return resolved
+    }
+
+    /// Schema-validity findings for `xs:include` when external schemas load: the
+    /// included document must be chameleon (no `targetNamespace`) or declare the
+    /// same target namespace as the includer (XSD Structures §4.2.3).
+    static func includeCompositionErrors(
+        _ containers: [XSDTree],
+        mainTargetNamespace: String?,
+        compositionLoaded: Bool,
+        containerLocations: [ObjectIdentifier: String?],
+    ) -> [String] {
+        guard compositionLoaded else { return [] }
+        let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: mainTargetNamespace)
+        var errors: [String] = []
+        for (parentIndex, parent) in containers.enumerated() {
+            guard PureXML.Schema.XSDNode.localName(parent) == "schema" else { continue }
+            let parentNamespace = resolvedNamespace(at: parentIndex, in: namespaceMap, fallback: mainTargetNamespace)
+            for child in PureXML.Schema.XSDNode.elementChildren(parent) {
+                guard PureXML.Schema.XSDNode.localName(child) == "include",
+                      let location = PureXML.Schema.XSDNode.attribute(child, "schemaLocation")
+                else { continue }
+                guard let includedIndex = containers.firstIndex(where: {
+                    containerLocations[ObjectIdentifier($0)] == location
+                }) else { continue }
+                let includedNamespace = PureXML.Schema.XSDNode.attribute(containers[includedIndex], "targetNamespace")
+                if let includedNamespace, includedNamespace != parentNamespace {
+                    let parentLabel = parentNamespace ?? "no namespace"
+                    errors.append(
+                        "included schema targetNamespace '\(includedNamespace)' must match includer targetNamespace '\(parentLabel)' or be chameleon (no targetNamespace)",
+                    )
+                }
+            }
+        }
+        return errors
+    }
+
+    private static func resolvedNamespace(at index: Int, in map: [Int: String?], fallback: String?) -> String? {
+        switch map[index] {
+        case nil: fallback
+        case let .some(namespace): namespace
+        }
     }
 
     private static func findMatchingContainerIndex(
@@ -274,9 +332,9 @@ extension PureXML.Schema.XSDParser {
         before parentIndex: Int,
         kind: String,
         namespaces: (parent: String?, expected: String?),
-        resolved: [Int: String?],
+        resolvedIndices: Set<Int>,
     ) -> Int? {
-        for index in (0 ..< parentIndex).reversed() where resolved[index] == nil {
+        for index in (0 ..< parentIndex).reversed() where !resolvedIndices.contains(index) {
             let container = containers[index]
             let attrNS = PureXML.Schema.XSDNode.attribute(container, "targetNamespace")
             let isMatch: Bool = if kind == "import" {

@@ -39,27 +39,12 @@ extension PureXML.Schema.XSDParser {
         node.attributes.first { $0.name.prefix == nil && $0.name.localName == "id" }?.value
     }
 
-    /// All compile-time schema-consistency findings, collected together so they are
-    /// reported in one pass: `id` validity, schema-for-schemas structure, global
-    /// component-name uniqueness, content-model determinism (UPA), and circular
-    /// type derivation. The explicit return type keeps the type-checker from
-    /// inferring a long concatenation.
+    /// All compile-time schema-consistency findings before named types resolve.
     static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
-        let structural = idAttributeErrors(schema) + structureErrors(schema)
-            + componentNameErrors(schema, containers, context)
-            + simpleTypeFinalErrors(schema)
-        let determinism = PureXML.Schema.ContentModelDeterminism.violations(in: schema, context: context)
-        let cycles = derivationCycleErrors(containers, context.namespaceBindings, context.targetNamespace)
-            + circularReferenceErrors(containers, context.namespaceBindings, context.targetNamespace)
-        let placement = allGroupReferencePlacementErrors(containers, context.namespaceBindings, context.targetNamespace)
-        return structural + determinism + cycles + placement
+        PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers).map(\.reason)
     }
 
-    /// Consistency findings that depend on the resolved named types, collected after
-    /// `namedTypes` has populated them: unresolved references, attribute-use
-    /// uniqueness and single-ID, ID-typed value constraints, substitution-group
-    /// member type derivation (`e-props-correct.4`), and value constraints valid
-    /// against a user type (`e-props-correct.2` / `a-props-correct.2`).
+    /// Consistency findings that depend on the resolved named types.
     static func postNamedTypeErrors(
         _ schema: XSDTree,
         _ context: PureXML.Schema.XSDContext,
@@ -67,15 +52,17 @@ extension PureXML.Schema.XSDParser {
         _ derivation: DerivationTables,
         typeMaps: (global: [String: PureXML.Schema.ElementType], named: [String: PureXML.Schema.ElementType]),
     ) -> [String] {
-        referenceErrors(schema, in: context, elements: typeMaps.global)
-            + attributeUseErrors(containers, context)
-            + idValueConstraintErrors(schema, context)
-            + substitutionTypeErrors(schema, derivation, typeMaps.named)
-            + userTypeValueConstraintErrors(schema, context, typeMaps.named)
-            + extensionAllGroupErrors(schema, context, typeMaps.named)
-            + attributeRestrictionErrors(schema, context, typeMaps.named)
-            + simpleTypeBaseNotComplexErrors(schema, in: context)
-            + simpleTypeVarietyErrors(schema, context)
-            + notationValidityErrors(containers, context)
+        PureXML.Validation.SchemaCompile.postCompileErrors(
+            schema: schema,
+            context: context,
+            containers: containers,
+            namedTypes: PureXML.Schema.SchemaCompileNamedTypes(
+                derivation: derivation,
+                globalElements: typeMaps.global,
+                types: typeMaps.named,
+            ),
+        ).map(\.reason)
     }
+
+    // Legacy helpers retained for direct unit tests of individual checks.
 }

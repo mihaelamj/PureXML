@@ -97,7 +97,10 @@ public extension PureXML.Validation {
 
         /// A validator combining the content-model and identity-constraint rules.
         static func validator() -> Validator<XSDContext> {
-            Validator<XSDContext>.blank.validating(contentValidity, identityConstraints)
+            Validator<XSDContext>.defaults(
+                nonReference: [AnyValidation(contentValidity)],
+                reference: [AnyValidation(identityConstraints)],
+            )
         }
     }
 }

@@ -8,8 +8,9 @@ public extension PureXML.Validation {
     /// validity is checked when that child closes.
     ///
     /// Type resolution covers the global root declaration, the parent content
-    /// model, `xsi:type` overrides, and `typeReference` chains. Wildcard
-    /// `processContents` and substitution groups stay on the tree validator.
+    /// model, wildcard `processContents`, `xsi:type` overrides, and
+    /// `typeReference` chains. Document-scoped identity constraints are checked
+    /// at the end of a streaming run when the caller supplies the parsed tree.
     struct StreamingXSDValidator {
         private let validator: PureXML.Schema.ComplexValidator
         private let rootElements: [String: PureXML.Schema.ElementType]
@@ -90,7 +91,14 @@ public extension PureXML.Validation {
         /// element has no type to validate against.
         private mutating func resolveDeclared(_ name: PureXML.Model.QualifiedName, path: [PathKey]) -> PureXML.Schema.ElementType? {
             guard stack.isEmpty else {
-                return stack.last?.effective.flatMap { validator.childType(of: $0, child: name) }
+                guard let parent = stack.last?.effective else { return nil }
+                if let declared = validator.childType(of: parent, child: name) {
+                    return declared
+                }
+                if let error = validator.strictWildcardError(for: name, in: parent, at: path) {
+                    collected.append(error)
+                }
+                return nil
             }
             sawRoot = true
             guard let declaration = rootElements[name.localName] else {

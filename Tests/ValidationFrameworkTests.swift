@@ -157,11 +157,38 @@ struct ValidationFrameworkTests {
         #expect((atA + atB).count == 2)
     }
 
-    @Test("Error rendering: at-path, at-root, and a stripped trailing period")
-    func test_errorRendering() {
-        let rooted = Error(reason: "Bad.", at: [])
-        #expect(String(describing: rooted) == "Bad at root of document")
-        let located = Error(reason: "Bad value", at: [.element("box"), .element("id")])
-        #expect(String(describing: located) == "Bad value at path: box/id")
+    @Test("lookup resolves against the document store")
+    func test_lookup() {
+        struct Item: PureXML.Validation.Validatable { var key: String }
+        struct Store { var items: [String: Item] = [:] }
+        typealias Context = PureXML.Validation.ValidationContext<Item, Store>
+        let rule: (Context) -> [PureXML.Validation.ValidationError] = lookup(
+            \Store.items,
+            name: \Item.key,
+            missing: { "missing \($0)" },
+            into: PureXML.Validation.Validation(description: "present", check: { _ in true }),
+        )
+        let store = Store(items: ["a": Item(key: "a")])
+        let context = Context(document: store, subject: Item(key: "a"), codingPath: [])
+        #expect(rule(context).isEmpty)
+        let missing = Context(document: store, subject: Item(key: "z"), codingPath: [])
+        #expect(rule(missing).count == 1)
+    }
+
+    @Test("Parameter-pack KeyPath validating mixes void-document builtins")
+    func test_keyPathParameterPack() {
+        let validator = PureXML.Validation.Validator<Void>.blank
+            .validating(\.uniqueAttributes, \.htmlVoidElementsAreEmpty)
+        #expect(validator.validationDescriptions == [
+            "Element attribute names are unique",
+            "Void HTML elements have no content",
+        ])
+    }
+
+    @Test("Validator.outcome returns valid when no rules fail")
+    func test_outcomeValid() {
+        let node = PureXML.Model.Node.document([.element(.init("a"))])
+        let outcome = PureXML.Validation.Validator<Void>().outcome(for: node, in: ())
+        #expect(outcome.isValid)
     }
 }

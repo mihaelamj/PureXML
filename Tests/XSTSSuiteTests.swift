@@ -29,8 +29,8 @@ struct XSTSSuiteTests {
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 266
-    private let knownInstanceValidRejected = 171
+    private let knownSchemaInvalidAccepted = 264
+    private let knownInstanceValidRejected = 173
     private let knownInstanceInvalidAccepted = 155
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")

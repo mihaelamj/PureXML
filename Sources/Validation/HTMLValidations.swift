@@ -49,9 +49,10 @@ public extension PureXML.Validation {
 
         /// A validator combining the HTML conformance rules.
         static func validator() -> Validator<Void> {
-            Validator<Void>.blank
-                .validating(voidElementsAreEmpty, requiredParent)
-                .validating(uniqueIdentifiers)
+            Validator<Void>.defaults(
+                nonReference: [AnyValidation(voidElementsAreEmpty), AnyValidation(requiredParent)],
+                reference: [AnyValidation(uniqueIdentifiers)],
+            )
         }
 
         /// The allowed direct parents for each element that requires one (the

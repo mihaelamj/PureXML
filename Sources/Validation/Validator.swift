@@ -1,23 +1,31 @@
 public extension PureXML.Validation {
     /// Applies a set of ``Validation`` values across a parsed node tree, gathering
     /// every error with its coding path and throwing one ``ValidationErrorCollection``
-    /// at the end. Holds an ordered list of erased validations (a layer's default
-    /// set plus any custom additions). Build one with ``blank`` and the fluent
-    /// ``validating(_:)``/``withoutValidating(_:)`` methods, or take a layer's
+    /// at the end. Holds default rules in two tiers (non-reference, then reference)
+    /// plus any custom additions, in that order. Build one with ``blank`` and the
+    /// fluent ``validating(_:)``/``withoutValidating(_:)`` methods, or take a layer's
     /// default factory.
     ///
     /// Parameterized over `Document`, the cross-cutting context the rules consult
     /// (a schema, a scope, or `Void` for rules that need only their subject).
-    struct Validator<Document> {
-        var validations: [AnyValidation<Document>]
+    final class Validator<Document>: @unchecked Sendable {
+        fileprivate let nonReferenceDefaultValidations: [AnyValidation<Document>]
+        fileprivate let referenceDefaultValidations: [AnyValidation<Document>]
+        fileprivate let customValidations: [AnyValidation<Document>]
 
-        init(validations: [AnyValidation<Document>]) {
-            self.validations = validations
+        init(
+            nonReferenceDefaultValidations: [AnyValidation<Document>],
+            referenceDefaultValidations: [AnyValidation<Document>],
+            customValidations: [AnyValidation<Document>],
+        ) {
+            self.nonReferenceDefaultValidations = nonReferenceDefaultValidations
+            self.referenceDefaultValidations = referenceDefaultValidations
+            self.customValidations = customValidations
         }
 
         /// A validator with no rules; add your own with ``validating(_:)``.
         public static var blank: Validator {
-            Validator(validations: [])
+            Validator(nonReferenceDefaultValidations: [], referenceDefaultValidations: [], customValidations: [])
         }
 
         /// The descriptions of the active rules, in application order.
@@ -25,12 +33,57 @@ public extension PureXML.Validation {
             validations.map(\.description)
         }
 
-        /// Returns a validator with `additions` appended after the current rules.
-        public func validating<Subject>(_ additions: Validation<Subject, Document>...) -> Validator {
-            Validator(validations: validations + additions.map { AnyValidation($0) })
+        /// Descriptions of the non-reference default tier, in order.
+        public var nonReferenceValidationDescriptions: [String] {
+            nonReferenceDefaultValidations.map(\.description)
         }
 
-        /// Returns a validator with a single-error Bool rule appended.
+        /// Descriptions of the reference default tier, in order.
+        public var referenceValidationDescriptions: [String] {
+            referenceDefaultValidations.map(\.description)
+        }
+
+        /// Descriptions of the custom tier, in order.
+        public var customValidationDescriptions: [String] {
+            customValidations.map(\.description)
+        }
+
+        fileprivate var validations: [AnyValidation<Document>] {
+            nonReferenceDefaultValidations + referenceDefaultValidations + customValidations
+        }
+
+        /// Returns a validator with `additions` appended to the custom tier.
+        @discardableResult
+        public func validating<Subject>(_ additions: Validation<Subject, Document>...) -> Validator {
+            Validator(
+                nonReferenceDefaultValidations: nonReferenceDefaultValidations,
+                referenceDefaultValidations: referenceDefaultValidations,
+                customValidations: customValidations + additions.map { AnyValidation($0) },
+            )
+        }
+
+        /// Returns a validator with one named builtin rule appended to the custom tier.
+        @discardableResult
+        public func validating(
+            _ rule: KeyPath<BuiltinValidation.Type, Validation<some Any, Document>>,
+        ) -> Validator {
+            validating(BuiltinValidation.self[keyPath: rule])
+        }
+
+        /// Returns a validator with several named builtin rules appended (mixed subject types).
+        @discardableResult
+        public func validating<each Subject: Validatable>(
+            _ rules: repeat KeyPath<BuiltinValidation.Type, Validation<each Subject, Document>>,
+        ) -> Validator {
+            var result = self
+            for rule in repeat each rules {
+                result = result.validating(BuiltinValidation.self[keyPath: rule])
+            }
+            return result
+        }
+
+        /// Returns a validator with a single-error Bool rule appended to the custom tier.
+        @discardableResult
         public func validating<Subject>(
             _ description: String,
             check: @escaping (ValidationContext<Subject, Document>) -> Bool,
@@ -39,51 +92,84 @@ public extension PureXML.Validation {
             validating(Validation(description: description, check: check, when: predicate))
         }
 
-        /// Returns a validator with the rules matching `descriptions` removed.
+        /// Returns a validator with the rules matching `descriptions` removed from
+        /// every tier.
+        @discardableResult
         public func withoutValidating(_ descriptions: String...) -> Validator {
-            Validator(validations: validations.filter { !descriptions.contains($0.description) })
+            let drop = Set(descriptions)
+            func filter(_ tier: [AnyValidation<Document>]) -> [AnyValidation<Document>] {
+                tier.filter { !drop.contains($0.description) }
+            }
+            return Validator(
+                nonReferenceDefaultValidations: filter(nonReferenceDefaultValidations),
+                referenceDefaultValidations: filter(referenceDefaultValidations),
+                customValidations: filter(customValidations),
+            )
+        }
+
+        /// Applies every active rule to `subject` at `path` in `document`, without
+        /// walking a node tree. Used for compile-time schema checks and other
+        /// single-subject validation passes.
+        public func errors(
+            for subject: some Validatable,
+            at path: [PathKey] = [],
+            in document: Document,
+        ) -> [ValidationError] {
+            var findings: [ValidationError] = []
+            apply(subject, at: path, in: document, into: &findings)
+            return PureXML.Validation.splitFindings(findings).errors
         }
 
         // MARK: Running
 
-        /// Gathers every error from validating `node` in `document`, in document
-        /// order. Returns an empty array when the tree is valid.
+        /// Every validation finding for `node` in `document`, including advisory
+        /// warnings from rules and from ``HasWarnings`` values.
+        public func findings(for node: PureXML.Model.Node, in document: Document) -> [ValidationError] {
+            var findings: [ValidationError] = []
+            walk(node, path: [], document, &findings)
+            return findings
+        }
+
+        /// Gathers every error-severity finding from validating `node` in `document`.
         public func errors(for node: PureXML.Model.Node, in document: Document) -> [ValidationError] {
-            var errors: [ValidationError] = []
-            walk(node, path: [], document, &errors)
-            return errors
+            PureXML.Validation.splitFindings(findings(for: node, in: document)).errors
+        }
+
+        /// Gathers every warning-severity finding from validating `node` in `document`.
+        public func warnings(for node: PureXML.Model.Node, in document: Document) -> [ValidationError] {
+            PureXML.Validation.splitFindings(findings(for: node, in: document)).warnings
         }
 
         /// Validates `node` in `document`, throwing a ``ValidationErrorCollection``
-        /// if any rule fails.
-        public func validate(_ node: PureXML.Model.Node, in document: Document) throws {
-            let found = errors(for: node, in: document)
-            if !found.isEmpty { throw ValidationErrorCollection(values: found) }
+        /// when any error-severity finding occurs, and also when any warning occurs
+        /// and `strict` is true (the default).
+        public func validate(_ node: PureXML.Model.Node, in document: Document, strict: Bool = true) throws {
+            let split = PureXML.Validation.splitFindings(findings(for: node, in: document))
+            let toThrow = strict ? split.errors + split.warnings : split.errors
+            if !toThrow.isEmpty { throw ValidationErrorCollection(values: toThrow) }
         }
 
-        private func walk(_ node: PureXML.Model.Node, path: [PathKey], _ document: Document, _ errors: inout [ValidationError]) {
-            apply(node, at: path, in: document, into: &errors)
+        private func walk(_ node: PureXML.Model.Node, path: [PathKey], _ document: Document, _ findings: inout [ValidationError]) {
+            apply(node, at: path, in: document, into: &findings)
             switch node {
             case let .document(children):
-                walkChildren(children, path: path, document, &errors)
+                walkChildren(children, path: path, document, &findings)
             case let .element(element):
-                apply(element, at: path, in: document, into: &errors)
+                apply(element, at: path, in: document, into: &findings)
                 for attribute in element.attributes {
-                    apply(attribute, at: path + [.attribute(attribute.name.localName)], in: document, into: &errors)
+                    apply(attribute, at: path + [.attribute(attribute.name.localName)], in: document, into: &findings)
                 }
-                walkChildren(element.children, path: path, document, &errors)
+                walkChildren(element.children, path: path, document, &findings)
             case .text, .cdata, .comment, .processingInstruction:
                 break
             }
         }
 
-        /// Recurses element children, extending the path by `name` (and a sibling
-        /// index only when more than one child shares that name).
         private func walkChildren(
             _ children: [PureXML.Model.Node],
             path: [PathKey],
             _ document: Document,
-            _ errors: inout [ValidationError],
+            _ findings: inout [ValidationError],
         ) {
             let elementNames = children.compactMap { child -> String? in
                 guard case let .element(element) = child else { return nil }
@@ -92,18 +178,46 @@ public extension PureXML.Validation {
             var steps = PathKey.steps(forChildNames: elementNames).makeIterator()
             for child in children {
                 guard case .element = child else {
-                    walk(child, path: path, document, &errors)
+                    walk(child, path: path, document, &findings)
                     continue
                 }
                 let step = steps.next() ?? .element("")
-                walk(child, path: path + [step], document, &errors)
+                walk(child, path: path + [step], document, &findings)
             }
         }
 
-        private func apply(_ value: some Validatable, at path: [PathKey], in document: Document, into errors: inout [ValidationError]) {
+        private func apply(_ value: some Validatable, at path: [PathKey], in document: Document, into findings: inout [ValidationError]) {
             for validation in validations {
-                errors += validation.apply(to: value, at: path, in: document)
+                findings += validation.apply(to: value, at: path, in: document)
+            }
+            if let warningSource = value as? HasWarnings {
+                findings += warningSource.validationWarnings(at: path)
             }
         }
+    }
+}
+
+public extension PureXML.Validation.Validator where Document == Void {
+    /// The default structural validator: schema-independent well-formedness rules.
+    convenience init() {
+        self.init(
+            nonReferenceDefaultValidations: PureXML.Validation.Structural.defaults.map { PureXML.Validation.AnyValidation($0) },
+            referenceDefaultValidations: [],
+            customValidations: [],
+        )
+    }
+}
+
+extension PureXML.Validation.Validator {
+    /// Builds a validator whose default tiers are populated explicitly.
+    static func defaults(
+        nonReference: [PureXML.Validation.AnyValidation<Document>] = [],
+        reference: [PureXML.Validation.AnyValidation<Document>] = [],
+    ) -> PureXML.Validation.Validator<Document> {
+        PureXML.Validation.Validator(
+            nonReferenceDefaultValidations: nonReference,
+            referenceDefaultValidations: reference,
+            customValidations: [],
+        )
     }
 }

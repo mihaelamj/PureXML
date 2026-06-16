@@ -28,20 +28,25 @@ public extension PureXML.Validation {
     }
 }
 
-public extension PureXML.Validation.Validator where Document == Void {
-    /// The default structural validator: schema-independent well-formedness rules.
-    init() {
-        self.init(validations: PureXML.Validation.Structural.defaults.map { PureXML.Validation.AnyValidation($0) })
-    }
-
+extension PureXML.Validation.Validator where Document == Void {
     /// Validates a node with the structural rules, throwing a
     /// ``PureXML/Validation/ValidationErrorCollection`` on any failure.
-    func validate(_ node: PureXML.Model.Node) throws {
-        try validate(node, in: ())
+    func validate(_ node: PureXML.Model.Node, strict: Bool = true) throws {
+        try validate(node, in: (), strict: strict)
     }
 
     /// The structural errors for a node, in document order; empty when valid.
     func errors(for node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {
         errors(for: node, in: ())
+    }
+
+    /// The structural warnings for a node, in document order.
+    func warnings(for node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {
+        warnings(for: node, in: ())
+    }
+
+    /// Every structural finding for a node, errors and warnings together.
+    func findings(for node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {
+        findings(for: node, in: ())
     }
 }

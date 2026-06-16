@@ -149,6 +149,13 @@ public extension PureXML.Schema {
         /// another document. With no hints this is `validate(_:)`.
         public func validate(_ xml: String, schemaLoader: @escaping (String) -> String?) throws -> [PureXML.Validation.ValidationError] {
             let node = try PureXML.parse(xml)
+            return merged(with: node, schemaLoader: schemaLoader).validate(node)
+        }
+
+        /// Merges global declarations from every schema document the instance
+        /// references through `xsi:schemaLocation` or
+        /// `xsi:noNamespaceSchemaLocation`.
+        private func merged(with node: PureXML.Model.Node, schemaLoader: @escaping (String) -> String?) -> Document {
             var combined = self
             for location in Self.hintedSchemaLocations(in: node) {
                 guard let source = schemaLoader(location),
@@ -156,7 +163,7 @@ public extension PureXML.Schema {
                 else { continue }
                 combined = combined.merging(other)
             }
-            return combined.validate(node)
+            return combined
         }
 
         /// The schema-document locations an instance points at through
@@ -191,9 +198,32 @@ public extension PureXML.Schema {
         /// Validates `xml` against the schema while it is pulled event by event (the
         /// libxml2 `xmlTextReader` model) rather than over a built tree. Memory is
         /// bounded to the open-element stack. Content models, attributes, and simple
-        /// content are checked; document-scoped identity constraints (which need the
-        /// whole tree) stay on ``validate(_:)-(String)``.
+        /// content are checked incrementally; document-scoped identity constraints
+        /// are checked once at the end from a parsed tree (the instance is parsed
+        /// again only when constraints are present).
         public func validate(streaming xml: String, limits: PureXML.Parsing.Limits = .default) throws -> [PureXML.Validation.ValidationError] {
+            let identityNode = constraints.isEmpty ? nil : try PureXML.parse(xml)
+            return try validateStreaming(xml, limits: limits, identityNode: identityNode)
+        }
+
+        /// Validates `xml` while it is pulled event by event, additionally honoring
+        /// the instance's `xsi:schemaLocation` and
+        /// `xsi:noNamespaceSchemaLocation` hints through `schemaLoader`. See
+        /// ``validate(_:schemaLoader:)-(String)``.
+        public func validate(
+            streaming xml: String,
+            schemaLoader: @escaping (String) -> String?,
+            limits: PureXML.Parsing.Limits = .default,
+        ) throws -> [PureXML.Validation.ValidationError] {
+            let node = try PureXML.parse(xml)
+            return try merged(with: node, schemaLoader: schemaLoader).validateStreaming(xml, limits: limits, identityNode: node)
+        }
+
+        private func validateStreaming(
+            _ xml: String,
+            limits: PureXML.Parsing.Limits,
+            identityNode: PureXML.Model.Node?,
+        ) throws -> [PureXML.Validation.ValidationError] {
             let validator = PureXML.Schema.ComplexValidator(
                 types: types,
                 nillableElements: nillableElements,
@@ -213,7 +243,21 @@ public extension PureXML.Schema {
             while let event = try reader.next() {
                 driver.consume(event)
             }
-            return driver.finish()
+            var errors = driver.finish()
+            errors += validator.idErrors()
+            if !constraints.isEmpty, let identityNode {
+                errors += identityErrors(in: identityNode)
+            }
+            return errors
+        }
+
+        /// Identity-constraint findings for an already-parsed instance tree.
+        private func identityErrors(in node: PureXML.Model.Node) -> [PureXML.Validation.ValidationError] {
+            guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
+                return []
+            }
+            return PureXML.Schema.IdentityValidator(constraints: constraints)
+                .validate(PureXML.Model.TreeNode(.element(root)), at: [.element(root.name.description)])
         }
 
         /// Validates an already-parsed node tree, so a caller can validate the same

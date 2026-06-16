@@ -42,6 +42,14 @@ public extension PureXML.Schema {
             return engine.streamingValid(state)
         }
 
+        /// Located validation errors for a streaming run. When the stream verdict
+        /// is invalid, falls back to the tree ``errors(in:)`` pass so diagnostics
+        /// stay located rather than a bare false.
+        public func errors(streaming xml: String, limits: PureXML.Parsing.Limits = .default) throws -> [PureXML.Validation.ValidationError] {
+            if try validate(streaming: xml, limits: limits) { return [] }
+            return try errors(in: xml)
+        }
+
         /// Every way `xml` fails the schema, as located errors with recovery hints,
         /// so an editor can show all of a faulty document's problems at once rather
         /// than only the first. An empty array means the document is valid.

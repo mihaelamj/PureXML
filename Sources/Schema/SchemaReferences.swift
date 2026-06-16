@@ -1,17 +1,24 @@
 extension PureXML.Schema.XSDParser {
-    /// The built-in type names a reference may name without a declaration: the
-    /// XSD Part 2 datatypes, the built-in list types, and the ur-types.
-    private static let referenceBuiltins: Set<String> = {
-        var names = Set(PureXML.Schema.BuiltinType.allCases.map(\.rawValue))
-        names.formUnion(["anyType", "anySimpleType", "anyAtomicType", "NOTATION", "IDREFS", "ENTITIES", "NMTOKENS"])
-        return names
-    }()
-
     private struct ResolutionContext {
-        let types: Set<String>
-        let pools: [String: Set<String>]
-        let bindings: [String: String]
-        let targetNamespace: String?
+        let check: ReferenceCheckContext
+
+        init(
+            types: Set<String>,
+            pools: [String: Set<String>],
+            bindings: [String: String],
+            targetNamespace: String?,
+            foreignPools: [String?: [String: Set<String>]],
+            chameleonNamespace: Bool,
+        ) {
+            check = ReferenceCheckContext(
+                types: types,
+                pools: pools,
+                bindings: bindings,
+                targetNamespace: targetNamespace,
+                foreignPools: foreignPools,
+                chameleonNamespace: chameleonNamespace,
+            )
+        }
     }
 
     /// Schema-validity findings for unresolvable references: every QName a schema
@@ -23,10 +30,17 @@ extension PureXML.Schema.XSDParser {
     /// Skipped when the document pulls in external definitions through
     /// `import`/`include`/`redefine`: the default compile does not load them, so
     /// the pools would be incomplete and a reference into them must not be flagged.
-    static func referenceErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext, elements: [String: PureXML.Schema.ElementType]) -> [String] {
+    static func referenceErrors(
+        _ schema: XSDTree,
+        in context: PureXML.Schema.XSDContext,
+        elements: [String: PureXML.Schema.ElementType],
+        containers: [XSDTree],
+    ) -> [String] {
         let xsdErrors = xsdNamespaceReferenceErrors(schema)
         let simpleContentErrors = simpleContentBaseErrors(schema, in: context)
-        if hasExternalReference(schema) { return xsdErrors + simpleContentErrors }
+        if skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) {
+            return xsdErrors + simpleContentErrors
+        }
         let types = referenceBuiltins.union(context.simpleTypes.keys).union(context.complexTypeNodes.keys)
         let pools: [String: Set<String>] = [
             "element": Set(elements.keys),
@@ -34,12 +48,44 @@ extension PureXML.Schema.XSDParser {
             "group": Set(context.groups.keys),
             "attributeGroup": Set(context.attributeGroups.keys),
         ]
-        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
         let targetNamespace = context.targetNamespace
+        let foreignPools = context.compositionLoaded
+            ? foreignComponentPools(containers, mainTargetNamespace: targetNamespace)
+            : [:]
         var errors: [String] = []
-        let resolutionContext = ResolutionContext(types: types, pools: pools, bindings: bindings, targetNamespace: targetNamespace)
-        collectReferenceErrors(schema, in: resolutionContext, into: &errors)
+        let referenceSources: [(XSDTree, String?)]
+        if context.compositionLoaded {
+            let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: targetNamespace)
+            referenceSources = containers.compactMap { container -> (XSDTree, String?)? in
+                guard PureXML.Schema.XSDNode.localName(container) == "schema" else { return nil }
+                let index = containers.firstIndex(where: { $0 === container }) ?? containers.count - 1
+                let effectiveNamespace = namespaceMap[index] ?? targetNamespace
+                return (container, effectiveNamespace)
+            }
+        } else {
+            referenceSources = [(schema, targetNamespace)]
+        }
+        for (source, effectiveNamespace) in referenceSources {
+            let sourceBindings = PureXML.Schema.XSDNode.namespaceBindings(of: source)
+            let chameleonNamespace = PureXML.Schema.XSDNode.attribute(source, "targetNamespace") == nil
+            let resolutionContext = ResolutionContext(
+                types: types,
+                pools: pools,
+                bindings: sourceBindings,
+                targetNamespace: effectiveNamespace,
+                foreignPools: foreignPools,
+                chameleonNamespace: chameleonNamespace,
+            )
+            collectReferenceErrors(source, in: resolutionContext, inheritedBindings: sourceBindings, into: &errors)
+        }
         return xsdErrors + simpleContentErrors + errors
+    }
+
+    /// Whether cross-document schema-validity rules should stand down: an external
+    /// reference is declared but no external document was loaded through a
+    /// `schemaLoader`, so the merged component set is incomplete.
+    static func skipsCrossDocumentRules(_ schema: XSDTree, compositionLoaded: Bool) -> Bool {
+        hasExternalReference(schema) && !compositionLoaded
     }
 
     /// Whether the document declares an `import`, `include`, or `redefine`, so its
@@ -72,15 +118,25 @@ extension PureXML.Schema.XSDParser {
     private static func collectReferenceErrors(
         _ node: XSDTree,
         in resolutionContext: ResolutionContext,
+        inheritedBindings: [String: String],
         into errors: inout [String],
     ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
+        let bindings = mergedNamespaceBindings(on: node, inherited: inheritedBindings)
+        let nodeContext = ResolutionContext(
+            types: resolutionContext.check.types,
+            pools: resolutionContext.check.pools,
+            bindings: bindings,
+            targetNamespace: resolutionContext.check.targetNamespace,
+            foreignPools: resolutionContext.check.foreignPools,
+            chameleonNamespace: resolutionContext.check.chameleonNamespace,
+        )
         if node.name?.namespaceURI == xsdNamespace, let local {
-            errors += referenceErrors(at: node, local: local, in: resolutionContext)
+            errors += referenceErrors(at: node, local: local, in: nodeContext)
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectReferenceErrors(child, in: resolutionContext, into: &errors)
+            collectReferenceErrors(child, in: resolutionContext, inheritedBindings: bindings, into: &errors)
         }
     }
 
@@ -90,65 +146,32 @@ extension PureXML.Schema.XSDParser {
         in resolutionContext: ResolutionContext,
     ) -> [String] {
         var errors: [String] = []
-
-        func isUndeclaredType(_ qname: String) -> Bool {
-            let prefix = PureXML.Schema.XSDNode.prefix(qname)
-            let uri = prefix.flatMap { resolutionContext.bindings[$0] } ?? resolutionContext.bindings[""]
-            let localPart = localName(qname)
-            if uri == xsdNamespace {
-                if resolutionContext.targetNamespace == xsdNamespace {
-                    return !referenceBuiltins.contains(localPart) && !resolutionContext.types.contains(localPart)
-                } else {
-                    return !referenceBuiltins.contains(localPart)
-                }
-            }
-            let target = resolutionContext.targetNamespace
-            if uri == target || ((uri == nil || uri == "") && (target == nil || target == "")) {
-                return !resolutionContext.types.contains(localPart)
-            }
-            return true
-        }
-
-        func isUndeclaredRef(_ qname: String, _ poolName: String) -> Bool {
-            let prefix = PureXML.Schema.XSDNode.prefix(qname)
-            let uri = prefix.flatMap { resolutionContext.bindings[$0] } ?? resolutionContext.bindings[""]
-            let localPart = localName(qname)
-            let target = resolutionContext.targetNamespace
-            if uri == target || ((uri == nil || uri == "") && (target == nil || target == "")) {
-                return resolutionContext.pools[poolName]?.contains(localPart) != true
-            }
-            return true
-        }
-
+        let context = resolutionContext.check
         for attribute in ["type", "base", "itemType"] {
-            if let qname = PureXML.Schema.XSDNode.attribute(node, attribute), isUndeclaredType(qname) {
+            guard let qname = PureXML.Schema.XSDNode.attribute(node, attribute) else { continue }
+            if isUndeclaredReferenceType(qname, in: context) {
                 errors.append("\(attribute) references undeclared type '\(qname)'")
             }
         }
         if let members = PureXML.Schema.XSDNode.attribute(node, "memberTypes") {
             for token in members.split(whereSeparator: \.isWhitespace) {
                 let qname = String(token)
-                if isUndeclaredType(qname) {
+                if isUndeclaredReferenceType(qname, in: context) {
                     errors.append("memberTypes references undeclared type '\(qname)'")
                 }
             }
         }
-        if let head = PureXML.Schema.XSDNode.attribute(node, "substitutionGroup"), isUndeclaredRef(head, "element") {
-            errors.append("substitutionGroup references undeclared element '\(head)'")
+        if let head = PureXML.Schema.XSDNode.attribute(node, "substitutionGroup") {
+            if isUndeclaredReferenceRef(head, poolName: "element", in: context) {
+                errors.append("substitutionGroup references undeclared element '\(head)'")
+            }
         }
-        if let reference = PureXML.Schema.XSDNode.attribute(node, "ref"), resolutionContext.pools[local] != nil {
-            if isUndeclaredRef(reference, local) {
+        if let reference = PureXML.Schema.XSDNode.attribute(node, "ref"), context.pools[local] != nil {
+            if isUndeclaredReferenceRef(reference, poolName: local, in: context) {
                 errors.append("\(local) ref references undeclared '\(reference)'")
             }
         }
         return errors
-    }
-
-    /// The local part of a QName reference, after the whitespace normalization a
-    /// `whiteSpace="collapse"` QName attribute receives (a value may be written
-    /// with surrounding or, harmlessly, interior whitespace).
-    private static func localName(_ qname: String) -> String {
-        PureXML.Schema.XSDNode.stripPrefix(qname.trimmingXMLWhitespace())
     }
 
     static func simpleTypeBaseNotComplexErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext) -> [String] {
