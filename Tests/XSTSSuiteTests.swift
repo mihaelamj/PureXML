@@ -57,10 +57,16 @@ struct XSTSSuiteTests {
     /// one node; cvc-identity-constraint.3) then caught four invalid instances that
     /// were accepted (idF005, idG005, and kin): invalid accepted 147 → 143, no
     /// other bucket moved.
+    ///
+    /// Resolving identity-constraint selector/field XPath prefixes against the
+    /// schema's namespace context (where the constraint is declared) rather than
+    /// the instance document then caught ten more (the idc004/5/6 cluster and
+    /// namespace-resolution cases): invalid accepted 143 → 133, no other bucket
+    /// moved.
     private let knownSchemaValidRejected = 1
     private let knownSchemaInvalidAccepted = 262
     private let knownInstanceValidRejected = 3
-    private let knownInstanceInvalidAccepted = 143
+    private let knownInstanceInvalidAccepted = 133
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

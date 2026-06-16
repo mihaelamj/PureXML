@@ -156,7 +156,13 @@ extension PureXML.Schema.XSDParser {
         }
         let selector = PureXML.Schema.XSDNode.firstChild(node, named: "selector").flatMap { PureXML.Schema.XSDNode.attribute($0, "xpath") } ?? ""
         let fields = PureXML.Schema.XSDNode.children(node, named: "field").compactMap { PureXML.Schema.XSDNode.attribute($0, "xpath") }
-        return PureXML.Schema.IdentityConstraint(name: PureXML.Schema.XSDNode.attribute(node, "name") ?? "", kind: kind, selector: selector, fields: fields)
+        return PureXML.Schema.IdentityConstraint(
+            name: PureXML.Schema.XSDNode.attribute(node, "name") ?? "",
+            kind: kind,
+            selector: selector,
+            fields: fields,
+            namespaceBindings: PureXML.Schema.XSDParser.namespaceBindingsInScope(of: node, defaultBindings: [:]),
+        )
     }
 
     static func descendants(_ node: XSDTree, named name: String) -> [XSDTree] {

@@ -143,46 +143,19 @@ extension PureXML.Schema {
             PureXML.Validation.PathKey.steps(forChildNames: children.map { $0.name?.description ?? "" })
         }
 
-        /// The coding-path steps from the constraint-bearing `container` down to a
-        /// selected `target`, so an identity error locates the actual offending
-        /// element rather than the element that merely declares the constraint.
-        /// Returns an empty path if `target` is not a descendant of `container`.
-        private func steps(from container: PureXML.Model.TreeNode, to target: PureXML.Model.TreeNode) -> [PureXML.Validation.PathKey] {
-            var chain: [PureXML.Model.TreeNode] = []
-            var current = target
-            while current !== container {
-                guard let parent = current.parent else { return [] }
-                chain.append(current)
-                current = parent
-            }
-            var steps: [PureXML.Validation.PathKey] = []
-            var parent = container
-            for node in chain.reversed() {
-                let name = node.name?.description ?? ""
-                let siblings = parent.children.filter { $0.kind == .element && ($0.name?.description ?? "") == name }
-                if siblings.count > 1, let index = siblings.firstIndex(where: { $0 === node }) {
-                    steps.append(.element(name, index: index + 1))
-                } else {
-                    steps.append(.element(name))
-                }
-                parent = node
-            }
-            return steps
-        }
-
         /// The coding-path step from a `target` down to the single field a
         /// constraint names, so an error locates the offending value (`@id`, a
         /// child element) rather than just the target. Empty for a multi-field
         /// constraint or a complex field path, in which case the error stays on the
         /// target.
-        private func fieldStep(_ fields: [String], at target: PureXML.Model.TreeNode) -> [PureXML.Validation.PathKey] {
+        private func fieldStep(_ fields: [String], at target: PureXML.Model.TreeNode, namespaces: [String: String]) -> [PureXML.Validation.PathKey] {
             guard fields.count == 1 else { return [] }
             let field = fields[0]
             if field.hasPrefix("@"), !field.dropFirst().contains(where: { $0 == "/" || $0 == "[" }) {
                 return [.attribute(String(field.dropFirst()))]
             }
             let isSimpleName = !field.contains(where: { "/@[(".contains($0) })
-            if isSimpleName, let child = select(field, at: target).first, child.kind == .element {
+            if isSimpleName, let child = select(field, at: target, namespaces: namespaces).first, child.kind == .element {
                 return steps(from: target, to: child)
             }
             return []
@@ -203,7 +176,7 @@ extension PureXML.Schema {
             guard isNonRef(constraint) else { return }
             var tuples: [[FieldValue?]] = []
             var seen: [[FieldValue?]] = []
-            for target in select(constraint.selector, at: node) {
+            for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
                 if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
                     issues.append(error)
@@ -211,12 +184,18 @@ extension PureXML.Schema {
                 }
                 let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
-                    issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: targetPath + fieldStep(constraint.fields, at: target)))
+                    issues.append(.init(
+                        reason: "key '\(constraint.name)': a field is missing",
+                        at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
+                    ))
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if seen.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "\(label(constraint)) '\(constraint.name)': duplicate value", at: targetPath + fieldStep(constraint.fields, at: target)))
+                    issues.append(.init(
+                        reason: "\(label(constraint)) '\(constraint.name)': duplicate value",
+                        at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
+                    ))
                 } else {
                     seen.append(tuple)
                 }
@@ -234,7 +213,7 @@ extension PureXML.Schema {
         ) {
             guard case let .keyref(refer) = constraint.kind else { return }
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
-            for target in select(constraint.selector, at: node) {
+            for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
                 if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
                     issues.append(error)
@@ -243,7 +222,10 @@ extension PureXML.Schema {
                 let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: targetPath + fieldStep(constraint.fields, at: target)))
+                    issues.append(.init(
+                        reason: "keyref '\(constraint.name)': no matching key '\(refer)'",
+                        at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
+                    ))
                 }
             }
         }
@@ -257,10 +239,10 @@ extension PureXML.Schema {
             at target: PureXML.Model.TreeNode,
             path targetPath: [PureXML.Validation.PathKey],
         ) -> PureXML.Validation.ValidationError? {
-            for field in constraint.fields where select(field, at: target).count > 1 {
+            for field in constraint.fields where select(field, at: target, namespaces: constraint.namespaceBindings).count > 1 {
                 return .init(
                     reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must select at most one node",
-                    at: targetPath + fieldStep(constraint.fields, at: target),
+                    at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
                 )
             }
             return nil
@@ -268,23 +250,26 @@ extension PureXML.Schema {
 
         // MARK: XPath helpers
 
-        private func select(_ xpath: String, at node: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
+        private func select(_ xpath: String, at node: PureXML.Model.TreeNode, namespaces: [String: String]) -> [PureXML.Model.TreeNode] {
             guard let query = cache.query(xpath) else { return [] }
-            return query.nodes(over: node, namespaces: namespaceBindings(at: node))
+            return query.nodes(over: node, namespaces: namespaces)
         }
 
         private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode, constraint: IdentityConstraint) -> [FieldValue?] {
-            let namespaces = namespaceBindings(at: node)
+            // The field XPath's prefixes resolve against the schema (where the
+            // constraint is declared); a QName field VALUE resolves against the
+            // instance, so the FieldValue keeps the instance bindings.
+            let instanceNamespaces = namespaceBindings(at: node)
             return fields.map { field in
                 guard let query = cache.query(field),
-                      let value = try? query.value(at: node, namespaces: namespaces)
+                      let value = try? query.value(at: node, namespaces: constraint.namespaceBindings)
                 else {
                     return nil
                 }
                 if let nodes = value.nodes, nodes.isEmpty { return nil }
                 let type = resolveFieldType(field, constraint: constraint, at: node)
                     ?? Self.effectiveType(of: value)
-                return FieldValue(string: value.string, type: type, namespaceBindings: namespaces)
+                return FieldValue(string: value.string, type: type, namespaceBindings: instanceNamespaces)
             }
         }
 
@@ -361,5 +346,34 @@ extension PureXML.Schema {
         private func label(_ constraint: IdentityConstraint) -> String {
             constraint.kind == .key ? "key" : "unique"
         }
+    }
+}
+
+extension PureXML.Schema.IdentityValidator {
+    /// The coding-path steps from the constraint-bearing `container` down to a
+    /// selected `target`, so an identity error locates the actual offending
+    /// element rather than the element that merely declares the constraint.
+    /// Returns an empty path if `target` is not a descendant of `container`.
+    func steps(from container: PureXML.Model.TreeNode, to target: PureXML.Model.TreeNode) -> [PureXML.Validation.PathKey] {
+        var chain: [PureXML.Model.TreeNode] = []
+        var current = target
+        while current !== container {
+            guard let parent = current.parent else { return [] }
+            chain.append(current)
+            current = parent
+        }
+        var steps: [PureXML.Validation.PathKey] = []
+        var parent = container
+        for node in chain.reversed() {
+            let name = node.name?.description ?? ""
+            let siblings = parent.children.filter { $0.kind == .element && ($0.name?.description ?? "") == name }
+            if siblings.count > 1, let index = siblings.firstIndex(where: { $0 === node }) {
+                steps.append(.element(name, index: index + 1))
+            } else {
+                steps.append(.element(name))
+            }
+            parent = node
+        }
+        return steps
     }
 }

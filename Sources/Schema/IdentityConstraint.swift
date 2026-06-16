@@ -20,12 +20,24 @@ public extension PureXML.Schema {
         public var kind: IdentityConstraintKind
         public var selector: String
         public var fields: [String]
+        /// Prefix-to-namespace bindings in scope where the constraint is declared
+        /// in the schema. Selector and field XPath prefixes resolve against these
+        /// (XSD Part 1, Identity-constraint Definition), not against the instance
+        /// document, so `.//v:vehicle` works whatever prefix the instance uses.
+        public var namespaceBindings: [String: String]
 
-        public init(name: String, kind: IdentityConstraintKind, selector: String, fields: [String]) {
+        public init(
+            name: String,
+            kind: IdentityConstraintKind,
+            selector: String,
+            fields: [String],
+            namespaceBindings: [String: String] = [:],
+        ) {
             self.name = name
             self.kind = kind
             self.selector = selector
             self.fields = fields
+            self.namespaceBindings = namespaceBindings
         }
     }
 }
