@@ -36,6 +36,26 @@ extension PureXML.Schema.XSDParser {
         elements: [String: PureXML.Schema.ElementType],
         containers: [XSDTree],
     ) -> [String] {
+        collectReferenceErrors(schema, in: context, elements: elements, containers: containers)
+    }
+
+    static func referenceFindings(
+        _ schema: XSDTree,
+        in context: PureXML.Schema.XSDContext,
+        elements: [String: PureXML.Schema.ElementType],
+        containers: [XSDTree],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
+        PureXML.Schema.SchemaLocatedFinding.unlocated(
+            collectReferenceErrors(schema, in: context, elements: elements, containers: containers),
+        )
+    }
+
+    private static func collectReferenceErrors(
+        _ schema: XSDTree,
+        in context: PureXML.Schema.XSDContext,
+        elements: [String: PureXML.Schema.ElementType],
+        containers: [XSDTree],
+    ) -> [String] {
         let xsdErrors = xsdNamespaceReferenceErrors(schema)
         let simpleContentErrors = simpleContentBaseErrors(schema, in: context)
         if skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) {

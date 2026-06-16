@@ -54,18 +54,36 @@ extension PureXML.Schema.XSDParser {
     /// once) must be first, and an identity constraint needs a selector and field.
     /// Walks the one document rooted at `schema`, skipping foreign content.
     static func structureErrors(_ schema: XSDTree) -> [String] {
-        var errors: [String] = []
-        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
-        collectStructure(schema, bindings: bindings, into: &errors)
-        errors += simpleTypeVarietyFacetErrors(schema)
-        errors += valueConstraintErrors(schema)
-        errors += topLevelDeclarationErrors(schema)
-        errors += nestedNamedDefinitionErrors(schema)
-        errors += anySimpleTypeRestrictionErrors(schema)
-        return errors
+        structureFindings(schema).map(\.reason)
     }
 
-    private static func collectStructure(_ node: XSDTree, bindings: [String: String], into errors: inout [String]) {
+    static func structureFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
+        collectStructure(schema, bindings: bindings, into: &findings)
+        append(simpleTypeVarietyFacetErrors(schema), at: schema, into: &findings)
+        append(valueConstraintErrors(schema), at: schema, into: &findings)
+        append(topLevelDeclarationErrors(schema), at: schema, into: &findings)
+        append(nestedNamedDefinitionErrors(schema), at: schema, into: &findings)
+        append(anySimpleTypeRestrictionErrors(schema), at: schema, into: &findings)
+        return findings
+    }
+
+    private static func append(
+        _ messages: [String],
+        at node: XSDTree,
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
+    ) {
+        for message in messages {
+            findings.append(PureXML.Schema.SchemaLocatedFinding(reason: message, node: node))
+        }
+    }
+
+    private static func collectStructure(
+        _ node: XSDTree,
+        bindings: [String: String],
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
+    ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         let children = PureXML.Schema.XSDNode.elementChildren(node)
         var currentBindings = bindings
@@ -77,15 +95,15 @@ extension PureXML.Schema.XSDParser {
             }
         }
         if node.name?.namespaceURI == xsdNamespace, let local {
-            errors += attributeValueErrors(node, bindings: currentBindings)
-            errors += occurrenceOrderErrors(node)
-            errors += attributeApplicabilityErrors(node, local: local)
+            append(attributeValueErrors(node, bindings: currentBindings), at: node, into: &findings)
+            append(occurrenceOrderErrors(node), at: node, into: &findings)
+            append(attributeApplicabilityErrors(node, local: local), at: node, into: &findings)
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
-            errors += componentSpecificErrors(node, local: local, names: names)
+            append(componentSpecificErrors(node, local: local, names: names), at: node, into: &findings)
         }
         if local == "appinfo" || local == "documentation" { return }
         for child in children {
-            collectStructure(child, bindings: currentBindings, into: &errors)
+            collectStructure(child, bindings: currentBindings, into: &findings)
         }
     }
 

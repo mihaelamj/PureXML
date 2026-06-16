@@ -9,26 +9,40 @@ extension PureXML.Schema.XSDParser {
     /// Walks the one document rooted at `schema`; an included or imported document
     /// keeps its own `id` scope, so cross-document collisions are not flagged here.
     static func idAttributeErrors(_ schema: XSDTree) -> [String] {
-        var errors: [String] = []
-        var seen: Set<String> = []
-        collectIDErrors(schema, into: &errors, seen: &seen)
-        return errors
+        idAttributeFindings(schema).map(\.reason)
     }
 
-    private static func collectIDErrors(_ node: XSDTree, into errors: inout [String], seen: inout Set<String>) {
+    static func idAttributeFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        var seen: Set<String> = []
+        collectIDFindings(schema, into: &findings, seen: &seen)
+        return findings
+    }
+
+    private static func collectIDFindings(
+        _ node: XSDTree,
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
+        seen: inout Set<String>,
+    ) {
         // `appinfo` and `documentation` hold arbitrary foreign content whose own
         // `id` attributes are not xs:ID; do not descend into them.
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         if let id = unprefixedID(node) {
             if !PureXML.Schema.Lexical.isNCName(id) {
-                errors.append("id attribute value '\(id)' is not a valid NCName")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "id attribute value '\(id)' is not a valid NCName",
+                    node: node,
+                ))
             } else if !seen.insert(id).inserted {
-                errors.append("duplicate id attribute value '\(id)' in the schema document")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "duplicate id attribute value '\(id)' in the schema document",
+                    node: node,
+                ))
             }
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectIDErrors(child, into: &errors, seen: &seen)
+            collectIDFindings(child, into: &findings, seen: &seen)
         }
     }
 

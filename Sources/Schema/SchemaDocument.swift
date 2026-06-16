@@ -15,7 +15,7 @@ public extension PureXML.Schema {
         /// The compiled schema fails one or more consistency rules (a `final`
         /// violation, an unfaithful restriction); every finding is carried, so a
         /// schema with several problems reports them all at once.
-        case inconsistent([String])
+        case inconsistent([PureXML.Validation.ValidationError])
 
         public var description: String {
             switch self {
@@ -28,8 +28,14 @@ public extension PureXML.Schema {
             case let .invalidRelaxNG(reason):
                 "invalid RELAX NG schema: \(reason)"
             case let .inconsistent(findings):
-                findings.joined(separator: "; ")
+                findings.map(\.description).joined(separator: "; ")
             }
+        }
+
+        /// Every compile-time finding when the schema is inconsistent.
+        public var inconsistentFindings: [PureXML.Validation.ValidationError]? {
+            if case let .inconsistent(findings) = self { return findings }
+            return nil
         }
     }
 
@@ -123,12 +129,12 @@ public extension PureXML.Schema {
             // Valid (Restriction)), and ALL findings are reported together, joined
             // with the schema-validity findings gathered while parsing (malformed
             // facet definitions and the like).
-            let findings = PureXML.Validation.XSDSchema.consistencyErrors(
+            let consistencyFindings = PureXML.Validation.XSDSchema.consistencyErrors(
                 types: compiled.types,
                 typeDerivation: compiled.typeDerivation,
                 typeFinal: compiled.typeFinal,
             )
-            let allFindings = compiled.schemaErrors + findings.map { String(describing: $0) }
+            let allFindings = compiled.schemaErrors + consistencyFindings
             if !allFindings.isEmpty {
                 throw SchemaError.inconsistent(allFindings)
             }

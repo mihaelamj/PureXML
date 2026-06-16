@@ -178,26 +178,36 @@ extension PureXML.Schema {
         /// Schema-validity findings gathered while parsing (malformed facet
         /// definitions and the like), reported together with the model-level
         /// consistency findings when the schema is compiled.
-        var schemaErrors: [String] = []
+        var schemaErrors: [PureXML.Validation.ValidationError] = []
     }
 
     /// Collects schema-validity findings during parsing. A reference type so the
     /// findings survive the value-type ``XSDContext``'s copies (`visiting(_:)`):
     /// every copy shares the one collector, and the parser harvests it at the end.
     final class SchemaDiagnostics {
-        private(set) var errors: [String] = []
+        private(set) var errors: [PureXML.Validation.ValidationError] = []
 
-        func report(_ message: String) {
-            errors.append(message)
+        func report(_ error: PureXML.Validation.ValidationError) {
+            errors.append(error)
+        }
+
+        func report(_ reason: String, at node: PureXML.Model.TreeNode?) {
+            report(PureXML.Validation.ValidationError(
+                reason: reason,
+                at: node?.validationCodingPath() ?? [.element("schema")],
+            ))
         }
 
         /// The findings with exact-duplicate messages removed, first occurrence
         /// kept. The same malformed definition is visited more than once (named
         /// simple types resolve over repeated passes), so dedup keeps one finding
         /// per distinct problem.
-        var deduplicated: [String] {
+        var deduplicated: [PureXML.Validation.ValidationError] {
             var seen: Set<String> = []
-            return errors.filter { seen.insert($0).inserted }
+            return errors.filter {
+                let key = "\(PureXML.Validation.PathKey.render($0.codingPath))|\($0.reason)"
+                return seen.insert(key).inserted
+            }
         }
     }
 

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Schema compile diagnostics are now located: `SchemaError.inconsistent` carries `[ValidationError]` with coding paths that resolve to `TreeNode.sourceRange` on a ranged schema tree (#169). Parse-time facet and structure findings attach to their declaring nodes where possible; `SchemaError.inconsistentFindings` exposes the full list. Schematron reuses the shared `validationCodingPath()` helper.
+
 - DTD parse-time validity findings are warnings until strict validation promotes them; `validateAgainstInternalDTD` returns full findings (errors and warnings).
  - 2026-06-16
 

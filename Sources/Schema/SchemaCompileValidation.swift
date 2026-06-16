@@ -35,6 +35,16 @@ extension PureXML.Schema {
     /// A marker subject for compile-time schema checks that run once over the
     /// whole schema document rather than per node in an instance tree.
     struct SchemaCompileRoot: PureXML.Validation.Validatable {}
+
+    /// One schema compile finding with an optional source node for location.
+    struct SchemaLocatedFinding {
+        let reason: String
+        let node: PureXML.Model.TreeNode?
+
+        static func unlocated(_ reasons: [String]) -> [SchemaLocatedFinding] {
+            reasons.map { SchemaLocatedFinding(reason: $0, node: nil) }
+        }
+    }
 }
 
 extension PureXML.Validation {
@@ -47,71 +57,83 @@ extension PureXML.Validation {
 
         static var idAttributesValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema component id attributes are valid NCNames and unique") { document in
-                PureXML.Schema.XSDParser.idAttributeErrors(document.schema)
+                PureXML.Schema.XSDParser.idAttributeFindings(document.schema)
             }
         }
 
         static var schemaStructureValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema vocabulary elements follow the schema-for-schemas structure") { document in
-                PureXML.Schema.XSDParser.structureErrors(document.schema)
+                PureXML.Schema.XSDParser.structureFindings(document.schema)
             }
         }
 
         static var componentNamesUnique: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Global schema component names are unique within their symbol spaces") { document in
-                PureXML.Schema.XSDParser.componentNameErrors(document.schema, document.containers, document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.componentNameErrors(document.schema, document.containers, document.context),
+                )
             }
         }
 
         static var simpleTypeFinalControlsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple-type final controls are declared consistently") { document in
-                PureXML.Schema.XSDParser.simpleTypeFinalErrors(
-                    document.schema,
-                    compositionLoaded: document.context.compositionLoaded,
-                    containers: document.containers,
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.simpleTypeFinalErrors(
+                        document.schema,
+                        compositionLoaded: document.context.compositionLoaded,
+                        containers: document.containers,
+                    ),
                 )
             }
         }
 
         static var contentModelsDeterministic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema content models are deterministic (UPA)") { document in
-                PureXML.Schema.ContentModelDeterminism.violations(in: document.schema, context: document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.ContentModelDeterminism.violations(in: document.schema, context: document.context),
+                )
             }
         }
 
         static var typeDerivationAcyclic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Type derivation chains contain no cycles") { document in
-                PureXML.Schema.XSDParser.derivationCycleErrors(
-                    document.containers,
-                    document.context.namespaceBindings,
-                    document.context.targetNamespace,
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.derivationCycleErrors(
+                        document.containers,
+                        document.context.namespaceBindings,
+                        document.context.targetNamespace,
+                    ),
                 )
             }
         }
 
         static var typeReferencesAcyclic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema type references contain no cycles") { document in
-                PureXML.Schema.XSDParser.circularReferenceErrors(
-                    document.containers,
-                    document.context.namespaceBindings,
-                    document.context.targetNamespace,
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.circularReferenceErrors(
+                        document.containers,
+                        document.context.namespaceBindings,
+                        document.context.targetNamespace,
+                    ),
                 )
             }
         }
 
         static var allGroupReferencesPlaced: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("xs:all group references appear only where permitted") { document in
-                PureXML.Schema.XSDParser.allGroupReferencePlacementErrors(
-                    document.containers,
-                    document.context.namespaceBindings,
-                    document.context.targetNamespace,
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.allGroupReferencePlacementErrors(
+                        document.containers,
+                        document.context.namespaceBindings,
+                        document.context.targetNamespace,
+                    ),
                 )
             }
         }
 
         static var includesCompositionValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Included schemas are chameleon or match the includer targetNamespace") { document in
-                PureXML.Schema.XSDParser.includeCompositionErrors(
+                PureXML.Schema.XSDParser.includeCompositionFindings(
                     document.containers,
                     mainTargetNamespace: document.context.targetNamespace,
                     compositionLoaded: document.context.compositionLoaded,
@@ -125,7 +147,7 @@ extension PureXML.Validation {
         static var schemaReferencesResolve: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Every schema reference resolves to a declared component") { document in
                 guard let globalElements = document.globalElements else { return [] }
-                return PureXML.Schema.XSDParser.referenceErrors(
+                return PureXML.Schema.XSDParser.referenceFindings(
                     document.schema,
                     in: document.context,
                     elements: globalElements,
@@ -136,25 +158,31 @@ extension PureXML.Validation {
 
         static var attributeUsesValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Attribute uses are unique and declare at most one ID attribute") { document in
-                PureXML.Schema.XSDParser.attributeUseErrors(document.containers, document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.attributeUseErrors(document.containers, document.context),
+                )
             }
         }
 
         static var idValueConstraintsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("ID-typed value constraints are valid") { document in
-                PureXML.Schema.XSDParser.idValueConstraintErrors(document.schema, document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.idValueConstraintErrors(document.schema, document.context),
+                )
             }
         }
 
         static var substitutionMembersDeriveCorrectly: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Substitution-group members derive correctly from their head") { document in
                 guard let derivation = document.derivation, let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.XSDParser.substitutionTypeErrors(
-                    document.schema,
-                    document.containers,
-                    derivation,
-                    namedTypes,
-                    document.context,
+                return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.substitutionTypeErrors(
+                        document.schema,
+                        document.containers,
+                        derivation,
+                        namedTypes,
+                        document.context,
+                    ),
                 )
             }
         }
@@ -162,39 +190,51 @@ extension PureXML.Validation {
         static var userTypeValueConstraintsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Element value constraints are valid against their declared types") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.XSDParser.userTypeValueConstraintErrors(document.schema, document.context, namedTypes)
+                return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.userTypeValueConstraintErrors(document.schema, document.context, namedTypes),
+                )
             }
         }
 
         static var extensionAllGroupsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Complex types extending xs:all groups satisfy XSD placement rules") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.XSDParser.extensionAllGroupErrors(document.schema, document.context, namedTypes)
+                return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.extensionAllGroupErrors(document.schema, document.context, namedTypes),
+                )
             }
         }
 
         static var attributeRestrictionsFaithful: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Attribute restrictions are faithful to their bases") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.XSDParser.attributeRestrictionErrors(document.schema, document.context, namedTypes)
+                return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.attributeRestrictionErrors(document.schema, document.context, namedTypes),
+                )
             }
         }
 
         static var simpleTypeBasesAreSimple: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple types do not derive from complex types") { document in
-                PureXML.Schema.XSDParser.simpleTypeBaseNotComplexErrors(document.schema, in: document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.simpleTypeBaseNotComplexErrors(document.schema, in: document.context),
+                )
             }
         }
 
         static var simpleTypeVarietiesValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple-type varieties are declared consistently") { document in
-                PureXML.Schema.XSDParser.simpleTypeVarietyErrors(document.schema, document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.simpleTypeVarietyErrors(document.schema, document.context),
+                )
             }
         }
 
         static var notationsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Notation declarations are valid") { document in
-                PureXML.Schema.XSDParser.notationValidityErrors(document.containers, document.context)
+                PureXML.Schema.SchemaLocatedFinding.unlocated(
+                    PureXML.Schema.XSDParser.notationValidityErrors(document.containers, document.context),
+                )
             }
         }
 
@@ -279,13 +319,20 @@ extension PureXML.Validation {
 
         private static func compileRule(
             _ description: String,
-            _ messages: @escaping (PureXML.Schema.SchemaCompileContext) -> [String],
+            _ findings: @escaping (PureXML.Schema.SchemaCompileContext) -> [PureXML.Schema.SchemaLocatedFinding],
         ) -> Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             .init(description: description) { context in
-                messages(context.document).map {
-                    ValidationError(reason: $0, at: context.codingPath)
+                findings(context.document).map { finding in
+                    ValidationError(
+                        reason: finding.reason,
+                        at: finding.node?.validationCodingPath() ?? context.codingPath,
+                    )
                 }
             }
+        }
+
+        static func locatedFindings(_ reasons: [String], at node: PureXML.Model.TreeNode?) -> [PureXML.Schema.SchemaLocatedFinding] {
+            reasons.map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: node) }
         }
     }
 }

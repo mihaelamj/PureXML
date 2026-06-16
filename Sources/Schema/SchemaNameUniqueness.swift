@@ -295,9 +295,23 @@ extension PureXML.Schema.XSDParser {
         compositionLoaded: Bool,
         containerLocations: [ObjectIdentifier: String?],
     ) -> [String] {
+        includeCompositionFindings(
+            containers,
+            mainTargetNamespace: mainTargetNamespace,
+            compositionLoaded: compositionLoaded,
+            containerLocations: containerLocations,
+        ).map(\.reason)
+    }
+
+    static func includeCompositionFindings(
+        _ containers: [XSDTree],
+        mainTargetNamespace: String?,
+        compositionLoaded: Bool,
+        containerLocations: [ObjectIdentifier: String?],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard compositionLoaded else { return [] }
         let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: mainTargetNamespace)
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for (parentIndex, parent) in containers.enumerated() {
             guard PureXML.Schema.XSDNode.localName(parent) == "schema" else { continue }
             let parentNamespace = resolvedNamespace(at: parentIndex, in: namespaceMap, fallback: mainTargetNamespace)
@@ -311,13 +325,14 @@ extension PureXML.Schema.XSDParser {
                 let includedNamespace = PureXML.Schema.XSDNode.attribute(containers[includedIndex], "targetNamespace")
                 if let includedNamespace, includedNamespace != parentNamespace {
                     let parentLabel = parentNamespace ?? "no namespace"
-                    errors.append(
-                        "included schema targetNamespace '\(includedNamespace)' must match includer targetNamespace '\(parentLabel)' or be chameleon (no targetNamespace)",
-                    )
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "included schema targetNamespace '\(includedNamespace)' must match includer targetNamespace '\(parentLabel)' or be chameleon (no targetNamespace)",
+                        node: child,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     private static func resolvedNamespace(at index: Int, in map: [Int: String?], fallback: String?) -> String? {

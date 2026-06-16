@@ -136,8 +136,8 @@ struct XSDSchemaValidationTests {
                 return
             }
             #expect(findings.count == 2)
-            #expect(findings.contains { $0.contains("declares final") })
-            #expect(findings.contains { $0.contains("not a valid restriction") })
+            #expect(findings.contains { $0.reason.contains("declares final") })
+            #expect(findings.contains { $0.reason.contains("not a valid restriction") })
         }
     }
 

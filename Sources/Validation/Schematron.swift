@@ -157,7 +157,7 @@ public extension PureXML.Validation {
             diagnostics: [String: [SchematronMessagePart]],
             _ functions: Functions,
         ) -> [ValidationError] {
-            let path = codingPath(of: node)
+            let path = node.validationCodingPath()
             var errors: [ValidationError] = []
             for assertion in assertions {
                 let holds = (try? assertion.test.value(at: node, position: 1, size: 1, variables: variables, functions: functions(node)).boolean) ?? false
@@ -205,28 +205,6 @@ public extension PureXML.Validation {
                 }
             }.joined()
             return joined.split(whereSeparator: \.isWhitespace).joined(separator: " ")
-        }
-
-        /// The coding path of a context node, built from the element chain to the
-        /// root (a sibling index only when a name repeats), so each finding is
-        /// located at the node its rule fired on rather than the document root.
-        private static func codingPath(of node: PureXML.Model.TreeNode) -> [PathKey] {
-            var steps: [PathKey] = []
-            var current: PureXML.Model.TreeNode? = node
-            while let element = current, element.kind == .element, let name = element.name?.description {
-                steps.append(step(for: element, named: name))
-                current = element.parent
-            }
-            return steps.reversed()
-        }
-
-        private static func step(for element: PureXML.Model.TreeNode, named name: String) -> PathKey {
-            guard let parent = element.parent else { return .element(name) }
-            let siblings = parent.children.filter { $0.kind == .element && $0.name?.description == name }
-            guard siblings.count > 1, let index = siblings.firstIndex(where: { $0 === element }) else {
-                return .element(name)
-            }
-            return .element(name, index: index + 1)
         }
     }
 }

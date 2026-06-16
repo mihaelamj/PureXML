@@ -51,7 +51,7 @@ extension PureXML.Schema {
                 compositionLoaded: compositionLoaded,
             )
             for error in PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers) {
-                context.diagnostics.report(error.reason)
+                context.diagnostics.report(error)
             }
             var types = namedTypes(containers, into: &context)
             let elements = globalElements(containers, context, into: &types)
@@ -64,7 +64,7 @@ extension PureXML.Schema {
                 namedTypes: types,
             )
             for error in PureXML.Validation.SchemaCompile.postCompileErrors(in: postCompileDocument) {
-                context.diagnostics.report(error.reason)
+                context.diagnostics.report(error)
             }
             return buildCompiled(
                 elements: elements,
