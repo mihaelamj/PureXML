@@ -57,7 +57,7 @@ extension PureXML.Schema {
 }
 
 extension PureXML.Schema.XSDParser {
-    private static func containerLocationMap(
+    static func containerLocationMap(
         _ containerTuples: [(location: String?, tree: XSDTree)],
         rootLocation: String?,
     ) -> [ObjectIdentifier: String?] {
@@ -68,13 +68,13 @@ extension PureXML.Schema.XSDParser {
         return containerLocations
     }
 
-    private static func createContext(
+    static func createContext(
         schema: XSDTree,
         containers: [XSDTree],
         derivation: DerivationTables,
         containerLocations: [ObjectIdentifier: String?],
         compositionLoaded: Bool,
-    ) -> XSDContext {
+    ) -> PureXML.Schema.XSDContext {
         var context = XSDContext(
             simpleTypes: [:],
             attributeGroups: indexByName(allChildren(containers, named: "attributeGroup")),
@@ -137,12 +137,12 @@ extension PureXML.Schema.XSDParser {
         var identityFieldTypes: [String: SimpleType]
     }
 
-    private static func finishCompile(
+    static func finishCompile(
         schema: XSDTree,
         containers: [XSDTree],
         derivation: DerivationTables,
-        context: inout XSDContext,
-    ) -> XSDCompiled {
+        context: inout PureXML.Schema.XSDContext,
+    ) -> PureXML.Schema.XSDCompiled {
         for error in PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers) {
             context.diagnostics.report(error)
         }

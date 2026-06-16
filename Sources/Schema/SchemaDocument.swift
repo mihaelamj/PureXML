@@ -123,8 +123,7 @@ public extension PureXML.Schema {
         /// schema source; it returns nil (the default) when external schemas are
         /// not available, which keeps compilation from reaching the filesystem or
         /// network by default.
-        public init(_ xsd: String, schemaLoader: @escaping (String) -> String? = { _ in nil }) throws {
-            let compiled = try XSDParser.parse(xsd, loader: schemaLoader)
+        private init(compiled: XSDCompiled) throws {
             elements = compiled.elements
             types = compiled.types
             constraints = compiled.constraints
@@ -372,5 +371,23 @@ public extension PureXML.Schema {
             guard let completions = completions(at: path, in: tree), let element = tree.node(at: path) else { return [] }
             return PureXML.QuickFixEngine.fixes(from: completions, element: element)
         }
+    }
+}
+
+public extension PureXML.Schema.Document {
+    /// Compiles a schema document. `schemaLoader` resolves the `schemaLocation` of
+    /// `xs:include`, `xs:import`, and `xs:redefine` to schema source; it returns
+    /// nil (the default) when external schemas are not available, which keeps
+    /// compilation from reaching the filesystem or network by default.
+    init(_ xsd: String, schemaLoader: @escaping (String) -> String? = { _ in nil }) throws {
+        try self.init(compiled: PureXML.Schema.XSDParser.parse(xsd, loader: schemaLoader))
+    }
+
+    /// Compiles several schema documents that jointly form one schema as a single
+    /// union (#161), so cross-document substitution-group membership is resolved.
+    /// Use this rather than compiling each document and merging the results, which
+    /// freezes each document's content models before the others are known.
+    init(composing sources: [String], schemaLoader: @escaping (String) -> String? = { _ in nil }) throws {
+        try self.init(compiled: PureXML.Schema.XSDParser.parse(union: sources, loader: schemaLoader))
     }
 }

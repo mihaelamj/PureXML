@@ -45,12 +45,16 @@ struct XSTSSuiteTests {
     /// than a by-name lookup (#180) then cleared isDefault079 (two same-named
     /// particles with different `fixed` values) and QFE1700c2 (an element matching
     /// a `skip` wildcard must not be validated against its global declaration):
-    /// instances rejected 6 → 4, no other bucket moved. The remaining four are the
-    /// three Ethiopic-digit `\d` cases (reS17, reS38, reZ004v) and ctZ007 (a
-    /// cross-document substitution group, tracked under #180/#161).
+    /// instances rejected 6 → 4, no other bucket moved.
+    ///
+    /// Compiling an import chain of schema documents as a union rather than merging
+    /// separately compiled documents (#161) then cleared ctZ007, a cross-document
+    /// substitution group: instances rejected 4 → 3, no other bucket moved. The
+    /// remaining three are the Ethiopic-digit `\d` cases (reS17, reS38, reZ004v),
+    /// which contradict `\d` = `\p{Nd}` and are tracked as suspect tests.
     private let knownSchemaValidRejected = 1
     private let knownSchemaInvalidAccepted = 262
-    private let knownInstanceValidRejected = 4
+    private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 147
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
@@ -122,30 +126,7 @@ struct XSTSSuiteTests {
             let hrefs = references(in: .element(schemaTest), named: "schemaDocument")
             guard !hrefs.isEmpty else { continue }
             schemaExpectedValid = expectedValidity(schemaTest) != "invalid"
-            // A schemaTest's documents jointly form the schema under test (one is
-            // typically the entry point that imports the others; their order in the
-            // metadata is not significant). Compile each and merge so the schema is
-            // complete regardless of which document declares the root.
-            var compiled: PureXML.Schema.Document?
-            var allCompiled = true
-            for href in hrefs {
-                let schemaPath = resolve(href, against: directory)
-                let schemaDirectory = self.directory(of: schemaPath)
-                let loader: (String) -> String? = { location in
-                    (try? String(contentsOfFile: resolve(location, against: schemaDirectory), encoding: .utf8))
-                }
-                guard let source = try? String(contentsOfFile: schemaPath, encoding: .utf8) else {
-                    counters.note("\(name): unreadable schema \(href)")
-                    allCompiled = false
-                    continue
-                }
-                guard let document = try? PureXML.Schema.Document(source, schemaLoader: loader) else {
-                    allCompiled = false
-                    continue
-                }
-                compiled = compiled.map { $0.merged(with: document) } ?? document
-            }
-            if !allCompiled { compiled = nil }
+            let compiled = compileSchemaDocuments(hrefs, directory: directory, name: name, into: &counters)
             switch (schemaExpectedValid, compiled == nil) {
             case (true, true):
                 counters.schemaValidRejected += 1
@@ -159,6 +140,60 @@ struct XSTSSuiteTests {
             schema = compiled
         }
         return (schema, schemaExpectedValid)
+    }
+
+    /// Compiles a schemaTest's documents into one schema. When one document
+    /// imports another listed document they form an import chain and are compiled
+    /// as a union so cross-document substitution groups resolve (#161); otherwise
+    /// they are independent roots, composed through the lenient per-document merge
+    /// (a union of independent roots wrongly trips cross-document checks).
+    private func compileSchemaDocuments(
+        _ hrefs: [String],
+        directory: String,
+        name: String,
+        into counters: inout Counters,
+    ) -> PureXML.Schema.Document? {
+        let schemaDirectory = self.directory(of: resolve(hrefs[0], against: directory))
+        let loader: (String) -> String? = { location in
+            (try? String(contentsOfFile: resolve(location, against: schemaDirectory), encoding: .utf8))
+        }
+        let basenames = hrefs.map { String($0.split(separator: "/").last ?? "") }
+        var sources: [(name: String, text: String)] = []
+        for (index, href) in hrefs.enumerated() {
+            guard let source = try? String(contentsOfFile: resolve(href, against: directory), encoding: .utf8) else {
+                counters.note("\(name): unreadable schema \(href)")
+                return nil
+            }
+            sources.append((basenames[index], source))
+        }
+        let isImportChain = sources.contains { source in
+            importedBasenames(of: source.text).contains { $0 != source.name && basenames.contains($0) }
+        }
+        if isImportChain {
+            return try? PureXML.Schema.Document(composing: sources.map(\.text), schemaLoader: loader)
+        }
+        var merged: PureXML.Schema.Document?
+        for source in sources {
+            guard let document = try? PureXML.Schema.Document(source.text, schemaLoader: loader) else { return nil }
+            merged = merged.map { $0.merged(with: document) } ?? document
+        }
+        return merged
+    }
+
+    /// The basenames a schema source imports, includes, or redefines, used to tell
+    /// an import chain (compile as a union) from independent roots (merge). Matches
+    /// the `schemaLocation` attribute, not a raw substring, so a name appearing in
+    /// documentation or as a suffix of another name does not misclassify.
+    private func importedBasenames(of source: String) -> Set<String> {
+        guard let node = try? PureXML.parse(source, limits: .init(allowDoctype: true)) else { return [] }
+        var result: Set<String> = []
+        for kind in ["import", "include", "redefine"] {
+            for element in elements(named: kind, under: node) {
+                guard let location = element.attributes.first(where: { $0.name.localName == "schemaLocation" })?.value else { continue }
+                result.insert(String(location.split(separator: "/").last ?? ""))
+            }
+        }
+        return result
     }
 
     private func runInstanceTests(
