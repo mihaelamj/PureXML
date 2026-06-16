@@ -204,8 +204,12 @@ extension PureXML.Schema {
             var tuples: [[FieldValue?]] = []
             var seen: [[FieldValue?]] = []
             for target in select(constraint.selector, at: node) {
-                let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 let targetPath = path + steps(from: node, to: target)
+                if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
+                    issues.append(error)
+                    continue
+                }
+                let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
                     issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: targetPath + fieldStep(constraint.fields, at: target)))
                     continue
@@ -231,13 +235,35 @@ extension PureXML.Schema {
             guard case let .keyref(refer) = constraint.kind else { return }
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
             for target in select(constraint.selector, at: node) {
+                let targetPath = path + steps(from: node, to: target)
+                if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
+                    issues.append(error)
+                    continue
+                }
                 let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
-                    let targetPath = path + steps(from: node, to: target)
                     issues.append(.init(reason: "keyref '\(constraint.name)': no matching key '\(refer)'", at: targetPath + fieldStep(constraint.fields, at: target)))
                 }
             }
+        }
+
+        /// The error when a field of `constraint` selects more than one node at
+        /// `target`. A field must evaluate to a node-set with at most one member
+        /// (Identity-constraint Definition; cvc-identity-constraint.3); selecting
+        /// several is a violation, not a multi-valued key.
+        private func fieldCardinalityError(
+            _ constraint: IdentityConstraint,
+            at target: PureXML.Model.TreeNode,
+            path targetPath: [PureXML.Validation.PathKey],
+        ) -> PureXML.Validation.ValidationError? {
+            for field in constraint.fields where select(field, at: target).count > 1 {
+                return .init(
+                    reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must select at most one node",
+                    at: targetPath + fieldStep(constraint.fields, at: target),
+                )
+            }
+            return nil
         }
 
         // MARK: XPath helpers

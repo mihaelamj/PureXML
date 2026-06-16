@@ -52,10 +52,15 @@ struct XSTSSuiteTests {
     /// substitution group: instances rejected 4 → 3, no other bucket moved. The
     /// remaining three are the Ethiopic-digit `\d` cases (reS17, reS38, reZ004v),
     /// which contradict `\d` = `\p{Nd}` and are tracked as suspect tests.
+    ///
+    /// Enforcing identity-constraint field cardinality (a field must select at most
+    /// one node; cvc-identity-constraint.3) then caught four invalid instances that
+    /// were accepted (idF005, idG005, and kin): invalid accepted 147 → 143, no
+    /// other bucket moved.
     private let knownSchemaValidRejected = 1
     private let knownSchemaInvalidAccepted = 262
     private let knownInstanceValidRejected = 3
-    private let knownInstanceInvalidAccepted = 147
+    private let knownInstanceInvalidAccepted = 143
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
