@@ -7,9 +7,12 @@ extension PureXML.Schema.ComplexValidator {
         child: PureXML.Model.Element,
         at path: [PureXML.Validation.PathKey],
     ) -> PureXML.Validation.ValidationError? {
-        guard abstractTypes.contains(name), Self.xsiTypeName(child) == nil else { return nil }
+        guard abstractTypes.contains(PureXML.Schema.XSDParser.bareTypeLocalName(name)),
+              Self.xsiTypeName(child) == nil
+        else { return nil }
+        let bare = PureXML.Schema.XSDParser.bareTypeLocalName(name)
         return PureXML.Validation.ValidationError(
-            reason: "element '\(child.name.localName)' has abstract type '\(name)' and requires an xsi:type naming a concrete derived type",
+            reason: "element '\(child.name.localName)' has abstract type '\(bare)' and requires an xsi:type naming a concrete derived type",
             at: path,
         )
     }
@@ -24,17 +27,23 @@ extension PureXML.Schema.ComplexValidator {
         at path: [PureXML.Validation.PathKey],
     ) -> PureXML.Validation.ValidationError? {
         guard case let .typeReference(reference) = declared,
-              let substitute = Self.xsiTypeName(child), types[substitute] != nil
+              let substitute = Self.xsiTypeName(child),
+              Self.resolveNamedType(substitute, in: types) != nil
         else {
             return nil
         }
         // A ref'd child carries its type as an element-ref key (`element:foo`)
         // that resolves through `types` to the concrete type; follow that chain
         // to the declared type name the derivation backbone and `block` use.
-        var declaredName = reference
+        var declaredKey = reference
+        var declaredName = PureXML.Schema.XSDParser.bareTypeLocalName(reference)
         var steps = 0
-        while case let .typeReference(next)? = types[declaredName], next != declaredName, steps <= types.count {
-            declaredName = next
+        while steps <= types.count {
+            guard let resolved = types[declaredKey] ?? Self.resolveNamedType(declaredKey, in: types),
+                  case let .typeReference(next) = resolved
+            else { break }
+            declaredKey = next
+            declaredName = PureXML.Schema.XSDParser.bareTypeLocalName(next)
             steps += 1
         }
         guard let methods = PureXML.Schema.XSDParser.derivationMethods(from: substitute, to: declaredName, typeDerivation) else {

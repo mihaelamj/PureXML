@@ -1,7 +1,6 @@
 extension PureXML.Regex {
     /// An error compiling a regular expression.
     enum RegexError: Swift.Error, Equatable, Sendable, CustomStringConvertible {
-        case empty
         case unbalanced
         case danglingQuantifier
         case badEscape(String)
@@ -11,7 +10,6 @@ extension PureXML.Regex {
 
         var description: String {
             switch self {
-            case .empty: "the pattern is empty"
             case .unbalanced: "unbalanced parentheses"
             case .danglingQuantifier: "a quantifier has nothing to repeat"
             case let .badEscape(detail): "invalid escape '\\\(detail)'"
@@ -33,15 +31,17 @@ extension PureXML.Regex {
 
         func contains(_ scalar: Unicode.Scalar) -> Bool {
             switch self {
-            case .digit: scalar.properties.numericType == .decimal
-            case .space: scalar == " " || scalar == "\t" || scalar == "\n" || scalar == "\r"
-            // XSD \w is [#x0000-#x10FFFF]-[\p{P}\p{Z}\p{C}]: everything except
-            // punctuation, separators, and other. So symbols and marks are word
-            // characters, and `_` (Pc) is not, unlike the Perl definition.
-            case .word: !(CategoryMatcher.matches("P", scalar) || CategoryMatcher.matches("Z", scalar) || CategoryMatcher.matches("C", scalar))
-            case .nameStart: PureXML.Parsing.XMLCharacter.isNameStart(scalar)
-            case .nameChar: PureXML.Parsing.XMLCharacter.isNameChar(scalar)
-            case .anyButLineBreak: scalar != "\n" && scalar != "\r"
+            case .digit: return XSDCategory.generalCategoryCode(scalar) == "Nd"
+            case .space: return scalar == " " || scalar == "\t" || scalar == "\n" || scalar == "\r"
+            // XSD \w is [#x0000-#x10FFFF]-[\p{P}\p{Z}\p{C}] (Datatypes Appendix F).
+            // Symbols and marks are word characters; `_` (Pc) is not, unlike the
+            // Perl definition.
+            case .word:
+                let code = XSDCategory.generalCategoryCode(scalar)
+                return !(code.hasPrefix("P") || code.hasPrefix("Z") || code.hasPrefix("C"))
+            case .nameStart: return PureXML.Parsing.XMLCharacter.isNameStart(scalar)
+            case .nameChar: return PureXML.Parsing.XMLCharacter.isNameChar(scalar)
+            case .anyButLineBreak: return scalar != "\n" && scalar != "\r"
             }
         }
     }
@@ -62,11 +62,15 @@ extension PureXML.Regex {
             guard character.unicodeScalars.count == 1, let scalar = character.unicodeScalars.first else {
                 return false
             }
+            return matches(scalar)
+        }
+
+        func matches(_ scalar: Unicode.Scalar) -> Bool {
             var hit = ranges.contains { $0.contains(scalar) }
                 || named.contains { $0.contains(scalar) }
                 || negatedNamed.contains { !$0.contains(scalar) }
                 || categories.contains { $0.contains(scalar) }
-            if hit, subtraction.contains(where: { $0.matches(character) }) { hit = false }
+            if hit, subtraction.contains(where: { $0.matches(scalar) }) { hit = false }
             return negated ? !hit : hit
         }
 

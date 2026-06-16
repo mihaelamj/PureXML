@@ -2,6 +2,11 @@
 /// namespace to avoid nesting a type two levels deep.
 typealias XSDFailure = PureXML.Validation.ValidationError
 typealias XSDPath = [PureXML.Validation.PathKey]
+private struct XSDChildValidationFrame {
+    let path: XSDPath
+    let namespaceBindings: [String: String]
+}
+
 private typealias XSDGroup = PureXML.Schema.Group
 private typealias XSDTerm = PureXML.Schema.Term
 private typealias XSDTermLabel = PureXML.Schema.TermLabel
@@ -30,6 +35,8 @@ public extension PureXML.Schema {
         let elementBlock: [String: Set<DerivationMethod>]
         /// Each named complex type's base and derivation method.
         let typeDerivation: [String: TypeDerivation]
+        /// Global attribute declarations for strict/lax `anyAttribute` validation.
+        let globalAttributes: [String: AttributeUse]
         /// Document-scoped xs:ID/xs:IDREF accumulator, filled during the typed walk
         /// and reported by `idErrors()` once the whole tree has been seen. See the
         /// ID/IDREF extension for `idErrors()` and `recordIDs(_:value:at:)`.
@@ -37,6 +44,7 @@ public extension PureXML.Schema {
 
         public init(
             types: [String: ElementType] = [:],
+            globalAttributes: [String: AttributeUse] = [:],
             nillableElements: Set<String> = [],
             elementConstraints: [String: ValueConstraint] = [:],
             abstractTypes: Set<String> = [],
@@ -45,6 +53,7 @@ public extension PureXML.Schema {
             typeDerivation: [String: TypeDerivation] = [:],
         ) {
             self.types = types
+            self.globalAttributes = globalAttributes
             self.nillableElements = nillableElements
             self.elementConstraints = elementConstraints
             self.abstractTypes = abstractTypes
@@ -58,7 +67,9 @@ public extension PureXML.Schema {
             _ element: PureXML.Model.Element,
             against type: ComplexType,
             at path: [PureXML.Validation.PathKey] = [],
+            namespaceBindings inheritedBindings: [String: String] = [:],
         ) -> [PureXML.Validation.ValidationError] {
+            let namespaceBindings = Self.namespaceBindings(for: element, inherited: inheritedBindings)
             var errors: [XSDFailure] = []
             validateAttributes(element, type, at: path, into: &errors)
             // An xsi:nil element keeps its attribute obligations but must have no
@@ -66,7 +77,7 @@ public extension PureXML.Schema {
             if let nilErrors = nilErrors(element, at: path) {
                 return errors + nilErrors
             }
-            validateContent(element, type.content, at: path, into: &errors)
+            validateContent(element, type.content, at: path, namespaceBindings: namespaceBindings, into: &errors)
             errors += elementFixedErrors(element, at: path)
             return errors
         }
@@ -87,12 +98,18 @@ public extension PureXML.Schema {
         }
 
         /// The error from a `fixed` element value constraint: the element's text
-        /// must equal the fixed value.
-        func elementFixedErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure] {
-            guard let fixed = elementConstraints[element.name.localName]?.fixedValue else { return [] }
-            let text = Self.textContent(element)
+        /// must equal the fixed value in the element type's value space when known.
+        func elementFixedErrors(
+            _ element: PureXML.Model.Element,
+            valueType: SimpleType? = nil,
+            particleFixed: String? = nil,
+            at path: XSDPath,
+        ) -> [XSDFailure] {
+            guard let fixed = particleFixed ?? elementConstraints[element.name.localName]?.fixedValue else { return [] }
+            let text = Self.rawTextContent(element)
             // An empty element takes the fixed value; only present content must equal it.
             if text.isEmpty { return [] }
+            if let valueType, valueType.valueMatches(text, literal: fixed) { return [] }
             return text == fixed ? [] : [XSDFailure(reason: "element '\(element.name.localName)' is fixed and must be '\(fixed)'", at: path)]
         }
 
@@ -104,39 +121,9 @@ public extension PureXML.Schema {
             at path: [PureXML.Validation.PathKey] = [],
         ) -> [PureXML.Validation.ValidationError] {
             var errors: [XSDFailure] = []
-            validateChild(element, against: type, at: path, into: &errors)
+            let namespaceBindings = Self.namespaceBindings(for: element)
+            validateChild(element, against: type, at: path, namespaceBindings: namespaceBindings, into: &errors)
             return errors
-        }
-
-        // MARK: Attributes
-
-        func validateAttributes(
-            _ element: PureXML.Model.Element,
-            _ type: ComplexType,
-            at path: XSDPath,
-            into errors: inout [XSDFailure],
-        ) {
-            let present = element.attributes.filter { !Self.isNamespaceDeclaration($0) && !Self.isSchemaInstanceAttribute($0) }
-            for use in type.attributes {
-                let match = present.first { Self.sameName($0.name, use.name) }
-                if let match {
-                    if let error = use.type.validate(match.value) {
-                        errors.append(XSDFailure(reason: "attribute '\(use.name.localName)': \(error)", at: path))
-                    }
-                    if let fixed = use.valueConstraint?.fixedValue, match.value != fixed {
-                        errors.append(XSDFailure(reason: "attribute '\(use.name.localName)' is fixed and must be '\(fixed)'", at: path))
-                    }
-                    recordIDs(use.type, value: match.value, at: path)
-                } else if use.required {
-                    errors.append(XSDFailure(reason: "missing required attribute '\(use.name.localName)'", at: path))
-                }
-            }
-            // An undeclared attribute is allowed only if an xs:anyAttribute wildcard
-            // admits its namespace.
-            for attribute in present where !type.attributes.contains(where: { Self.sameName($0.name, attribute.name) }) {
-                if type.attributeWildcard?.admits(attribute.name) == true { continue }
-                errors.append(XSDFailure(reason: "undeclared attribute '\(attribute.name.localName)'", at: path))
-            }
         }
 
         // MARK: Content
@@ -145,6 +132,7 @@ public extension PureXML.Schema {
             _ element: PureXML.Model.Element,
             _ content: ContentType,
             at path: XSDPath,
+            namespaceBindings: [String: String],
             into errors: inout [XSDFailure],
         ) {
             let children = element.children.compactMap(\.element)
@@ -159,9 +147,9 @@ public extension PureXML.Schema {
                 }
             case let .elementOnly(particle):
                 rejectText(element, at: path, into: &errors)
-                validateParticle(particle, children: children, at: path, into: &errors)
+                validateParticle(particle, children: children, at: path, namespaceBindings: namespaceBindings, into: &errors)
             case let .mixed(particle):
-                validateParticle(particle, children: children, at: path, into: &errors)
+                validateParticle(particle, children: children, at: path, namespaceBindings: namespaceBindings, into: &errors)
             }
         }
 
@@ -176,40 +164,53 @@ public extension PureXML.Schema {
             _ particle: Particle,
             children: [PureXML.Model.Element],
             at path: XSDPath,
+            namespaceBindings: [String: String],
             into errors: inout [XSDFailure],
         ) {
             // Locate each content-model violation at the offending child (or the
             // missing one), with a recovery hint, rather than one opaque failure,
-            // then still validate every well-placed child's own content.
+            // then assess every well-placed child against the exact particle the
+            // content model matched it to (#180), not a by-name lookup that loses
+            // which of two same-named particles, or a wildcard versus a named
+            // particle, actually matched.
+            let matched: [PureXML.Schema.MatchedParticle?]
             if case let .group(group) = particle.term, group.compositor == .all {
                 allStructureErrors(group, children: children, at: path, into: &errors)
+                matched = allMatchedParticles(group, children: children)
             } else {
                 sequenceStructureErrors(particle, children: children, at: path, into: &errors)
+                matched = PureXML.Schema.ContentNFABuilder.build(particle).matchedParticles(children.map(\.name))
             }
             validateChildren(
                 children,
-                childTypes: Self.elementTypes(in: particle.term),
-                wildcard: Self.wildcard(in: particle.term),
-                at: path,
+                matched: matched,
+                frame: XSDChildValidationFrame(path: path, namespaceBindings: namespaceBindings),
                 into: &errors,
             )
         }
 
         private func validateChildren(
             _ children: [PureXML.Model.Element],
-            childTypes: [String: ElementType],
-            wildcard: ProcessContents?,
-            at path: XSDPath,
+            matched: [PureXML.Schema.MatchedParticle?],
+            frame: XSDChildValidationFrame,
             into errors: inout [XSDFailure],
         ) {
             let steps = Self.childSteps(children)
-            for (child, step) in zip(children, steps) {
-                if let declared = childTypes[Self.key(child.name)] {
-                    validateChild(child, against: declared, at: path + [step], into: &errors)
-                } else if let wildcard {
-                    // The structure already matched, so an undeclared child here was
-                    // admitted by a wildcard; process its content per the wildcard.
-                    validateWildcardChild(child, processContents: wildcard, at: path + [step], into: &errors)
+            for (index, child) in children.enumerated() {
+                let namespaceBindings = Self.namespaceBindings(for: child, inherited: frame.namespaceBindings)
+                let path = frame.path + [steps[index]]
+                switch matched[index] {
+                case let .element(type, valueConstraint):
+                    // An element particle without an inlined type (a bare ref)
+                    // resolves through its global declaration, as before.
+                    guard let declared = type ?? globalElementDeclaration(for: child.name) else { continue }
+                    validateChild(child, against: declared, at: path, namespaceBindings: namespaceBindings, particleConstraint: valueConstraint, into: &errors)
+                case let .wildcard(wildcard):
+                    validateWildcardChild(child, processContents: wildcard.processContents, at: path, namespaceBindings: namespaceBindings, into: &errors)
+                case .none:
+                    // The content model rejected this child (a structure error,
+                    // already located above); the matched particle is undefined.
+                    continue
                 }
             }
         }
@@ -217,32 +218,54 @@ public extension PureXML.Schema {
         /// Validates a wildcard-matched child by its `processContents`: skip does
         /// nothing, lax validates against a global declaration when one exists, and
         /// strict requires one.
+        private func globalElementDeclaration(for name: PureXML.Model.QualifiedName) -> PureXML.Schema.ElementType? {
+            if let declaration = types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] {
+                return declaration
+            }
+            guard name.namespaceURI == nil else { return nil }
+            return types["element:\(name.localName)"]
+        }
+
         private func validateWildcardChild(
             _ child: PureXML.Model.Element,
             processContents: ProcessContents,
             at path: XSDPath,
+            namespaceBindings: [String: String],
             into errors: inout [XSDFailure],
         ) {
             switch processContents {
             case .skip:
                 return
             case .lax:
-                if let declaration = types["element:\(child.name.localName)"] {
-                    validateChild(child, against: declaration, at: path, into: &errors)
+                if let declaration = globalElementDeclaration(for: child.name) {
+                    validateChild(child, against: declaration, at: path, namespaceBindings: namespaceBindings, into: &errors)
                 }
             case .strict:
-                guard let declaration = types["element:\(child.name.localName)"] else {
+                if let declaration = globalElementDeclaration(for: child.name) {
+                    validateChild(child, against: declaration, at: path, namespaceBindings: namespaceBindings, into: &errors)
+                } else if let type = xsiDeclaredType(for: child, namespaceBindings: namespaceBindings) {
+                    validateChild(child, against: type, at: path, namespaceBindings: namespaceBindings, into: &errors)
+                } else {
                     errors.append(XSDFailure(reason: "no declaration for wildcard-matched element '\(child.name.localName)'", at: path))
-                    return
                 }
-                validateChild(child, against: declaration, at: path, into: &errors)
             }
+        }
+
+        /// The type named by a wildcard-matched element's `xsi:type`, when present.
+        private func xsiDeclaredType(for child: PureXML.Model.Element, namespaceBindings: [String: String]) -> ElementType? {
+            guard Self.xsiTypeAttributeValue(child) != nil else { return nil }
+            guard let reference = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings),
+                  let type = Self.resolveNamedType(reference, in: types)
+            else { return nil }
+            return type
         }
 
         private func validateChild(
             _ child: PureXML.Model.Element,
             against declared: ElementType,
             at path: XSDPath,
+            namespaceBindings: [String: String],
+            particleConstraint: ValueConstraint? = nil,
             into errors: inout [XSDFailure],
         ) {
             // An instance `xsi:type` overrides the declared type, provided the named
@@ -258,7 +281,7 @@ public extension PureXML.Schema {
                 errors.append(missing)
                 return
             }
-            guard let declared = overriddenType(declared, for: child, at: path, into: &errors) else { return }
+            guard let declared = overriddenType(declared, for: child, namespaceBindings: namespaceBindings, at: path, into: &errors) else { return }
             switch declared {
             case let .simple(simple):
                 // A simple type declares no attribute uses, so a simple-typed
@@ -281,16 +304,17 @@ public extension PureXML.Schema {
                 // (not the empty string) is what must be valid against the type,
                 // including any xsi:type override already resolved into `simple`.
                 let text = Self.rawTextContent(child)
-                let effective = text.isEmpty ? (elementConstraints[child.name.localName]?.value ?? text) : text
+                let constraint = particleConstraint ?? elementConstraints[child.name.localName]
+                let effective = text.isEmpty ? (constraint?.value ?? text) : text
                 if let error = simple.validate(effective) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
                 }
                 recordIDs(simple, value: text, at: path)
-                errors += elementFixedErrors(child, at: path)
+                errors += elementFixedErrors(child, valueType: simple, particleFixed: particleConstraint?.fixedValue, at: path)
             case let .complex(complex):
-                errors.append(contentsOf: validate(child, against: complex, at: path))
+                errors.append(contentsOf: validate(child, against: complex, at: path, namespaceBindings: namespaceBindings))
             case .typeReference:
-                validateResolvedReference(declared, child, at: path, into: &errors)
+                validateResolvedReference(declared, child, at: path, namespaceBindings: namespaceBindings, into: &errors)
             }
         }
 
@@ -300,6 +324,7 @@ public extension PureXML.Schema {
             _ declared: ElementType,
             _ child: PureXML.Model.Element,
             at path: XSDPath,
+            namespaceBindings: [String: String],
             into errors: inout [XSDFailure],
         ) {
             switch resolveReference(declared) {
@@ -308,75 +333,8 @@ public extension PureXML.Schema {
             case let .circular(name):
                 errors.append(XSDFailure(reason: "circular type reference '\(name)'", at: path))
             case let .resolved(resolved):
-                validateChild(child, against: resolved, at: path, into: &errors)
+                validateChild(child, against: resolved, at: path, namespaceBindings: namespaceBindings, into: &errors)
             }
         }
-    }
-}
-
-/// Located content-model diagnostics: pinpoint which child breaks the model and
-/// what was expected there, so an editor shows placed errors with recovery hints
-/// rather than one opaque "content does not match" per element.
-extension PureXML.Schema.ComplexValidator {
-    /// Walks the children through the content automaton, flagging the first child
-    /// the follow-set rejects, or the missing content when the sequence ends early.
-    func sequenceStructureErrors(_ particle: PureXML.Schema.Particle, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
-        let nfa = PureXML.Schema.ContentNFABuilder.build(particle)
-        let steps = Self.childSteps(children)
-        // Advance one active state-set across the children rather than re-walking
-        // the prefix per child (which is quadratic over the content model, #129).
-        var current = nfa.startStates()
-        for (index, child) in children.enumerated() {
-            guard let next = nfa.step(current, over: child.name) else {
-                let allowed = nfa.admissible(from: current)
-                errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here\(Self.expectation(allowed))", at: path + [steps[index]]))
-                return
-            }
-            current = next
-        }
-        if !nfa.isComplete(current) {
-            errors.append(XSDFailure(reason: "content is incomplete\(Self.expectation(nfa.admissible(from: current)))", at: path))
-        }
-    }
-
-    /// Locates `all`-group violations: each child that is not an in-bounds member,
-    /// recovering past it, then each required member that never appeared.
-    func allStructureErrors(_ group: PureXML.Schema.Group, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
-        var counts = [Int](repeating: 0, count: group.particles.count)
-        let steps = Self.childSteps(children)
-        for (index, child) in children.enumerated() {
-            guard let position = group.particles.indices.first(where: { slot in
-                let member = group.particles[slot]
-                let room = member.maxOccurs.map { counts[slot] < $0 } ?? true
-                return room && Self.memberMatches(member.term, child.name)
-            }) else {
-                errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here", at: path + [steps[index]]))
-                continue
-            }
-            counts[position] += 1
-        }
-        for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
-            if case let .element(name, _, _) = member.term {
-                errors.append(XSDFailure(reason: "element '\(name.localName)' is required but missing", at: path))
-            }
-        }
-    }
-
-    static func memberMatches(_ term: PureXML.Schema.Term, _ name: PureXML.Model.QualifiedName) -> Bool {
-        switch term {
-        case let .element(declared, _, _): declared.localName == name.localName && declared.namespaceURI == name.namespaceURI
-        case let .wildcard(wildcard): wildcard.admits(name)
-        case .group: false
-        }
-    }
-
-    /// A "; expected a, b" hint naming the elements the automaton accepts next.
-    static func expectation(_ labels: [PureXML.Schema.TermLabel]) -> String {
-        let names = labels.compactMap { label -> String? in
-            if case let .name(qualified) = label { return "<\(qualified.localName)>" }
-            return nil
-        }
-        let unique = Set(names).sorted()
-        return unique.isEmpty ? "" : "; expected \(unique.joined(separator: ", "))"
     }
 }

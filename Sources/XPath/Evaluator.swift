@@ -36,6 +36,7 @@ extension PureXML.XPath {
             _ expression: Expression,
             over root: PureXML.Model.TreeNode,
             functions: FunctionTable = FunctionTable(),
+            namespaces: [String: String] = [:],
         ) -> [PureXML.Model.TreeNode] {
             let context = EvaluationContext(
                 node: .tree(root),
@@ -43,6 +44,7 @@ extension PureXML.XPath {
                 size: 1,
                 variables: [:],
                 functions: library.merging(functions),
+                namespaces: namespaces,
             )
             guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
                 return []

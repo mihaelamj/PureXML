@@ -49,11 +49,20 @@ extension PureXML.Schema.XSDSimpleParser {
     }
 
     static func applyFacets(_ restriction: XSDTree, into facets: inout PureXML.Schema.Facets) {
+        var stepPatterns: [String] = []
         for facet in XSDNode.elementChildren(restriction) {
             guard facet.name?.namespaceURI == PureXML.Schema.XSDParser.xsdNamespace else { continue }
             let value = XSDNode.attribute(facet, "value")
-            applyStringFacet(XSDNode.localName(facet), value, into: &facets)
-            applyNumericFacet(XSDNode.localName(facet), value, into: &facets)
+            let local = XSDNode.localName(facet)
+            if local == "pattern", let value {
+                stepPatterns.append(value)
+            } else {
+                applyStringFacet(local, value, into: &facets)
+                applyNumericFacet(local, value, into: &facets)
+            }
+        }
+        if !stepPatterns.isEmpty {
+            facets.patternGroups.append(stepPatterns)
         }
     }
 
@@ -79,7 +88,6 @@ extension PureXML.Schema.XSDSimpleParser {
 
     private static func applyStringFacet(_ name: String?, _ value: String?, into facets: inout PureXML.Schema.Facets) {
         switch name {
-        case "pattern": if let value { facets.patterns.append(value) }
         case "enumeration": if let value { facets.enumeration = (facets.enumeration ?? []) + [value] }
         case "minInclusive": facets.minInclusive = value
         case "maxInclusive": facets.maxInclusive = value

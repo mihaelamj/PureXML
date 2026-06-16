@@ -44,6 +44,16 @@ struct RegexCategoryTests {
         #expect(try !matches("\\p{IsBasicLatin}+", "abç"))
     }
 
+    @Test("\\p{IsArabic} tests the Arabic block")
+    func test_arabicBlock() throws {
+        #expect(try matches("\\p{IsArabic}+", "\u{0627}\u{0628}"))
+        // Adjacent Arabic block scalars that Swift fuses into one grapheme cluster.
+        #expect(try matches("\\p{IsArabic}+", "\u{0600}\u{0601}"))
+        // Base letter plus combining mark: two XSD characters, one grapheme.
+        #expect(try matches("\\p{IsArabic}+", "\u{0627}\u{064B}"))
+        #expect(try !matches("\\p{IsArabic}+", "abc"))
+    }
+
     @Test("An unknown category name is a compile error")
     func test_unknownCategory() {
         #expect(throws: PureXML.Regex.RegexError.self) {

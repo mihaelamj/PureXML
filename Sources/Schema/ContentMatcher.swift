@@ -19,6 +19,21 @@ extension PureXML.Schema {
         var epsilon: [Int] = []
         var label: TermLabel?
         var target: Int?
+        /// The declared type and value constraint of the element particle this
+        /// state's `.name` transition stands for, carried so that whoever the
+        /// automaton matches a child to can be assessed against that exact
+        /// particle (its type, its `fixed`/`default`), not a by-name lookup that
+        /// cannot tell two same-named particles apart.
+        var elementType: ElementType?
+        var valueConstraint: ValueConstraint?
+    }
+
+    /// The content-model particle a child was matched to, for per-child
+    /// assessment: a named element (with the particle's declared type and value
+    /// constraint) or a wildcard (carrying its `processContents`).
+    enum MatchedParticle: Sendable {
+        case element(type: ElementType?, valueConstraint: ValueConstraint?)
+        case wildcard(Wildcard)
     }
 
     /// A Thompson NFA over element names compiled from a ``Particle``. `all` groups
@@ -72,6 +87,44 @@ extension PureXML.Schema {
                 if let label = states[state].label { labels.append(label) }
             }
             return labels
+        }
+
+        /// The particle each child matched, in order, for per-child assessment.
+        /// A unique-particle-attribution-valid content model is deterministic, so
+        /// at each position at most one particle accepts the child; the entry is
+        /// nil from the first child the model rejects onward (a structure error,
+        /// reported separately), since the match path is then undefined.
+        ///
+        /// When more than one active state accepts the child (only possible if the
+        /// compile-time UPA check missed an ambiguity), selection is still made
+        /// reproducible rather than left to `Set` iteration order: a named particle
+        /// is preferred over a wildcard, then the lowest state index wins.
+        func matchedParticles(_ names: [PureXML.Model.QualifiedName]) -> [MatchedParticle?] {
+            var current = startStates()
+            var result: [MatchedParticle?] = []
+            for name in names {
+                var next: Set<Int> = []
+                var namedMatch: Int?
+                var anyMatch: Int?
+                for state in current {
+                    guard let label = states[state].label, let target = states[state].target, label.matches(name) else { continue }
+                    next.insert(target)
+                    if anyMatch.map({ state < $0 }) ?? true { anyMatch = state }
+                    if case .name = label, namedMatch.map({ state < $0 }) ?? true { namedMatch = state }
+                }
+                guard let chosen = namedMatch ?? anyMatch, !next.isEmpty else {
+                    result.append(contentsOf: Array(repeating: nil, count: names.count - result.count))
+                    return result
+                }
+                let matched = states[chosen]
+                if case let .wildcard(wildcard) = matched.label {
+                    result.append(.wildcard(wildcard))
+                } else {
+                    result.append(.element(type: matched.elementType, valueConstraint: matched.valueConstraint))
+                }
+                current = closure(next)
+            }
+            return result
         }
 
         /// Advances `current` by consuming one element `name`, or nil when `name`
@@ -194,12 +247,15 @@ extension PureXML.Schema {
 
         private mutating func term(_ term: PureXML.Schema.Term) -> (start: Int, accept: Int) {
             switch term {
-            case let .element(name, _, _):
-                labeled(.name(name))
+            case let .element(name, type, _, constraint):
+                let fragment = labeled(.name(name))
+                states[fragment.start].elementType = type
+                states[fragment.start].valueConstraint = constraint
+                return fragment
             case let .wildcard(wildcard):
-                labeled(.wildcard(wildcard))
+                return labeled(.wildcard(wildcard))
             case let .group(group):
-                self.group(group)
+                return self.group(group)
             }
         }
 

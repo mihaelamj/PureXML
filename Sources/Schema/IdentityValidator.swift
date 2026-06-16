@@ -20,12 +20,34 @@ private final class XPathQueryCache {
 private struct FieldValue: Equatable {
     let string: String
     let type: PureXML.Schema.SimpleType?
+    let namespaceBindings: [String: String]
+
+    init(string: String, type: PureXML.Schema.SimpleType?, namespaceBindings: [String: String] = [:]) {
+        self.string = string
+        self.type = type
+        self.namespaceBindings = namespaceBindings
+    }
 
     static func == (lhs: FieldValue, rhs: FieldValue) -> Bool {
-        if let lhsType = lhs.type, let rhsType = rhs.type, lhsType.base == rhsType.base {
-            return lhsType.valueMatches(lhs.string, literal: rhs.string)
+        if let left = lhs.qnameValue, let right = rhs.qnameValue, left.uri == right.uri, left.local == right.local {
+            return true
+        }
+        if let lhsType = lhs.type, let rhsType = rhs.type {
+            if lhsType.base == rhsType.base {
+                return lhsType.valueMatches(lhs.string, literal: rhs.string)
+            }
+            return false
         }
         return lhs.string == rhs.string
+    }
+
+    private var qnameValue: (uri: String?, local: String)? {
+        let trimmed = string.trimmingXMLWhitespace()
+        guard trimmed.contains(":") else { return nil }
+        let parts = trimmed.split(separator: ":", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        let uri = namespaceBindings[parts[0]] ?? (parts[0].isEmpty ? namespaceBindings[""] : nil)
+        return (uri, parts[1])
     }
 }
 
@@ -39,11 +61,22 @@ extension PureXML.Schema {
     struct IdentityValidator {
         /// The constraints declared for each element local name.
         let constraints: [String: [IdentityConstraint]]
+        /// Simple types for identity-constraint fields keyed by
+        /// ``XSDParser/identityFieldKey(selector:field:)``.
+        let fieldTypes: [String: SimpleType]
+        /// Global element and type declarations for runtime field typing.
+        let types: [String: ElementType]
         /// Selector and field XPaths compiled once per run, not per element.
         private let cache = XPathQueryCache()
 
-        init(constraints: [String: [IdentityConstraint]]) {
+        init(
+            constraints: [String: [IdentityConstraint]],
+            fieldTypes: [String: SimpleType] = [:],
+            types: [String: ElementType] = [:],
+        ) {
             self.constraints = constraints
+            self.fieldTypes = fieldTypes
+            self.types = types
         }
 
         func validate(
@@ -171,7 +204,7 @@ extension PureXML.Schema {
             var tuples: [[FieldValue?]] = []
             var seen: [[FieldValue?]] = []
             for target in select(constraint.selector, at: node) {
-                let tuple = fieldTuple(constraint.fields, at: target)
+                let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 let targetPath = path + steps(from: node, to: target)
                 if constraint.kind == .key, tuple.contains(where: { $0 == nil }) {
                     issues.append(.init(reason: "key '\(constraint.name)': a field is missing", at: targetPath + fieldStep(constraint.fields, at: target)))
@@ -198,7 +231,7 @@ extension PureXML.Schema {
             guard case let .keyref(refer) = constraint.kind else { return }
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
             for target in select(constraint.selector, at: node) {
-                let tuple = fieldTuple(constraint.fields, at: target)
+                let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if tuple.contains(where: { $0 == nil }) { continue }
                 if !keyTuples.contains(where: { $0 == tuple }) {
                     let targetPath = path + steps(from: node, to: target)
@@ -211,17 +244,43 @@ extension PureXML.Schema {
 
         private func select(_ xpath: String, at node: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
             guard let query = cache.query(xpath) else { return [] }
-            return query.nodes(over: node)
+            return query.nodes(over: node, namespaces: namespaceBindings(at: node))
         }
 
-        private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode) -> [FieldValue?] {
-            fields.map { field in
-                guard let query = cache.query(field), let value = try? query.value(at: node) else {
+        private func fieldTuple(_ fields: [String], at node: PureXML.Model.TreeNode, constraint: IdentityConstraint) -> [FieldValue?] {
+            let namespaces = namespaceBindings(at: node)
+            return fields.map { field in
+                guard let query = cache.query(field),
+                      let value = try? query.value(at: node, namespaces: namespaces)
+                else {
                     return nil
                 }
                 if let nodes = value.nodes, nodes.isEmpty { return nil }
-                return FieldValue(string: value.string, type: Self.effectiveType(of: value))
+                let type = resolveFieldType(field, constraint: constraint, at: node)
+                    ?? Self.effectiveType(of: value)
+                return FieldValue(string: value.string, type: type, namespaceBindings: namespaces)
             }
+        }
+
+        /// Prefix bindings in scope at `node`, gathered from ancestor elements.
+        private func namespaceBindings(at node: PureXML.Model.TreeNode) -> [String: String] {
+            var chain: [PureXML.Model.TreeNode] = []
+            var current: PureXML.Model.TreeNode? = node
+            while let element = current, element.kind == .element {
+                chain.append(element)
+                current = element.parent
+            }
+            var bindings: [String: String] = [:]
+            for element in chain.reversed() {
+                for attribute in element.attributes {
+                    if attribute.name.prefix == "xmlns" {
+                        bindings[attribute.name.localName] = attribute.value
+                    } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
+                        bindings[""] = attribute.value
+                    }
+                }
+            }
+            return bindings
         }
 
         /// The simple type a field value compares in: the built-in named by the
@@ -230,6 +289,31 @@ extension PureXML.Schema {
         /// `3.0` and `3` are the same value and violate a `unique`/`key`. With no
         /// `xsi:type` the comparison falls back to the lexical form (the type
         /// declared in the schema is not threaded into identity validation).
+        private func resolveFieldType(_ field: String, constraint: IdentityConstraint, at target: PureXML.Model.TreeNode) -> SimpleType? {
+            if field == ".", let local = target.name?.localName {
+                if let type = fieldTypes[PureXML.Schema.XSDParser.identityFieldKey(constraint: constraint, field: field, targetLocal: local)] {
+                    return type
+                }
+                guard let name = target.name else { return nil }
+                if let declaration = types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] {
+                    return simpleType(of: declaration)
+                }
+                if let declaration = types[PureXML.Schema.XSDParser.elementKey(name.localName)] {
+                    return simpleType(of: declaration)
+                }
+            }
+            return fieldTypes[PureXML.Schema.XSDParser.identityFieldKey(constraint: constraint, field: field)]
+        }
+
+        private func simpleType(of declaration: ElementType) -> SimpleType? {
+            switch declaration {
+            case let .simple(simple): simple
+            case let .complex(complex):
+                if case let .simpleContent(simple) = complex.content { simple } else { nil }
+            case .typeReference: nil
+            }
+        }
+
         private static func effectiveType(of value: PureXML.XPath.Value) -> SimpleType? {
             guard let nodes = value.nodes, case let .tree(treeNode)? = nodes.first,
                   treeNode.kind == .element, let local = xsiTypeLocalName(of: treeNode),

@@ -10,7 +10,7 @@ extension PureXML.Schema {
 
         private static func applyValue(_ name: String, _ value: String, into facets: inout Facets) {
             switch name {
-            case "pattern": facets.patterns.append(value)
+            case "pattern": facets.patternGroups.append([value])
             case "minInclusive": facets.minInclusive = value
             case "maxInclusive": facets.maxInclusive = value
             case "minExclusive": facets.minExclusive = value

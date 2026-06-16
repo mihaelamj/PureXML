@@ -28,10 +28,30 @@ struct XSTSSuiteTests {
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
     /// are written to /tmp/xsts-failures.txt for the burn-down.
+    ///
+    /// Re-measured 2026-06-16 after the harness was corrected to compile and merge
+    /// ALL of a schemaTest's schemaDocuments (it previously loaded only the first,
+    /// under-loading any multi-document schema). That removed a spurious valid-
+    /// instance rejection (wildZ003, whose root element is declared in the second
+    /// document) and exposed one previously-masked invalid-instance acceptance
+    /// (schA5, a schema-collection test the engine wrongly accepts once the full
+    /// collection is loaded): instances rejected 8 → 7, invalid accepted 146 → 147.
+    ///
+    /// Pinning the regex repertoire to Unicode 3.2 (the version the corpus is
+    /// consistent at) then cleared reZ003v, whose `\w` instance is all code points
+    /// assigned by 3.2: instances rejected 7 → 6, no other bucket moved.
+    ///
+    /// Driving per-child assessment from the matched content-model particle rather
+    /// than a by-name lookup (#180) then cleared isDefault079 (two same-named
+    /// particles with different `fixed` values) and QFE1700c2 (an element matching
+    /// a `skip` wildcard must not be validated against its global declaration):
+    /// instances rejected 6 → 4, no other bucket moved. The remaining four are the
+    /// three Ethiopic-digit `\d` cases (reS17, reS38, reZ004v) and ctZ007 (a
+    /// cross-document substitution group, tracked under #180/#161).
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 264
-    private let knownInstanceValidRejected = 173
-    private let knownInstanceInvalidAccepted = 155
+    private let knownSchemaInvalidAccepted = 262
+    private let knownInstanceValidRejected = 4
+    private let knownInstanceInvalidAccepted = 147
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
@@ -99,18 +119,33 @@ struct XSTSSuiteTests {
         var schemaExpectedValid = true
         for schemaTest in elements(named: "schemaTest", under: .element(group)) {
             guard isAccepted(schemaTest) else { continue }
-            guard let first = references(in: .element(schemaTest), named: "schemaDocument").first else { continue }
+            let hrefs = references(in: .element(schemaTest), named: "schemaDocument")
+            guard !hrefs.isEmpty else { continue }
             schemaExpectedValid = expectedValidity(schemaTest) != "invalid"
-            let schemaPath = resolve(first, against: directory)
-            let schemaDirectory = self.directory(of: schemaPath)
-            let loader: (String) -> String? = { location in
-                (try? String(contentsOfFile: resolve(location, against: schemaDirectory), encoding: .utf8))
+            // A schemaTest's documents jointly form the schema under test (one is
+            // typically the entry point that imports the others; their order in the
+            // metadata is not significant). Compile each and merge so the schema is
+            // complete regardless of which document declares the root.
+            var compiled: PureXML.Schema.Document?
+            var allCompiled = true
+            for href in hrefs {
+                let schemaPath = resolve(href, against: directory)
+                let schemaDirectory = self.directory(of: schemaPath)
+                let loader: (String) -> String? = { location in
+                    (try? String(contentsOfFile: resolve(location, against: schemaDirectory), encoding: .utf8))
+                }
+                guard let source = try? String(contentsOfFile: schemaPath, encoding: .utf8) else {
+                    counters.note("\(name): unreadable schema \(href)")
+                    allCompiled = false
+                    continue
+                }
+                guard let document = try? PureXML.Schema.Document(source, schemaLoader: loader) else {
+                    allCompiled = false
+                    continue
+                }
+                compiled = compiled.map { $0.merged(with: document) } ?? document
             }
-            guard let source = try? String(contentsOfFile: schemaPath, encoding: .utf8) else {
-                counters.note("\(name): unreadable schema \(first)")
-                continue
-            }
-            let compiled = try? PureXML.Schema.Document(source, schemaLoader: loader)
+            if !allCompiled { compiled = nil }
             switch (schemaExpectedValid, compiled == nil) {
             case (true, true):
                 counters.schemaValidRejected += 1

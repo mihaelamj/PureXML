@@ -95,7 +95,7 @@ struct XSDDatatypeTests {
 
     @Test("pattern facets use the regex engine")
     func test_patternFacet() {
-        let type = Schema.SimpleType(base: .string, facets: .init(patterns: ["[A-Z]{3}-\\d{2}"]))
+        let type = Schema.SimpleType(base: .string, facets: .init(patternGroups: [["[A-Z]{3}-\\d{2}"]]))
         #expect(type.isValid("XYZ-42") && !type.isValid("xyz-42"))
     }
 

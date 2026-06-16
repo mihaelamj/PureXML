@@ -49,8 +49,16 @@ public extension PureXML.XPath {
         /// nodes in document order. Build the tree once (``PureXML/parseTree(_:)``)
         /// and query it repeatedly; pair with ``value(at:position:size:variables:)``
         /// to evaluate further expressions relative to each result.
+        public func nodes(over root: PureXML.Model.TreeNode, namespaces: [String: String] = [:]) -> [PureXML.Model.TreeNode] {
+            Evaluator.nodes(expression, over: root, namespaces: namespaces)
+        }
+
+        /// Evaluates the query over a pre-built tree and returns the matched tree
+        /// nodes in document order. Build the tree once (``PureXML/parseTree(_:)``)
+        /// and query it repeatedly; pair with ``value(at:position:size:variables:)``
+        /// to evaluate further expressions relative to each result.
         public func nodes(over root: PureXML.Model.TreeNode) -> [PureXML.Model.TreeNode] {
-            Evaluator.nodes(expression, over: root)
+            nodes(over: root, namespaces: [:])
         }
 
         /// Evaluates the query against an explicit context: a node already in a

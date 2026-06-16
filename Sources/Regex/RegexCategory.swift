@@ -28,11 +28,11 @@ extension PureXML.Regex {
         }
 
         static func matches(_ name: String, _ scalar: Unicode.Scalar) -> Bool {
+            let code = XSDCategory.generalCategoryCode(scalar)
             if name.hasPrefix("Is") {
                 guard let range = blocks[String(name.dropFirst(2))] else { return false }
                 return range.contains(scalar.value)
             }
-            let code = codes[scalar.properties.generalCategory] ?? "Cn"
             return name.count == 1 ? code.hasPrefix(name) : code == name
         }
 

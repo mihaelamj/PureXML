@@ -11,6 +11,7 @@ private typealias Wildcard = PureXML.Schema.Wildcard
 private typealias Facets = PureXML.Schema.Facets
 private typealias Group = PureXML.Schema.Group
 private typealias SimpleType = PureXML.Schema.SimpleType
+private typealias AttributeUse = PureXML.Schema.AttributeUse
 private typealias XSDCompiled = PureXML.Schema.XSDCompiled
 
 extension PureXML.Schema {
@@ -50,29 +51,7 @@ extension PureXML.Schema {
                 containerLocations: containerLocations,
                 compositionLoaded: compositionLoaded,
             )
-            for error in PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers) {
-                context.diagnostics.report(error)
-            }
-            var types = namedTypes(containers, into: &context)
-            let elements = globalElements(containers, context, into: &types)
-            let postCompileDocument = PureXML.Schema.SchemaCompileContext(
-                schema: schema,
-                context: context,
-                containers: containers,
-                derivation: derivation,
-                globalElements: elements,
-                namedTypes: types,
-            )
-            for error in PureXML.Validation.SchemaCompile.postCompileErrors(in: postCompileDocument) {
-                context.diagnostics.report(error)
-            }
-            return buildCompiled(
-                elements: elements,
-                types: types,
-                containers: containers,
-                derivation: derivation,
-                context: context,
-            )
+            return finishCompile(schema: schema, containers: containers, derivation: derivation, context: &context)
         }
     }
 }
@@ -87,31 +66,6 @@ extension PureXML.Schema.XSDParser {
             containerLocations[ObjectIdentifier(tree)] = loc ?? rootLocation
         }
         return containerLocations
-    }
-
-    private static func buildCompiled(
-        elements: [String: ElementType],
-        types: [String: ElementType],
-        containers: [XSDTree],
-        derivation: DerivationTables,
-        context: XSDContext,
-    ) -> XSDCompiled {
-        let (nillable, elementConstraints) = elementMetadata(containers)
-        return XSDCompiled(
-            elements: elements,
-            types: types,
-            constraints: identityConstraints(containers),
-            nillableElements: nillable,
-            elementConstraints: elementConstraints,
-            abstractTypes: derivation.abstractTypes,
-            abstractElements: derivation.abstractElements,
-            typeBlock: derivation.typeBlock,
-            elementBlock: derivation.elementBlock,
-            typeDerivation: derivation.typeDerivation,
-            typeFinal: derivation.typeFinal,
-            targetNamespace: context.targetNamespace,
-            schemaErrors: context.diagnostics.deduplicated,
-        )
     }
 
     private static func createContext(
@@ -136,43 +90,220 @@ extension PureXML.Schema.XSDParser {
         context.namespaceBindings = XSDNode.namespaceBindings(of: schema)
         context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
         context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
+        let redefinedAttributeGroups = PureXML.Schema.XSDParser.redefinedNames(containers, "attributeGroup")
+        let redefinedGroups = PureXML.Schema.XSDParser.redefinedNames(containers, "group")
+        let redefinedComplexTypes = PureXML.Schema.XSDParser.redefinedNames(containers, "complexType")
+        context.redefinedAttributeGroups = redefinedAttributeGroups
+        context.redefinedGroups = redefinedGroups
+        context.redefinedComplexTypes = redefinedComplexTypes
+        context.baseAttributeGroups = baseNamedComponents(containers, named: "attributeGroup")
+        context.baseGroups = baseNamedComponents(containers, named: "group")
+        context.baseComplexTypeNodes = baseNamedComponents(containers, named: "complexType")
+        context.chameleonTargetNamespaces = chameleonTargetNamespaces(containers, locations: containerLocations)
         return context
     }
 
-    /// The named-type table: the global simple types resolved into `context`,
-    /// then each global complex type compiled and added by name.
+    private static func chameleonTargetNamespaces(
+        _ containers: [XSDTree],
+        locations: [ObjectIdentifier: String?],
+    ) -> [ObjectIdentifier: String] {
+        var map: [ObjectIdentifier: String] = [:]
+        let schemas = containers.filter { XSDNode.localName($0) == "schema" }
+        for included in schemas {
+            let declared = XSDNode.attribute(included, "targetNamespace")
+            guard declared == nil || declared?.isEmpty == true else { continue }
+            guard let includedLocation = locations[ObjectIdentifier(included)] ?? nil else { continue }
+            let includedBase = includedLocation.split(separator: "/").last.map(String.init) ?? includedLocation
+            for parent in schemas where parent !== included {
+                guard let parentNamespace = XSDNode.attribute(parent, "targetNamespace"), !parentNamespace.isEmpty else { continue }
+                for child in XSDNode.elementChildren(parent) where XSDNode.localName(child) == "include" {
+                    let href = XSDNode.attribute(child, "schemaLocation") ?? ""
+                    if href == includedBase || includedLocation.hasSuffix(href) {
+                        map[ObjectIdentifier(included)] = parentNamespace
+                    }
+                }
+            }
+        }
+        return map
+    }
+
+    private struct CompiledBuild {
+        var elements: [String: ElementType]
+        var types: [String: ElementType]
+        var globalAttributes: [String: AttributeUse]
+        var containers: [XSDTree]
+        var derivation: DerivationTables
+        var context: XSDContext
+        var identityFieldTypes: [String: SimpleType]
+    }
+
+    private static func finishCompile(
+        schema: XSDTree,
+        containers: [XSDTree],
+        derivation: DerivationTables,
+        context: inout XSDContext,
+    ) -> XSDCompiled {
+        for error in PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers) {
+            context.diagnostics.report(error)
+        }
+        seedElementNamespaces(containers, &context)
+        var types = namedTypes(containers, into: &context)
+        let elements = globalElements(containers, &context, into: &types)
+        let globalAttributes = globalAttributeUses(containers, context)
+        let postCompileDocument = PureXML.Schema.SchemaCompileContext(
+            schema: schema,
+            context: context,
+            containers: containers,
+            derivation: derivation,
+            globalElements: elements,
+            namedTypes: types,
+        )
+        for error in PureXML.Validation.SchemaCompile.postCompileErrors(in: postCompileDocument) {
+            context.diagnostics.report(error)
+        }
+        return buildCompiled(CompiledBuild(
+            elements: elements,
+            types: types,
+            globalAttributes: globalAttributes,
+            containers: containers,
+            derivation: derivation,
+            context: context,
+            identityFieldTypes: identityFieldTypes(containers, context),
+        ))
+    }
+
+    private static func buildCompiled(_ build: CompiledBuild) -> XSDCompiled {
+        let (nillable, elementConstraints) = elementMetadata(build.containers)
+        return XSDCompiled(
+            elements: build.elements,
+            types: build.types,
+            constraints: identityConstraints(build.containers),
+            identityFieldTypes: build.identityFieldTypes,
+            nillableElements: nillable,
+            elementConstraints: elementConstraints,
+            abstractTypes: build.derivation.abstractTypes,
+            abstractElements: build.derivation.abstractElements,
+            typeBlock: build.derivation.typeBlock,
+            elementBlock: build.derivation.elementBlock,
+            typeDerivation: build.derivation.typeDerivation,
+            typeFinal: build.derivation.typeFinal,
+            targetNamespace: build.context.targetNamespace,
+            schemaErrors: build.context.diagnostics.deduplicated,
+            globalAttributes: build.globalAttributes,
+        )
+    }
+
     private static func namedTypes(_ containers: [XSDTree], into context: inout XSDContext) -> [String: ElementType] {
-        resolveSimpleTypes(allChildren(containers, named: "simpleType"), into: &context)
-        var types: [String: ElementType] = context.simpleTypes.mapValues(ElementType.simple)
-        for node in allChildren(containers, named: "complexType") {
-            if let name = XSDNode.attribute(node, "name") {
-                types[name] = .complex(complexType(node, context))
+        var types: [String: ElementType] = [:]
+        for container in containers {
+            let kind = XSDNode.localName(container)
+            guard kind == "schema" || kind == "redefine" else { continue }
+            var containerContext = scopedContext(from: context, container: container)
+            let simpleTypeNodes = kind == "redefine"
+                ? XSDNode.elementChildren(container).filter { XSDNode.localName($0) == "simpleType" }
+                : XSDNode.children(container, named: "simpleType")
+            resolveSimpleTypes(simpleTypeNodes, into: &containerContext)
+            for (name, simple) in containerContext.simpleTypes {
+                context.simpleTypes[name] = simple
+                let compiled = ElementType.simple(simple)
+                let key = typeDeclarationKey(name, namespaceURI: containerContext.targetNamespace)
+                types[key] = compiled
+                types[name] = compiled
+            }
+            let complexTypeNodes = kind == "redefine"
+                ? XSDNode.elementChildren(container).filter { XSDNode.localName($0) == "complexType" }
+                : XSDNode.children(container, named: "complexType")
+            for node in complexTypeNodes {
+                guard let name = XSDNode.attribute(node, "name") else { continue }
+                let compiled = ElementType.complex(complexType(node, containerContext.visitingType(name)))
+                let key = typeDeclarationKey(name, namespaceURI: containerContext.targetNamespace)
+                types[key] = compiled
+                types[name] = compiled
             }
         }
         return types
     }
 
-    /// The global element declarations, also registering each under a reserved
-    /// `element:name` key in `types` so an `xs:element ref="name"` resolves to
-    /// this declaration's type (a colon keeps it out of the NCName-only type
-    /// namespace), letting forward and recursive refs resolve at validation time.
+    private static func scopedContext(from context: XSDContext, container: XSDTree) -> XSDContext {
+        context.scoped(for: container)
+    }
+
+    /// Records each global element's target namespace before types are compiled,
+    /// so substitution-group expansion during particle compilation sees the right
+    /// namespace for imported members (for example `add:salutation` in ipo6).
+    private static func seedElementNamespaces(_ containers: [XSDTree], _ context: inout XSDContext) {
+        for container in containers where XSDNode.localName(container) == "schema" {
+            let containerContext = scopedContext(from: context, container: container)
+            for node in XSDNode.children(container, named: "element") {
+                guard XSDNode.attribute(node, "name") != nil, XSDNode.attribute(node, "ref") == nil else { continue }
+                let name = XSDNode.attribute(node, "name") ?? ""
+                context.elementNamespaces[name] = containerContext.targetNamespace
+            }
+        }
+    }
+
     private static func globalElements(
         _ containers: [XSDTree],
-        _ context: XSDContext,
+        _ context: inout XSDContext,
         into types: inout [String: ElementType],
     ) -> [String: ElementType] {
         var elements: [String: ElementType] = [:]
-        for node in allChildren(containers, named: "element") where XSDNode.attribute(node, "name") != nil {
-            let name = XSDNode.attribute(node, "name") ?? ""
-            let type = elementType(node, context)
-            elements[name] = type
-            types[elementKey(name)] = type
+        for container in containers where XSDNode.localName(container) == "schema" {
+            let containerContext = scopedContext(from: context, container: container)
+            for node in XSDNode.children(container, named: "element") {
+                guard XSDNode.attribute(node, "name") != nil, XSDNode.attribute(node, "ref") == nil else { continue }
+                let name = XSDNode.attribute(node, "name") ?? ""
+                context.elementNamespaces[name] = containerContext.targetNamespace
+                let type = elementType(node, containerContext)
+                elements[name] = type
+                types[elementKey(name)] = type
+                let qualified = PureXML.Model.QualifiedName(localName: name, namespaceURI: containerContext.targetNamespace)
+                types[elementDeclarationKey(qualified)] = type
+            }
         }
         return elements
     }
 
+    private static func globalAttributeUses(
+        _ containers: [XSDTree],
+        _ context: XSDContext,
+    ) -> [String: AttributeUse] {
+        var attributes: [String: AttributeUse] = [:]
+        for container in containers where XSDNode.localName(container) == "schema" {
+            let containerContext = scopedContext(from: context, container: container)
+            for node in XSDNode.children(container, named: "attribute") {
+                guard XSDNode.attribute(node, "name") != nil, XSDNode.attribute(node, "ref") == nil,
+                      var use = attributeUse(node, containerContext)
+                else { continue }
+                if let target = containerContext.targetNamespace, !target.isEmpty {
+                    use.name = PureXML.Model.QualifiedName(localName: use.name.localName, namespaceURI: target)
+                    let explicitTarget = XSDNode.attribute(container, "targetNamespace")
+                    if explicitTarget == nil || explicitTarget?.isEmpty == true {
+                        use.chameleonUnprefixed = true
+                    }
+                }
+                attributes[attributeDeclarationKey(use.name)] = use
+            }
+        }
+        return attributes
+    }
+
     private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {
         containers.flatMap { XSDNode.children($0, named: name) }
+    }
+
+    /// Named component definitions from every container except `redefine`
+    /// overlays, so a redefinition's self-reference resolves to the included
+    /// definition rather than the overlay being built.
+    private static func baseNamedComponents(_ containers: [XSDTree], named kind: String) -> [String: XSDTree] {
+        var index: [String: XSDTree] = [:]
+        for container in containers where XSDNode.localName(container) != "redefine" {
+            for node in XSDNode.children(container, named: kind) {
+                guard let name = XSDNode.attribute(node, "name") else { continue }
+                index[name] = node
+            }
+        }
+        return index
     }
 
     /// Resolves the named simple types into `context` over repeated passes:
@@ -190,55 +321,23 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
-    // MARK: Element and type references
-
-    private static func elementType(_ node: XSDTree, _ context: XSDContext) -> ElementType {
-        if let typeName = XSDNode.attribute(node, "type") {
-            return typeReference(typeName, context)
-        }
-        if let inline = XSDNode.firstChild(node, named: "simpleType") {
-            return .simple(XSDSimpleParser.simpleType(inline, context))
-        }
-        if let inline = XSDNode.firstChild(node, named: "complexType") {
-            return .complex(complexType(inline, context))
-        }
-        return .complex(anyType)
-    }
-
-    private static func typeReference(_ typeName: String, _ context: XSDContext) -> ElementType {
-        let local = XSDNode.stripPrefix(typeName)
-        let uri = XSDNode.referenceNamespace(typeName, context.namespaceBindings)
-        if uri == PureXML.Schema.XSDParser.xsdNamespace {
-            if let builtin = BuiltinType(rawValue: local) {
-                return .simple(SimpleType(base: builtin))
-            }
-            if let item = XSDSimpleParser.listBuiltinItem(local) {
-                return .simple(.list(item: SimpleType(base: item), isBuiltinList: true))
-            }
-        }
-        return .typeReference(local)
-    }
-
-    private static var anyType: ComplexType {
-        ComplexType(
-            attributeWildcard: Wildcard(processContents: .skip),
-            content: .mixed(Particle(minOccurs: 0, maxOccurs: nil, term: .wildcard(Wildcard(processContents: .skip)))),
-        )
-    }
-
     // MARK: Complex types
 
     static func complexType(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.ComplexType {
-        let mixed = XSDNode.attribute(node, "mixed") == "true"
+        let mixed = XSDNode.attribute(node, "mixed").map { $0 == "true" || $0 == "1" } ?? false
         let attributes = attributeUses(under: node, context)
         if let simpleContent = XSDNode.firstChild(node, named: "simpleContent") {
             let inner = derivation(simpleContent)
             let wildcard = inner.flatMap { attributeWildcard(under: $0, context) }
-            let extra = inner.map { attributeUses(under: $0, context) } ?? []
-            return ComplexType(attributes: attributes + extra, attributeWildcard: wildcard, content: .simpleContent(simpleContentType(simpleContent, context)))
+            let derived = inner.map { PureXML.Schema.XSDParser.simpleContentAttributes(under: $0, context) } ?? []
+            return ComplexType(
+                attributes: attributes + derived,
+                attributeWildcard: wildcard,
+                content: .simpleContent(simpleContentType(simpleContent, context)),
+            )
         }
         if let complexContent = XSDNode.firstChild(node, named: "complexContent"), let inner = derivation(complexContent) {
-            return complexContentType(inner, mixed: mixed || XSDNode.attribute(complexContent, "mixed") == "true", context)
+            return complexContentType(inner, mixed: mixed || XSDNode.attribute(complexContent, "mixed").map { $0 == "true" || $0 == "1" } ?? false, context)
         }
         let wildcard = attributeWildcard(under: node, context)
         guard let particle = modelGroup(in: node, context) else {
@@ -258,7 +357,8 @@ extension PureXML.Schema.XSDParser {
         guard let inner = derivation(node) else { return SimpleType(base: .string) }
         let rawBase = XSDNode.attribute(inner, "base") ?? "string"
         let baseName = XSDNode.stripPrefix(rawBase)
-        let uri = XSDNode.referenceNamespace(rawBase, context.namespaceBindings)
+        let bindings = PureXML.Schema.XSDParser.namespaceBindingsInScope(of: inner, defaultBindings: context.namespaceBindings)
+        let uri = XSDNode.referenceNamespace(rawBase, bindings)
 
         let base: BuiltinType
         let inheritedFacets: Facets
@@ -272,118 +372,5 @@ extension PureXML.Schema.XSDParser {
         var facets = inheritedFacets
         XSDSimpleParser.applyFacets(inner, into: &facets)
         return SimpleType(base: base, facets: facets)
-    }
-
-    // MARK: Attribute uses and groups
-
-    // MARK: Model groups
-
-    static func modelGroup(in node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Particle? {
-        for (name, compositor) in [("sequence", Compositor.sequence), ("choice", .choice), ("all", .all)] {
-            if let group = XSDNode.firstChild(node, named: name) {
-                return groupParticle(group, compositor, context)
-            }
-        }
-        if let groupRef = XSDNode.firstChild(node, named: "group") {
-            return particle(groupRef, context)
-        }
-        return nil
-    }
-
-    private static func groupParticle(
-        _ node: XSDTree,
-        _ compositor: Compositor,
-        _ context: XSDContext,
-    ) -> Particle {
-        var particles: [Particle] = []
-        for child in XSDNode.elementChildren(node) {
-            if let member = particle(child, context) { particles.append(member) }
-        }
-        let (minimum, maximum) = XSDNode.occurrence(node)
-        return Particle(
-            minOccurs: minimum,
-            maxOccurs: maximum,
-            term: .group(Group(compositor: compositor, particles: particles)),
-        )
-    }
-
-    private static func particle(_ node: XSDTree, _ context: XSDContext) -> Particle? {
-        let (minimum, maximum) = XSDNode.occurrence(node)
-        switch XSDNode.localName(node) {
-        case "element":
-            return elementParticle(node, minimum, maximum, context)
-        case "sequence":
-            return groupParticle(node, .sequence, context)
-        case "choice":
-            return groupParticle(node, .choice, context)
-        case "all":
-            return groupParticle(node, .all, context)
-        case "group":
-            return groupReferenceParticle(node, minimum, maximum, context)
-        case "any":
-            return Particle(minOccurs: minimum, maxOccurs: maximum, term: .wildcard(wildcard(node, context)))
-        default:
-            return nil
-        }
-    }
-
-    private static func elementParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle {
-        if let ref = XSDNode.attribute(node, "ref") {
-            return referenceParticle(ref, minimum, maximum, context)
-        }
-        let name = XSDNode.attribute(node, "name") ?? ""
-        return Particle(
-            minOccurs: minimum,
-            maxOccurs: maximum,
-            term: .element(
-                name: localElementName(name, XSDNode.attribute(node, "form"), context),
-                type: elementType(node, context),
-                typeName: elementTypeName(node),
-            ),
-        )
-    }
-
-    private static func groupReferenceParticle(_ node: XSDTree, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle? {
-        guard let ref = XSDNode.attribute(node, "ref") else { return nil }
-        let name = XSDNode.stripPrefix(ref)
-        guard !context.visitingGroups.contains(name), let definition = context.groups[name],
-              let inner = modelGroup(in: definition, context.visiting(name))
-        else {
-            return nil
-        }
-        return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
-    }
-
-    /// The particle for an `<xs:element ref="...">`. An abstract head may not appear
-    /// itself, only its substitution-group members; a concrete head appears alongside
-    /// them, the reference expanding to a choice over the head and every member.
-    static func referenceParticle(_ ref: String, _ minimum: Int, _ maximum: Int?, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Particle {
-        let name = PureXML.Schema.XSDNode.stripPrefix(ref)
-        // The reference's QName is resolved by standard XML namespace rules (a bound
-        // prefix gives its namespace, so an imported element lands in the imported
-        // namespace; an unprefixed name the default namespace, or none), as the W3C
-        // XSTS suite expects: a bare `ref="foo"` with no default namespace is in no
-        // namespace, which `##other` admits; forcing it to the target over-rejects
-        // those and masks a dangling reference. Members are this schema's globals.
-        let refNamespace = PureXML.Schema.XSDNode.referenceNamespace(ref, context.namespaceBindings)
-        let head: [(String, String?)] = context.abstractElements.contains(name) ? [] : [(name, refNamespace)]
-        let alternatives = head + (context.substitutions[name] ?? []).map { ($0, context.targetNamespace) }
-        if alternatives.count == 1 {
-            return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1))
-        }
-        let members = alternatives.map { PureXML.Schema.Particle(term: elementReferenceTerm($0.0, $0.1)) }
-        return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(.init(compositor: .choice, particles: members)))
-    }
-
-    /// The term for a reference to a global element, in the resolved `namespace`.
-    static func elementReferenceTerm(_ name: String, _ namespace: String?) -> PureXML.Schema.Term {
-        // A reference's type is resolved indirectly through the element key, so its
-        // derivation identity is not a plain type name; NameAndTypeOK over a ref
-        // falls back to the structural check (typeName nil).
-        .element(
-            name: PureXML.Model.QualifiedName(localName: name, namespaceURI: namespace),
-            type: .typeReference(elementKey(name)),
-            typeName: nil,
-        )
     }
 }

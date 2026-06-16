@@ -1,11 +1,12 @@
 public extension PureXML.Schema {
     /// The constraining facets of a simple type. Every facet is optional; an unset
-    /// facet imposes no constraint. `patterns` are combined with AND.
+    /// facet imposes no constraint. Multiple patterns on one restriction step are
+    /// OR'd (libxml2/xmlschemas.c); each group is AND'd across derivation steps.
     struct Facets: Sendable {
         public var length: Int?
         public var minLength: Int?
         public var maxLength: Int?
-        public var patterns: [String]
+        public var patternGroups: [[String]]
         public var enumeration: [String]?
         public var whiteSpace: WhiteSpace?
         public var minInclusive: String?
@@ -19,7 +20,7 @@ public extension PureXML.Schema {
             length: Int? = nil,
             minLength: Int? = nil,
             maxLength: Int? = nil,
-            patterns: [String] = [],
+            patternGroups: [[String]] = [],
             enumeration: [String]? = nil,
             whiteSpace: WhiteSpace? = nil,
             minInclusive: String? = nil,
@@ -32,7 +33,7 @@ public extension PureXML.Schema {
             self.length = length
             self.minLength = minLength
             self.maxLength = maxLength
-            self.patterns = patterns
+            self.patternGroups = patternGroups
             self.enumeration = enumeration
             self.whiteSpace = whiteSpace
             self.minInclusive = minInclusive
@@ -48,7 +49,7 @@ public extension PureXML.Schema {
         /// substitute for a declared type (a faceted restriction may not be the
         /// target of a built-in substitution).
         public var isUnconstrained: Bool {
-            length == nil && minLength == nil && maxLength == nil && patterns.isEmpty
+            length == nil && minLength == nil && maxLength == nil && patternGroups.isEmpty
                 && enumeration == nil && whiteSpace == nil
                 && minInclusive == nil && maxInclusive == nil
                 && minExclusive == nil && maxExclusive == nil
@@ -273,9 +274,14 @@ public extension PureXML.Schema {
         }
 
         private func patternError(_ value: String) -> String? {
-            for pattern in facets.patterns {
-                guard let regex = try? PureXML.Regex.Pattern(pattern), regex.matches(value) else {
-                    return "'\(value)' does not match pattern '\(pattern)'"
+            for group in facets.patternGroups {
+                let matched = group.contains { pattern in
+                    guard let regex = try? PureXML.Regex.Pattern(pattern) else { return false }
+                    return regex.matches(value)
+                }
+                guard matched else {
+                    let label = group.joined(separator: "|")
+                    return "'\(value)' does not match pattern '\(label)'"
                 }
             }
             return nil

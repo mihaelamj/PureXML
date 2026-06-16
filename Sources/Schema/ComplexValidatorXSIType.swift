@@ -5,17 +5,14 @@ extension PureXML.Schema.ComplexValidator {
     func overriddenType(
         _ declared: PureXML.Schema.ElementType,
         for child: PureXML.Model.Element,
+        namespaceBindings: [String: String] = [:],
         at path: XSDPath,
         into errors: inout [XSDFailure],
     ) -> PureXML.Schema.ElementType? {
-        guard let overriding = Self.xsiTypeName(child) else { return declared }
-        if let resolved = types[overriding] { return resolved }
-        // An xsi:type may name a built-in datatype (xsd:int, xsd:boolean) rather
-        // than a schema-declared one. The substitution is valid only when the
-        // built-in is validly derived from the declared type (Schema-Validity
-        // Assessment, xsi:type): the ur-type admits any type, and a built-in
-        // declared type admits the built-ins derived from it. An invalid
-        // built-in substitution is a genuine error, not a silent acceptance.
+        guard Self.xsiTypeAttributeValue(child) != nil else { return declared }
+        let reference = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings) ?? Self.xsiTypeName(child) ?? ""
+        if let resolved = Self.resolveNamedType(reference, in: types) { return resolved }
+        let overriding = Self.xsiTypeName(child) ?? reference
         if let builtin = PureXML.Schema.BuiltinType(rawValue: overriding) {
             if xsiBuiltinSubstitutes(builtin, for: declared) {
                 return .simple(PureXML.Schema.SimpleType(base: builtin))
@@ -35,7 +32,7 @@ extension PureXML.Schema.ComplexValidator {
     private func xsiBuiltinSubstitutes(_ xsi: PureXML.Schema.BuiltinType, for declared: PureXML.Schema.ElementType) -> Bool {
         switch declared {
         case let .typeReference(name):
-            if name == "anyType" || name == "anySimpleType" { return true }
+            if name == "anyType" || name == "anySimpleType" || name.hasSuffix("}anyType") || name.hasSuffix("}anySimpleType") { return true }
             switch resolveReference(declared) {
             case let .resolved(resolved): return xsiBuiltinSubstitutes(xsi, for: resolved)
             case .unknown, .circular: return false

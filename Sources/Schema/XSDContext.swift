@@ -25,6 +25,16 @@ extension PureXML.Schema {
             children(node, named: name).first
         }
 
+        /// The enclosing `schema` element for a component node or container.
+        static func schemaOwner(_ node: XSDTree) -> XSDTree {
+            var current: XSDTree? = node
+            while let element = current {
+                if localName(element) == "schema" { return element }
+                current = element.parent
+            }
+            return node
+        }
+
         static func stripPrefix(_ qualified: String) -> String {
             qualified.split(separator: ":").last.map(String.init) ?? qualified
         }
@@ -54,9 +64,22 @@ extension PureXML.Schema {
         /// default-namespace binding (nil when none is declared).
         static func referenceNamespace(_ qualified: String, _ bindings: [String: String]) -> String? {
             if let prefix = prefix(qualified) {
+                if prefix == "xml" { return "http://www.w3.org/XML/1998/namespace" }
                 return bindings[prefix]
             }
             return bindings[""]
+        }
+
+        /// The namespace of a schema-local unprefixed QName: the default-namespace
+        /// binding when declared, otherwise the schema `targetNamespace`.
+        static func schemaComponentNamespace(_ qualified: String, _ bindings: [String: String], targetNamespace: String?) -> String? {
+            if prefix(qualified) != nil {
+                return referenceNamespace(qualified, bindings)
+            }
+            if let defaultNamespace = bindings[""] {
+                return defaultNamespace
+            }
+            return targetNamespace
         }
 
         static func occurrence(_ node: XSDTree) -> (min: Int, max: Int?) {
@@ -152,6 +175,8 @@ extension PureXML.Schema {
         var elements: [String: ElementType]
         var types: [String: ElementType]
         var constraints: [String: [IdentityConstraint]]
+        /// Simple types for identity-constraint field paths.
+        var identityFieldTypes: [String: SimpleType] = [:]
         /// Local names of elements declared `nillable="true"`.
         var nillableElements: Set<String> = []
         /// The `default`/`fixed` value constraint declared on each element name.
@@ -179,6 +204,8 @@ extension PureXML.Schema {
         /// definitions and the like), reported together with the model-level
         /// consistency findings when the schema is compiled.
         var schemaErrors: [PureXML.Validation.ValidationError] = []
+        /// Global attribute declarations keyed by ``attributeDeclarationKey(_:)``.
+        var globalAttributes: [String: AttributeUse] = [:]
     }
 
     /// Collects schema-validity findings during parsing. A reference type so the
@@ -217,13 +244,27 @@ extension PureXML.Schema {
     struct XSDContext {
         var simpleTypes: [String: SimpleType]
         var attributeGroups: [String: XSDTree]
+        /// Attribute-group definitions from included schemas before a `redefine`
+        /// overlay replaces them; used when a redefinition self-references its
+        /// former self.
+        var baseAttributeGroups: [String: XSDTree] = [:]
+        /// Names of attribute groups redefined through `xs:redefine`.
+        var redefinedAttributeGroups: Set<String> = []
         /// Top-level (global) attribute declaration nodes by name, so an
         /// `<attribute ref="...">` resolves to the global declaration's type.
         var globalAttributes: [String: XSDTree] = [:]
         var groups: [String: XSDTree]
+        /// Model-group definitions before a `redefine` overlay.
+        var baseGroups: [String: XSDTree] = [:]
+        /// Names of model groups redefined through `xs:redefine`.
+        var redefinedGroups: Set<String> = []
         /// Named complex-type definition nodes, so a `complexContent` derivation can
         /// resolve and compose its base type's content model and attributes.
         var complexTypeNodes: [String: XSDTree] = [:]
+        /// Complex-type definitions before a `redefine` overlay.
+        var baseComplexTypeNodes: [String: XSDTree] = [:]
+        /// Names of complex types redefined through `xs:redefine`.
+        var redefinedComplexTypes: Set<String> = []
         /// The schema's target namespace, for resolving `##other`/`##targetNamespace`
         /// in wildcard constraints and qualifying global and qualified-form local
         /// declarations.
@@ -242,6 +283,8 @@ extension PureXML.Schema {
         /// Each substitution-group head maps to its transitive member element
         /// names, so an `xs:element ref` to a head also admits its members.
         var substitutions: [String: [String]] = [:]
+        /// Target namespace of each global element, keyed by local name.
+        var elementNamespaces: [String: String?] = [:]
         /// Local names of element declarations declared `abstract="true"`, so a
         /// reference to an abstract head expands to its members but not the head.
         var abstractElements: Set<String> = []
@@ -255,6 +298,9 @@ extension PureXML.Schema {
         var compositionLoaded: Bool = false
         /// The location of each container schema document.
         var containerLocations: [ObjectIdentifier: String?] = [:]
+        /// Target namespace imposed on an included schema with no `targetNamespace`
+        /// (chameleon include), keyed by that included schema container.
+        var chameleonTargetNamespaces: [ObjectIdentifier: String] = [:]
         /// The shared schema-validity finding collector. A reference type, so the
         /// value-type context's copies all report into the one place.
         let diagnostics = SchemaDiagnostics()
@@ -269,6 +315,20 @@ extension PureXML.Schema {
             var copy = self
             copy.visitingTypes.insert(type)
             return copy
+        }
+
+        /// Namespace and form defaults for components defined under `container`.
+        func scoped(for container: XSDTree) -> XSDContext {
+            var scoped = self
+            let schema = XSDNode.schemaOwner(container)
+            scoped.targetNamespace = XSDNode.attribute(schema, "targetNamespace")
+            if scoped.targetNamespace?.isEmpty != false {
+                scoped.targetNamespace = chameleonTargetNamespaces[ObjectIdentifier(schema)]
+            }
+            scoped.namespaceBindings = XSDNode.namespaceBindings(of: schema)
+            scoped.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"
+            scoped.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
+            return scoped
         }
     }
 }

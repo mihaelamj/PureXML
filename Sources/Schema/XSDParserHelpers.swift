@@ -28,6 +28,124 @@ extension PureXML.Schema.XSDParser {
         return map
     }
 
+    /// Simple types for identity-constraint field paths, keyed by
+    /// ``identityFieldKey(constraint:field:)``.
+    static func identityFieldTypes(_ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String: PureXML.Schema.SimpleType] {
+        var types: [String: PureXML.Schema.SimpleType] = [:]
+        for container in containers {
+            for element in descendants(container, named: "element") {
+                let constraints = PureXML.Schema.XSDNode.elementChildren(element).compactMap(constraint)
+                guard !constraints.isEmpty else { continue }
+                for constraint in constraints {
+                    for field in constraint.fields {
+                        if field == ".", selectorBranches(constraint.selector).count > 1 {
+                            for branch in selectorBranches(constraint.selector) {
+                                if let type = declaredElementSimpleType(named: branch, under: element, context) {
+                                    types[identityFieldKey(constraint: constraint, field: field, targetLocal: branch)] = type
+                                }
+                            }
+                            continue
+                        }
+                        if let type = identityFieldType(field, host: element, constraint: constraint, context) {
+                            types[identityFieldKey(constraint: constraint, field: field)] = type
+                        }
+                    }
+                }
+            }
+        }
+        return types
+    }
+
+    static func identityFieldKey(constraint: PureXML.Schema.IdentityConstraint, field: String, targetLocal: String? = nil) -> String {
+        if let targetLocal { return "\(constraint.name)|\(field)|\(targetLocal)" }
+        return "\(constraint.name)|\(field)"
+    }
+
+    private static func selectorBranches(_ selector: String) -> [String] {
+        let token = selector.split(separator: "/").last.map(String.init) ?? selector
+        guard token.contains("|") else {
+            return selectorTargetLocalName(selector).map { [$0] } ?? []
+        }
+        return token.split(separator: "|").compactMap { branch in
+            let local = PureXML.Schema.XSDNode.stripPrefix(String(branch))
+            return local.isEmpty ? nil : local
+        }
+    }
+
+    private static func identityFieldType(
+        _ field: String,
+        host: XSDTree,
+        constraint: PureXML.Schema.IdentityConstraint,
+        _ context: PureXML.Schema.XSDContext,
+    ) -> PureXML.Schema.SimpleType? {
+        if field.hasPrefix("@") {
+            let attributeName = identityFieldAttributeName(field)
+            return attributeType(named: attributeName, under: host, context)
+        }
+        if field == "." {
+            let local = selectorTargetLocalName(constraint.selector)
+            return declaredElementSimpleType(named: local, under: host, context)
+        }
+        return nil
+    }
+
+    private static func identityFieldAttributeName(_ field: String) -> String {
+        let token = field.split(separator: "|").first.map(String.init) ?? field
+        guard token.hasPrefix("@") else { return String(field.dropFirst()) }
+        return String(token.dropFirst())
+    }
+
+    private static func selectorTargetLocalName(_ selector: String) -> String? {
+        let token = selector.split(separator: "/").last.map(String.init) ?? selector
+        return PureXML.Schema.XSDNode.stripPrefix(token)
+    }
+
+    private static func declaredElementSimpleType(
+        named local: String?,
+        under host: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+    ) -> PureXML.Schema.SimpleType? {
+        guard let local else { return elementSimpleType(under: host, context) }
+        guard let complex = PureXML.Schema.XSDNode.firstChild(host, named: "complexType") else { return nil }
+        for child in descendants(complex, named: "element") {
+            guard PureXML.Schema.XSDNode.attribute(child, "name") == local,
+                  let typeName = PureXML.Schema.XSDNode.attribute(child, "type")
+            else { continue }
+            let stripped = PureXML.Schema.XSDNode.stripPrefix(typeName)
+            let uri = PureXML.Schema.XSDNode.referenceNamespace(typeName, context.namespaceBindings)
+            if uri == PureXML.Schema.XSDParser.xsdNamespace, let builtin = PureXML.Schema.BuiltinType(rawValue: stripped) {
+                return PureXML.Schema.SimpleType(base: builtin)
+            }
+        }
+        return nil
+    }
+
+    private static func attributeType(named name: String, under host: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.SimpleType? {
+        for element in descendants(host, named: "element") {
+            guard let complex = PureXML.Schema.XSDNode.firstChild(element, named: "complexType") else { continue }
+            for attribute in descendants(complex, named: "attribute") {
+                guard PureXML.Schema.XSDNode.attribute(attribute, "name") == name else { continue }
+                if let use = PureXML.Schema.XSDParser.attributeUse(attribute, context) {
+                    return use.type
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func elementSimpleType(under host: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.SimpleType? {
+        guard let complex = PureXML.Schema.XSDNode.firstChild(host, named: "complexType") else { return nil }
+        for child in descendants(complex, named: "element") {
+            guard let typeName = PureXML.Schema.XSDNode.attribute(child, "type") else { continue }
+            let local = PureXML.Schema.XSDNode.stripPrefix(typeName)
+            let uri = PureXML.Schema.XSDNode.referenceNamespace(typeName, context.namespaceBindings)
+            if uri == PureXML.Schema.XSDParser.xsdNamespace, let builtin = PureXML.Schema.BuiltinType(rawValue: local) {
+                return PureXML.Schema.SimpleType(base: builtin)
+            }
+        }
+        return nil
+    }
+
     private static func constraint(_ node: XSDTree) -> PureXML.Schema.IdentityConstraint? {
         let kind: PureXML.Schema.IdentityConstraintKind
         switch PureXML.Schema.XSDNode.localName(node) {
@@ -60,6 +178,29 @@ extension PureXML.Schema.XSDParser {
 
     static func elementKey(_ name: String) -> String {
         "element:\(name)"
+    }
+
+    /// The local name from a type-table key (`type:{namespace}local` or a legacy bare name).
+    static func bareTypeLocalName(_ reference: String) -> String {
+        guard reference.hasPrefix("type:") else { return reference }
+        let key = String(reference.dropFirst("type:".count))
+        guard let close = key.firstIndex(of: "}") else { return key }
+        return String(key[key.index(after: close)...])
+    }
+
+    /// The type-table key for a global type declaration in a specific namespace.
+    static func typeDeclarationKey(_ localName: String, namespaceURI: String?) -> String {
+        "type:\(PureXML.Schema.ComplexValidator.key(PureXML.Model.QualifiedName(localName: localName, namespaceURI: namespaceURI)))"
+    }
+
+    /// The type-table key for a global element declaration in a specific namespace.
+    static func elementDeclarationKey(_ name: PureXML.Model.QualifiedName) -> String {
+        "element:\(PureXML.Schema.ComplexValidator.key(name))"
+    }
+
+    /// The lookup key for a global attribute declaration in a specific namespace.
+    static func attributeDeclarationKey(_ name: PureXML.Model.QualifiedName) -> String {
+        "attribute:\(PureXML.Schema.ComplexValidator.key(name))"
     }
 
     static func indexByName(_ nodes: [XSDTree]) -> [String: XSDTree] {

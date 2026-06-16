@@ -111,7 +111,7 @@ public extension PureXML.Schema {
 
         private static func collect(_ term: Term, into result: inout [String: ElementType]) {
             switch term {
-            case let .element(name, type, _):
+            case let .element(name, type, _, _):
                 if let type { result[name.description] = type }
             case let .group(group):
                 for member in group.particles {

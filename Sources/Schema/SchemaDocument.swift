@@ -45,6 +45,7 @@ public extension PureXML.Schema {
         private let elements: [String: ElementType]
         private let types: [String: ElementType]
         private let constraints: [String: [IdentityConstraint]]
+        private let identityFieldTypes: [String: SimpleType]
         private let nillableElements: Set<String>
         private let elementConstraints: [String: ValueConstraint]
         private let abstractTypes: Set<String>
@@ -53,6 +54,7 @@ public extension PureXML.Schema {
         private let elementBlock: [String: Set<DerivationMethod>]
         private let typeDerivation: [String: TypeDerivation]
         private let targetNamespace: String?
+        private let globalAttributes: [String: AttributeUse]
 
         /// Combines already-compiled declaration tables, for merging the schemas
         /// an instance references through `xsi:schemaLocation`. No consistency
@@ -61,6 +63,7 @@ public extension PureXML.Schema {
             elements: [String: ElementType],
             types: [String: ElementType],
             constraints: [String: [IdentityConstraint]],
+            identityFieldTypes: [String: SimpleType] = [:],
             nillableElements: Set<String>,
             elementConstraints: [String: ValueConstraint],
             abstractTypes: Set<String>,
@@ -69,10 +72,12 @@ public extension PureXML.Schema {
             elementBlock: [String: Set<DerivationMethod>],
             typeDerivation: [String: TypeDerivation],
             targetNamespace: String?,
+            globalAttributes: [String: AttributeUse],
         ) {
             self.elements = elements
             self.types = types
             self.constraints = constraints
+            self.identityFieldTypes = identityFieldTypes
             self.nillableElements = nillableElements
             self.elementConstraints = elementConstraints
             self.abstractTypes = abstractTypes
@@ -81,12 +86,17 @@ public extension PureXML.Schema {
             self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
             self.targetNamespace = targetNamespace
+            self.globalAttributes = globalAttributes
         }
 
         /// This schema with `other`'s global declarations merged in; this schema's
         /// own declarations win on any key conflict. Used to fold in the schemas an
         /// instance points at, so a strict/lax wildcard can resolve elements
         /// declared in another document.
+        public func merged(with other: Document) -> Document {
+            merging(other)
+        }
+
         private func merging(_ other: Document) -> Document {
             func mineFirst<V>(_ mine: [String: V], _ theirs: [String: V]) -> [String: V] {
                 mine.merging(theirs) { current, _ in current }
@@ -95,6 +105,7 @@ public extension PureXML.Schema {
                 elements: mineFirst(elements, other.elements),
                 types: mineFirst(types, other.types),
                 constraints: mineFirst(constraints, other.constraints),
+                identityFieldTypes: mineFirst(identityFieldTypes, other.identityFieldTypes),
                 nillableElements: nillableElements.union(other.nillableElements),
                 elementConstraints: mineFirst(elementConstraints, other.elementConstraints),
                 abstractTypes: abstractTypes.union(other.abstractTypes),
@@ -103,6 +114,7 @@ public extension PureXML.Schema {
                 elementBlock: mineFirst(elementBlock, other.elementBlock),
                 typeDerivation: mineFirst(typeDerivation, other.typeDerivation),
                 targetNamespace: targetNamespace,
+                globalAttributes: mineFirst(globalAttributes, other.globalAttributes),
             )
         }
 
@@ -116,6 +128,7 @@ public extension PureXML.Schema {
             elements = compiled.elements
             types = compiled.types
             constraints = compiled.constraints
+            identityFieldTypes = compiled.identityFieldTypes
             nillableElements = compiled.nillableElements
             elementConstraints = compiled.elementConstraints
             abstractTypes = compiled.abstractTypes
@@ -124,6 +137,7 @@ public extension PureXML.Schema {
             elementBlock = compiled.elementBlock
             typeDerivation = compiled.typeDerivation
             targetNamespace = compiled.targetNamespace
+            globalAttributes = compiled.globalAttributes
             // Schema consistency through the validation framework: every named
             // type is checked by the composable rules (final respected, Particle
             // Valid (Restriction)), and ALL findings are reported together, joined
@@ -232,6 +246,7 @@ public extension PureXML.Schema {
         ) throws -> [PureXML.Validation.ValidationError] {
             let validator = PureXML.Schema.ComplexValidator(
                 types: types,
+                globalAttributes: globalAttributes,
                 nillableElements: nillableElements,
                 elementConstraints: elementConstraints,
                 abstractTypes: abstractTypes,
@@ -262,8 +277,12 @@ public extension PureXML.Schema {
             guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
                 return []
             }
-            return PureXML.Schema.IdentityValidator(constraints: constraints)
-                .validate(PureXML.Model.TreeNode(.element(root)), at: [.element(root.name.description)])
+            return PureXML.Schema.IdentityValidator(
+                constraints: constraints,
+                fieldTypes: identityFieldTypes,
+                types: types,
+            )
+            .validate(PureXML.Model.TreeNode(.element(root)), at: [.element(root.name.description)])
         }
 
         /// Validates an already-parsed node tree, so a caller can validate the same
@@ -272,13 +291,15 @@ public extension PureXML.Schema {
             guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
                 return [.init(reason: "the document has no root element", at: [])]
             }
-            guard let declaration = elements[root.name.localName] else {
+            guard let declaration = globalElementDeclaration(for: root.name) ?? rootTypeOverride(for: root) else {
                 return [.init(reason: "no element declaration for '\(root.name.localName)'", at: [.element(root.name.description)])]
             }
             // A schema with a target namespace declares its global elements in that
-            // namespace; the root must be in it.
-            if let target = targetNamespace, !target.isEmpty, root.name.namespaceURI != target {
-                return [.init(reason: "root element '\(root.name.localName)' is not in the schema target namespace '\(target)'", at: [.element(root.name.description)])]
+            // namespace; the root must be in it unless a merged schema declares it
+            // in another namespace, or xsi:type names the validating type.
+            if rootTypeOverride(for: root) == nil, rootNamespaceMismatch(root.name) {
+                let reason = "root element '\(root.name.localName)' is not in the schema target namespace '\(targetNamespace ?? "")'"
+                return [.init(reason: reason, at: [.element(root.name.description)])]
             }
             // An abstract element may not appear in an instance directly; only a
             // concrete substitution-group member may stand in its place.
@@ -295,8 +316,37 @@ public extension PureXML.Schema {
                 typeBlock: typeBlock,
                 elementBlock: elementBlock,
                 typeDerivation: typeDerivation,
+                globalAttributes: globalAttributes,
+                identityFieldTypes: identityFieldTypes,
             )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
+        }
+
+        /// The global element declaration for a qualified instance name.
+        private func globalElementDeclaration(for name: PureXML.Model.QualifiedName) -> ElementType? {
+            if let declaration = types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] {
+                return declaration
+            }
+            if name.namespaceURI == nil || name.namespaceURI?.isEmpty == true {
+                return elements[name.localName]
+            }
+            return nil
+        }
+
+        private func rootNamespaceMismatch(_ name: PureXML.Model.QualifiedName) -> Bool {
+            guard let target = targetNamespace, !target.isEmpty, name.namespaceURI != target else { return false }
+            return types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] == nil
+        }
+
+        /// When the root has no global element declaration, an `xsi:type` attribute
+        /// can still name the type to validate against (Sun target-NS tests).
+        private func rootTypeOverride(for root: PureXML.Model.Element) -> ElementType? {
+            guard PureXML.Schema.ComplexValidator.xsiTypeAttributeValue(root) != nil else { return nil }
+            let bindings = PureXML.Schema.ComplexValidator.namespaceBindings(for: root)
+            guard let reference = PureXML.Schema.ComplexValidator.xsiTypeReference(root, namespaceBindings: bindings),
+                  let type = PureXML.Schema.ComplexValidator.resolveNamedType(reference, in: types)
+            else { return nil }
+            return type
         }
 
         /// What the schema allows at the element a coding `path` addresses in

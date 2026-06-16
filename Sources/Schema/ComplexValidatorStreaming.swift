@@ -105,7 +105,8 @@ public extension PureXML.Schema.ComplexValidator {
         case .skip:
             return nil
         case .lax, .strict:
-            return types["element:\(name.localName)"]
+            return types[PureXML.Schema.XSDParser.elementDeclarationKey(name)]
+                ?? types["element:\(name.localName)"]
         }
     }
 

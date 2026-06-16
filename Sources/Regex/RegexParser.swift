@@ -20,7 +20,7 @@ extension PureXML.Regex {
         }
 
         static func parse(_ pattern: String) throws -> Node {
-            guard !pattern.isEmpty else { throw RegexError.empty }
+            if pattern.isEmpty { return .empty }
             var parser = RegexParser(pattern)
             let node = try parser.parseAlternation()
             guard parser.isAtEnd else { throw RegexError.unbalanced }

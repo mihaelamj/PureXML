@@ -5,6 +5,36 @@ private typealias XSDGroup = PureXML.Schema.Group
 private typealias XSDContentNode = PureXML.Schema.XSDNode
 
 extension PureXML.Schema.XSDParser {
+    /// Attribute uses contributed by a `simpleContent` extension or restriction,
+    /// including those inherited from a complex base type.
+    static func simpleContentAttributes(under derivationNode: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.AttributeUse] {
+        let ownAttributes = attributeUses(under: derivationNode, context)
+        let derivationType = XSDContentNode.localName(derivationNode)
+        if derivationType == "extension", let base = resolvedBase(derivationNode, context) {
+            return base.attributes + ownAttributes
+        }
+        if derivationType == "restriction" {
+            let allowedOwnAttributes = ownAttributes.filter { !isProhibited($0.name, under: derivationNode, context) }
+            if let base = resolvedBase(derivationNode, context) {
+                var attributes: [PureXML.Schema.AttributeUse] = []
+                for baseAttr in base.attributes {
+                    if isProhibited(baseAttr.name, under: derivationNode, context) { continue }
+                    if let derived = allowedOwnAttributes.first(where: { $0.name == baseAttr.name }) {
+                        attributes.append(derived)
+                    } else {
+                        attributes.append(baseAttr)
+                    }
+                }
+                for ownAttr in allowedOwnAttributes where !base.attributes.contains(where: { $0.name == ownAttr.name }) {
+                    attributes.append(ownAttr)
+                }
+                return attributes
+            }
+            return allowedOwnAttributes
+        }
+        return ownAttributes
+    }
+
     /// Builds the effective complex type of a `complexContent` derivation. An
     /// extension composes the base type's attributes and content with its own
     /// (the base's content first, then the extension's, in sequence); a
@@ -23,7 +53,7 @@ extension PureXML.Schema.XSDParser {
         if derivationType == "extension", let base = resolvedBase(derivationNode, context) {
             return XSDComplexType(
                 attributes: base.attributes + ownAttributes,
-                attributeWildcard: ownWildcard ?? base.attributeWildcard,
+                attributeWildcard: PureXML.Schema.Wildcard.union(ownWildcard, base.attributeWildcard),
                 content: extendedContent(base: base.content, own: ownParticle, mixed: mixed),
             )
         } else if derivationType == "restriction" {
@@ -75,8 +105,7 @@ extension PureXML.Schema.XSDParser {
             case "attributeGroup":
                 guard let ref = XSDContentNode.attribute(child, "ref") else { break }
                 let refName = XSDContentNode.stripPrefix(ref)
-                guard !visited.contains(refName), let group = context.attributeGroups[refName] else { break }
-                if isProhibited(name, under: group, context, visited: visited.union([refName])) {
+                if attributeGroupProhibits(name, refName: refName, under: node, context, visited: visited) {
                     return true
                 }
             default:
@@ -84,6 +113,22 @@ extension PureXML.Schema.XSDParser {
             }
         }
         return false
+    }
+
+    private static func attributeGroupProhibits(
+        _ name: PureXML.Model.QualifiedName,
+        refName: String,
+        under _: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        visited: Set<String>,
+    ) -> Bool {
+        if visited.contains(refName) {
+            guard context.redefinedAttributeGroups.contains(refName),
+                  let base = context.baseAttributeGroups[refName] else { return false }
+            return isProhibited(name, under: base, context, visited: visited)
+        }
+        guard let group = context.attributeGroups[refName] else { return false }
+        return isProhibited(name, under: group, context, visited: visited.union([refName]))
     }
 
     private static func attributeName(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Model.QualifiedName? {
@@ -102,12 +147,29 @@ extension PureXML.Schema.XSDParser {
     /// node, or nil when the base is unknown (a built-in or undeclared type) or
     /// would form a derivation cycle.
     private static func resolvedBase(_ derivationNode: XSDTree, _ context: PureXML.Schema.XSDContext) -> XSDComplexType? {
-        guard let baseName = XSDContentNode.attribute(derivationNode, "base").map(XSDContentNode.stripPrefix),
-              !context.visitingTypes.contains(baseName), let baseNode = context.complexTypeNodes[baseName]
-        else {
+        guard let baseName = XSDContentNode.attribute(derivationNode, "base").map(XSDContentNode.stripPrefix) else {
             return nil
         }
-        return complexType(baseNode, context.visitingType(baseName))
+        guard let baseNode = baseTypeNode(named: baseName, context) else { return nil }
+        let scoped = context.scoped(for: XSDContentNode.schemaOwner(baseNode))
+        return complexType(baseNode, scoped.visitingType(baseName))
+    }
+
+    /// The schema node a complex type derives from: the redefined base when this
+    /// type is the redefining occurrence of `baseName`, otherwise the ordinary
+    /// declaration. Returns nil when resolving would form a derivation cycle.
+    private static func baseTypeNode(named baseName: String, _ context: PureXML.Schema.XSDContext) -> XSDTree? {
+        if let redefined = redefinedBaseNode(named: baseName, context) { return redefined }
+        guard !context.visitingTypes.contains(baseName) else { return nil }
+        return context.complexTypeNodes[baseName]
+    }
+
+    private static func redefinedBaseNode(named baseName: String, _ context: PureXML.Schema.XSDContext) -> XSDTree? {
+        guard context.redefinedComplexTypes.contains(baseName),
+              context.visitingTypes.contains(baseName),
+              let baseNode = context.baseComplexTypeNodes[baseName]
+        else { return nil }
+        return baseNode
     }
 
     /// A particle wrapped as element-only or mixed content, or empty content when

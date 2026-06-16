@@ -101,7 +101,9 @@ public extension PureXML.Validation {
                 return nil
             }
             sawRoot = true
-            guard let declaration = rootElements[name.localName] else {
+            guard let declaration = rootElements[name.localName]
+                ?? validator.types[PureXML.Schema.XSDParser.elementDeclarationKey(name)]
+            else {
                 collected.append(ValidationError(reason: "no element declaration for '\(name.localName)'", at: path))
                 return nil
             }
@@ -109,11 +111,16 @@ public extension PureXML.Validation {
                 collected.append(ValidationError(reason: "abstract element '\(name.localName)' must not appear in an instance", at: path))
                 return nil
             }
-            if let target = targetNamespace, !target.isEmpty, name.namespaceURI != target {
-                collected.append(ValidationError(reason: "root element '\(name.localName)' is not in the schema target namespace '\(target)'", at: path))
+            if rootNamespaceMismatch(name) {
+                collected.append(ValidationError(reason: "root element '\(name.localName)' is not in the schema target namespace '\(targetNamespace ?? "")'", at: path))
                 return nil
             }
             return declaration
+        }
+
+        private func rootNamespaceMismatch(_ name: PureXML.Model.QualifiedName) -> Bool {
+            guard let target = targetNamespace, !target.isEmpty, name.namespaceURI != target else { return false }
+            return validator.types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] == nil
         }
 
         /// The coding path for an opening element: the root unindexed, a child with

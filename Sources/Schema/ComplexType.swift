@@ -60,6 +60,41 @@ public extension PureXML.Schema {
                 return uris.contains(namespaceURI)
             }
         }
+
+        /// The union of two wildcard constraints (XSD 1.0 `cos-aw-union`), used when
+        /// a complexContent extension adds its own `anyAttribute`.
+        func union(with other: Wildcard) -> Wildcard {
+            Wildcard(
+                namespace: Self.unionNamespace(namespace, other.namespace),
+                processContents: Self.unionProcessContents(processContents, other.processContents),
+                targetNamespace: targetNamespace ?? other.targetNamespace,
+            )
+        }
+
+        /// Combines optional wildcards from a base type and a derivation.
+        static func union(_ left: Wildcard?, _ right: Wildcard?) -> Wildcard? {
+            switch (left, right) {
+            case (nil, nil): nil
+            case (let left?, nil): left
+            case (nil, let right?): right
+            case let (left?, right?): left.union(with: right)
+            }
+        }
+
+        private static func unionNamespace(_ left: WildcardNamespace, _ right: WildcardNamespace) -> WildcardNamespace {
+            switch (left, right) {
+            case (.any, _), (_, .any): .any
+            case (.other, .other): .other
+            case let (.enumerated(lhs), .enumerated(rhs)): .enumerated(lhs.union(rhs))
+            case (.other, _), (_, .other): .any
+            }
+        }
+
+        private static func unionProcessContents(_ left: ProcessContents, _ right: ProcessContents) -> ProcessContents {
+            if left == .strict || right == .strict { return .strict }
+            if left == .lax || right == .lax { return .lax }
+            return .skip
+        }
     }
 
     /// The term of a particle: an element declaration, a nested model group, or a
@@ -69,7 +104,7 @@ public extension PureXML.Schema {
         /// (a built-in, a user type, or `anyType` for an absent type), or nil when
         /// the type is an inline anonymous definition. It preserves the derivation
         /// identity the flattened `type` (`ElementType`) loses, for NameAndTypeOK.
-        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?)
+        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?, valueConstraint: ValueConstraint? = nil)
         case group(Group)
         case wildcard(Wildcard)
     }
@@ -135,17 +170,22 @@ public extension PureXML.Schema {
         public var type: SimpleType
         public var required: Bool
         public var valueConstraint: ValueConstraint?
+        /// When true, an unprefixed instance attribute may match this use if the
+        /// element is in the same namespace (chameleon include only).
+        public var chameleonUnprefixed: Bool
 
         public init(
             name: PureXML.Model.QualifiedName,
             type: SimpleType,
             required: Bool = false,
             valueConstraint: ValueConstraint? = nil,
+            chameleonUnprefixed: Bool = false,
         ) {
             self.name = name
             self.type = type
             self.required = required
             self.valueConstraint = valueConstraint
+            self.chameleonUnprefixed = chameleonUnprefixed
         }
     }
 

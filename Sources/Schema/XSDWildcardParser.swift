@@ -1,7 +1,35 @@
 extension PureXML.Schema.XSDParser {
-    /// The `xs:anyAttribute` wildcard declared directly under `node`, if any.
-    static func attributeWildcard(under node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Wildcard? {
-        PureXML.Schema.XSDNode.firstChild(node, named: "anyAttribute").map { wildcard($0, context) }
+    /// The effective `xs:anyAttribute` wildcard declared under `node`, including
+    /// any `anyAttribute` on nested `attributeGroup` references.
+    static func attributeWildcard(
+        under node: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        visited: Set<String> = [],
+    ) -> PureXML.Schema.Wildcard? {
+        var combined: PureXML.Schema.Wildcard?
+        if let direct = PureXML.Schema.XSDNode.firstChild(node, named: "anyAttribute").map({ wildcard($0, context) }) {
+            combined = PureXML.Schema.Wildcard.union(combined, direct)
+        }
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            guard PureXML.Schema.XSDNode.localName(child) == "attributeGroup",
+                  let ref = PureXML.Schema.XSDNode.attribute(child, "ref")
+            else { continue }
+            let name = PureXML.Schema.XSDNode.stripPrefix(ref)
+            if visited.contains(name) {
+                guard context.redefinedAttributeGroups.contains(name),
+                      let base = context.baseAttributeGroups[name],
+                      let found = attributeWildcard(under: base, context, visited: visited)
+                else { continue }
+                combined = PureXML.Schema.Wildcard.union(combined, found)
+                continue
+            }
+            guard let group = context.attributeGroups[name] else { continue }
+            let scoped = context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(group))
+            if let found = attributeWildcard(under: group, scoped, visited: visited.union([name])) {
+                combined = PureXML.Schema.Wildcard.union(combined, found)
+            }
+        }
+        return combined
     }
 
     /// Parses a wildcard's `namespace` and `processContents` constraints.

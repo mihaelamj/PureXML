@@ -66,11 +66,11 @@ extension PureXML.Schema {
                 return emptiable(base)
             }
             switch (restricted.term, base.term) {
-            case let (.element(restrictedName, _, restrictedTypeName), .element(baseName, _, baseTypeName)):
+            case let (.element(restrictedName, _, restrictedTypeName, _), .element(baseName, _, baseTypeName, _)):
                 return rangeSubsumed(restricted, base)
                     && sameName(restrictedName, baseName)
                     && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
-            case let (.element(name, _, _), .wildcard(wildcard)):
+            case let (.element(name, _, _, _), .wildcard(wildcard)):
                 return rangeSubsumed(restricted, base) && wildcard.admits(name)
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
@@ -80,7 +80,7 @@ extension PureXML.Schema {
                 // a base member inside `groupValid`, not against the base group's own
                 // occurrence, so no outer `rangeSubsumed` here.
                 return groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
-            case let (.group, .element(baseName, _, baseTypeName)):
+            case let (.group, .element(baseName, _, baseTypeName, _)):
                 // The mirror of RecurseAsIfGroup, by the same cardinality argument as
                 // group/wildcard: a base element accepts only its own name, its own
                 // occurrence count of times. The derived group is a valid restriction
@@ -277,7 +277,7 @@ extension PureXML.Schema {
         /// element by name, a nested wildcard by narrowing.
         private static func leavesAdmitted(_ particle: Particle, by wildcard: Wildcard) -> Bool {
             switch particle.term {
-            case let .element(name, _, _): wildcard.admits(name)
+            case let .element(name, _, _, _): wildcard.admits(name)
             case let .wildcard(inner): narrows(inner, wildcard)
             case let .group(group): group.particles.allSatisfy { leavesAdmitted($0, by: wildcard) }
             }
@@ -295,7 +295,7 @@ extension PureXML.Schema {
             _ derivation: [String: TypeDerivation],
         ) -> Bool {
             switch particle.term {
-            case let .element(name, _, typeName):
+            case let .element(name, _, typeName, _):
                 sameName(name, baseName) && elementTypeRestrictionOK(typeName, baseTypeName, types, derivation)
             case .wildcard:
                 false

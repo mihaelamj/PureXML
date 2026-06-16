@@ -34,7 +34,7 @@ extension PureXML.Schema.ComplexValidator {
 
     fileprivate static func label(of term: XSDTerm) -> XSDTermLabel {
         switch term {
-        case let .element(name, _, _): .name(name)
+        case let .element(name, _, _, _): .name(name)
         case let .wildcard(wildcard): .wildcard(wildcard)
         case .group: .wildcard(XSDWildcard())
         }
@@ -64,7 +64,7 @@ extension PureXML.Schema.ComplexValidator {
 
     fileprivate static func collectTypes(_ term: XSDTerm, into result: inout [String: XSDElementType]) {
         switch term {
-        case let .element(name, type, _):
+        case let .element(name, type, _, _):
             if let type { result[key(name)] = type }
         case let .group(group):
             for member in group.particles {
@@ -84,6 +84,47 @@ extension PureXML.Schema.ComplexValidator {
     /// share a local name in different namespaces are kept distinct.
     static func sameName(_ lhs: PureXML.Model.QualifiedName, _ rhs: PureXML.Model.QualifiedName) -> Bool {
         lhs.namespaceURI == rhs.namespaceURI && lhs.localName == rhs.localName
+    }
+
+    /// Namespace prefix bindings declared on an element (`xmlns`, `xmlns:p`).
+    static func namespaceBindingsDeclared(on element: PureXML.Model.Element) -> [String: String] {
+        var bindings: [String: String] = [:]
+        for attribute in element.attributes {
+            if attribute.name.prefix == "xmlns" {
+                bindings[attribute.name.localName] = attribute.value
+            } else if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
+                bindings[""] = attribute.value
+            }
+        }
+        return bindings
+    }
+
+    /// In-scope prefix bindings for `element`, merging ancestor declarations.
+    static func namespaceBindings(for element: PureXML.Model.Element, inherited: [String: String] = [:]) -> [String: String] {
+        inherited.merging(namespaceBindingsDeclared(on: element)) { _, new in new }
+    }
+
+    /// The lexical `xsi:type` attribute value, when present.
+    static func xsiTypeAttributeValue(_ element: PureXML.Model.Element) -> String? {
+        let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
+        let match = element.attributes.first { attribute in
+            attribute.name.localName == "type"
+                && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
+        }
+        return match?.value.trimmingXMLWhitespace()
+    }
+
+    /// Resolves an instance `xsi:type` attribute to a named type-table key.
+    static func xsiTypeReference(_ element: PureXML.Model.Element, namespaceBindings: [String: String]) -> String? {
+        guard let value = xsiTypeAttributeValue(element) else { return nil }
+        let local = value.split(separator: ":").last.map(String.init) ?? value
+        if value.contains(":"), let prefix = value.split(separator: ":", maxSplits: 1).first.map(String.init), let uri = namespaceBindings[prefix] {
+            return PureXML.Schema.XSDParser.typeDeclarationKey(local, namespaceURI: uri)
+        }
+        if let uri = namespaceBindings[""] {
+            return PureXML.Schema.XSDParser.typeDeclarationKey(local, namespaceURI: uri)
+        }
+        return local
     }
 
     /// The element's character content, trimmed: used to decide whether an
@@ -135,12 +176,7 @@ extension PureXML.Schema.ComplexValidator {
     /// carries none. Recognizes the attribute by the XML Schema instance
     /// namespace or, failing namespace resolution, the conventional `xsi` prefix.
     static func xsiTypeName(_ element: PureXML.Model.Element) -> String? {
-        let schemaInstance = "http://www.w3.org/2001/XMLSchema-instance"
-        let match = element.attributes.first { attribute in
-            attribute.name.localName == "type"
-                && (attribute.name.namespaceURI == schemaInstance || attribute.name.prefix == "xsi")
-        }
-        return match.map { $0.value.split(separator: ":").last.map(String.init) ?? $0.value }
+        xsiTypeAttributeValue(element).map { $0.split(separator: ":").last.map(String.init) ?? $0 }
     }
 }
 
@@ -184,10 +220,74 @@ extension PureXML.Schema.ComplexValidator {
         var visited: Set<String> = []
         while case let .typeReference(name) = current {
             guard visited.insert(name).inserted else { return .circular(name) }
-            guard let next = types[name] else { return .unknown(name) }
+            guard let next = resolveNamedType(name, in: types) else { return .unknown(name) }
             current = next
         }
         return .resolved(current)
+    }
+
+    /// Resolves a named type reference, including built-in datatypes and ur-types.
+    static func resolveNamedType(_ name: String, in types: [String: PureXML.Schema.ElementType]) -> PureXML.Schema.ElementType? {
+        if let next = types[name] { return next }
+        if name.hasPrefix("type:"), let (uri, local) = parseQualifiedTypeKey(name) {
+            if uri == PureXML.Schema.XSDParser.xsdNamespace, let builtin = urOrBuiltinType(named: local) {
+                return builtin
+            }
+            if let next = types[PureXML.Schema.XSDParser.typeDeclarationKey(local, namespaceURI: uri)] {
+                return next
+            }
+        }
+        if !name.hasPrefix("type:"), let next = types[PureXML.Schema.XSDParser.typeDeclarationKey(name, namespaceURI: nil)] {
+            return next
+        }
+        if let builtin = PureXML.Schema.BuiltinType(rawValue: name) {
+            return .simple(PureXML.Schema.SimpleType(base: builtin))
+        }
+        if name == "anySimpleType" {
+            return .simple(PureXML.Schema.SimpleType(base: .string, isAnySimpleType: true))
+        }
+        if name == "anyType" {
+            return .complex(PureXML.Schema.ComplexType(
+                attributeWildcard: PureXML.Schema.Wildcard(processContents: .skip),
+                content: .mixed(PureXML.Schema.Particle(
+                    minOccurs: 0,
+                    maxOccurs: nil,
+                    term: .wildcard(PureXML.Schema.Wildcard(processContents: .skip)),
+                )),
+            ))
+        }
+        if let item = PureXML.Schema.XSDSimpleParser.listBuiltinItem(name) {
+            return .simple(.list(item: PureXML.Schema.SimpleType(base: item), isBuiltinList: true))
+        }
+        return nil
+    }
+
+    private static func parseQualifiedTypeKey(_ name: String) -> (uri: String, local: String)? {
+        let keyBody = String(name.dropFirst("type:".count))
+        guard keyBody.hasPrefix("{"), let close = keyBody.firstIndex(of: "}") else { return nil }
+        let uri = String(keyBody[keyBody.index(after: keyBody.startIndex) ..< close])
+        let local = String(keyBody[keyBody.index(after: close)...])
+        return (uri, local)
+    }
+
+    private static func urOrBuiltinType(named local: String) -> PureXML.Schema.ElementType? {
+        if let builtin = PureXML.Schema.BuiltinType(rawValue: local) {
+            return .simple(PureXML.Schema.SimpleType(base: builtin))
+        }
+        if local == "anySimpleType" {
+            return .simple(PureXML.Schema.SimpleType(base: .string, isAnySimpleType: true))
+        }
+        if local == "anyType" {
+            return .complex(PureXML.Schema.ComplexType(
+                attributeWildcard: PureXML.Schema.Wildcard(processContents: .skip),
+                content: .mixed(PureXML.Schema.Particle(
+                    minOccurs: 0,
+                    maxOccurs: nil,
+                    term: .wildcard(PureXML.Schema.Wildcard(processContents: .skip)),
+                )),
+            ))
+        }
+        return nil
     }
 
     /// The instance resolver over this validator's type table.

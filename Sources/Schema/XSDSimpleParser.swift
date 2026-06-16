@@ -36,7 +36,8 @@ extension PureXML.Schema {
             var facets = baseType.facets
             // A restriction's own `enumeration` replaces the inherited set (the new
             // enumeration is the value space, not a union with the base's), whereas
-            // `pattern` accumulates across steps and is ANDed. So drop the inherited
+            // `pattern` accumulates in groups: OR within a restriction step, AND
+            // across derivation (libxml2 `xmlSchemaValidateFacets`). Drop the inherited
             // enumeration when this step declares its own.
             if XSDNode.elementChildren(restriction).contains(where: { XSDNode.localName($0) == "enumeration" }) {
                 facets.enumeration = nil
@@ -80,7 +81,7 @@ extension PureXML.Schema {
             switch error {
             case .unbalanced, .danglingQuantifier:
                 true
-            case .empty, .unsupported, .badQuantifier, .badEscape, .badClass:
+            case .unsupported, .badQuantifier, .badEscape, .badClass:
                 false
             }
         }

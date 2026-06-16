@@ -12,6 +12,8 @@ public extension PureXML.Validation {
         public let typeBlock: [String: Set<PureXML.Schema.DerivationMethod>]
         public let elementBlock: [String: Set<PureXML.Schema.DerivationMethod>]
         public let typeDerivation: [String: PureXML.Schema.TypeDerivation]
+        public let globalAttributes: [String: PureXML.Schema.AttributeUse]
+        public let identityFieldTypes: [String: PureXML.Schema.SimpleType]
 
         public init(
             types: [String: PureXML.Schema.ElementType],
@@ -23,6 +25,8 @@ public extension PureXML.Validation {
             typeBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
             elementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
             typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:],
+            globalAttributes: [String: PureXML.Schema.AttributeUse] = [:],
+            identityFieldTypes: [String: PureXML.Schema.SimpleType] = [:],
         ) {
             self.types = types
             self.constraints = constraints
@@ -33,10 +37,13 @@ public extension PureXML.Validation {
             self.typeBlock = typeBlock
             self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
+            self.globalAttributes = globalAttributes
+            self.identityFieldTypes = identityFieldTypes
         }
     }
+}
 
-    /// XSD validation expressed as composable ``Validation`` values over an
+public extension PureXML.Validation {
     /// ``XSDContext``, in the OpenAPIKit idiom: each rule is a named, removable
     /// ``Validation`` value with a positive description, and the ``validator()``
     /// composes them; failures are located ``ValidationError``s.
@@ -63,14 +70,16 @@ public extension PureXML.Validation {
                     guard case let .element(root) = context.subject, let declaration = context.document.rootDeclaration else {
                         return []
                     }
+                    let schema = context.document
                     let validator = PureXML.Schema.ComplexValidator(
-                        types: context.document.types,
-                        nillableElements: context.document.nillableElements,
-                        elementConstraints: context.document.elementConstraints,
-                        abstractTypes: context.document.abstractTypes,
-                        typeBlock: context.document.typeBlock,
-                        elementBlock: context.document.elementBlock,
-                        typeDerivation: context.document.typeDerivation,
+                        types: schema.types,
+                        globalAttributes: schema.globalAttributes,
+                        nillableElements: schema.nillableElements,
+                        elementConstraints: schema.elementConstraints,
+                        abstractTypes: schema.abstractTypes,
+                        typeBlock: schema.typeBlock,
+                        elementBlock: schema.elementBlock,
+                        typeDerivation: schema.typeDerivation,
                     )
                     var errors = validator.validate(root, as: declaration, at: [.element(root.name.description)])
                     // Document-scoped ID uniqueness and IDREF resolution, gathered
@@ -86,10 +95,13 @@ public extension PureXML.Validation {
         static var identityConstraints: Validation<PureXML.Model.Node, XSDContext> {
             .init(
                 description: "XSD identity constraints hold",
-                check: { context in
+                check: { context -> [PureXML.Validation.ValidationError] in
                     guard case let .element(root) = context.subject else { return [] }
-                    return PureXML.Schema.IdentityValidator(constraints: context.document.constraints)
-                        .validate(PureXML.Model.TreeNode(context.subject), at: [.element(root.name.description)])
+                    return PureXML.Schema.IdentityValidator(
+                        constraints: context.document.constraints,
+                        fieldTypes: context.document.identityFieldTypes,
+                        types: context.document.types,
+                    ).validate(PureXML.Model.TreeNode(context.subject), at: [.element(root.name.description)])
                 },
                 when: { $0.codingPath.isEmpty },
             )

@@ -18,9 +18,9 @@ Parallel: **#130** (XSLT suite), **#139** (performance epic; tasks [#175](https:
 | Gate | Now | Issue |
 |---|---|---|
 | Valid schemas rejected | 1 | [#148](https://github.com/mihaelamj/PureXML/issues/148) |
-| Invalid schemas accepted | 264 | [#145](https://github.com/mihaelamj/PureXML/issues/145) |
-| Valid instances rejected | 173 | [#146](https://github.com/mihaelamj/PureXML/issues/146) |
-| Invalid instances accepted | 155 | [#147](https://github.com/mihaelamj/PureXML/issues/147) |
+| Invalid schemas accepted | 261 | [#145](https://github.com/mihaelamj/PureXML/issues/145) |
+| Valid instances rejected | 99 | [#146](https://github.com/mihaelamj/PureXML/issues/146) |
+| Invalid instances accepted | 147 | [#147](https://github.com/mihaelamj/PureXML/issues/147) |
 
 Gates are **metric trackers**, not implementation tasks. Pick up **task** issues; ratchet baselines in `Tests/XSTSSuiteTests.swift` when counts fall.
 

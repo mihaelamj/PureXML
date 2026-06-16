@@ -19,13 +19,14 @@ extension PureXML.Regex {
         var accept: Int
 
         /// Whether the automaton matches the whole string (XSD patterns are
-        /// implicitly anchored at both ends).
+        /// implicitly anchored at both ends). XSD regular expressions match a
+        /// sequence of Unicode code points, not Swift extended grapheme clusters.
         func matchesWhole(_ string: String) -> Bool {
             var current = closure([start])
-            for character in string {
+            for scalar in string.unicodeScalars {
                 var next: Set<Int> = []
                 for state in current {
-                    if let transition = states[state].transition, transition.charClass.matches(character) {
+                    if let transition = states[state].transition, transition.charClass.matches(scalar) {
                         next.insert(transition.target)
                     }
                 }

@@ -223,7 +223,7 @@ extension PureXML.Schema.XSDParser {
     /// The names of components of `kind` redefined in an `xs:redefine`. A redefined
     /// model group or attribute group legitimately references its own former self
     /// once, so it is a chain end rather than a cycle.
-    private static func redefinedNames(_ containers: [XSDTree], _ kind: String) -> Set<String> {
+    static func redefinedNames(_ containers: [XSDTree], _ kind: String) -> Set<String> {
         var names: Set<String> = []
         for container in containers where XSDDerivNode.localName(container) == "redefine" {
             for definition in XSDDerivNode.children(container, named: kind) {

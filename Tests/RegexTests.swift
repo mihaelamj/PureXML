@@ -82,6 +82,14 @@ struct RegexTests {
         #expect(try !matches("\\w", " "))
         #expect(try matches("a\\sb", "a b"))
         #expect(try matches("\\D+", "abc"))
+        // XSTS reT51: Tamil digit U+0BE6 was unassigned in Unicode 3.1, so it matches \D.
+        #expect(try matches("\\D", "\u{0BE6}"))
+        // XSTS reZ003v: ceiling brackets were Sm in Unicode 3.1, so they match `\w`.
+        #expect(try matches("\\w", "\u{2308}"))
+        #expect(try matches("[\\w]", "\u{2308}"))
+        #expect(try matches("[\\w]", "\u{2309}"))
+        // XSTS reZ004v: decimal digits from other scripts match `\d` via Nd.
+        #expect(try matches("\\d", "\u{0661}"))
     }
 
     @Test("Escaped metacharacters are literal")
@@ -102,7 +110,14 @@ struct RegexTests {
     func test_errors() {
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("a(b") }
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("*ab") }
-        #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("") }
+    }
+
+    @Test("The empty pattern is valid and matches only the empty string")
+    func test_emptyPattern() throws {
+        // XSD grammar (Datatypes Appendix F): branch ::= piece*, so a branch
+        // may have zero pieces. The empty regex is valid and matches "".
+        #expect(try matches("", ""))
+        #expect(try !matches("", "a"))
     }
 
     @Test("Pathological quantifiers compile bounded instead of exhausting memory")
