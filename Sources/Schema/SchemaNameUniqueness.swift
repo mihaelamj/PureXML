@@ -318,17 +318,19 @@ extension PureXML.Schema.XSDParser {
             guard PureXML.Schema.XSDNode.localName(parent) == "schema" else { continue }
             let parentNamespace = resolvedNamespace(at: parentIndex, in: namespaceMap, fallback: mainTargetNamespace)
             for child in PureXML.Schema.XSDNode.elementChildren(parent) {
-                guard PureXML.Schema.XSDNode.localName(child) == "include",
+                let kind = PureXML.Schema.XSDNode.localName(child)
+                guard kind == "include" || kind == "redefine",
                       let location = PureXML.Schema.XSDNode.attribute(child, "schemaLocation")
                 else { continue }
                 guard let includedIndex = containers.firstIndex(where: {
-                    containerLocations[ObjectIdentifier($0)] == location
+                    containerLocations[ObjectIdentifier($0)] == location && PureXML.Schema.XSDNode.localName($0) == "schema"
                 }) else { continue }
                 let includedNamespace = PureXML.Schema.XSDNode.attribute(containers[includedIndex], "targetNamespace")
                 if let includedNamespace, includedNamespace != parentNamespace {
                     let parentLabel = parentNamespace ?? "no namespace"
+                    let verb = kind == "redefine" ? "redefined" : "included"
                     findings.append(PureXML.Schema.SchemaLocatedFinding(
-                        reason: "included schema targetNamespace '\(includedNamespace)' must match includer targetNamespace '\(parentLabel)' or be chameleon (no targetNamespace)",
+                        reason: "\(verb) schema targetNamespace '\(includedNamespace)' must match the '\(parentLabel)' targetNamespace or be chameleon (no targetNamespace)",
                         node: child,
                     ))
                 }

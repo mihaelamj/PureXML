@@ -94,6 +94,24 @@ struct SchemaIncludeTests {
         #expect((try? PureXML.Schema.Document(redefine(#"<xs:group ref="g"/>"#), schemaLoader: loader)) != nil)
     }
 
+    /// A redefined schema's targetNamespace must match the redefining schema's (or be
+    /// chameleon, no targetNamespace), exactly as for include; a redefine of a
+    /// different-namespace schema is invalid.
+    @Test("a redefine's schema must match the redefiner's targetNamespace")
+    func test_redefineTargetNamespaceMatch() {
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a">
+          <xs:redefine schemaLocation="r.xsd"/>
+        </xs:schema>
+        """
+        func redefined(_ namespace: String) -> String {
+            "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"\(namespace)><xs:simpleType name=\"t\"><xs:restriction base=\"xs:string\"/></xs:simpleType></xs:schema>"
+        }
+        // A different targetNamespace is invalid; the same one is valid.
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "r.xsd" ? redefined(" targetNamespace=\"urn:other\"") : nil })) == nil)
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { $0 == "r.xsd" ? redefined(" targetNamespace=\"urn:a\"") : nil })) != nil)
+    }
+
     /// src-redefine.7.2.1: a redefined attributeGroup may contain at most one
     /// self-reference; two references to the group being redefined are invalid.
     @Test("a redefined attributeGroup may have at most one self-reference")
