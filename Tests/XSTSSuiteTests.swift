@@ -145,8 +145,11 @@ struct XSTSSuiteTests {
     /// minOccurs may not exceed maxOccurs, both defaulting to 1; cos-all-limited.2: an
     /// all group's maxOccurs is 1 and minOccurs 0 or 1, its particles' maxOccurs 0 or
     /// 1) then caught twenty more invalid schemas with no false positive: 130 → 110.
+    /// Enforcing the identity-constraint content model (`unique`/`key`/`keyref` is
+    /// `(annotation?, selector, field+)`: exactly one selector, then one or more
+    /// fields, in order) caught six more with no false positive: 110 → 104.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 110
+    private let knownSchemaInvalidAccepted = 104
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

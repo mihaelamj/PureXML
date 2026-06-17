@@ -136,6 +136,8 @@ extension PureXML.Schema.XSDParser {
             errors += simpleContentOrderErrors(node)
         case "selector", "field":
             errors += identityXPathErrors(node, local: local)
+        case "unique", "key", "keyref":
+            errors += identityConstraintContentErrors(names)
         default:
             break
         }

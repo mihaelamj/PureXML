@@ -68,4 +68,38 @@ struct SchemaIdentityXPathTests {
             #expect(rejectsField(field), "expected rejection: '\(field)'")
         }
     }
+
+    /// The content model of `unique`/`key`/`keyref` is `(annotation?, selector,
+    /// field+)`: a field before the selector, a second selector, or no field is
+    /// invalid, while one selector followed by one or more fields (optionally after
+    /// an annotation) is valid.
+    private func compilesConstraint(_ body: String) -> Bool {
+        let document = #"""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="r">
+            <xs:complexType><xs:sequence><xs:element name="c" type="xs:string"/></xs:sequence></xs:complexType>
+            <xs:unique name="u">\#(body)</xs:unique>
+          </xs:element>
+        </xs:schema>
+        """#
+        return (try? PureXML.Schema.Document(document)) != nil
+    }
+
+    @Test("an identity constraint requires one selector then one or more fields")
+    func test_identityConstraintContentModel() {
+        let selector = #"<xs:selector xpath="c"/>"#
+        let field = #"<xs:field xpath="@v"/>"#
+        let annotation = "<xs:annotation><xs:documentation>x</xs:documentation></xs:annotation>"
+        // Valid shapes.
+        #expect(compilesConstraint(selector + field))
+        #expect(compilesConstraint(selector + field + field))
+        #expect(compilesConstraint(annotation + selector + field))
+        // A field before the selector (idA044 shape).
+        #expect(!compilesConstraint(field + selector))
+        // Two selectors (idA046 shape).
+        #expect(!compilesConstraint(selector + selector + field))
+        // No field, or no selector.
+        #expect(!compilesConstraint(selector))
+        #expect(!compilesConstraint(field))
+    }
 }

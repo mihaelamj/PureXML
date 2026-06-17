@@ -227,6 +227,19 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// The content model of an identity constraint (`unique`/`key`/`keyref`) is
+    /// `(annotation?, selector, field+)`: exactly one `selector`, then one or more
+    /// `field`s, in that order. A `field` before the `selector`, a second
+    /// `selector`, or no `field` is invalid. (`names` is already the XSD-namespace
+    /// children; misplaced annotation is checked by the general annotation rule.)
+    static func identityConstraintContentErrors(_ names: [String]) -> [String] {
+        let meaningful = names.filter { $0 != "annotation" }
+        let wellFormed = meaningful.first == "selector"
+            && meaningful.count >= 2
+            && meaningful.dropFirst().allSatisfy { $0 == "field" }
+        return wellFormed ? [] : ["an identity constraint must contain one selector followed by one or more fields"]
+    }
+
     static func groupChildrenErrors(_: XSDTree, names: [String]) -> [String] {
         var errors: [String] = []
         let compositors = names.count { $0 == "all" || $0 == "choice" || $0 == "sequence" }

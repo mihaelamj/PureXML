@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an identity constraint's content model is enforced. `unique`, `key`, and `keyref` must contain exactly one `selector` followed by one or more `field`s (after an optional `annotation`); a `field` before the `selector`, a second `selector`, or no `field` is now rejected (previously only child-element membership was checked, not their cardinality or order). invalid-schemas-accepted 110 → 104, no false positive (valid-schemas-rejected held at 0), no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): the occurrence-range constraints on model groups are enforced. A particle's `minOccurs` may not exceed its `maxOccurs`, both defaulting to 1 when absent (`p-props-correct.1`), so `<xs:sequence minOccurs="2">` (2 > the default 1) and `<xs:all maxOccurs="0">` (the default 1 > 0) are rejected; and an `all` group's `maxOccurs` must be 1 and `minOccurs` 0 or 1, with every particle it contains limited to `maxOccurs` 0 or 1 (`cos-all-limited.2`). The previous check fired only when both attributes were present, missing the common default-`maxOccurs` cases. Triple-confirmed against the W3C-labelled suite and libxml2: invalid-schemas-accepted 130 → 110, with no false positive (valid-schemas-rejected held at 0) and no other bucket moved.
  - 2026-06-16
 
