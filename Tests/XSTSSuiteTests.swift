@@ -78,8 +78,13 @@ struct XSTSSuiteTests {
     /// belong on a reference), and an attribute in the XML Schema namespace (e.g.
     /// `xsd:type`) is never valid. Invalid-schemas accepted 244 → 235, no other
     /// bucket moved.
+    /// Rejecting a complexContent extension that adds element content (a model
+    /// group) on top of a simpleContent base (cos-ct-extends.1.4.2.2) then caught
+    /// two more invalid schemas; an attribute-only complexContent extension of a
+    /// simpleContent base stays valid. Invalid-schemas accepted 235 → 233, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 235
+    private let knownSchemaInvalidAccepted = 233
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

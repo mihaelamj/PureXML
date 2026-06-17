@@ -265,6 +265,7 @@ extension PureXML.Validation {
                     AnyValidation(idValueConstraintsValid),
                     AnyValidation(userTypeValueConstraintsValid),
                     AnyValidation(extensionAllGroupsValid),
+                    AnyValidation(complexExtensionBaseValid),
                     AnyValidation(attributeRestrictionsFaithful),
                     AnyValidation(simpleTypeBasesAreSimple),
                     AnyValidation(simpleTypeVarietiesValid),
@@ -333,6 +334,19 @@ extension PureXML.Validation {
 
         static func locatedFindings(_ reasons: [String], at node: PureXML.Model.TreeNode?) -> [PureXML.Schema.SchemaLocatedFinding] {
             reasons.map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: node) }
+        }
+    }
+}
+
+extension PureXML.Validation.SchemaCompile {
+    /// cos-ct-extends.1.4.2.2: a complexContent extension adding element content
+    /// must have a base with complex (or empty) content, not simpleContent.
+    static var complexExtensionBaseValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A complexContent extension's base has complex content") { document in
+            guard let namedTypes = document.namedTypes else { return [] }
+            return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.simpleContentExtensionBaseErrors(document.schema, document.context, namedTypes),
+            )
         }
     }
 }

@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content (a non-empty model group) may not extend a base whose content is simple (`cos-ct-extends.1.4.2.2`); a simple-content type is extended through `simpleContent`. An attribute-only `complexContent` extension of a simpleContent base stays valid (the `complexContent`-around-`simpleContent` idiom). Caught two invalid schemas: invalid-schemas-accepted 235 → 233, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): two more schema-for-schemas structural rules. A named model group's compositor (`all`/`choice`/`sequence`) may not carry `minOccurs`/`maxOccurs` (those belong on a group reference), and an attribute in the XML Schema namespace (such as `xsd:type`) is rejected since the schema vocabulary defines no namespaced attributes (a foreign attribute in any other namespace stays the author's own). Caught nine invalid schemas: invalid-schemas-accepted 244 → 235, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): unambiguously malformed regular expressions in `pattern` facets are now schema-invalid: a reversed character-class range (`[b-a]`), an empty class (`[]`), and a reversed bounded quantifier (`{37,17}`). The parser raises distinct errors for these, which the schema-validity check rejects, while constructs the engine merely does not support (an untabulated `\p{Is…}` block, the lenient `{,m}` form) stay non-rejecting so a valid pattern is never refused. Caught eighteen invalid schemas: invalid-schemas-accepted 262 → 244, no other bucket moved.

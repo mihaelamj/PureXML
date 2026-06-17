@@ -29,6 +29,40 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 `cos-ct-extends.1.4.2.2`: a `complexContent` extension that adds
+    /// element content (a model group) produces an element-only/mixed content type,
+    /// so its base must have complex or empty content. A `simpleContent` base has a
+    /// simple content type and cannot gain element content this way. An extension
+    /// that adds only attributes keeps the base's simple content and is valid (it
+    /// is the `complexContent`-around-`simpleContent` idiom), so the model group is
+    /// required for the error. Resolved in this schema's own target namespace.
+    static func simpleContentExtensionBaseErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for content in descendants(schema, named: "complexContent") {
+            guard let ext = ExtAllNode.firstChild(content, named: "extension"),
+                  extensionAddsElementContent(ext),
+                  let base = ExtAllNode.attribute(ext, "base"),
+                  ExtAllNode.referenceNamespace(base, bindings) == context.targetNamespace,
+                  case let .complex(complex)? = types[ExtAllNode.stripPrefix(base)],
+                  case .simpleContent = complex.content
+            else { continue }
+            errors.append("a complexContent extension that adds element content may not extend '\(ExtAllNode.stripPrefix(base))', which has simple content")
+        }
+        return errors
+    }
+
+    /// Whether a `complexContent` extension adds element content: an `element` or
+    /// a wildcard `any` somewhere in its model group. An empty group (`<sequence/>`)
+    /// or an attribute-only extension adds no element content, so it keeps the
+    /// base's simple content and is not flagged.
+    private static func extensionAddsElementContent(_ extension: XSDTree) -> Bool {
+        let hasElement = descendants(`extension`, named: "element").contains { $0.name?.namespaceURI == xsdNamespace }
+        let hasWildcard = descendants(`extension`, named: "any").contains { $0.name?.namespaceURI == xsdNamespace }
+        return hasElement || hasWildcard
+    }
+
     private static func extensionHasAllGroup(_ extension: XSDTree) -> Bool {
         ExtAllNode.elementChildren(`extension`).contains { child in
             child.name?.namespaceURI == xsdNamespace && ExtAllNode.localName(child) == "all"
