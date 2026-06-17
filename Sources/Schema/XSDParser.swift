@@ -42,8 +42,6 @@ extension PureXML.Schema {
             let failedSchemaReferences = XSDNode.failedSchemaReferences(schema, wrappedLoader, &locationCheckVisited)
             let containers = containerTuples.map(\.tree)
             let derivation = derivationTables(containers)
-            try checkRedefine(containers)
-            try checkAllGroups(containers)
             let containerLocations = containerLocationMap(containerTuples, rootLocation: rootLocation)
             let compositionLoaded = XSDNode.compositionLoaded(from: containerTuples)
             var context = createContext(

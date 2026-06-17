@@ -243,11 +243,11 @@ extension PureXML.Validation {
         static func preCompileValidator() -> Validator<PureXML.Schema.SchemaCompileContext> {
             Validator<PureXML.Schema.SchemaCompileContext>.defaults(
                 nonReference: [
-                    AnyValidation(idAttributesValid),
-                    AnyValidation(schemaStructureValid),
+                    AnyValidation(idAttributesValid), AnyValidation(schemaStructureValid),
                     AnyValidation(componentNamesUnique),
                     AnyValidation(simpleTypeFinalControlsValid),
-                    AnyValidation(contentModelsDeterministic), AnyValidation(referencedSchemasResolveToSchemas),
+                    AnyValidation(contentModelsDeterministic),
+                    AnyValidation(referencedSchemasResolveToSchemas), AnyValidation(redefinitionsDeriveFromThemselves),
                 ],
                 reference: [
                     AnyValidation(typeDerivationAcyclic),
@@ -320,7 +320,7 @@ extension PureXML.Validation {
             ))
         }
 
-        private static func compileRule(
+        static func compileRule(
             _ description: String,
             _ findings: @escaping (PureXML.Schema.SchemaCompileContext) -> [PureXML.Schema.SchemaLocatedFinding],
         ) -> Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
@@ -341,17 +341,6 @@ extension PureXML.Validation {
 }
 
 extension PureXML.Validation.SchemaCompile {
-    /// src-resolve: a resolved include/import/redefine schemaLocation must be a schema.
-    static var referencedSchemasResolveToSchemas: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
-        compileRule("A resolved schemaLocation reference is a valid schema") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                document.context.failedSchemaReferences.map {
-                    "the referenced schema document '\($0)' is not a valid schema"
-                },
-            )
-        }
-    }
-
     /// au-props-correct: an attribute's type is a simple type, never complex.
     static var attributeTypesSimple: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("An attribute's type is a simple type") { document in

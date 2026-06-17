@@ -300,7 +300,12 @@ extension PureXML.Schema.XSDParser {
 
     /// Throws when a type inside an `xs:redefine` does not derive from itself: a
     /// redefinition's `base` must name the type being redefined.
-    static func checkRedefine(_ containers: [XSDTree]) throws {
+    /// src-redefine.5: every type inside `xs:redefine` must restrict or extend the
+    /// type it redefines (same local name, in the redefining schema's own target
+    /// namespace). Returns one finding per offending type, for a validation to
+    /// report; it does not throw, so the finding flows through the validator.
+    static func redefineDerivationErrors(_ containers: [XSDTree]) -> [String] {
+        var errors: [String] = []
         for container in containers where XSDDerivNode.localName(container) == "redefine" {
             for type in XSDDerivNode.children(container, named: "complexType") {
                 guard let name = XSDDerivNode.attribute(type, "name") else { continue }
@@ -310,22 +315,19 @@ extension PureXML.Schema.XSDParser {
                     .flatMap { XSDDerivNode.firstChild($0, named: "extension") ?? XSDDerivNode.firstChild($0, named: "restriction") }
                     .flatMap { XSDDerivNode.attribute($0, "base") }
                 if derivationInfo(type)?.base != name || redefineBaseIsForeign(type, rawBase) {
-                    throw SchemaFault.redefineIncompatible(type: name)
+                    errors.append("redefined type '\(name)' must restrict or extend itself")
                 }
             }
             for type in XSDDerivNode.children(container, named: "simpleType") {
-                try checkRedefinedSimpleType(type)
+                guard let name = XSDDerivNode.attribute(type, "name") else { continue }
+                let rawBase = XSDDerivNode.firstChild(type, named: "restriction")
+                    .flatMap { XSDDerivNode.attribute($0, "base") }
+                if rawBase.map(XSDDerivNode.stripPrefix) != name || redefineBaseIsForeign(type, rawBase) {
+                    errors.append("redefined type '\(name)' must restrict or extend itself")
+                }
             }
         }
-    }
-
-    private static func checkRedefinedSimpleType(_ type: XSDTree) throws {
-        guard let name = XSDDerivNode.attribute(type, "name") else { return }
-        let rawBase = XSDDerivNode.firstChild(type, named: "restriction")
-            .flatMap { XSDDerivNode.attribute($0, "base") }
-        if rawBase.map(XSDDerivNode.stripPrefix) != name || redefineBaseIsForeign(type, rawBase) {
-            throw SchemaFault.redefineIncompatible(type: name)
-        }
+        return errors
     }
 
     /// Drops from each substitution group the members a head's `block` forbids: a
@@ -351,38 +353,5 @@ extension PureXML.Schema.XSDParser {
             }
         }
         return result
-    }
-
-    /// Throws when any `xs:all` group violates its XSD 1.0 constraints: its members
-    /// must all be elements, each occurring at most once, and the group itself may
-    /// occur at most once. Nested model groups inside an `all` are not allowed.
-    static func checkAllGroups(_ containers: [XSDTree]) throws {
-        for container in containers {
-            for all in descendants(container, named: "all") {
-                try checkAllGroup(all)
-            }
-        }
-    }
-
-    private static func checkAllGroup(_ all: XSDTree) throws {
-        if !atMostOnce(XSDDerivNode.attribute(all, "maxOccurs")) {
-            throw SchemaFault.invalidAllGroup(reason: "the group's maxOccurs must be 0 or 1")
-        }
-        for member in XSDDerivNode.elementChildren(all) {
-            let kind = XSDDerivNode.localName(member) ?? ""
-            if kind == "annotation" { continue }
-            guard kind == "element" else {
-                throw SchemaFault.invalidAllGroup(reason: "a member may only be an element, not '\(kind)'")
-            }
-            if !atMostOnce(XSDDerivNode.attribute(member, "maxOccurs")) {
-                let label = XSDDerivNode.attribute(member, "name") ?? XSDDerivNode.attribute(member, "ref") ?? ""
-                throw SchemaFault.invalidAllGroup(reason: "element '\(label)' must have maxOccurs 0 or 1")
-            }
-        }
-    }
-
-    private static func atMostOnce(_ maxOccurs: String?) -> Bool {
-        guard let maxOccurs else { return true }
-        return maxOccurs == "0" || maxOccurs == "1"
     }
 }

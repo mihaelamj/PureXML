@@ -46,8 +46,6 @@ extension PureXML.Schema.XSDParser {
 
         let containers = containerTuples.map(\.tree)
         let derivation = derivationTables(containers)
-        try checkRedefine(containers)
-        try checkAllGroups(containers)
         let containerLocations = containerLocationMap(containerTuples, rootLocation: nil)
         let compositionLoaded = XSDNode.compositionLoaded(from: containerTuples)
         var context = createContext(
