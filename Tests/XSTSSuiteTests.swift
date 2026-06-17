@@ -149,9 +149,11 @@ struct XSTSSuiteTests {
     /// base-type kind (src-ct.1 a complexContent base is complex; src-ct.2 a
     /// simpleContent extension base is a simple type or a simple-content complex type;
     /// a local type takes precedence over the built-in reading so the schema-for-
-    /// schemas, which targets the XSD namespace, is not rejected) 104 -> 99.
+    /// schemas, which targets the XSD namespace, is not rejected) 104 -> 99; and the
+    /// element value-constraint content type (cos-valid-default: a default/fixed needs
+    /// simple or mixed content, not element-only) 99 -> 96.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 99
+    private let knownSchemaInvalidAccepted = 96
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

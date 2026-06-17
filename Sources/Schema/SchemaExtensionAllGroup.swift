@@ -201,6 +201,54 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 `cos-valid-default` / `e-props-correct`: an element with a `default`
+    /// or `fixed` value constraint must have a content type that admits character
+    /// data, i.e. a simple type or mixed content. An element whose type is (or whose
+    /// inline complex type has) element-only or empty content may not carry a value
+    /// constraint. Conservative by construction: it flags only a content type that is
+    /// CERTAINLY element-only or empty. A simple type, mixed content, the ur-type
+    /// `xs:anyType` (mixed), an untyped element (also `anyType`), a complexContent
+    /// derivation (mixedness may be inherited), and a foreign or unresolved type are
+    /// all left alone, so this cannot raise a false positive. Self-contained schema.
+    static func elementValueConstraintContentErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for element in descendants(schema, named: "element") where element.name?.namespaceURI == xsdNamespace {
+            guard ExtAllNode.attribute(element, "fixed") != nil || ExtAllNode.attribute(element, "default") != nil,
+                  valueConstraintForbiddenByContent(element, bindings, context, types)
+            else { continue }
+            errors.append("an element with a 'default' or 'fixed' value must have simple or mixed content, not element-only or empty content")
+        }
+        return errors
+    }
+
+    /// Whether `element`'s content type is certainly element-only or empty, so a
+    /// value constraint on it is invalid. Returns false (no error) for anything that
+    /// admits character data or that cannot be resolved with certainty.
+    private static func valueConstraintForbiddenByContent(
+        _ element: XSDTree,
+        _ bindings: [String: String],
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> Bool {
+        if let inline = ExtAllNode.firstChild(element, named: "complexType") {
+            if ExtAllNode.firstChild(inline, named: "simpleContent") != nil { return false }
+            if ["true", "1"].contains(ExtAllNode.attribute(inline, "mixed")) { return false }
+            if ExtAllNode.firstChild(inline, named: "complexContent") != nil { return false }
+            return ["all", "sequence", "choice", "group"].contains { ExtAllNode.firstChild(inline, named: $0) != nil }
+        }
+        guard let typeName = ExtAllNode.attribute(element, "type") else { return false }
+        let namespace = ExtAllNode.referenceNamespace(typeName, bindings)
+        let local = ExtAllNode.stripPrefix(typeName)
+        if namespace == xsdNamespace { return false }
+        guard namespace == context.targetNamespace, case let .complex(complex)? = types[local] else { return false }
+        switch complex.content {
+        case .elementOnly, .empty: return true
+        case .simpleContent, .mixed: return false
+        }
+    }
+
     /// XSD 1.0 `cos-ct-extends.1.4.3.2.2.1`: a `complexContent` extension's mixedness
     /// must match its base type's. The effective content joins the base content and
     /// the extension's, so a mixed extension may extend only a mixed base and an

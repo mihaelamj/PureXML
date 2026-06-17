@@ -111,4 +111,24 @@ struct SchemaExtensionAllGroupTests {
         """
         #expect((try? PureXML.Schema.Document(document)) != nil)
     }
+
+    /// cos-valid-default: an element with a `default`/`fixed` value constraint needs
+    /// simple or mixed content. An element-only type (inline or named) is rejected;
+    /// a simple type, `xs:anyType` (mixed), an untyped element (anyType), a mixed or
+    /// simple-content complex type, all stay valid.
+    @Test("an element value constraint requires simple or mixed content (cos-valid-default)")
+    func test_valueConstraintContentType() {
+        // Inline element-only complex type with a fixed value (elemG003/elemG004).
+        #expect(!compiles("<xs:element name=\"e\" fixed=\"foo\"><xs:complexType>\(allContent)</xs:complexType></xs:element>"))
+        // Named element-only complex type with a default value (elemD004).
+        #expect(!compiles(seqBase + "<xs:element name=\"e\" type=\"myType\" default=\"foo\"/>"))
+        // Valid: a simple type, the ur-type, an untyped (anyType) element.
+        #expect(compiles("<xs:element name=\"e\" type=\"xs:string\" fixed=\"foo\"/>"))
+        #expect(compiles("<xs:element name=\"e\" type=\"xs:anyType\" fixed=\"foo\"/>"))
+        #expect(compiles("<xs:element name=\"e\" default=\"foo\"/>"))
+        // Valid: a complex type with simple content, and a mixed complex type.
+        #expect(compiles(simpleBase + "<xs:element name=\"e\" type=\"simpleC\" fixed=\"foo\"/>"))
+        let mixedType = "<xs:complexType name=\"mx\" mixed=\"true\"><xs:sequence/></xs:complexType>"
+        #expect(compiles(mixedType + "<xs:element name=\"e\" type=\"mx\" default=\"foo\"/>"))
+    }
 }
