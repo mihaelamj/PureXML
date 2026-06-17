@@ -22,8 +22,21 @@ extension PureXML.Schema.XSDParser {
     /// Only the `complexContent` context is checked, where a model group is part of
     /// the model; a `simpleContent` derivation (facets, no model group) has a
     /// different model and is left to its own rules.
+    /// The number of `restriction`/`extension` children of a `simpleContent` or
+    /// `complexContent`. Its content model requires exactly one, so zero (an empty
+    /// `<complexContent/>`) or more than one is a structural error.
+    private static func derivationCount(_ content: XSDTree) -> Int {
+        PureXML.Schema.XSDNode.elementChildren(content).count { child in
+            guard child.name?.namespaceURI == xsdNamespace, let local = PureXML.Schema.XSDNode.localName(child) else { return false }
+            return local == "restriction" || local == "extension"
+        }
+    }
+
     static func complexContentOrderErrors(_ complexContent: XSDTree) -> [String] {
         var errors: [String] = []
+        if derivationCount(complexContent) != 1 {
+            errors.append("a complexContent must contain exactly one 'restriction' or 'extension'")
+        }
         for derivation in PureXML.Schema.XSDNode.elementChildren(complexContent) {
             guard let local = PureXML.Schema.XSDNode.localName(derivation),
                   local == "restriction" || local == "extension"
@@ -65,6 +78,9 @@ extension PureXML.Schema.XSDParser {
     /// table but is invalid (the ctD family).
     static func simpleContentOrderErrors(_ simpleContent: XSDTree) -> [String] {
         var errors: [String] = []
+        if derivationCount(simpleContent) != 1 {
+            errors.append("a simpleContent must contain exactly one 'restriction' or 'extension'")
+        }
         for derivation in PureXML.Schema.XSDNode.elementChildren(simpleContent) {
             guard let local = PureXML.Schema.XSDNode.localName(derivation) else { continue }
             let slots: [(members: Set<String>, max: Int?)]

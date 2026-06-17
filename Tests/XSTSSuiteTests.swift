@@ -125,8 +125,12 @@ struct XSTSSuiteTests {
     /// followed by a non-block character: `\p{\L}`, `\p{Is}`) while staying lenient
     /// on a well-formed but unrecognised block name then caught three more invalid
     /// schemas: invalid-schemas accepted 203 → 200, no other bucket moved.
+    /// Requiring a `complexContent` or `simpleContent` to contain exactly one
+    /// `restriction` or `extension` (an empty `<complexContent/>` has none) then
+    /// caught three more invalid schemas: invalid-schemas accepted 200 → 197, no
+    /// other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 200
+    private let knownSchemaInvalidAccepted = 197
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

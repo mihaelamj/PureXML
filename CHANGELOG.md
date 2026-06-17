@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `complexContent` or `simpleContent` must contain exactly one `restriction` or `extension`. An empty `<complexContent/>` (or `<simpleContent/>`), which declares no derivation, is now rejected as a structural error. Caught three invalid schemas: invalid-schemas-accepted 200 → 197, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a `pattern` facet whose `\p{...}` or `\P{...}` property name can be no XSD `charProp` (`IsCategory | IsBlock`) under any repertoire is now rejected as a schema-validity error: an empty name, the bare prefix `Is`, a non-block name carrying a non-letter (`\p{\L}`), or `Is` followed by a non-block character. A well-formed but unrecognised category or block name (such as an unknown `Is`-block) stays a lenient engine limitation rather than an error, so only the unambiguously malformed forms reject. Caught three invalid schemas: invalid-schemas-accepted 203 → 200, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): two attribute-declaration validity rules. An attribute `ref` may not also carry `form` (the form comes from the referenced global declaration; `src-attribute.3.2`), and no attribute declaration may be named `xmlns` (that name is reserved for namespace declarations; no-xmlns). Caught four invalid schemas: invalid-schemas-accepted 207 → 203, no other bucket moved.
