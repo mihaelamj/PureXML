@@ -144,8 +144,12 @@ struct XSTSSuiteTests {
     /// blocks a restriction or extension derivation from it; explicit `final=""`
     /// overrides) then caught four more invalid schemas: invalid-schemas accepted
     /// 189 → 185, no other bucket moved.
+    /// Validating an element/attribute `default`/`fixed` against an INLINE type (an
+    /// inline simpleType, or an inline complex type with simpleContent) the same way
+    /// a named `type` reference already is, then caught two more invalid schemas:
+    /// invalid-schemas accepted 185 → 183, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 185
+    private let knownSchemaInvalidAccepted = 183
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

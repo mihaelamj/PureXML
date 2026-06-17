@@ -191,7 +191,8 @@ extension PureXML.Validation {
             compileRule("Element value constraints are valid against their declared types") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
                 return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.userTypeValueConstraintErrors(document.schema, document.context, namedTypes),
+                    PureXML.Schema.XSDParser.userTypeValueConstraintErrors(document.schema, document.context, namedTypes)
+                        + PureXML.Schema.XSDParser.inlineTypeValueConstraintErrors(document.schema, document.context),
                 )
             }
         }

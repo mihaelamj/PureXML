@@ -98,6 +98,44 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// Like ``userTypeValueConstraintErrors`` but for an element or attribute whose
+    /// type is INLINE (no `type` attribute): an inline `simpleType`, or an inline
+    /// complex type with `simpleContent`. The `default`/`fixed` value must be valid
+    /// against that type's value space. Validated against the simpleContent base's
+    /// value space (not the local restriction facets), so only a clear value-space
+    /// mismatch (a non-numeric `default` on a decimal-based type) is flagged.
+    static func inlineTypeValueConstraintErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
+        var errors: [String] = []
+        forEachValueConstrained(schema) { node in
+            guard node.name?.namespaceURI == xsdNamespace,
+                  unprefixedValue(node, "type") == nil
+            else { return }
+            let fixed = unprefixedValue(node, "fixed")
+            guard let value = fixed ?? unprefixedValue(node, "default"),
+                  let simple = inlineSimpleType(of: node, context), !simple.isValid(value)
+            else { return }
+            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for the declared inline type")
+        }
+        return errors
+    }
+
+    /// The simple value space of an element/attribute's INLINE type: an inline
+    /// `simpleType` child, or an inline complex type whose `simpleContent` derives
+    /// from a base simple type. Anything else (element-only/mixed/empty content)
+    /// carries no simple value space here and is left unchecked.
+    private static func inlineSimpleType(of node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.SimpleType? {
+        if let inline = PureXML.Schema.XSDNode.firstChild(node, named: "simpleType") {
+            return PureXML.Schema.XSDSimpleParser.simpleType(inline, context)
+        }
+        guard let complexType = PureXML.Schema.XSDNode.firstChild(node, named: "complexType"),
+              let simpleContent = PureXML.Schema.XSDNode.firstChild(complexType, named: "simpleContent"),
+              let derivation = PureXML.Schema.XSDNode.firstChild(simpleContent, named: "extension")
+              ?? PureXML.Schema.XSDNode.firstChild(simpleContent, named: "restriction"),
+              let base = PureXML.Schema.XSDNode.attribute(derivation, "base")
+        else { return nil }
+        return PureXML.Schema.XSDSimpleParser.simpleTypeReference(base, context)
+    }
+
     /// The simple type a value constraint is validated against: a simple type
     /// directly, or the simple content of a complex type. A complex type with
     /// element-only, mixed, or empty content carries no simple value space here, so

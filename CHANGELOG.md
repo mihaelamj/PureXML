@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an element or attribute `default`/`fixed` value constraint is now validated against an inline type (an inline `simpleType`, or an inline complex type with `simpleContent`) just as it already was against a named `type` reference, so a non-numeric `default` on a decimal-based inline type is rejected. Validated against the simpleContent base's value space, so only a clear value-space mismatch is flagged. Caught two invalid schemas: invalid-schemas-accepted 185 → 183, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a complex type without its own `final` attribute now inherits the schema's `finalDefault` as its `{final}` property, so `finalDefault="#all"` or `"restriction"`/`"extension"` blocks a `complexContent` restriction or extension derived from it just as an explicit `final` would (an explicit `final=""` overrides the default back to no restriction). Complex types previously honoured only an explicit `final`. Caught four invalid schemas: invalid-schemas-accepted 189 → 185, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): the global-only element properties `abstract`, `final`, and `substitutionGroup` are now rejected on a local element declaration (an element particle, not a direct child of `schema`). They belong to the `topLevelElement` form only, so their presence on a local element is invalid at any value (`abstract="false"` is rejected as well as `"true"`). Caught five invalid schemas: invalid-schemas-accepted 194 → 189, no other bucket moved.
