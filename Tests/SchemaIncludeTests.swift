@@ -47,6 +47,29 @@ struct SchemaIncludeTests {
         #expect((try? PureXML.Schema.Document(main, schemaLoader: { _ in nil })) != nil)
     }
 
+    /// src-import.3.1/3.2: an import's namespace attribute must equal the imported
+    /// schema's targetNamespace (both equal, or both absent). Checked only when the
+    /// schemaLocation resolves to a loaded schema.
+    @Test("an import's namespace must match the imported targetNamespace")
+    func test_importNamespaceMustMatchImportedTarget() {
+        let mainNS = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a" xmlns:b="urn:b">
+          <xs:import namespace="urn:b" schemaLocation="b.xsd"/>
+        </xs:schema>
+        """
+        // Imported doc's targetNamespace does NOT match the declared import namespace.
+        let mismatched = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" targetNamespace=\"urn:WRONG\"/>"
+        #expect((try? PureXML.Schema.Document(mainNS, schemaLoader: { $0 == "b.xsd" ? mismatched : nil })) == nil)
+        // Imported doc has NO targetNamespace but the import declares one.
+        let noTarget = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\"/>"
+        #expect((try? PureXML.Schema.Document(mainNS, schemaLoader: { $0 == "b.xsd" ? noTarget : nil })) == nil)
+        // Matching targetNamespace compiles.
+        let matched = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\" targetNamespace=\"urn:b\"/>"
+        #expect((try? PureXML.Schema.Document(mainNS, schemaLoader: { $0 == "b.xsd" ? matched : nil })) != nil)
+        // An unresolved import (loader returns nil) is not an error.
+        #expect((try? PureXML.Schema.Document(mainNS, schemaLoader: { _ in nil })) != nil)
+    }
+
     @Test("xs:include with a mismatched targetNamespace is rejected")
     func test_invalidIncludeDifferentTargetNamespace() {
         let included = """

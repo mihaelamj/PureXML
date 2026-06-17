@@ -99,6 +99,7 @@ extension PureXML.Schema.XSDParser {
             collectReferenceErrors(source, in: resolutionContext, inheritedBindings: sourceBindings, into: &errors)
         }
         return xsdErrors + simpleContentErrors + errors + redefineComponentExistenceErrors(containers)
+            + importNamespaceErrors(context, containers)
     }
 
     /// XSD 1.0 `src-redefine.6`/`7.2.1`/`7.2.2`: each component a `redefine` names

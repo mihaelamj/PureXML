@@ -146,10 +146,12 @@ struct XSTSSuiteTests {
     /// 130->110; identity-constraint content model 110->104; derivation base-type kind
     /// (src-ct.1/.2, local type beats the built-in reading) 104->99; element value
     /// constraint needs simple/mixed content (cos-valid-default) 99->96; an attribute's
-    /// type is a simple type (au-props-correct) 96->95; and a resolved include/import/
-    /// redefine schemaLocation must be a well-formed schema (src-resolve) 95->87.
+    /// type is a simple type (au-props-correct) 96->95; a resolved include/import/
+    /// redefine schemaLocation must be a well-formed schema (src-resolve) 95->87; and
+    /// an import's namespace must equal the imported targetNamespace (src-import.3)
+    /// 87->84.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 87
+    private let knownSchemaInvalidAccepted = 84
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 
