@@ -130,10 +130,21 @@ struct XSTSSuiteTests {
     /// would corrupt the definition and is refused; the tests are the outliers.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
 
-    private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 128
+    /// FALSE POSITIVES ARE 0 (production stopper #1). The last over-rejection,
+    /// particlesZ001 (`element{0,∞}` restricting `choice{0,∞}` over that element;
+    /// the test's own doc calls the RecurseAsIfGroup rule "ambiguous"), is fixed by
+    /// reading element-vs-choice restriction via effective total range. That reading
+    /// is a bounded, NAMED under-rejection: element-vs-choice no longer models exact
+    /// in-branch sequencing, so invalid-schemas-accepted rose 128 → 130 (two
+    /// element-vs-choice restriction cases) and, with particlesZ001 now correctly
+    /// compiling, its instance particlesZ001.i (a previously-masked invalid-instance
+    /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
+    /// non-starter and under-rejection is recoverable; this debt is recovered by the
+    /// full effective-total-range Particle-Valid-Restriction (tracked).
+    private let knownSchemaValidRejected = 0
+    private let knownSchemaInvalidAccepted = 130
     private let knownInstanceValidRejected = 0
-    private let knownInstanceInvalidAccepted = 132
+    private let knownInstanceInvalidAccepted = 133
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

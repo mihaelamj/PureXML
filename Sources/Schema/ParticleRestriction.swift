@@ -83,16 +83,7 @@ extension PureXML.Schema {
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
             case let (.element, .group(baseGroup)):
-                // RecurseAsIfGroup (XSD 1.0 §3.9.6): the element is treated as a group
-                // with {min,max}=1,1 holding the element. That SYNTHETIC {1,1}
-                // occurrence must be within the base group's range, so a base group
-                // that must occur two or more times cannot be restricted to a single
-                // element (particlesL001). The element's OWN occurrence is matched
-                // against a base branch inside `groupValid`; comparing the element's
-                // own range to the base group's would wrongly reject e.g. an optional
-                // element restricting a once-or-more base group.
-                return rangeWithinWildcard(derivedMin: 1, derivedMax: 1, wildcardMin: base.minOccurs, wildcardMax: base.maxOccurs)
-                    && groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
+                return elementRestrictsGroup(restricted, base, baseGroup, types, derivation)
             case let (.group, .element(baseName, _, baseTypeName, _, _, _)):
                 // The mirror of RecurseAsIfGroup, by the same cardinality argument as
                 // group/wildcard: a base element accepts only its own name, its own
@@ -295,36 +286,52 @@ extension PureXML.Schema {
             lhs.localName == rhs.localName && (lhs.namespaceURI ?? "") == (rhs.namespaceURI ?? "")
         }
 
-        /// Validation strength of a wildcard's `processContents`, for the Wildcard
-        /// Subset rule: `strict` is stronger than `lax` is stronger than `skip`.
-        private static func processContentsRank(_ processContents: ProcessContents) -> Int {
-            switch processContents {
-            case .skip: 0
-            case .lax: 1
-            case .strict: 2
+        /// RecurseAsIfGroup against a CHOICE, read by effective total range. The
+        /// literal §3.9.6 rule under-approximates the ground truth (derived language ⊆
+        /// base language) and over-rejects a repeating base choice (particlesZ001, whose
+        /// test doc calls the rule "ambiguous"; W3C reads it valid). First principles:
+        /// the element validly restricts the choice iff its leaf is a NameAndTypeOK
+        /// restriction of some element the choice admits AND its effective occurrence
+        /// range is within the choice's. Accepts `element{0,∞}` over `choice{0,∞}(...)`
+        /// (Z001) and `c1{2,2}` over a choice whose branch holds `c1` (M002/003); a
+        /// must-repeat choice (effective min ≥ 2) still rejects a single element
+        /// (particlesL). A documented, bounded under-rejection (exact in-branch
+        /// sequencing is not modelled); over-rejection is the non-starter.
+        private static func elementRestrictsGroup(
+            _ restricted: Particle,
+            _ base: Particle,
+            _ baseGroup: Group,
+            _ types: [String: ElementType],
+            _ derivation: [String: TypeDerivation],
+        ) -> Bool {
+            if baseGroup.compositor == .choice {
+                return elementRestrictsChoice(restricted, base, baseGroup, types, derivation)
             }
+            // RecurseAsIfGroup for a sequence/all base (§3.9.6): the element as a
+            // {1,1} synthetic group must be within the base group's range and map to
+            // a base member inside `groupValid`.
+            return rangeWithinWildcard(derivedMin: 1, derivedMax: 1, wildcardMin: base.minOccurs, wildcardMax: base.maxOccurs)
+                && groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
         }
 
-        /// NameAndTypeOK value-constraint clause: when the base element is `fixed`,
-        /// the restricting element must also be `fixed` to the same value (compared in
-        /// the base type's value space, so `1` and `01` match). A base with no fixed
-        /// value, or a `default`, imposes no constraint on the restriction.
-        private static func fixedValueOK(_ restrictedValue: ValueConstraint?, _ baseValue: ValueConstraint?, _ baseType: ElementType?, _ types: [String: ElementType]) -> Bool {
-            guard let baseFixed = baseValue?.fixedValue else { return true }
-            guard let restrictedFixed = restrictedValue?.fixedValue else { return false }
-            return atomicType(baseType, types)?.valueMatches(restrictedFixed, literal: baseFixed) ?? (restrictedFixed == baseFixed)
-        }
-
-        /// The atomic simple type an element's type resolves to (following a
-        /// `typeReference` through the types map, bounded against cycles), or nil for
-        /// a complex, list, or union type.
-        private static func atomicType(_ type: ElementType?, _ types: [String: ElementType], _ depth: Int = 0) -> PureXML.Schema.SimpleType? {
-            guard depth < 32 else { return nil }
-            switch type {
-            case let .simple(simple): return simple
-            case let .typeReference(key): return atomicType(types[key], types, depth + 1)
-            default: return nil
+        private static func elementRestrictsChoice(
+            _ restricted: Particle,
+            _ base: Particle,
+            _ baseGroup: Group,
+            _ types: [String: ElementType],
+            _ derivation: [String: TypeDerivation],
+        ) -> Bool {
+            let neutral = Particle(minOccurs: 1, maxOccurs: 1, term: restricted.term)
+            let admitted = elementLeaves(of: baseGroup).contains {
+                valid(neutral, Particle(minOccurs: 1, maxOccurs: 1, term: $0), types, derivation)
             }
+            return admitted
+                && rangeWithinWildcard(
+                    derivedMin: restricted.effectiveOccurrenceMin(),
+                    derivedMax: restricted.effectiveOccurrenceMax(),
+                    wildcardMin: base.effectiveOccurrenceMin(),
+                    wildcardMax: base.effectiveOccurrenceMax(),
+                )
         }
 
         /// Whether every leaf a particle can contain is admitted by `wildcard`: an
