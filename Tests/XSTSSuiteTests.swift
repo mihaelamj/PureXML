@@ -151,9 +151,10 @@ struct XSTSSuiteTests {
     /// a local type takes precedence over the built-in reading so the schema-for-
     /// schemas, which targets the XSD namespace, is not rejected) 104 -> 99; and the
     /// element value-constraint content type (cos-valid-default: a default/fixed needs
-    /// simple or mixed content, not element-only) 99 -> 96.
+    /// simple or mixed content, not element-only) 99 -> 96; and an attribute's type
+    /// must be a simple type, never a complex type (au-props-correct) 96 -> 95.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 96
+    private let knownSchemaInvalidAccepted = 95
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

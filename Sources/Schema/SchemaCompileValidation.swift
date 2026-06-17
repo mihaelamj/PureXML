@@ -262,7 +262,7 @@ extension PureXML.Validation {
         static func postCompileValidator() -> Validator<PureXML.Schema.SchemaCompileContext> {
             Validator<PureXML.Schema.SchemaCompileContext>.defaults(
                 nonReference: [
-                    AnyValidation(attributeUsesValid),
+                    AnyValidation(attributeUsesValid), AnyValidation(attributeTypesSimple),
                     AnyValidation(idValueConstraintsValid),
                     AnyValidation(userTypeValueConstraintsValid),
                     AnyValidation(extensionAllGroupsValid),
@@ -341,6 +341,16 @@ extension PureXML.Validation {
 }
 
 extension PureXML.Validation.SchemaCompile {
+    /// au-props-correct: an attribute's type is a simple type, never complex.
+    static var attributeTypesSimple: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("An attribute's type is a simple type") { document in
+            guard let namedTypes = document.namedTypes else { return [] }
+            return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.attributeTypeMustBeSimpleErrors(document.schema, document.context, namedTypes),
+            )
+        }
+    }
+
     /// Particle Valid (Restriction) for anonymous (inline) complex types, which the
     /// name-keyed `restrictionsAreSubsets` rule never sees.
     static var anonymousRestrictionsValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {

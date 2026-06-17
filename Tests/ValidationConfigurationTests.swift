@@ -97,6 +97,7 @@ struct ValidationConfigurationTests {
         ])
         #expect(PureXML.Validation.SchemaCompile.postCompileValidator().validationDescriptions == [
             "Attribute uses are unique and declare at most one ID attribute",
+            "An attribute's type is a simple type",
             "ID-typed value constraints are valid",
             "Element value constraints are valid against their declared types",
             "Complex types extending xs:all groups satisfy XSD placement rules",

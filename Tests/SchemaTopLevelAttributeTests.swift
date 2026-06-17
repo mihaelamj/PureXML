@@ -44,4 +44,18 @@ struct SchemaTopLevelAttributeTests {
                 + "</xs:complexType></xs:element>",
         ))
     }
+
+    /// au-props-correct: an attribute's type must be a simple type. A complex type
+    /// (here one with simple content) is rejected; a built-in or user simple type,
+    /// an inline simpleType, or no type (anySimpleType) is valid.
+    @Test("an attribute's type must be a simple type")
+    func test_attributeTypeMustBeSimple() {
+        let complexT = "<xs:complexType name=\"ct\"><xs:simpleContent><xs:extension base=\"xs:integer\"/></xs:simpleContent></xs:complexType>"
+        #expect(!compiles(complexT + "<xs:attribute name=\"a\" type=\"ct\"/>"))
+        #expect(!compiles("<xs:attribute name=\"a\" type=\"xs:anyType\"/>"))
+        let simpleT = "<xs:simpleType name=\"st\"><xs:restriction base=\"xs:string\"/></xs:simpleType>"
+        #expect(compiles(simpleT + "<xs:attribute name=\"a\" type=\"st\"/>"))
+        #expect(compiles("<xs:attribute name=\"a\"><xs:simpleType><xs:restriction base=\"xs:string\"/></xs:simpleType></xs:attribute>"))
+        #expect(compiles("<xs:attribute name=\"a\"/>"))
+    }
 }

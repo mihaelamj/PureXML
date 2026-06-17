@@ -10,6 +10,32 @@ private struct ReachedAttribute {
 }
 
 extension PureXML.Schema.XSDParser {
+    /// XSD 1.0 `au-props-correct` / `src-attribute`: the {type definition} of an
+    /// attribute is a SIMPLE type. An `attribute` whose `type` resolves to a complex
+    /// type, or to the complex ur-type `xs:anyType`, is invalid; a built-in or user
+    /// simple type, an inline `simpleType`, or no type (`anySimpleType`) is valid. A
+    /// locally-declared type takes precedence over the built-in reading (a schema may
+    /// target the XSD namespace and define its own components there), so resolve
+    /// `types` first. Self-contained schema; a foreign or unresolved type is left
+    /// alone. Strictly zero false positive: an attribute can never carry a complex
+    /// type, so no valid schema is affected.
+    static func attributeTypeMustBeSimpleErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for attribute in descendants(schema, named: "attribute") where attribute.name?.namespaceURI == xsdNamespace {
+            guard let typeName = AttrNode.attribute(attribute, "type") else { continue }
+            let namespace = AttrNode.referenceNamespace(typeName, bindings)
+            let local = AttrNode.stripPrefix(typeName)
+            if namespace == context.targetNamespace, case .complex? = types[local] {
+                errors.append("an attribute's type must be a simple type, not the complex type '\(local)'")
+            } else if namespace == xsdNamespace, types[local] == nil, local == "anyType" {
+                errors.append("an attribute's type must be a simple type, not 'anyType'")
+            }
+        }
+        return errors
+    }
+
     /// Schema-validity findings for attribute-use uniqueness (XSD 1.0
     /// `ct-props-correct.4` / `ag-props-correct.2`) and the single-ID rule
     /// (`ct-props-correct.5`): a complex type's or attribute group's complete
