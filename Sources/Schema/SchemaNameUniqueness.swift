@@ -1,8 +1,9 @@
 extension PureXML.Schema.XSDParser {
     /// Schema-validity findings for component-name uniqueness. Within a schema,
     /// global type names (simpleType and complexType share one symbol space),
-    /// global element names, global attribute names, named model-group names, and
-    /// named attribute-group names must each be unique; identity-constraint names
+    /// global element names, global attribute names, named model-group names,
+    /// named attribute-group names, and notation names must each be unique;
+    /// identity-constraint names
     /// (unique/key/keyref) must be unique across the whole schema. A duplicate was
     /// accepted, with a later definition silently overwriting the earlier one.
     ///
@@ -112,6 +113,7 @@ extension PureXML.Schema.XSDParser {
         case "attribute": "attribute"
         case "group": "group"
         case "attributeGroup": "attributeGroup"
+        case "notation": "notation"
         default: nil
         }
     }

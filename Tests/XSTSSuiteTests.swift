@@ -109,8 +109,12 @@ struct XSTSSuiteTests {
     /// (no element child other than an annotation, no non-whitespace character
     /// content) then caught three more invalid schemas: invalid-schemas accepted
     /// 214 → 211, no other bucket moved.
+    /// Adding notations to the component-name uniqueness check (they have their own
+    /// symbol space; two notations of the same name and namespace clash) then caught
+    /// one more invalid schema: invalid-schemas accepted 211 → 210, no other bucket
+    /// moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 211
+    private let knownSchemaInvalidAccepted = 210
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
