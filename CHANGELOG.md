@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an `xsd:notation` declaration is held to its `(annotation?)` content model. A notation may carry only an optional `annotation` child, so any other element child, or any non-whitespace character content, is now rejected (`notatG`). Caught three invalid schemas: invalid-schemas-accepted 214 → 211, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a `list` simple type must draw its item type from exactly one of an `itemType` attribute or an inline `simpleType` child (neither, or both, is invalid), and a `union` must declare at least one member type through a `memberTypes` attribute or an inline `simpleType` child (an empty `union` declares none), per `src-simple-type.2`/`.3`. Caught one invalid schema: invalid-schemas-accepted 215 → 214, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a simple type without its own `final` attribute now inherits the schema's `finalDefault` as its `{final}` property (XSD 1.0 Schemas §3.14.2), so `finalDefault="list"` or `"union"` blocks the matching list-item or union-member derivation just as an explicit `final` would. An explicit `final=""` still overrides the default back to no restriction. Caught two invalid schemas: invalid-schemas-accepted 217 → 215, no other bucket moved.

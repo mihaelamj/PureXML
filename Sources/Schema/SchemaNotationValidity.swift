@@ -21,6 +21,9 @@ extension PureXML.Schema.XSDParser {
                 if PureXML.Schema.XSDNode.attribute(child, "public") == nil, PureXML.Schema.XSDNode.attribute(child, "system") == nil {
                     errors.append("notation '\(name)' must specify at least one of public or system attributes")
                 }
+                if notationHasForbiddenContent(child) {
+                    errors.append("notation '\(name)' may contain only an optional annotation, no other element or character content")
+                }
                 let qName = PureXML.Model.QualifiedName(localName: name, namespaceURI: containerNamespace)
                 declaredNotations.insert(qName)
             }
@@ -33,6 +36,20 @@ extension PureXML.Schema.XSDParser {
         }
 
         return errors
+    }
+
+    /// Whether a `notation` declaration carries content its `(annotation?)` model
+    /// forbids: any element child other than an `xsd:annotation`, or any
+    /// non-whitespace character content. Whitespace and a single optional
+    /// annotation are allowed.
+    private static func notationHasForbiddenContent(_ node: XSDTree) -> Bool {
+        let hasForeignElement = PureXML.Schema.XSDNode.elementChildren(node).contains {
+            $0.name?.namespaceURI != xsdNamespace || PureXML.Schema.XSDNode.localName($0) != "annotation"
+        }
+        let hasText = node.children.contains {
+            ($0.kind == .text || $0.kind == .cdata) && $0.value.contains { !$0.isWhitespace }
+        }
+        return hasForeignElement || hasText
     }
 
     private static func walkSimpleTypes(

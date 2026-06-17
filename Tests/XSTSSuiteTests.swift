@@ -105,8 +105,12 @@ struct XSTSSuiteTests {
     /// `memberTypes` or an inline simpleType child (src-simple-type.2/.3), then
     /// caught one more invalid schema: invalid-schemas accepted 215 → 214, no other
     /// bucket moved.
+    /// Enforcing the `(annotation?)` content model of an `xsd:notation` declaration
+    /// (no element child other than an annotation, no non-whitespace character
+    /// content) then caught three more invalid schemas: invalid-schemas accepted
+    /// 214 → 211, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 214
+    private let knownSchemaInvalidAccepted = 211
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
