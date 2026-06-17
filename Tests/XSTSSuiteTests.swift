@@ -102,8 +102,11 @@ struct XSTSSuiteTests {
     /// Enforcing the NameAndTypeOK nillable clause (a restriction may not be nillable
     /// unless the base element is) then caught two more invalid schemas:
     /// invalid-schemas accepted 144 → 142, no other bucket moved.
+    /// Requiring a `simpleContent` restriction's base to be a complex type, not a
+    /// built-in or user simple type (src-ct.2), then caught five more invalid
+    /// schemas: invalid-schemas accepted 142 → 137, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 142
+    private let knownSchemaInvalidAccepted = 137
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

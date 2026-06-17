@@ -113,6 +113,31 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 `src-ct.2` / Derivation Valid (Restriction): the base of a
+    /// `simpleContent` RESTRICTION must be a complex type (whose content is simple).
+    /// A built-in (`xs:integer`, `xs:anySimpleType`) or a user `simpleType` base is
+    /// invalid: a complex type with simple content is built by EXTENDING a simple
+    /// type, never by restricting one through `simpleContent`. Self-contained schema
+    /// only; a foreign or unresolved base is left alone.
+    static func simpleContentRestrictionBaseErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for content in descendants(schema, named: "simpleContent") {
+            guard let restriction = ExtAllNode.firstChild(content, named: "restriction"),
+                  let base = ExtAllNode.attribute(restriction, "base")
+            else { continue }
+            let namespace = ExtAllNode.referenceNamespace(base, bindings)
+            let baseName = ExtAllNode.stripPrefix(base)
+            if namespace == xsdNamespace {
+                errors.append("a simpleContent restriction's base must be a complex type, not the built-in simple type '\(baseName)'")
+            } else if namespace == context.targetNamespace, case .simple? = types[baseName] {
+                errors.append("a simpleContent restriction's base must be a complex type, not the simple type '\(baseName)'")
+            }
+        }
+        return errors
+    }
+
     /// XSD 1.0 `cos-ct-extends.1.4.3.2.2.1`: a `complexContent` extension's mixedness
     /// must match its base type's. The effective content joins the base content and
     /// the extension's, so a mixed extension may extend only a mixed base and an

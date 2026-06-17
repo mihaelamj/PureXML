@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `simpleContent` restriction's base must be a complex type. Restricting a built-in (`xs:integer`, `xs:anySimpleType`) or a user `simpleType` through `<simpleContent><restriction>` is rejected (`src-ct.2`); a complex type with simple content is built by extending a simple type, not by restricting one. Caught five invalid schemas: invalid-schemas-accepted 142 → 137, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now enforces the NameAndTypeOK nillable clause. A restricting element may not be `nillable` unless the base element it restricts is also nillable. Caught two invalid schemas: invalid-schemas-accepted 144 → 142, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now enforces the NameAndTypeOK fixed-value clause. When the base element has a `fixed` value constraint, the restricting element must also be `fixed` to the same value (compared in the base type's value space, so a value-equal pair in different lexical forms is not wrongly flagged). Caught four invalid schemas: invalid-schemas-accepted 148 → 144, no other bucket moved.

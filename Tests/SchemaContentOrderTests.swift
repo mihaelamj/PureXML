@@ -44,6 +44,11 @@ struct SchemaContentOrderTests {
     @Test("well-formed simpleContent derivations compile")
     func test_valid() {
         #expect(!rejects(simpleContent(#"<xs:extension base="xs:string"><xs:attribute name="a" type="xs:string"/></xs:extension>"#)))
-        #expect(!rejects(simpleContent(#"<xs:restriction base="xs:string"><xs:maxLength value="3"/><xs:attribute name="a"/></xs:restriction>"#)))
+        // A simpleContent restriction's base must be a complex type (src-ct.2), so it
+        // restricts a complexType with simple content, not xs:string directly.
+        #expect(!rejects(#"""
+        <xs:complexType name="base"><xs:simpleContent><xs:extension base="xs:string"><xs:attribute name="a"/></xs:extension></xs:simpleContent></xs:complexType>
+        <xs:complexType name="t"><xs:simpleContent><xs:restriction base="base"><xs:maxLength value="3"/></xs:restriction></xs:simpleContent></xs:complexType>
+        """#))
     }
 }
