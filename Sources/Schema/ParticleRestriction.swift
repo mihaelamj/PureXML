@@ -267,7 +267,10 @@ extension PureXML.Schema {
         }
 
         /// Whether the restricted wildcard admits no namespace the base refuses.
-        private static func narrows(_ restricted: Wildcard, _ base: Wildcard) -> Bool {
+        /// Whether `restricted` is a valid subset of `base` (Wildcard Subset): its
+        /// processContents is at least as strong and its namespace constraint is
+        /// narrower or equal. Shared with attribute-wildcard restriction.
+        static func narrows(_ restricted: Wildcard, _ base: Wildcard) -> Bool {
             // Wildcard Subset (XSD 1.0 §3.10.6): the restriction's processContents
             // must be identical to or STRONGER than the base's (strict > lax > skip);
             // a restriction may not weaken validation. Namespace narrowing is below.

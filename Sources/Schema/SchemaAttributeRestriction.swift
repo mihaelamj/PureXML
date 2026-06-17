@@ -34,6 +34,19 @@ extension PureXML.Schema.XSDParser {
                     errors.append(message)
                 }
             }
+            // cos-ct-restricts.4: a restriction's own attribute wildcard must be a
+            // subset of the base's. A base with no wildcard admits none, so the
+            // restriction may not introduce one (ctO005); a wider namespace
+            // constraint, such as `##any` over `##other`, is not a subset (ctO007).
+            if let derivedWildcard = attributeWildcard(under: restriction, context) {
+                if let baseWildcard = complex.attributeWildcard {
+                    if !PureXML.Schema.ParticleRestriction.narrows(derivedWildcard, baseWildcard) {
+                        errors.append("the restriction's attribute wildcard is not a subset of the base type's attribute wildcard")
+                    }
+                } else {
+                    errors.append("a restriction may not introduce an attribute wildcard that the base type does not have")
+                }
+            }
         }
         return errors
     }

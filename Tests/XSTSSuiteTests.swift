@@ -115,8 +115,12 @@ struct XSTSSuiteTests {
     /// to be admitted by the base's attribute wildcard (cos-ct-restricts.3) then
     /// caught one more invalid schema: invalid-schemas accepted 132 → 131, no other
     /// bucket moved.
+    /// Requiring a restriction's own attribute wildcard to be a subset of the base's
+    /// (cos-ct-restricts.4: a base without one admits none; `##any` over `##other` is
+    /// not a subset) then caught three more invalid schemas: invalid-schemas accepted
+    /// 131 → 128, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 131
+    private let knownSchemaInvalidAccepted = 128
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
