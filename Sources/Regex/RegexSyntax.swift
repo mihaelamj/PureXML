@@ -7,6 +7,13 @@ extension PureXML.Regex {
         case badClass
         case badQuantifier
         case unsupported(String)
+        /// A character-class range whose first endpoint exceeds its second
+        /// (`[b-a]`): unambiguously invalid, never an engine limitation.
+        case reversedRange
+        /// An empty character class (`[]`): a class requires at least one member.
+        case emptyClass
+        /// A bounded quantifier whose minimum exceeds its maximum (`{37,17}`).
+        case reversedQuantifier
 
         var description: String {
             switch self {
@@ -16,6 +23,9 @@ extension PureXML.Regex {
             case .badClass: "malformed character class"
             case .badQuantifier: "malformed quantifier"
             case let .unsupported(detail): "unsupported construct: \(detail)"
+            case .reversedRange: "character-class range is reversed"
+            case .emptyClass: "empty character class"
+            case .reversedQuantifier: "quantifier minimum exceeds maximum"
             }
         }
     }

@@ -75,6 +75,7 @@ extension PureXML.Regex {
                 maximum = peek() == "}" ? nil : parseInteger()
             }
             guard peek() == "}", let minimum else { throw RegexError.badQuantifier }
+            if let maximum, minimum > maximum { throw RegexError.reversedQuantifier }
             advance()
             return .repeated(atom, min: minimum, max: maximum)
         }
@@ -178,6 +179,8 @@ extension PureXML.Regex {
                 advance()
                 cls.negated = true
             }
+            // A class must have at least one member; `[]` (or `[^]`) is invalid.
+            if peek() == "]" { throw RegexError.emptyClass }
             while let character = peek(), character != "]" {
                 if character == "-", peek(1) == "[" {
                     advance()
@@ -204,7 +207,7 @@ extension PureXML.Regex {
             if peek() == "-", peek(1) != "]", peek(1) != "[" {
                 advance()
                 guard case let .scalar(high) = try nextClassMember() else { throw RegexError.badClass }
-                guard low <= high else { throw RegexError.badClass }
+                guard low <= high else { throw RegexError.reversedRange }
                 cls.ranges.append(low ... high)
             } else {
                 cls.ranges.append(low ... low)

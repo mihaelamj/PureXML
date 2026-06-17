@@ -68,8 +68,13 @@ struct XSTSSuiteTests {
     /// selector's target global element (not just the host's descendants) lets a
     /// `unique`/`key` compare values in their value space (3.0 and 3 are the same
     /// xsd:decimal key): invalid accepted 133 → 132, no other bucket moved.
+    /// Rejecting unambiguously malformed regex in `pattern` facets (a reversed
+    /// character-class range `[b-a]`, an empty class `[]`, a reversed quantifier
+    /// `{37,17}`) as schema-invalid, while staying lenient on constructs the
+    /// engine merely does not support, then caught eighteen invalid schemas:
+    /// invalid-schemas-accepted 262 → 244, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 262
+    private let knownSchemaInvalidAccepted = 244
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
