@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an `xs:include` and `xs:redefine` require a `schemaLocation` attribute (only `xs:import`'s is optional); one declared without it is rejected. invalid-schemas-accepted 71 → 69, no false positive (valid-schemas-rejected held at 0; a required-attribute check with no name resolution cannot over-reject), no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#161): a schema referenced by `xs:redefine` must have the same `targetNamespace` as the redefining schema, or none (chameleon), exactly as for `xs:include`; redefining a different-namespace schema is rejected. The existing include-namespace-matching check now also covers `redefine`, selecting the loaded redefined schema document (not the redefine wrapper) so its real target namespace is compared. invalid-schemas-accepted 74 → 71, no false positive (valid-schemas-rejected held at 0; an adversarial review confirmed same-namespace, chameleon, and no-namespace redefines are not flagged), no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): an identity-constraint `selector`/`field` xpath may not use an undeclared namespace prefix. Every prefix in a name test must be a declared `xmlns:` prefix in scope (the implicit `xml` prefix excepted); a `selector`/`field` whose xpath names an unbound prefix is rejected. invalid-schemas-accepted 77 → 75, no false positive (valid-schemas-rejected held at 0; an adversarial review confirmed declared prefixes on the schema root or any ancestor resolve correctly), no other bucket moved.

@@ -141,20 +141,14 @@ struct XSTSSuiteTests {
     /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
     /// non-starter and under-rejection is recoverable; this debt is recovered by the
     /// full effective-total-range Particle-Valid-Restriction (tracked).
-    /// Further rules (each with valid-schemas-rejected held at 0; see CHANGELOG for
-    /// detail) drove invalid-schemas-accepted 130 -> 79: model-group occurrence ranges
-    /// (p-props-correct.1, cos-all-limited.2), identity-constraint content model,
-    /// derivation base-type kind (src-ct.1/.2), element value-constraint content type
-    /// (cos-valid-default), attribute type must be simple (au-props-correct), resolved
-    /// schemaLocation must be a schema (src-resolve), import namespace matches the
-    /// imported target (src-import.3), redefined type derives from itself
-    /// (src-redefine.5), local complexType is anonymous, a local element has a name
-    /// or ref, a redefined group's self-reference occurs exactly once
-    /// (src-redefine.6.1), an identity-constraint xpath uses no undeclared namespace
-    /// prefix, a redefined group/attributeGroup has at most one self-reference, and a
-    /// redefined schema's targetNamespace matches the redefiner or is chameleon.
+    /// Further rules, each with valid-schemas-rejected held at 0 (see CHANGELOG and
+    /// docs/xsts-deviations.md), drove invalid-schemas-accepted 130 -> 69: model-group
+    /// occurrence, identity-constraint content model and xpath prefixes, derivation
+    /// base-type kind and value-constraint content type, attribute/simple-type rules,
+    /// and the cross-document composition family (src-resolve, src-import.3,
+    /// src-redefine.5/6.1/7.2.1, redefine cross-namespace, required schemaLocation).
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 71
+    private let knownSchemaInvalidAccepted = 69
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

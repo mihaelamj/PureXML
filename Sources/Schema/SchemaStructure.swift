@@ -147,8 +147,7 @@ extension PureXML.Schema.XSDParser {
 
     private static func structuralErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
         switch local {
-        case "any", "anyAttribute":
-            wildcardNamespaceErrors(node)
+        case "any", "anyAttribute": wildcardNamespaceErrors(node)
         case "restriction":
             restrictionErrors(node, names: names)
         case "list":
@@ -157,6 +156,8 @@ extension PureXML.Schema.XSDParser {
             schemaChildrenOrderErrors(names)
         case "import":
             importErrors(node)
+        case "include", "redefine":
+            PureXML.Schema.XSDNode.attribute(node, "schemaLocation") == nil ? ["an '\(local)' must have a 'schemaLocation' attribute"] : []
         default:
             containerStructuralErrors(node, local: local, names: names)
         }

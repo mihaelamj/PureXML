@@ -372,6 +372,14 @@ struct SchemaStructureOrderTests {
         """#))
     }
 
+    /// An xs:include and xs:redefine require a schemaLocation attribute (only
+    /// xs:import's is optional); one without it is invalid.
+    @Test("include and redefine require a schemaLocation")
+    func test_includeRedefineRequireSchemaLocation() {
+        #expect(rejects(#"<xs:include/>"#))
+        #expect(rejects(#"<xs:redefine/>"#))
+    }
+
     /// A local element declaration must identify itself with a name or a ref; an
     /// element with neither is invalid, while a named one is valid.
     @Test("a local element must have a name or a ref")
