@@ -330,38 +330,6 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
-    /// src-redefine.6.1.2: a `group` inside `xs:redefine` may reference ITSELF (the
-    /// group it redefines) at most once, and that self-reference must have
-    /// `minOccurs` = `maxOccurs` = 1. A self-reference with any other occurrence
-    /// (`minOccurs="0"`, `maxOccurs="unbounded"`, a count above 1) is invalid. A
-    /// reference is the self-reference only when it resolves (by NAMESPACE, not local
-    /// name alone) to the redefined group: a `<group ref="b:g">` to an imported group
-    /// that merely shares the local name is a different component and is unconstrained,
-    /// so the namespace guard prevents a false positive.
-    static func redefineGroupSelfReferenceErrors(_ containers: [XSDTree]) -> [String] {
-        var errors: [String] = []
-        for container in containers where XSDDerivNode.localName(container) == "redefine" {
-            let schema = XSDDerivNode.schemaOwner(container)
-            let target = XSDDerivNode.attribute(schema, "targetNamespace")
-            let bindings = XSDDerivNode.namespaceBindings(of: schema)
-            for group in XSDDerivNode.children(container, named: "group") {
-                guard let name = XSDDerivNode.attribute(group, "name") else { continue }
-                for ref in descendants(group, named: "group") {
-                    guard let refName = XSDDerivNode.attribute(ref, "ref"),
-                          XSDDerivNode.stripPrefix(refName) == name,
-                          XSDDerivNode.referenceNamespace(refName, bindings) == target
-                    else { continue }
-                    let minOccurs = XSDDerivNode.attribute(ref, "minOccurs") ?? "1"
-                    let maxOccurs = XSDDerivNode.attribute(ref, "maxOccurs") ?? "1"
-                    if maxOccurs == "unbounded" || canonicalMagnitude(minOccurs) != "1" || canonicalMagnitude(maxOccurs) != "1" {
-                        errors.append("a redefined group's self-reference must have minOccurs and maxOccurs of 1")
-                    }
-                }
-            }
-        }
-        return errors
-    }
-
     /// Drops from each substitution group the members a head's `block` forbids: a
     /// member whose type derives from the head's type by a blocked method may not
     /// substitute.

@@ -247,7 +247,7 @@ extension PureXML.Validation {
                     AnyValidation(componentNamesUnique), AnyValidation(simpleTypeFinalControlsValid),
                     AnyValidation(contentModelsDeterministic),
                     AnyValidation(referencedSchemasResolveToSchemas), AnyValidation(redefinitionsDeriveFromThemselves),
-                    AnyValidation(redefineGroupSelfReferencesAreUnit),
+                    AnyValidation(redefineSelfReferencesAreWellFormed),
                 ],
                 reference: [
                     AnyValidation(typeDerivationAcyclic),

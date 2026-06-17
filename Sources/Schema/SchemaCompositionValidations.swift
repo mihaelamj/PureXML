@@ -25,11 +25,12 @@ extension PureXML.Validation.SchemaCompile {
         }
     }
 
-    /// src-redefine.6.1.2: a redefined group's self-reference has minOccurs = maxOccurs = 1.
-    static var redefineGroupSelfReferencesAreUnit: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
-        compileRule("A redefined group's self-reference occurs exactly once") { document in
+    /// src-redefine.6.1/7.2.1: a redefined group or attribute group has at most one
+    /// self-reference, and a group self-reference occurs exactly once.
+    static var redefineSelfReferencesAreWellFormed: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A redefined group or attribute group has a well-formed self-reference") { document in
             PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.redefineGroupSelfReferenceErrors(document.containers),
+                PureXML.Schema.XSDParser.redefineSelfReferenceErrors(document.containers),
             )
         }
     }

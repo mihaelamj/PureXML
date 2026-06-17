@@ -150,10 +150,10 @@ struct XSTSSuiteTests {
     /// imported target (src-import.3), redefined type derives from itself
     /// (src-redefine.5), local complexType is anonymous, a local element has a name
     /// or ref, a redefined group's self-reference occurs exactly once
-    /// (src-redefine.6.1.2), and an identity-constraint xpath uses no undeclared
-    /// namespace prefix.
+    /// (src-redefine.6.1), an identity-constraint xpath uses no undeclared namespace
+    /// prefix, and a redefined group/attributeGroup has at most one self-reference.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 75
+    private let knownSchemaInvalidAccepted = 74
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

@@ -94,6 +94,30 @@ struct SchemaIncludeTests {
         #expect((try? PureXML.Schema.Document(redefine(#"<xs:group ref="g"/>"#), schemaLoader: loader)) != nil)
     }
 
+    /// src-redefine.7.2.1: a redefined attributeGroup may contain at most one
+    /// self-reference; two references to the group being redefined are invalid.
+    @Test("a redefined attributeGroup may have at most one self-reference")
+    func test_redefineAttributeGroupSelfReferenceCount() {
+        let original = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:attributeGroup name="ag"><xs:attribute name="x" type="xs:string"/></xs:attributeGroup>
+        </xs:schema>
+        """
+        let loader: (String) -> String? = { $0 == "a.xsd" ? original : nil }
+        func redefine(_ refs: String) -> String {
+            """
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+              <xs:redefine schemaLocation="a.xsd">
+                <xs:attributeGroup name="ag"><xs:attribute name="y" type="xs:string"/>\(refs)</xs:attributeGroup>
+              </xs:redefine>
+            </xs:schema>
+            """
+        }
+        // Two self-references are invalid; one is valid.
+        #expect((try? PureXML.Schema.Document(redefine(#"<xs:attributeGroup ref="ag"/><xs:attributeGroup ref="ag"/>"#), schemaLoader: loader)) == nil)
+        #expect((try? PureXML.Schema.Document(redefine(#"<xs:attributeGroup ref="ag"/>"#), schemaLoader: loader)) != nil)
+    }
+
     /// src-resolve: when an include/import/redefine schemaLocation IS resolved (the
     /// loader returns content), that content must be a well-formed schema. Not-well-
     /// formed XML, or well-formed XML that is not an xs:schema, is rejected. A
