@@ -24,6 +24,29 @@ struct SchemaIncludeTests {
         #expect(try !doc.validate("<code xmlns=\"urn:main\">abc</code>").isEmpty)
     }
 
+    /// src-resolve: when an include/import/redefine schemaLocation IS resolved (the
+    /// loader returns content), that content must be a well-formed schema. Not-well-
+    /// formed XML, or well-formed XML that is not an xs:schema, is rejected. A
+    /// location the loader does not resolve (returns nil) is not an error.
+    @Test("a resolved schemaLocation that is not a valid schema is rejected")
+    func test_resolvedSchemaLocationMustBeSchema() {
+        let main = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:main">
+          <xs:include schemaLocation="bad.xsd"/>
+        </xs:schema>
+        """
+        // Resolved to not-well-formed XML.
+        #expect(throws: Error.self) {
+            _ = try PureXML.Schema.Document(main, schemaLoader: { $0 == "bad.xsd" ? "<not-well-formed" : nil })
+        }
+        // Resolved to well-formed XML that is not a schema.
+        #expect(throws: Error.self) {
+            _ = try PureXML.Schema.Document(main, schemaLoader: { $0 == "bad.xsd" ? "<root><child/></root>" : nil })
+        }
+        // An UNRESOLVED location (loader returns nil) is not an error.
+        #expect((try? PureXML.Schema.Document(main, schemaLoader: { _ in nil })) != nil)
+    }
+
     @Test("xs:include with a mismatched targetNamespace is rejected")
     func test_invalidIncludeDifferentTargetNamespace() {
         let included = """

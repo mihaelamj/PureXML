@@ -123,6 +123,33 @@ extension PureXML.Schema {
             return containers
         }
 
+        /// src-include.1 / src-import.1.2 / src-redefine: when an
+        /// `include`/`import`/`redefine` `schemaLocation` IS resolved (the loader
+        /// returns content), that content must be a well-formed schema document. A
+        /// location the loader does not resolve (returns nil) is not an error, since
+        /// resolution is the processor's choice. Mirrors `collectContainers`' walk,
+        /// recursing through resolved documents, cycle-guarded by `visited`.
+        static func checkSchemaLocations(
+            _ schema: XSDTree,
+            _ loader: (String) -> String?,
+            _ visited: inout Set<String>,
+        ) throws {
+            for child in elementChildren(schema) {
+                let kind = localName(child)
+                guard kind == "include" || kind == "import" || kind == "redefine",
+                      let location = attribute(child, "schemaLocation"), !visited.contains(location)
+                else { continue }
+                visited.insert(location)
+                guard let content = loader(location) else { continue }
+                guard let root = try? PureXML.parseTree(content),
+                      let sub = elementChildren(root).first(where: { localName($0) == "schema" })
+                else {
+                    throw PureXML.Schema.SchemaError.invalidSchemaReference(location: location)
+                }
+                try checkSchemaLocations(sub, loader, &visited)
+            }
+        }
+
         /// True when at least one external schema document was loaded (not merely
         /// referenced or a `redefine` wrapper without its included target).
         static func compositionLoaded(from containerTuples: [(location: String?, tree: XSDTree)]) -> Bool {

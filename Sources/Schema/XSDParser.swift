@@ -38,6 +38,8 @@ extension PureXML.Schema {
                 return content
             }
             let containerTuples = XSDNode.collectContainers(schema, wrappedLoader, &visited)
+            var locationCheckVisited: Set<String> = []
+            try XSDNode.checkSchemaLocations(schema, wrappedLoader, &locationCheckVisited)
             let containers = containerTuples.map(\.tree)
             let derivation = derivationTables(containers)
             try checkRedefine(containers)
