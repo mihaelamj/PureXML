@@ -34,7 +34,7 @@ extension PureXML.Schema.ComplexValidator {
 
     fileprivate static func label(of term: XSDTerm) -> XSDTermLabel {
         switch term {
-        case let .element(name, _, _, _): .name(name)
+        case let .element(name, _, _, _, _): .name(name)
         case let .wildcard(wildcard): .wildcard(wildcard)
         case .group: .wildcard(XSDWildcard())
         }
@@ -64,7 +64,7 @@ extension PureXML.Schema.ComplexValidator {
 
     fileprivate static func collectTypes(_ term: XSDTerm, into result: inout [String: XSDElementType]) {
         switch term {
-        case let .element(name, type, _, _):
+        case let .element(name, type, _, _, _):
             if let type { result[key(name)] = type }
         case let .group(group):
             for member in group.particles {

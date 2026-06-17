@@ -104,7 +104,10 @@ public extension PureXML.Schema {
         /// (a built-in, a user type, or `anyType` for an absent type), or nil when
         /// the type is an inline anonymous definition. It preserves the derivation
         /// identity the flattened `type` (`ElementType`) loses, for NameAndTypeOK.
-        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?, valueConstraint: ValueConstraint? = nil)
+        /// `block` is the element's `{disallowed substitutions}` (its own `block`, or
+        /// the schema's `blockDefault`), needed for the NameAndTypeOK block-superset
+        /// rule in Particle Valid (Restriction); empty when nothing is blocked.
+        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?, valueConstraint: ValueConstraint? = nil, block: Set<DerivationMethod> = [])
         case group(Group)
         case wildcard(Wildcard)
     }

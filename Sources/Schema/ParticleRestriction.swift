@@ -66,11 +66,15 @@ extension PureXML.Schema {
                 return emptiable(base)
             }
             switch (restricted.term, base.term) {
-            case let (.element(restrictedName, _, restrictedTypeName, _), .element(baseName, _, baseTypeName, _)):
+            case let (.element(restrictedName, _, restrictedTypeName, _, restrictedBlock), .element(baseName, _, baseTypeName, _, baseBlock)):
+                // NameAndTypeOK: beyond name, occurrence, and type derivation, the
+                // restricting element's {disallowed substitutions} must be a superset
+                // of the base's (a restriction may block more, never fewer).
                 return rangeSubsumed(restricted, base)
                     && sameName(restrictedName, baseName)
+                    && restrictedBlock.isSuperset(of: baseBlock)
                     && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
-            case let (.element(name, _, _, _), .wildcard(wildcard)):
+            case let (.element(name, _, _, _, _), .wildcard(wildcard)):
                 return rangeSubsumed(restricted, base) && wildcard.admits(name)
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
@@ -85,7 +89,7 @@ extension PureXML.Schema {
                 // element restricting a once-or-more base group.
                 return rangeWithinWildcard(derivedMin: 1, derivedMax: 1, wildcardMin: base.minOccurs, wildcardMax: base.maxOccurs)
                     && groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
-            case let (.group, .element(baseName, _, baseTypeName, _)):
+            case let (.group, .element(baseName, _, baseTypeName, _, _)):
                 // The mirror of RecurseAsIfGroup, by the same cardinality argument as
                 // group/wildcard: a base element accepts only its own name, its own
                 // occurrence count of times. The derived group is a valid restriction
@@ -282,7 +286,7 @@ extension PureXML.Schema {
         /// element by name, a nested wildcard by narrowing.
         private static func leavesAdmitted(_ particle: Particle, by wildcard: Wildcard) -> Bool {
             switch particle.term {
-            case let .element(name, _, _, _): wildcard.admits(name)
+            case let .element(name, _, _, _, _): wildcard.admits(name)
             case let .wildcard(inner): narrows(inner, wildcard)
             case let .group(group): group.particles.allSatisfy { leavesAdmitted($0, by: wildcard) }
             }
@@ -300,7 +304,7 @@ extension PureXML.Schema {
             _ derivation: [String: TypeDerivation],
         ) -> Bool {
             switch particle.term {
-            case let .element(name, _, typeName, _):
+            case let .element(name, _, typeName, _, _):
                 sameName(name, baseName) && elementTypeRestrictionOK(typeName, baseTypeName, types, derivation)
             case .wildcard:
                 false

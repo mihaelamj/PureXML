@@ -296,6 +296,9 @@ extension PureXML.Schema {
         /// `schemaLoader`, so cross-document rules may run over the merged component
         /// set instead of standing down.
         var compositionLoaded: Bool = false
+        /// The schema's `blockDefault`, the `{disallowed substitutions}` a local or
+        /// global element inherits when it states no `block` of its own.
+        var blockDefault: String?
         /// The location of each container schema document.
         var containerLocations: [ObjectIdentifier: String?] = [:]
         /// Target namespace imposed on an included schema with no `targetNamespace`

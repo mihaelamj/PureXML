@@ -87,8 +87,12 @@ struct XSTSSuiteTests {
     /// that must occur 2+ times cannot be restricted to one element; §3.9.6) then
     /// caught two more invalid schemas: invalid-schemas accepted 181 → 179, no other
     /// bucket moved.
+    /// Enforcing the NameAndTypeOK block-superset clause (a restricting element's
+    /// `{disallowed substitutions}` must be a superset of the base element's, with
+    /// `block`/`blockDefault` carried on the particle) then caught sixteen more
+    /// invalid schemas: invalid-schemas accepted 179 → 163, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 179
+    private let knownSchemaInvalidAccepted = 163
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

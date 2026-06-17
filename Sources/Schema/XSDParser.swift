@@ -85,6 +85,7 @@ extension PureXML.Schema.XSDParser {
             compositionLoaded: compositionLoaded,
             containerLocations: containerLocations,
         )
+        context.blockDefault = XSDNode.attribute(schema, "blockDefault")
         context.elementFormQualified = XSDNode.attribute(schema, "elementFormDefault") == "qualified"
         context.attributeFormQualified = XSDNode.attribute(schema, "attributeFormDefault") == "qualified"
         context.namespaceBindings = XSDNode.namespaceBindings(of: schema)

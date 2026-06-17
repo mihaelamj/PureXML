@@ -73,6 +73,7 @@ extension PureXML.Schema.XSDParser {
                 type: elementType(node, context),
                 typeName: elementTypeName(node),
                 valueConstraint: valueConstraint(of: node),
+                block: methodSet(XSDNode.attribute(node, "block") ?? context.blockDefault),
             ),
         )
     }
