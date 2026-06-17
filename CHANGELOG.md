@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `pattern` facet whose `\p{...}` or `\P{...}` property name can be no XSD `charProp` (`IsCategory | IsBlock`) under any repertoire is now rejected as a schema-validity error: an empty name, the bare prefix `Is`, a non-block name carrying a non-letter (`\p{\L}`), or `Is` followed by a non-block character. A well-formed but unrecognised category or block name (such as an unknown `Is`-block) stays a lenient engine limitation rather than an error, so only the unambiguously malformed forms reject. Caught three invalid schemas: invalid-schemas-accepted 203 → 200, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): two attribute-declaration validity rules. An attribute `ref` may not also carry `form` (the form comes from the referenced global declaration; `src-attribute.3.2`), and no attribute declaration may be named `xmlns` (that name is reserved for namespace declarations; no-xmlns). Caught four invalid schemas: invalid-schemas-accepted 207 → 203, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a referencing `attributeGroup` (one carrying a `ref`) is held to its `(annotation?)` content model. It names a definition elsewhere, so it may not itself declare attributes, nested attributeGroup references, or an `anyAttribute`; only a defining `attributeGroup` (with `name`) carries those (`attgD`). Caught three invalid schemas: invalid-schemas-accepted 210 → 207, no other bucket moved.

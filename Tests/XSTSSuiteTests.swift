@@ -120,8 +120,13 @@ struct XSTSSuiteTests {
     /// Rejecting an attribute `ref` that also carries `form` (src-attribute.3.2) and
     /// an attribute declaration named `xmlns` (no-xmlns) then caught four more
     /// invalid schemas: invalid-schemas accepted 207 → 203, no other bucket moved.
+    /// Rejecting a `\p{...}` property whose name can be no XSD charProp under any
+    /// repertoire (empty, the bare `Is`, a non-block name with a non-letter, or `Is`
+    /// followed by a non-block character: `\p{\L}`, `\p{Is}`) while staying lenient
+    /// on a well-formed but unrecognised block name then caught three more invalid
+    /// schemas: invalid-schemas accepted 203 → 200, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 203
+    private let knownSchemaInvalidAccepted = 200
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

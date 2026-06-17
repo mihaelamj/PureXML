@@ -80,7 +80,7 @@ extension PureXML.Schema {
         private static func rejectsPattern(_ error: PureXML.Regex.RegexError) -> Bool {
             switch error {
             case .unbalanced, .danglingQuantifier, .reversedRange, .emptyClass, .reversedQuantifier,
-                 .incompleteEscape, .unterminatedClass:
+                 .incompleteEscape, .unterminatedClass, .invalidProperty:
                 true
             case .unsupported, .badQuantifier, .badEscape, .badClass:
                 false

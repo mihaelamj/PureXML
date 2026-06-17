@@ -20,6 +20,12 @@ extension PureXML.Regex {
         /// A character class opened with `[` that the expression ends before
         /// closing with `]` (`a[`, `[a[:xyz:`). Unambiguously invalid.
         case unterminatedClass
+        /// The `{...}` of a `\p`/`\P` escape whose content can be no XSD charProp:
+        /// empty, the bare prefix `Is`, a non-block name carrying a character that
+        /// is not a letter, or `Is` followed by a non-block-name character
+        /// (`\p{\L}`, `\p{Is}`). Unambiguously invalid, distinct from an unknown but
+        /// well-formed category or block name (which stays an `unsupported` limit).
+        case invalidProperty
 
         var description: String {
             switch self {
@@ -34,6 +40,7 @@ extension PureXML.Regex {
             case .reversedQuantifier: "quantifier minimum exceeds maximum"
             case .incompleteEscape: "an escape '\\' has no following character"
             case .unterminatedClass: "a character class is not closed with ']'"
+            case .invalidProperty: "a \\p{...} property name is malformed"
             }
         }
     }

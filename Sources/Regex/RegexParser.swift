@@ -133,9 +133,26 @@ extension PureXML.Regex {
             guard peek() == "}" else { throw RegexError.badClass }
             advance()
             guard let predicate = CategoryPredicate(name: name, negated: negated) else {
-                throw RegexError.unsupported("\\p{\(name)}")
+                // An unknown name is by default a limit of this engine, not an error
+                // (stay lenient). But a name that can be NO XSD charProp at all is
+                // unambiguously invalid and rejects, independent of which categories
+                // or blocks this engine happens to recognise.
+                throw Self.isMalformedProperty(name) ? RegexError.invalidProperty : RegexError.unsupported("\\p{\(name)}")
             }
             return predicate
+        }
+
+        /// Whether `name` can be no XSD `charProp` (`IsCategory | IsBlock`) under any
+        /// repertoire: empty, the bare `Is` prefix, a non-block name (no `Is` prefix)
+        /// carrying a non-letter, or `Is` followed by a non-`[A-Za-z0-9-]` character.
+        /// A well-formed but unrecognised name (an unknown block such as `IsaA0-a9`)
+        /// is NOT malformed and stays a lenient `unsupported` limit.
+        private static func isMalformedProperty(_ name: String) -> Bool {
+            if name.isEmpty || name == "Is" { return true }
+            guard name.hasPrefix("Is") else {
+                return name.contains { !$0.isLetter }
+            }
+            return name.dropFirst(2).contains { !($0.isLetter || $0.isNumber || $0 == "-") }
         }
 
         private func classFrom(_ member: ClassMember) -> CharClass {
