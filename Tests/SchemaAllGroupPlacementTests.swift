@@ -29,6 +29,41 @@ struct SchemaAllGroupPlacementTests {
                 + "<xs:group ref=\"g\"/></xs:sequence></xs:complexType>"))
     }
 
+    /// p-props-correct.1: minOccurs may not exceed maxOccurs, both defaulting to 1.
+    /// A model group with `minOccurs="2"` and no `maxOccurs` means 2 > 1 and is
+    /// invalid; `maxOccurs="0"` with no `minOccurs` means 1 > 0 and is invalid.
+    @Test("minOccurs may not exceed maxOccurs on a model group")
+    func test_occurrenceRangeOnModelGroups() {
+        func ct(_ inner: String) -> String {
+            "<xs:complexType name=\"T\">\(inner)</xs:complexType>"
+        }
+        // minOccurs="2" with an absent (default 1) maxOccurs is 2 > 1.
+        #expect(!compiles(ct("<xs:sequence minOccurs=\"2\"><xs:element name=\"e\"/></xs:sequence>")))
+        #expect(!compiles(ct("<xs:choice minOccurs=\"2\"><xs:element name=\"e\"/></xs:choice>")))
+        #expect(!compiles(ct("<xs:sequence minOccurs=\"999999999\"><xs:element name=\"e\"/></xs:sequence>")))
+        // An explicit, well-ordered range stays valid; unbounded is never exceeded.
+        #expect(compiles(ct("<xs:sequence minOccurs=\"2\" maxOccurs=\"4\"><xs:element name=\"e\"/></xs:sequence>")))
+        #expect(compiles(ct("<xs:choice minOccurs=\"2\" maxOccurs=\"unbounded\"><xs:element name=\"e\"/></xs:choice>")))
+        #expect(compiles(ct("<xs:sequence><xs:element name=\"e\" minOccurs=\"0\"/></xs:sequence>")))
+    }
+
+    /// cos-all-limited clause 2: an all group's maxOccurs must be 1 and its minOccurs
+    /// 0 or 1, and every particle it contains has maxOccurs 0 or 1.
+    @Test("an all group's occurrence is limited to 0/1")
+    func test_allGroupOccurrenceLimited() {
+        func ct(_ inner: String) -> String {
+            "<xs:complexType name=\"T\">\(inner)</xs:complexType>"
+        }
+        #expect(!compiles(ct("<xs:all minOccurs=\"2\"><xs:element name=\"e\"/></xs:all>")))
+        #expect(!compiles(ct("<xs:all maxOccurs=\"0\"><xs:element name=\"e\"/></xs:all>")))
+        #expect(!compiles(ct("<xs:all minOccurs=\"0\" maxOccurs=\"0\"><xs:element name=\"e\"/></xs:all>")))
+        #expect(!compiles(ct("<xs:all maxOccurs=\"unbounded\"><xs:element name=\"e\"/></xs:all>")))
+        #expect(!compiles(ct("<xs:all><xs:element name=\"e\" maxOccurs=\"2\"/></xs:all>")))
+        // minOccurs 0 or 1 with the default maxOccurs of 1 is valid.
+        #expect(compiles(ct("<xs:all minOccurs=\"0\"><xs:element name=\"e\"/></xs:all>")))
+        #expect(compiles(ct("<xs:all><xs:element name=\"e\" minOccurs=\"0\"/></xs:all>")))
+    }
+
     /// An imported namespace may define an all-group whose local name collides with
     /// a *non-all* group in this schema's own target namespace. A reference to the
     /// local group inside a compositor resolves to this target namespace and is

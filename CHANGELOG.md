@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schema compile diagnostics are now located: `SchemaError.inconsistent` carries `[ValidationError]` with coding paths that resolve to `TreeNode.sourceRange` on a ranged schema tree (#169). Parse-time facet and structure findings attach to their declaring nodes where possible; `SchemaError.inconsistentFindings` exposes the full list. Schematron reuses the shared `validationCodingPath()` helper.
 
 - DTD parse-time validity findings are warnings until strict validation promotes them; `validateAgainstInternalDTD` returns full findings (errors and warnings).
+
+### Fixed
+
+- XSTS invalid-schemas-accepted (#145): the occurrence-range constraints on model groups are enforced. A particle's `minOccurs` may not exceed its `maxOccurs`, both defaulting to 1 when absent (`p-props-correct.1`), so `<xs:sequence minOccurs="2">` (2 > the default 1) and `<xs:all maxOccurs="0">` (the default 1 > 0) are rejected; and an `all` group's `maxOccurs` must be 1 and `minOccurs` 0 or 1, with every particle it contains limited to `maxOccurs` 0 or 1 (`cos-all-limited.2`). The previous check fired only when both attributes were present, missing the common default-`maxOccurs` cases. Triple-confirmed against the W3C-labelled suite and libxml2: invalid-schemas-accepted 130 → 110, with no false positive (valid-schemas-rejected held at 0) and no other bucket moved.
  - 2026-06-16
 
 Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-schemas-accepted 394 → 266** (settled expectations), **valid-instances-rejected 180 → 171**, **invalid-instances-accepted 158 → 155**, **valid-schemas-rejected held at 1** (`particlesZ001`, spec-ambiguous). Not yet 1.0: see `docs/production-readiness.md`.

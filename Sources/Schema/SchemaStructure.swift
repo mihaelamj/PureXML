@@ -143,30 +143,37 @@ extension PureXML.Schema.XSDParser {
     }
 
     private static func structuralErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
-        var errors: [String] = []
         switch local {
         case "any", "anyAttribute":
-            errors += wildcardNamespaceErrors(node)
+            wildcardNamespaceErrors(node)
         case "restriction":
-            errors += restrictionErrors(node, names: names)
+            restrictionErrors(node, names: names)
         case "list":
-            errors += listErrors(node, names: names)
+            listErrors(node, names: names)
         case "schema":
-            errors += schemaChildrenOrderErrors(names)
+            schemaChildrenOrderErrors(names)
         case "import":
-            errors += importErrors(node)
-        case "element":
-            errors += elementChildrenErrors(node, names: names)
-        case "attribute":
-            errors += attributeChildrenErrors(node, names: names)
-        case "attributeGroup":
-            errors += attributeGroupChildrenErrors(node, names: names)
-        case "group":
-            errors += groupChildrenErrors(node, names: names)
+            importErrors(node)
         default:
-            break
+            containerStructuralErrors(node, local: local, names: names)
         }
-        return errors
+    }
+
+    private static func containerStructuralErrors(_ node: XSDTree, local: String, names: [String]) -> [String] {
+        switch local {
+        case "element":
+            elementChildrenErrors(node, names: names)
+        case "attribute":
+            attributeChildrenErrors(node, names: names)
+        case "attributeGroup":
+            attributeGroupChildrenErrors(node, names: names)
+        case "group":
+            groupChildrenErrors(node, names: names)
+        case "all":
+            allGroupLimitedErrors(node)
+        default:
+            []
+        }
     }
 
     private static func allowedChildren(for local: String, node: XSDTree) -> Set<String>? {

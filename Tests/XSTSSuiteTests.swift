@@ -141,8 +141,12 @@ struct XSTSSuiteTests {
     /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
     /// non-starter and under-rejection is recoverable; this debt is recovered by the
     /// full effective-total-range Particle-Valid-Restriction (tracked).
+    /// Enforcing the occurrence-range constraints on model groups (p-props-correct.1:
+    /// minOccurs may not exceed maxOccurs, both defaulting to 1; cos-all-limited.2: an
+    /// all group's maxOccurs is 1 and minOccurs 0 or 1, its particles' maxOccurs 0 or
+    /// 1) then caught twenty more invalid schemas with no false positive: 130 → 110.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 130
+    private let knownSchemaInvalidAccepted = 110
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

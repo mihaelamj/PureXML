@@ -35,16 +35,45 @@ extension PureXML.Schema.XSDParser {
         return !digits.isEmpty && digits.allSatisfy { $0.isASCII && $0.isNumber }
     }
 
+    /// p-props-correct.1 (XSD 1.0 Structures 3.9.6): a particle's {min occurs} may
+    /// not exceed its {max occurs}. Both default to 1 when the attribute is absent,
+    /// so `minOccurs="2"` with no `maxOccurs` means 2 > 1 and is invalid, as is
+    /// `maxOccurs="0"` with no `minOccurs` (1 > 0). `unbounded` is infinite and never
+    /// exceeded; a non-integer lexical is a separate, already-reported error.
     static func occurrenceOrderErrors(_ node: XSDTree) -> [String] {
-        guard let minRaw = PureXML.Schema.XSDNode.attribute(node, "minOccurs"),
-              let maxRaw = PureXML.Schema.XSDNode.attribute(node, "maxOccurs")
-        else { return [] }
-        let minimum = minRaw.trimmingXMLWhitespace()
-        let maximum = maxRaw.trimmingXMLWhitespace()
+        let minRaw = PureXML.Schema.XSDNode.attribute(node, "minOccurs")
+        let maxRaw = PureXML.Schema.XSDNode.attribute(node, "maxOccurs")
+        guard minRaw != nil || maxRaw != nil else { return [] }
+        let minimum = (minRaw ?? "1").trimmingXMLWhitespace()
+        let maximum = (maxRaw ?? "1").trimmingXMLWhitespace()
         guard maximum != "unbounded", isNonNegativeInteger(minimum), isNonNegativeInteger(maximum),
               exceeds(minimum, maximum)
         else { return [] }
-        return ["minOccurs (\(minRaw)) exceeds maxOccurs (\(maxRaw))"]
+        return ["minOccurs (\(minRaw ?? "1")) exceeds maxOccurs (\(maxRaw ?? "1"))"]
+    }
+
+    /// cos-all-limited clause 2 (XSD 1.0 Structures 3.8.6): the {max occurs} of an
+    /// `all` group must be 1 and its {min occurs} 0 or 1, and the {max occurs} of
+    /// every particle the group contains must be 0 or 1. `unbounded`, or any value
+    /// above 1, is invalid. (The lexical validity of the values is checked
+    /// elsewhere; this orders only well-formed non-negative integers.)
+    static func allGroupLimitedErrors(_ node: XSDTree) -> [String] {
+        var errors: [String] = []
+        func limited(_ value: String?, allowZero: Bool, what: String) {
+            guard let raw = value?.trimmingXMLWhitespace() else { return }
+            let allowed: Set<Substring> = allowZero ? ["0", "1"] : ["1"]
+            if raw == "unbounded" || (isNonNegativeInteger(raw) && !allowed.contains(canonicalMagnitude(raw))) {
+                errors.append("\(what) must be \(allowZero ? "0 or 1" : "1")")
+            }
+        }
+        limited(PureXML.Schema.XSDNode.attribute(node, "maxOccurs"), allowZero: false, what: "the maxOccurs of an all group")
+        limited(PureXML.Schema.XSDNode.attribute(node, "minOccurs"), allowZero: true, what: "the minOccurs of an all group")
+        let xsd = PureXML.Schema.XSDParser.xsdNamespace
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            guard child.name?.namespaceURI == xsd, PureXML.Schema.XSDNode.localName(child) == "element" else { continue }
+            limited(PureXML.Schema.XSDNode.attribute(child, "maxOccurs"), allowZero: true, what: "the maxOccurs of a particle in an all group")
+        }
+        return errors
     }
 
     static func exceeds(_ lhs: String, _ rhs: String) -> Bool {
