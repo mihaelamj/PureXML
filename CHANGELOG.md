@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now enforces the NameAndTypeOK fixed-value clause. When the base element has a `fixed` value constraint, the restricting element must also be `fixed` to the same value (compared in the base type's value space, so a value-equal pair in different lexical forms is not wrongly flagged). Caught four invalid schemas: invalid-schemas-accepted 148 → 144, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now also covers anonymous complex types. The named-type subset check was keyed by type name, so an inline `complexType` deriving by `complexContent` restriction (the common `<element><complexType><complexContent><restriction base="...">` shape) was never validated against its base. Such restrictions are now compiled and checked with the same algorithm. Caught fifteen invalid schemas: invalid-schemas-accepted 163 → 148, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now enforces the NameAndTypeOK block-superset clause. A restricting element's `{disallowed substitutions}` (its `block`, or the schema's `blockDefault`) must be a superset of the base element's, so a restriction may block more substitutions but never fewer. The element particle now carries this `block` set. Caught sixteen invalid schemas: invalid-schemas-accepted 179 → 163, no other bucket moved.

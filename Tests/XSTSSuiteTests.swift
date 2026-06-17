@@ -95,8 +95,12 @@ struct XSTSSuiteTests {
     /// declarations, which the named-type rule never saw) with the same
     /// Particle-Valid-Restriction algorithm then caught fifteen more invalid schemas:
     /// invalid-schemas accepted 163 → 148, no other bucket moved.
+    /// Enforcing the NameAndTypeOK fixed-value clause (a restriction of a `fixed`
+    /// base element must be fixed to the same value, compared in the base type's
+    /// value space) then caught four more invalid schemas: invalid-schemas accepted
+    /// 148 → 144, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 148
+    private let knownSchemaInvalidAccepted = 144
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

@@ -66,13 +66,15 @@ extension PureXML.Schema {
                 return emptiable(base)
             }
             switch (restricted.term, base.term) {
-            case let (.element(restrictedName, _, restrictedTypeName, _, restrictedBlock), .element(baseName, _, baseTypeName, _, baseBlock)):
+            case let (.element(restrictedName, _, restrictedTypeName, restrictedValue, restrictedBlock), .element(baseName, baseType, baseTypeName, baseValue, baseBlock)):
                 // NameAndTypeOK: beyond name, occurrence, and type derivation, the
                 // restricting element's {disallowed substitutions} must be a superset
-                // of the base's (a restriction may block more, never fewer).
+                // of the base's (a restriction may block more, never fewer), and if
+                // the base is fixed the restriction must be fixed to the same value.
                 return rangeSubsumed(restricted, base)
                     && sameName(restrictedName, baseName)
                     && restrictedBlock.isSuperset(of: baseBlock)
+                    && fixedValueOK(restrictedValue, baseValue, baseType, types)
                     && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
             case let (.element(name, _, _, _, _), .wildcard(wildcard)):
                 return rangeSubsumed(restricted, base) && wildcard.admits(name)
@@ -280,6 +282,28 @@ extension PureXML.Schema {
 
         private static func sameName(_ lhs: PureXML.Model.QualifiedName, _ rhs: PureXML.Model.QualifiedName) -> Bool {
             lhs.localName == rhs.localName && (lhs.namespaceURI ?? "") == (rhs.namespaceURI ?? "")
+        }
+
+        /// NameAndTypeOK value-constraint clause: when the base element is `fixed`,
+        /// the restricting element must also be `fixed` to the same value (compared in
+        /// the base type's value space, so `1` and `01` match). A base with no fixed
+        /// value, or a `default`, imposes no constraint on the restriction.
+        private static func fixedValueOK(_ restrictedValue: ValueConstraint?, _ baseValue: ValueConstraint?, _ baseType: ElementType?, _ types: [String: ElementType]) -> Bool {
+            guard let baseFixed = baseValue?.fixedValue else { return true }
+            guard let restrictedFixed = restrictedValue?.fixedValue else { return false }
+            return atomicType(baseType, types)?.valueMatches(restrictedFixed, literal: baseFixed) ?? (restrictedFixed == baseFixed)
+        }
+
+        /// The atomic simple type an element's type resolves to (following a
+        /// `typeReference` through the types map, bounded against cycles), or nil for
+        /// a complex, list, or union type.
+        private static func atomicType(_ type: ElementType?, _ types: [String: ElementType], _ depth: Int = 0) -> PureXML.Schema.SimpleType? {
+            guard depth < 32 else { return nil }
+            switch type {
+            case let .simple(simple): return simple
+            case let .typeReference(key): return atomicType(types[key], types, depth + 1)
+            default: return nil
+            }
         }
 
         /// Whether every leaf a particle can contain is admitted by `wildcard`: an
