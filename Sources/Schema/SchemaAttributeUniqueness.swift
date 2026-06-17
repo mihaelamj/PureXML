@@ -34,6 +34,41 @@ extension PureXML.Schema.XSDParser {
                 let label = AttrNode.attribute(type, "name").map { "complex type '\($0)'" } ?? "an anonymous complex type"
                 errors += attributeSetErrors(attributeDeclarations(under: attributeContainer(of: type), context), label)
             }
+            errors += attributeRefValueConstraintErrors(container, context)
+        }
+        return errors
+    }
+
+    /// XSD 1.0 `au-props-correct.2`: when an attribute use references a global
+    /// attribute that has a `fixed` value constraint, the use may not contradict
+    /// it: a `fixed` whose value differs, or a `default`, on the reference is
+    /// invalid (the use either inherits the fixed value or restates the same one).
+    /// Compared in the attribute type's value space, so a value-equal pair written
+    /// in different lexical forms (`1` and `01`) is not wrongly flagged.
+    ///
+    /// The global declaration is looked up by local name (the only key the global
+    /// pool carries), so a reference is checked against it only once the resolved
+    /// declaration's own namespace matches the reference's resolved namespace. That
+    /// rejects a same-local-name collision across namespaces (an imported `imp:a`
+    /// versus a local `a`), where the local-name pool could otherwise surface the
+    /// wrong global and contradict a valid reference.
+    private static func attributeRefValueConstraintErrors(_ container: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
+        var errors: [String] = []
+        for use in descendants(container, named: "attribute") {
+            guard let ref = AttrNode.attribute(use, "ref"),
+                  let declaration = context.globalAttributes[AttrNode.stripPrefix(ref)],
+                  let resolved = attributeUse(declaration, context),
+                  resolved.name.namespaceURI == AttrNode.referenceNamespace(ref, context.namespaceBindings),
+                  let globalFixed = AttrNode.attribute(declaration, "fixed")
+            else { continue }
+            if let useFixed = AttrNode.attribute(use, "fixed") {
+                let equal = resolved.type.valueMatches(useFixed, literal: globalFixed) || useFixed == globalFixed
+                if !equal {
+                    errors.append("attribute reference to '\(AttrNode.stripPrefix(ref))' must use its fixed value '\(globalFixed)', not '\(useFixed)'")
+                }
+            } else if AttrNode.attribute(use, "default") != nil {
+                errors.append("attribute reference to '\(AttrNode.stripPrefix(ref))' has a fixed value and may not specify a default")
+            }
         }
         return errors
     }

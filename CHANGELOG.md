@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an attribute use that references a global attribute carrying a `fixed` value constraint may not contradict it. A `fixed` on the reference whose value differs from the global's (compared in the attribute type's value space, so `1` and `01` are not wrongly flagged), or a `default` on a reference to a fixed global, is invalid (`au-props-correct.2`). A reference that omits its own value constraint inherits the global's fixed value and stays valid. Caught two invalid schemas: invalid-schemas-accepted 232 → 230, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content may not extend a base whose whole content is a non-empty `all` group; the base's `all` would be nested in the sequence joining base and extension content (`cos-all-limited`). An empty-`all` base, or an attribute-only extension, stays valid. Caught one invalid schema: invalid-schemas-accepted 233 → 232, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content (a non-empty model group) may not extend a base whose content is simple (`cos-ct-extends.1.4.2.2`); a simple-content type is extended through `simpleContent`. An attribute-only `complexContent` extension of a simpleContent base stays valid (the `complexContent`-around-`simpleContent` idiom). Caught two invalid schemas: invalid-schemas-accepted 235 → 233, no other bucket moved.

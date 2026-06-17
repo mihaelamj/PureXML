@@ -87,8 +87,12 @@ struct XSTSSuiteTests {
     /// base whose whole content is an `all` group (the all would be nested in the
     /// joining sequence; cos-all-limited) then caught one more invalid schema:
     /// invalid-schemas accepted 233 → 232, no other bucket moved.
+    /// Rejecting an attribute use that references a global attribute with a `fixed`
+    /// value constraint but contradicts it (a value-space-differing `fixed`, or a
+    /// `default`; au-props-correct.2) then caught two more invalid schemas:
+    /// invalid-schemas accepted 232 → 230, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 232
+    private let knownSchemaInvalidAccepted = 230
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
