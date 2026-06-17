@@ -141,20 +141,17 @@ struct XSTSSuiteTests {
     /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
     /// non-starter and under-rejection is recoverable; this debt is recovered by the
     /// full effective-total-range Particle-Valid-Restriction (tracked).
-    /// Six further rules, each with valid-schemas-rejected held at 0 (see CHANGELOG
-    /// for detail): model-group occurrence ranges (p-props-correct.1, cos-all-limited.2)
-    /// 130->110; identity-constraint content model 110->104; derivation base-type kind
-    /// (src-ct.1/.2, local type beats the built-in reading) 104->99; element value
-    /// constraint needs simple/mixed content (cos-valid-default) 99->96; an attribute's
-    /// type is a simple type (au-props-correct) 96->95; a resolved include/import/
-    /// redefine schemaLocation must be a well-formed schema (src-resolve) 95->87; and
-    /// an import's namespace must equal the imported targetNamespace (src-import.3)
-    /// 87->84; and a redefined type must derive from the type it redefines in the
-    /// redefining schema's own namespace, not a same-named foreign one (src-redefine.5)
-    /// 84->81; and a complexType nested in an element must be anonymous (no name)
-    /// 81->80.
+    /// Further rules (each with valid-schemas-rejected held at 0; see CHANGELOG for
+    /// detail) drove invalid-schemas-accepted 130 -> 79: model-group occurrence ranges
+    /// (p-props-correct.1, cos-all-limited.2), identity-constraint content model,
+    /// derivation base-type kind (src-ct.1/.2), element value-constraint content type
+    /// (cos-valid-default), attribute type must be simple (au-props-correct), resolved
+    /// schemaLocation must be a schema (src-resolve), import namespace matches the
+    /// imported target (src-import.3), redefined type derives from itself
+    /// (src-redefine.5), local complexType is anonymous, and a local element has a
+    /// name or ref.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 80
+    private let knownSchemaInvalidAccepted = 79
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

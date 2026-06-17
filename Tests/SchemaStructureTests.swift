@@ -372,23 +372,21 @@ struct SchemaStructureOrderTests {
         """#))
     }
 
+    /// A local element declaration must identify itself with a name or a ref; an
+    /// element with neither is invalid, while a named one is valid.
+    @Test("a local element must have a name or a ref")
+    func test_localElementNameOrRef() {
+        #expect(rejects(#"<xs:complexType name="t"><xs:all><xs:element/></xs:all></xs:complexType>"#))
+        #expect(!rejects(#"<xs:complexType name="t"><xs:all><xs:element name="a" type="xs:string"/></xs:all></xs:complexType>"#))
+    }
+
     /// A complexType nested in an element is a local (anonymous) type and must not
     /// carry a name; only a top-level complexType is named.
     @Test("a local complexType may not have a name")
     func test_localComplexTypeMustBeAnonymous() {
-        #expect(rejects(#"""
-        <xs:element name="e">
-          <xs:complexType name="fooType">
-            <xs:sequence><xs:element name="c" type="xs:string"/></xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        """#))
-        // A top-level named complexType, and an anonymous local one, are both valid.
+        #expect(rejects(#"<xs:element name="e"><xs:complexType name="fooType"><xs:sequence/></xs:complexType></xs:element>"#))
+        // A named top-level complexType and an anonymous local one are both valid.
         try? compile(#"<xs:complexType name="t"><xs:sequence/></xs:complexType>"#)
-        #expect(!rejects(#"""
-        <xs:element name="e">
-          <xs:complexType><xs:sequence><xs:element name="c" type="xs:string"/></xs:sequence></xs:complexType>
-        </xs:element>
-        """#))
+        #expect(!rejects(#"<xs:element name="e"><xs:complexType><xs:sequence/></xs:complexType></xs:element>"#))
     }
 }

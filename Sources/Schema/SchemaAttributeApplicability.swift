@@ -169,6 +169,9 @@ extension PureXML.Schema.XSDParser {
               PureXML.Schema.XSDNode.localName(parent) != "schema"
         else { return [] }
         var errors: [String] = []
+        if PureXML.Schema.XSDNode.attribute(node, "name") == nil, PureXML.Schema.XSDNode.attribute(node, "ref") == nil {
+            errors.append("a local element declaration must have a 'name' or a 'ref'")
+        }
         for forbidden in ["abstract", "final", "substitutionGroup"] where hasUnprefixed(node, forbidden) {
             errors.append("a local element declaration may not specify '\(forbidden)'")
         }
