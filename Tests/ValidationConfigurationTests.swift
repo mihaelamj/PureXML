@@ -100,6 +100,7 @@ struct ValidationConfigurationTests {
             "ID-typed value constraints are valid",
             "Element value constraints are valid against their declared types",
             "Complex types extending xs:all groups satisfy XSD placement rules",
+            "Anonymous complex-type restrictions accept a subset of their base's",
             "A complexContent extension is consistent with its base type",
             "Attribute restrictions are faithful to their bases",
             "Simple types do not derive from complex types",

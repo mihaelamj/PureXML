@@ -39,6 +39,43 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// Particle Valid (Restriction) for ANONYMOUS complex types: the named-type
+    /// rule (`restrictionsAreSubsets`) is keyed by type name and so never sees an
+    /// inline `complexType` that derives by `complexContent` restriction (the
+    /// common `<element><complexType><complexContent><restriction base="...">`
+    /// shape). This walks those, compiles each restricting type, resolves its base
+    /// in this schema's own target namespace, and runs the same subset check. Only a
+    /// self-contained schema is examined; the same `ParticleRestriction.violation`
+    /// used for named types keeps the false-positive profile identical.
+    static func anonymousRestrictionErrors(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+        _ derivation: [String: PureXML.Schema.TypeDerivation],
+    ) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for complexType in descendants(schema, named: "complexType") where ExtAllNode.attribute(complexType, "name") == nil {
+            guard let content = ExtAllNode.firstChild(complexType, named: "complexContent"),
+                  let restriction = ExtAllNode.firstChild(content, named: "restriction"),
+                  let baseRef = ExtAllNode.attribute(restriction, "base"),
+                  ExtAllNode.referenceNamespace(baseRef, bindings) == context.targetNamespace,
+                  case let .complex(base)? = types[ExtAllNode.stripPrefix(baseRef)]
+            else { continue }
+            let restricted = PureXML.Schema.XSDParser.complexType(complexType, context)
+            if let reason = PureXML.Schema.ParticleRestriction.violation(
+                restricted: restricted.content,
+                base: base.content,
+                types: types,
+                derivation: derivation,
+            ) {
+                errors.append("an anonymous complex type is not a valid restriction of '\(ExtAllNode.stripPrefix(baseRef))': \(reason)")
+            }
+        }
+        return errors
+    }
+
     /// Whether a content type's whole content model is a NON-EMPTY `all` group. An
     /// empty `<all/>` contributes no content (the sibling rule treats extending
     /// empty content as valid), so it is not flagged.

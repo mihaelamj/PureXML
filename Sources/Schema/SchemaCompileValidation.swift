@@ -266,6 +266,7 @@ extension PureXML.Validation {
                     AnyValidation(idValueConstraintsValid),
                     AnyValidation(userTypeValueConstraintsValid),
                     AnyValidation(extensionAllGroupsValid),
+                    AnyValidation(anonymousRestrictionsValid),
                     AnyValidation(complexExtensionBaseValid),
                     AnyValidation(attributeRestrictionsFaithful),
                     AnyValidation(simpleTypeBasesAreSimple),
@@ -340,6 +341,22 @@ extension PureXML.Validation {
 }
 
 extension PureXML.Validation.SchemaCompile {
+    /// Particle Valid (Restriction) for anonymous (inline) complex types, which the
+    /// name-keyed `restrictionsAreSubsets` rule never sees.
+    static var anonymousRestrictionsValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("Anonymous complex-type restrictions accept a subset of their base's") { document in
+            guard let namedTypes = document.namedTypes else { return [] }
+            return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.anonymousRestrictionErrors(
+                    document.schema,
+                    document.context,
+                    namedTypes,
+                    document.derivation?.typeDerivation ?? [:],
+                ),
+            )
+        }
+    }
+
     /// cos-ct-extends.1.4.2.2: a complexContent extension adding element content
     /// must have a base with complex (or empty) content, not simpleContent.
     static var complexExtensionBaseValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {

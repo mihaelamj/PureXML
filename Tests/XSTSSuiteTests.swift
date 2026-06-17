@@ -91,8 +91,12 @@ struct XSTSSuiteTests {
     /// `{disallowed substitutions}` must be a superset of the base element's, with
     /// `block`/`blockDefault` carried on the particle) then caught sixteen more
     /// invalid schemas: invalid-schemas accepted 179 → 163, no other bucket moved.
+    /// Subset-checking ANONYMOUS complex-type restrictions (inline `<complexType>`
+    /// declarations, which the named-type rule never saw) with the same
+    /// Particle-Valid-Restriction algorithm then caught fifteen more invalid schemas:
+    /// invalid-schemas accepted 163 → 148, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 163
+    private let knownSchemaInvalidAccepted = 148
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

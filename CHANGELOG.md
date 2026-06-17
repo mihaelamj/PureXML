@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now also covers anonymous complex types. The named-type subset check was keyed by type name, so an inline `complexType` deriving by `complexContent` restriction (the common `<element><complexType><complexContent><restriction base="...">` shape) was never validated against its base. Such restrictions are now compiled and checked with the same algorithm. Caught fifteen invalid schemas: invalid-schemas-accepted 163 → 148, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): Particle Valid (Restriction) now enforces the NameAndTypeOK block-superset clause. A restricting element's `{disallowed substitutions}` (its `block`, or the schema's `blockDefault`) must be a superset of the base element's, so a restriction may block more substitutions but never fewer. The element particle now carries this `block` set. Caught sixteen invalid schemas: invalid-schemas-accepted 179 → 163, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): the RecurseAsIfGroup case of Particle Valid (Restriction) now checks occurrence. An element restricting a base model group is treated as a synthetic group with `minOccurs=maxOccurs=1` holding the element (XSD 1.0 §3.9.6), so a base group that must occur two or more times cannot be restricted to a single element. The element's own occurrence is still matched against the base branch it maps to, so an optional element restricting a once-or-more base group stays valid (no false rejection). Caught two invalid schemas: invalid-schemas-accepted 181 → 179, no other bucket moved.
