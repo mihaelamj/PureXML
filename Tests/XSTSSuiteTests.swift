@@ -108,8 +108,11 @@ struct XSTSSuiteTests {
     /// Requiring a restricting wildcard's `processContents` to be at least as strong
     /// as the base's (strict > lax > skip; Wildcard Subset §3.10.6) then caught three
     /// more invalid schemas: invalid-schemas accepted 137 → 134, no other bucket moved.
+    /// Rejecting an empty-string namespace value (`targetNamespace=""`, `import
+    /// namespace=""`) then caught two more invalid schemas: invalid-schemas accepted
+    /// 134 → 132, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 134
+    private let knownSchemaInvalidAccepted = 132
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

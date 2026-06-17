@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a namespace value may not be the empty string. `<schema targetNamespace="">` and `<import namespace="">` are rejected, since a namespace name must be a non-empty `anyURI` (omitting the attribute, for no target namespace or a no-namespace import, stays valid). Caught two invalid schemas: invalid-schemas-accepted 134 → 132, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a wildcard restriction may not weaken `processContents`. When a complex type restricts another, a restricting `xs:any` must have a `processContents` at least as strong as the base wildcard's (`strict` > `lax` > `skip`; Wildcard Subset, §3.10.6), in addition to narrowing the namespace. Caught three invalid schemas: invalid-schemas-accepted 137 → 134, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a `simpleContent` restriction's base must be a complex type. Restricting a built-in (`xs:integer`, `xs:anySimpleType`) or a user `simpleType` through `<simpleContent><restriction>` is rejected (`src-ct.2`); a complex type with simple content is built by extending a simple type, not by restricting one. Caught five invalid schemas: invalid-schemas-accepted 142 → 137, no other bucket moved.

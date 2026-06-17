@@ -224,4 +224,19 @@ extension PureXML.Schema.XSDParser {
         }
         return []
     }
+
+    /// A namespace value must be a non-empty `anyURI` (or absent): the empty string
+    /// is not a legal namespace name. So `<schema targetNamespace="">` and
+    /// `<import namespace="">` are invalid, while omitting the attribute (no target
+    /// namespace, a no-namespace import) stays valid.
+    static func emptyNamespaceErrors(_ schema: XSDTree) -> [String] {
+        var errors: [String] = []
+        if PureXML.Schema.XSDNode.attribute(schema, "targetNamespace") == "" {
+            errors.append("the 'targetNamespace' attribute may not be the empty string")
+        }
+        for importNode in descendants(schema, named: "import") where PureXML.Schema.XSDNode.attribute(importNode, "namespace") == "" {
+            errors.append("an 'import' namespace may not be the empty string")
+        }
+        return errors
+    }
 }
