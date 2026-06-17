@@ -148,8 +148,12 @@ struct XSTSSuiteTests {
     /// inline simpleType, or an inline complex type with simpleContent) the same way
     /// a named `type` reference already is, then caught two more invalid schemas:
     /// invalid-schemas accepted 185 → 183, no other bucket moved.
+    /// Requiring each component a `redefine` names to exist (same kind, same name) in
+    /// the redefined schema once that schema is loaded (src-redefine.6/7.2.1) then
+    /// caught one more invalid schema: invalid-schemas accepted 183 → 182, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 183
+    private let knownSchemaInvalidAccepted = 182
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

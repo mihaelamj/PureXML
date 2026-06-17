@@ -98,7 +98,39 @@ extension PureXML.Schema.XSDParser {
             )
             collectReferenceErrors(source, in: resolutionContext, inheritedBindings: sourceBindings, into: &errors)
         }
-        return xsdErrors + simpleContentErrors + errors
+        return xsdErrors + simpleContentErrors + errors + redefineComponentExistenceErrors(containers)
+    }
+
+    /// XSD 1.0 `src-redefine.6.1.1`/`6.2.1`/`7.2.1`: each component a `redefine`
+    /// names must have a same-kind component of that name in the redefined schema.
+    /// Runs only past the cross-document skip guard above, so the redefined schema
+    /// is loaded; a redefinition whose name matches nothing in any non-`redefine`
+    /// container (the loaded targets and the root) names a component that does not
+    /// exist and is invalid.
+    private static func redefineComponentExistenceErrors(_ containers: [XSDTree]) -> [String] {
+        let kinds = ["complexType", "simpleType", "group", "attributeGroup"]
+        var defined: [String: Set<String>] = [:]
+        for container in containers where PureXML.Schema.XSDNode.localName(container) != "redefine" {
+            for kind in kinds {
+                for node in PureXML.Schema.XSDNode.children(container, named: kind) {
+                    if let name = PureXML.Schema.XSDNode.attribute(node, "name") {
+                        defined[kind, default: []].insert(name)
+                    }
+                }
+            }
+        }
+        var errors: [String] = []
+        for container in containers where PureXML.Schema.XSDNode.localName(container) == "redefine" {
+            for kind in kinds {
+                for node in PureXML.Schema.XSDNode.children(container, named: kind) {
+                    guard let name = PureXML.Schema.XSDNode.attribute(node, "name") else { continue }
+                    if defined[kind]?.contains(name) != true {
+                        errors.append("a redefine of \(kind) '\(name)' has no '\(name)' to redefine in the redefined schema")
+                    }
+                }
+            }
+        }
+        return errors
     }
 
     /// Whether cross-document schema-validity rules should stand down: an external
