@@ -96,8 +96,12 @@ struct XSTSSuiteTests {
     /// closed with `]`), both unambiguously invalid and never an engine
     /// limitation, then caught thirteen more invalid schemas: invalid-schemas
     /// accepted 230 → 217, no other bucket moved.
+    /// Inheriting the schema's `finalDefault` as a simple type's `{final}` when the
+    /// type declares no `final` of its own (so `finalDefault="list"`/`"union"`
+    /// blocks the matching list/union derivation) then caught two more invalid
+    /// schemas: invalid-schemas accepted 217 → 215, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 217
+    private let knownSchemaInvalidAccepted = 215
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

@@ -46,6 +46,25 @@ struct SchemaSimpleTypeFinalTests {
         #expect(compiles(plain + unionOfT))
     }
 
+    /// A type without its own `final` inherits the schema's `finalDefault` as its
+    /// `{final}`, so `finalDefault="list"`/`"union"` forbids the matching derivation
+    /// just as an explicit `final` would. An explicit `final=""` overrides it back.
+    @Test("finalDefault is inherited as the type's final")
+    func test_finalDefaultInherited() {
+        func compilesWith(_ finalDefault: String, _ body: String) -> Bool {
+            (try? PureXML.Schema.Document("<xs:schema \(xsd) finalDefault=\"\(finalDefault)\">\(body)</xs:schema>")) != nil
+        }
+        let plain = "<xs:simpleType name=\"T\"><xs:restriction base=\"xs:string\"/></xs:simpleType>"
+        let empty = "<xs:simpleType name=\"T\" final=\"\"><xs:restriction base=\"xs:string\"/></xs:simpleType>"
+        #expect(!compilesWith("list", plain + listOfT))
+        #expect(!compilesWith("union", plain + unionOfT))
+        // finalDefault names only one direction; the other stays open.
+        #expect(compilesWith("list", plain + unionOfT))
+        #expect(compilesWith("union", plain + listOfT))
+        // An explicit empty final overrides the default back to no restriction.
+        #expect(compilesWith("list", empty + listOfT))
+    }
+
     /// A user type sharing a built-in's local name (here `string`, `final="list"`)
     /// must not be confused with a reference to the built-in `xs:string`: a list of
     /// `xs:string` is valid because the built-in's final is empty. The reference is

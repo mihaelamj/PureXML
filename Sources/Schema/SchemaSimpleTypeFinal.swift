@@ -39,11 +39,20 @@ extension PureXML.Schema.XSDParser {
     }
 
     /// Each named simple type mapped to the derivation tokens its `final` forbids.
+    /// A type without its own `final` inherits the schema's `finalDefault` (its
+    /// `{final}` property; XSD 1.0 Schemas §3.14.2), so `finalDefault="list"`
+    /// makes every such type final for list derivation. An explicit `final=""`
+    /// still overrides the default back to no restriction.
     private static func simpleTypeFinalMap(_ schema: XSDTree) -> [String: Set<String>] {
+        let fallback = finalTokens(FinalNode.attribute(schema, "finalDefault"))
         var finalOf: [String: Set<String>] = [:]
         for simpleType in descendants(schema, named: "simpleType") {
             guard let name = FinalNode.attribute(simpleType, "name") else { continue }
-            finalOf[name] = finalTokens(FinalNode.attribute(simpleType, "final"))
+            if let own = FinalNode.attribute(simpleType, "final") {
+                finalOf[name] = finalTokens(own)
+            } else {
+                finalOf[name] = fallback
+            }
         }
         return finalOf
     }
