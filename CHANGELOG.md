@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): two attribute-declaration validity rules. An attribute `ref` may not also carry `form` (the form comes from the referenced global declaration; `src-attribute.3.2`), and no attribute declaration may be named `xmlns` (that name is reserved for namespace declarations; no-xmlns). Caught four invalid schemas: invalid-schemas-accepted 207 → 203, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a referencing `attributeGroup` (one carrying a `ref`) is held to its `(annotation?)` content model. It names a definition elsewhere, so it may not itself declare attributes, nested attributeGroup references, or an `anyAttribute`; only a defining `attributeGroup` (with `name`) carries those (`attgD`). Caught three invalid schemas: invalid-schemas-accepted 210 → 207, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): notation names are now part of the component-name uniqueness check. A notation has its own symbol space, so two notations sharing a name and target namespace are a duplicate just as two global types or elements would be (`notatB005`). Caught one invalid schema: invalid-schemas-accepted 211 → 210, no other bucket moved.

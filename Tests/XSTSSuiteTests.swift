@@ -117,8 +117,11 @@ struct XSTSSuiteTests {
     /// content model, so it may not also declare attributes, nested attributeGroup
     /// references, or an anyAttribute, then caught three more invalid schemas:
     /// invalid-schemas accepted 210 → 207, no other bucket moved.
+    /// Rejecting an attribute `ref` that also carries `form` (src-attribute.3.2) and
+    /// an attribute declaration named `xmlns` (no-xmlns) then caught four more
+    /// invalid schemas: invalid-schemas accepted 207 → 203, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 207
+    private let knownSchemaInvalidAccepted = 203
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

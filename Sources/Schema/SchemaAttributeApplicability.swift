@@ -62,6 +62,16 @@ extension PureXML.Schema.XSDParser {
                 errors.append("attribute '\(name)' is not allowed on '\(local)'")
             }
         }
+        return errors + refAndNameExclusionErrors(node, local: local, present: present)
+    }
+
+    /// The exclusions a `ref`, a `type`, or a reserved name impose on an element or
+    /// attribute, beyond the per-component allowed-attribute table: `ref` excludes
+    /// `name`/`type` (and, on an element, the other declaration-only properties; on
+    /// an attribute, `form`) and an inline type; a `type` excludes an inline type;
+    /// and an attribute may not be named `xmlns` (no-xmlns).
+    private static func refAndNameExclusionErrors(_ node: XSDTree, local: String, present: Set<String>) -> [String] {
+        var errors: [String] = []
         if present.contains("ref"), present.contains("name") {
             errors.append("'\(local)' may not have both 'ref' and 'name'")
         }
@@ -76,6 +86,17 @@ extension PureXML.Schema.XSDParser {
             for excluded in ["nillable", "default", "fixed", "form", "block"] where present.contains(excluded) {
                 errors.append("'element' with a 'ref' may not also specify '\(excluded)'")
             }
+        }
+        // src-attribute.3.2: an attribute `ref` is a use of a global declaration, so
+        // beyond name/type it may not carry `form` either (the form comes from the
+        // referenced declaration). `use` and a value constraint stay allowed on the use.
+        if local == "attribute", present.contains("ref"), present.contains("form") {
+            errors.append("'attribute' with a 'ref' may not also specify 'form'")
+        }
+        // no-xmlns: the {name} of an attribute declaration may not match `xmlns`
+        // (that name is reserved for namespace declarations).
+        if local == "attribute", PureXML.Schema.XSDNode.attribute(node, "name") == "xmlns" {
+            errors.append("an attribute declaration may not be named 'xmlns'")
         }
         // A `ref` likewise excludes an inline type definition: the type comes from the
         // referenced declaration.
