@@ -24,4 +24,16 @@ extension PureXML.Validation.SchemaCompile {
             )
         }
     }
+
+    /// Facet definition validity and pattern syntax validity (XSD Part 2 4.3): a
+    /// constraining facet must be applicable to and valid for its base type, and a
+    /// `pattern` must compile. These are gathered during simple-type compilation
+    /// (where the resolved base type is available) into the context's finding sink,
+    /// then surfaced here as a named, located validation rather than reported
+    /// straight to the diagnostics collector during parsing.
+    static var simpleTypeFacetsAreValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("Simple-type facets are valid for their base type") { document in
+            document.context.facetFindingSink.findings
+        }
+    }
 }

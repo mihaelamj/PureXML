@@ -271,7 +271,7 @@ extension PureXML.Validation {
                     AnyValidation(attributeRestrictionsFaithful),
                     AnyValidation(simpleTypeBasesAreSimple),
                     AnyValidation(simpleTypeVarietiesValid),
-                    AnyValidation(notationsValid),
+                    AnyValidation(notationsValid), AnyValidation(simpleTypeFacetsAreValid),
                 ],
                 reference: [
                     AnyValidation(schemaReferencesResolve),

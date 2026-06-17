@@ -240,6 +240,19 @@ extension PureXML.Schema {
         var globalAttributes: [String: AttributeUse] = [:]
     }
 
+    /// Collects the located findings of simple-type facet and pattern validity,
+    /// which are computed during type compilation (they need the resolved base
+    /// type) and surfaced by the `simpleTypeFacetsAreValid` validation rather than
+    /// reported straight to `diagnostics`. A reference type so the findings survive
+    /// the value-type ``XSDContext``'s copies.
+    final class CompileFindingSink {
+        private(set) var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+
+        func add(_ reason: String, at node: PureXML.Model.TreeNode) {
+            findings.append(PureXML.Schema.SchemaLocatedFinding(reason: reason, node: node))
+        }
+    }
+
     /// Collects schema-validity findings during parsing. A reference type so the
     /// findings survive the value-type ``XSDContext``'s copies (`visiting(_:)`):
     /// every copy shares the one collector, and the parser harvests it at the end.
@@ -344,6 +357,10 @@ extension PureXML.Schema {
         /// The shared schema-validity finding collector. A reference type, so the
         /// value-type context's copies all report into the one place.
         let diagnostics = SchemaDiagnostics()
+        /// Facet/pattern validity findings gathered during simple-type compilation,
+        /// surfaced by the `simpleTypeFacetsAreValid` validation. A reference type so
+        /// the value-type context's copies share the one sink.
+        let facetFindingSink = CompileFindingSink()
 
         func visiting(_ group: String) -> XSDContext {
             var copy = self

@@ -44,7 +44,7 @@ extension PureXML.Schema {
             }
             applyFacets(restriction, into: &facets)
             for error in facetDefinitionErrors(restriction, base: baseType) + patternErrors(restriction) {
-                context.diagnostics.report(error, at: restriction)
+                context.facetFindingSink.add(error, at: restriction)
             }
             return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety, isBuiltinList: baseType.isBuiltinList)
         }

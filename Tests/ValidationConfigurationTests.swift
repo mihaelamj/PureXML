@@ -109,6 +109,7 @@ struct ValidationConfigurationTests {
             "Simple types do not derive from complex types",
             "Simple-type varieties are declared consistently",
             "Notation declarations are valid",
+            "Simple-type facets are valid for their base type",
             "Every schema reference resolves to a declared component",
             "Substitution-group members derive correctly from their head",
         ])
