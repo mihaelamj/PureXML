@@ -113,8 +113,12 @@ struct XSTSSuiteTests {
     /// symbol space; two notations of the same name and namespace clash) then caught
     /// one more invalid schema: invalid-schemas accepted 211 → 210, no other bucket
     /// moved.
+    /// Holding a referencing `attributeGroup` (one with `ref`) to its `(annotation?)`
+    /// content model, so it may not also declare attributes, nested attributeGroup
+    /// references, or an anyAttribute, then caught three more invalid schemas:
+    /// invalid-schemas accepted 210 → 207, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 210
+    private let knownSchemaInvalidAccepted = 207
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

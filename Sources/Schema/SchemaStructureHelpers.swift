@@ -169,7 +169,16 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
-    static func attributeGroupChildrenErrors(_: XSDTree, names: [String]) -> [String] {
+    static func attributeGroupChildrenErrors(_ node: XSDTree, names: [String]) -> [String] {
+        // A referencing attributeGroup (one with `ref`) names a definition elsewhere;
+        // its own content model is (annotation?), so it may not also declare
+        // attributes, nested attributeGroup references, or an anyAttribute. Only a
+        // defining attributeGroup (with `name`) carries those.
+        if PureXML.Schema.XSDNode.attribute(node, "ref") != nil {
+            return names.contains { $0 != "annotation" }
+                ? ["an attributeGroup reference may contain only an optional annotation"]
+                : []
+        }
         var errors: [String] = []
         let anyAttributes = names.count { $0 == "anyAttribute" }
         if anyAttributes > 1 {
