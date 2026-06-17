@@ -139,8 +139,13 @@ struct XSTSSuiteTests {
     /// direct child of schema; invalid at any value, so `abstract="false"` is rejected
     /// too) then caught five more invalid schemas: invalid-schemas accepted 194 → 189,
     /// no other bucket moved.
+    /// Inheriting the schema's `finalDefault` as a complex type's `{final}` when the
+    /// type states no `final` of its own (so `finalDefault="#all"`/`"restriction"`
+    /// blocks a restriction or extension derivation from it; explicit `final=""`
+    /// overrides) then caught four more invalid schemas: invalid-schemas accepted
+    /// 189 → 185, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 189
+    private let knownSchemaInvalidAccepted = 185
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

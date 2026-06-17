@@ -141,13 +141,17 @@ struct SchemaSubstitutionTypeTests {
 
     @Test("Substitution group member final exclusions: local name collisions and built-ins")
     func test_finalSubstitutionExclusionEdgeCases() {
-        // Local element name collision: local element does not overwrite global final setting
+        // Local element name collision: local element does not overwrite global final setting.
+        // Base carries an explicit empty final so the schema's finalDefault="extension" (which a
+        // complex type also inherits as its {final}) does not itself block Ext's extension of Base;
+        // the point under test is that the LOCAL element named "head" inside Ext does not clobber
+        // the GLOBAL "head" element's final="restriction".
         #expect((try? PureXML.Schema.Document("""
         <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" finalDefault="extension">
             <xs:element name="head" type="Base" final="restriction"/>
             <xs:element name="member" substitutionGroup="head" type="Ext"/>
-            <xs:complexType name="Base"><xs:sequence/></xs:complexType>
-            <xs:complexType name="Ext">
+            <xs:complexType name="Base" final=""><xs:sequence/></xs:complexType>
+            <xs:complexType name="Ext" final="">
                 <xs:complexContent>
                     <xs:extension base="Base">
                         <xs:sequence>

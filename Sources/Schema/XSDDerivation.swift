@@ -58,7 +58,7 @@ extension PureXML.Schema.XSDParser {
         if XSDDerivNode.attribute(type, "abstract") == "true" { tables.abstractTypes.insert(name) }
         let block = methodSet(XSDDerivNode.attribute(type, "block"))
         if !block.isEmpty { tables.typeBlock[name] = block }
-        let finalSet = methodSet(XSDDerivNode.attribute(type, "final"))
+        let finalSet = finalMethods(of: type)
         if !finalSet.isEmpty { tables.typeFinal[name] = finalSet }
         if let derivation = derivationInfo(type) { tables.typeDerivation[name] = derivation }
     }
@@ -73,24 +73,7 @@ extension PureXML.Schema.XSDParser {
             $0.name?.namespaceURI == xsdNamespace && XSDDerivNode.localName($0) == "schema"
         } ?? false
         if isGlobal {
-            var schemaFinalDefault: String?
-            var current: XSDTree? = element
-            while let parentSchema = current {
-                if parentSchema.name?.namespaceURI == xsdNamespace, XSDDerivNode.localName(parentSchema) == "schema" {
-                    schemaFinalDefault = XSDDerivNode.attribute(parentSchema, "finalDefault")
-                    break
-                }
-                current = parentSchema.parent
-            }
-
-            let finalAttr = XSDDerivNode.attribute(element, "final")
-            let finalSet: Set<PureXML.Schema.DerivationMethod> = if let finalAttr {
-                methodSet(finalAttr).intersection([.extension, .restriction])
-            } else if let schemaFinalDefault {
-                methodSet(schemaFinalDefault).intersection([.extension, .restriction])
-            } else {
-                []
-            }
+            let finalSet = finalMethods(of: element)
             if !finalSet.isEmpty { tables.elementFinal[name] = finalSet }
         }
 

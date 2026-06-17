@@ -48,4 +48,30 @@ extension PureXML.Schema.XSDParser {
         }
         return nil
     }
+
+    /// The `{final}` derivation methods of a complex type or element: its own
+    /// `final` when present, otherwise the enclosing schema's `finalDefault`, each
+    /// intersected with the extension/restriction methods these components admit. An
+    /// explicit `final=""` overrides the default back to no restriction.
+    static func finalMethods(of node: XSDTree) -> Set<PureXML.Schema.DerivationMethod> {
+        if let own = PureXML.Schema.XSDNode.attribute(node, "final") {
+            return methodSet(own).intersection([.extension, .restriction])
+        }
+        if let finalDefault = schemaFinalDefault(of: node) {
+            return methodSet(finalDefault).intersection([.extension, .restriction])
+        }
+        return []
+    }
+
+    /// The `finalDefault` of the `schema` enclosing `node`, or nil.
+    static func schemaFinalDefault(of node: XSDTree) -> String? {
+        var current: XSDTree? = node
+        while let element = current {
+            if element.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(element) == "schema" {
+                return PureXML.Schema.XSDNode.attribute(element, "finalDefault")
+            }
+            current = element.parent
+        }
+        return nil
+    }
 }
