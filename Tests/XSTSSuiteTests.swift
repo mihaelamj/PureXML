@@ -119,9 +119,20 @@ struct XSTSSuiteTests {
     /// (cos-ct-restricts.4: a base without one admits none; `##any` over `##other` is
     /// not a subset) then caught three more invalid schemas: invalid-schemas accepted
     /// 131 → 128, no other bucket moved.
+    /// Instance tests whose expected validity contradicts the normative XSD
+    /// definition of `\d`, excluded as a named, bounded spec divergence (not a
+    /// validator defect). XSD 1.0 Datatypes Appendix F defines `\d` as `\p{Nd}`.
+    /// reS17 (U+1369), reS38 (U+1371), and reZ004v use Ethiopic digits, which are
+    /// general category `No` (Other Number), not `Nd`, so `\d` does not match them
+    /// and the instance is invalid; the corpus marks these `valid`. Verified that
+    /// our `\d` matches `Nd` (incl. Khmer U+17E0) and rejects Ethiopic `No`, which is
+    /// what every conformant processor (e.g. Xerces) does. Faking `\d` to match `No`
+    /// would corrupt the definition and is refused; the tests are the outliers.
+    private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
+
     private let knownSchemaValidRejected = 1
     private let knownSchemaInvalidAccepted = 128
-    private let knownInstanceValidRejected = 3
+    private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 132
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
@@ -272,6 +283,7 @@ struct XSTSSuiteTests {
     ) {
         for instanceTest in elements(named: "instanceTest", under: .element(group)) {
             guard isAccepted(instanceTest) else { continue }
+            guard !Self.specDivergentInstances.contains(attribute("name", of: instanceTest) ?? "") else { continue }
             let expected = expectedValidity(instanceTest)
             guard expected == "valid" || expected == "invalid",
                   let href = references(in: .element(instanceTest), named: "instanceDocument").first

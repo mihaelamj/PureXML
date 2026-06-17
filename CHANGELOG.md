@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS valid-instances-rejected (#146) reaches 0. The three remaining rejections (reS17, reS38, reZ004v) are not validator defects: they assert that `\d` matches Ethiopic digits (U+1369, U+1371, and kin), which are Unicode general category `No` (Other Number), whereas the normative XSD definition is `\d` = `\p{Nd}` (Datatypes Appendix F). Our `\d` correctly matches `Nd` (including Khmer U+17E0) and rejects Ethiopic `No`, as every conformant processor does; faking it to match `No` would corrupt the definition. These three corpus entries are excluded as a named, bounded spec divergence, so the false-positive metric reflects spec correctness. valid-instances-rejected 3 → 0.
+
 - XSTS invalid-schemas-accepted (#145): a complexContent restriction's own attribute wildcard must be a subset of the base's (`cos-ct-restricts.4`). A base type with no attribute wildcard admits none, so the restriction may not introduce one, and a wider namespace constraint (such as `##any` over `##other`) or a weakened `processContents` is not a subset. Caught three invalid schemas: invalid-schemas-accepted 131 → 128, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a complexContent restriction may not add an attribute the base type never permitted. An attribute the restriction declares that has no matching base attribute use must be admitted by the base's `anyAttribute` wildcard (`cos-ct-restricts.3`); for example a no-namespace attribute is not admitted by a `##other` wildcard. A `prohibited` declaration (which removes an attribute) stays valid. Caught one invalid schema: invalid-schemas-accepted 132 → 131, no other bucket moved.
