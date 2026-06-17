@@ -30,7 +30,7 @@ extension PureXML.Schema.XSDParser {
                   case let .complex(complex)? = types[AttrRestrictNode.stripPrefix(base)]
             else { continue }
             for derived in attributeUses(under: restriction, context) {
-                if let message = attributeRestrictionViolation(derived, complex.attributes, restriction, context) {
+                if let message = attributeRestrictionViolation(derived, complex.attributes, complex.attributeWildcard, restriction, context) {
                     errors.append(message)
                 }
             }
@@ -46,10 +46,20 @@ extension PureXML.Schema.XSDParser {
     private static func attributeRestrictionViolation(
         _ derived: PureXML.Schema.AttributeUse,
         _ baseAttributes: [PureXML.Schema.AttributeUse],
+        _ baseWildcard: PureXML.Schema.Wildcard?,
         _ restrictionNode: XSDTree,
         _ context: PureXML.Schema.XSDContext,
     ) -> String? {
-        guard let base = baseAttributes.first(where: { $0.name == derived.name }) else { return nil }
+        guard let base = baseAttributes.first(where: { $0.name == derived.name }) else {
+            // No matching base attribute use (cos-ct-restricts.3): a `prohibited`
+            // declaration removes an attribute (valid); otherwise the base's
+            // attribute wildcard must admit it, else the restriction adds an
+            // attribute the base never permitted (ctO004: a no-namespace attribute
+            // over a `##other` wildcard).
+            if isProhibited(derived.name, under: restrictionNode, context) { return nil }
+            if baseWildcard?.admits(derived.name) == true { return nil }
+            return "attribute '\(derived.name.localName)' is not in the base type and is not admitted by its attribute wildcard, so a restriction may not add it"
+        }
         if base.required, !derived.required {
             return "attribute '\(derived.name.localName)' is required in the base type and a restriction may not make it optional or prohibited"
         }

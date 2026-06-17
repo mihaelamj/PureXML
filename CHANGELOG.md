@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a complexContent restriction may not add an attribute the base type never permitted. An attribute the restriction declares that has no matching base attribute use must be admitted by the base's `anyAttribute` wildcard (`cos-ct-restricts.3`); for example a no-namespace attribute is not admitted by a `##other` wildcard. A `prohibited` declaration (which removes an attribute) stays valid. Caught one invalid schema: invalid-schemas-accepted 132 → 131, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a namespace value may not be the empty string. `<schema targetNamespace="">` and `<import namespace="">` are rejected, since a namespace name must be a non-empty `anyURI` (omitting the attribute, for no target namespace or a no-namespace import, stays valid). Caught two invalid schemas: invalid-schemas-accepted 134 → 132, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a wildcard restriction may not weaken `processContents`. When a complex type restricts another, a restricting `xs:any` must have a `processContents` at least as strong as the base wildcard's (`strict` > `lax` > `skip`; Wildcard Subset, §3.10.6), in addition to narrowing the namespace. Caught three invalid schemas: invalid-schemas-accepted 137 → 134, no other bucket moved.

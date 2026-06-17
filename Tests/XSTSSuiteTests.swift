@@ -111,8 +111,12 @@ struct XSTSSuiteTests {
     /// Rejecting an empty-string namespace value (`targetNamespace=""`, `import
     /// namespace=""`) then caught two more invalid schemas: invalid-schemas accepted
     /// 134 → 132, no other bucket moved.
+    /// Requiring an attribute a restriction adds (with no matching base attribute use)
+    /// to be admitted by the base's attribute wildcard (cos-ct-restricts.3) then
+    /// caught one more invalid schema: invalid-schemas accepted 132 → 131, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 132
+    private let knownSchemaInvalidAccepted = 131
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
