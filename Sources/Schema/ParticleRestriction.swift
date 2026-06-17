@@ -75,11 +75,16 @@ extension PureXML.Schema {
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
             case let (.element, .group(baseGroup)):
-                // RecurseAsIfGroup: the lone element, as a one-particle sequence,
-                // against the base group. The element's occurrence is matched against
-                // a base member inside `groupValid`, not against the base group's own
-                // occurrence, so no outer `rangeSubsumed` here.
-                return groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
+                // RecurseAsIfGroup (XSD 1.0 §3.9.6): the element is treated as a group
+                // with {min,max}=1,1 holding the element. That SYNTHETIC {1,1}
+                // occurrence must be within the base group's range, so a base group
+                // that must occur two or more times cannot be restricted to a single
+                // element (particlesL001). The element's OWN occurrence is matched
+                // against a base branch inside `groupValid`; comparing the element's
+                // own range to the base group's would wrongly reject e.g. an optional
+                // element restricting a once-or-more base group.
+                return rangeWithinWildcard(derivedMin: 1, derivedMax: 1, wildcardMin: base.minOccurs, wildcardMax: base.maxOccurs)
+                    && groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
             case let (.group, .element(baseName, _, baseTypeName, _)):
                 // The mirror of RecurseAsIfGroup, by the same cardinality argument as
                 // group/wildcard: a base element accepts only its own name, its own

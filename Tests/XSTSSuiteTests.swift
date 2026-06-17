@@ -82,8 +82,13 @@ struct XSTSSuiteTests {
     /// Rejecting a `redefine` that redefines the same component twice (src-redefine.7.2.2)
     /// then caught one more invalid schema: invalid-schemas accepted 182 → 181, no
     /// other bucket moved.
+    /// Checking the RecurseAsIfGroup occurrence in Particle-Valid-Restriction (an
+    /// element restricting a base group is a synthetic {1,1} group, so a base group
+    /// that must occur 2+ times cannot be restricted to one element; §3.9.6) then
+    /// caught two more invalid schemas: invalid-schemas accepted 181 → 179, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 181
+    private let knownSchemaInvalidAccepted = 179
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
