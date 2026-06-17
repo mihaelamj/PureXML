@@ -141,15 +141,17 @@ struct XSTSSuiteTests {
     /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
     /// non-starter and under-rejection is recoverable; this debt is recovered by the
     /// full effective-total-range Particle-Valid-Restriction (tracked).
-    /// Enforcing the occurrence-range constraints on model groups (p-props-correct.1:
-    /// minOccurs may not exceed maxOccurs, both defaulting to 1; cos-all-limited.2: an
-    /// all group's maxOccurs is 1 and minOccurs 0 or 1, its particles' maxOccurs 0 or
-    /// 1) then caught twenty more invalid schemas with no false positive: 130 → 110.
-    /// Enforcing the identity-constraint content model (`unique`/`key`/`keyref` is
-    /// `(annotation?, selector, field+)`: exactly one selector, then one or more
-    /// fields, in order) caught six more with no false positive: 110 → 104.
+    /// Three further rules, each with valid-schemas-rejected held at 0: model-group
+    /// occurrence ranges (p-props-correct.1 minOccurs<=maxOccurs both defaulting to 1;
+    /// cos-all-limited.2 an all group's maxOccurs is 1, minOccurs 0/1, its particles'
+    /// maxOccurs 0/1) 130 -> 110; the identity-constraint content model (unique/key/
+    /// keyref is annotation?, one selector, then field+) 110 -> 104; the derivation
+    /// base-type kind (src-ct.1 a complexContent base is complex; src-ct.2 a
+    /// simpleContent extension base is a simple type or a simple-content complex type;
+    /// a local type takes precedence over the built-in reading so the schema-for-
+    /// schemas, which targets the XSD namespace, is not rejected) 104 -> 99.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 104
+    private let knownSchemaInvalidAccepted = 99
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

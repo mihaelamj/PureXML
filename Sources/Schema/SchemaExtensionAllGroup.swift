@@ -138,6 +138,69 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 `src-ct.1`: the base of a `complexContent` derivation (restriction or
+    /// extension) must be a COMPLEX type. The ur-type `xs:anyType` is complex and is
+    /// the legitimate base of most complex types; every other XSD built-in, and a
+    /// user `simpleType`, is a simple type and may not be a complexContent base. A
+    /// LOCALLY-declared type takes precedence over the built-in reading: a schema may
+    /// target the XSD namespace and define its own components there (the
+    /// schema-for-schemas extends its own `xs:openAttrs`), so resolve `types` first
+    /// and only fall back to the built-in table when there is no local declaration.
+    /// Self-contained schema only; a foreign or unresolved base is left alone.
+    static func complexContentBaseKindErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for content in descendants(schema, named: "complexContent") {
+            guard let derivation = ExtAllNode.firstChild(content, named: "extension")
+                ?? ExtAllNode.firstChild(content, named: "restriction"),
+                let base = ExtAllNode.attribute(derivation, "base")
+            else { continue }
+            let namespace = ExtAllNode.referenceNamespace(base, bindings)
+            let baseName = ExtAllNode.stripPrefix(base)
+            if namespace == context.targetNamespace, let local = types[baseName] {
+                if case .simple = local {
+                    errors.append("a complexContent base must be a complex type, not the simple type '\(baseName)'")
+                }
+            } else if namespace == xsdNamespace, types[baseName] == nil, baseName != "anyType" {
+                errors.append("a complexContent base must be a complex type, not the built-in simple type '\(baseName)'")
+            }
+        }
+        return errors
+    }
+
+    /// XSD 1.0 `src-ct.2` (extension): the base of a `simpleContent` EXTENSION must be
+    /// a simple type or a complex type whose content type is simple. A complex type
+    /// with element-only, mixed, or empty content (including the ur-type
+    /// `xs:anyType`) may not be a simpleContent extension base, since the result must
+    /// have simple content. A LOCALLY-declared type takes precedence over the
+    /// built-in reading (a schema may target the XSD namespace), so resolve `types`
+    /// first. A simple-type base (built-in or user) is valid; only `xs:anyType` as a
+    /// built-in, or a local complex type without simple content, is an error.
+    /// Self-contained schema only; a foreign or unresolved base is left alone.
+    static func simpleContentExtensionBaseKindErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for content in descendants(schema, named: "simpleContent") {
+            guard let ext = ExtAllNode.firstChild(content, named: "extension"),
+                  let base = ExtAllNode.attribute(ext, "base")
+            else { continue }
+            let namespace = ExtAllNode.referenceNamespace(base, bindings)
+            let baseName = ExtAllNode.stripPrefix(base)
+            if namespace == context.targetNamespace, case let .complex(complex)? = types[baseName] {
+                switch complex.content {
+                case .simpleContent: break
+                case .mixed, .elementOnly, .empty:
+                    errors.append("a simpleContent extension's base complex type '\(baseName)' must have simple content")
+                }
+            } else if namespace == xsdNamespace, types[baseName] == nil, baseName == "anyType" {
+                errors.append("a simpleContent extension's base must be a simple type or a complex type with simple content, not '\(baseName)'")
+            }
+        }
+        return errors
+    }
+
     /// XSD 1.0 `cos-ct-extends.1.4.3.2.2.1`: a `complexContent` extension's mixedness
     /// must match its base type's. The effective content joins the base content and
     /// the extension's, so a mixed extension may extend only a mixed base and an
