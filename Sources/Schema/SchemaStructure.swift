@@ -99,6 +99,7 @@ extension PureXML.Schema.XSDParser {
             append(xsdNamespaceAttributeErrors(node, bindings: currentBindings), at: node, into: &findings)
             append(occurrenceOrderErrors(node), at: node, into: &findings)
             append(attributeApplicabilityErrors(node, local: local), at: node, into: &findings)
+            append(localElementErrors(node, local: local), at: node, into: &findings)
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
             append(componentSpecificErrors(node, local: local, names: names), at: node, into: &findings)
         }

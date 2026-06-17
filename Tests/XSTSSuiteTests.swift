@@ -134,8 +134,13 @@ struct XSTSSuiteTests {
     /// `mixed` inherits the base's, so only an explicit conflict is invalid) then
     /// caught three more invalid schemas: invalid-schemas accepted 197 → 194, no
     /// other bucket moved.
+    /// Forbidding the global-only properties `abstract`, `final`, and
+    /// `substitutionGroup` on a LOCAL element declaration (an element particle, not a
+    /// direct child of schema; invalid at any value, so `abstract="false"` is rejected
+    /// too) then caught five more invalid schemas: invalid-schemas accepted 194 → 189,
+    /// no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 194
+    private let knownSchemaInvalidAccepted = 189
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

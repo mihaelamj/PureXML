@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): the global-only element properties `abstract`, `final`, and `substitutionGroup` are now rejected on a local element declaration (an element particle, not a direct child of `schema`). They belong to the `topLevelElement` form only, so their presence on a local element is invalid at any value (`abstract="false"` is rejected as well as `"true"`). Caught five invalid schemas: invalid-schemas-accepted 194 → 189, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that explicitly states `mixed` must agree with its base type's mixedness (`cos-ct-extends.1.4.3.2.2.1`): a mixed extension may extend only a mixed base, and an element-only extension only an element-only base. An extension that omits `mixed` inherits the base's setting and stays valid, so only an explicit conflict is rejected. Caught three invalid schemas: invalid-schemas-accepted 197 → 194, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a `complexContent` or `simpleContent` must contain exactly one `restriction` or `extension`. An empty `<complexContent/>` (or `<simpleContent/>`), which declares no derivation, is now rejected as a structural error. Caught three invalid schemas: invalid-schemas-accepted 200 → 197, no other bucket moved.

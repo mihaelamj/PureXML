@@ -158,6 +158,23 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
+    /// A LOCAL element declaration (an element particle, not a direct child of
+    /// `schema`) is not a global declaration, so the global-only properties
+    /// `abstract`, `final`, and `substitutionGroup` may not appear on it (XSD 1.0
+    /// schema-for-schemas `localElement`). Their presence is invalid at any value,
+    /// so `abstract="false"` on a local element is rejected as well as `"true"`.
+    static func localElementErrors(_ node: XSDTree, local: String) -> [String] {
+        guard local == "element",
+              let parent = node.parent,
+              PureXML.Schema.XSDNode.localName(parent) != "schema"
+        else { return [] }
+        var errors: [String] = []
+        for forbidden in ["abstract", "final", "substitutionGroup"] where hasUnprefixed(node, forbidden) {
+            errors.append("a local element declaration may not specify '\(forbidden)'")
+        }
+        return errors
+    }
+
     private static func hasUnprefixed(_ node: XSDTree, _ local: String) -> Bool {
         node.attributes.contains { $0.name.prefix == nil && $0.name.localName == local }
     }
