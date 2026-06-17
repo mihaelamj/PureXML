@@ -18,15 +18,38 @@ extension PureXML.Schema.XSDParser {
         var errors: [String] = []
         for content in descendants(schema, named: "complexContent") {
             guard let ext = ExtAllNode.firstChild(content, named: "extension"),
-                  extensionHasAllGroup(ext),
                   let base = ExtAllNode.attribute(ext, "base"),
                   ExtAllNode.referenceNamespace(base, bindings) == context.targetNamespace,
-                  case let .complex(complex)? = types[ExtAllNode.stripPrefix(base)],
-                  baseHasElementContent(complex.content)
+                  case let .complex(complex)? = types[ExtAllNode.stripPrefix(base)]
             else { continue }
-            errors.append("an 'all' group may not extend the type '\(ExtAllNode.stripPrefix(base))', which has its own content; an all group must be the whole content model")
+            let baseName = ExtAllNode.stripPrefix(base)
+            // The extension itself adds an `all` group over a base that already has
+            // element content: the all would be nested in the extension sequence.
+            if extensionHasAllGroup(ext), baseHasElementContent(complex.content) {
+                errors.append("an 'all' group may not extend the type '\(baseName)', which has its own content; an all group must be the whole content model")
+                continue
+            }
+            // The base's own content IS an `all` group and the extension adds
+            // element content: the base's all is then nested in the sequence that
+            // joins base and extension content, which is forbidden (cos-all-limited).
+            if contentIsAllGroup(complex.content), extensionAddsElementContent(ext) {
+                errors.append("the type '\(baseName)' has an 'all' group as its whole content and may not be extended with element content")
+            }
         }
         return errors
+    }
+
+    /// Whether a content type's whole content model is a NON-EMPTY `all` group. An
+    /// empty `<all/>` contributes no content (the sibling rule treats extending
+    /// empty content as valid), so it is not flagged.
+    private static func contentIsAllGroup(_ content: PureXML.Schema.ContentType) -> Bool {
+        switch content {
+        case let .elementOnly(particle), let .mixed(particle):
+            guard case let .group(group) = particle.term, group.compositor == .all else { return false }
+            return !PureXML.Schema.ParticleRestriction.contentFree(particle)
+        case .empty, .simpleContent:
+            return false
+        }
     }
 
     /// XSD 1.0 `cos-ct-extends.1.4.2.2`: a `complexContent` extension that adds

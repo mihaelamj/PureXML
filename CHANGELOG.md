@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content may not extend a base whose whole content is a non-empty `all` group; the base's `all` would be nested in the sequence joining base and extension content (`cos-all-limited`). An empty-`all` base, or an attribute-only extension, stays valid. Caught one invalid schema: invalid-schemas-accepted 233 → 232, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content (a non-empty model group) may not extend a base whose content is simple (`cos-ct-extends.1.4.2.2`); a simple-content type is extended through `simpleContent`. An attribute-only `complexContent` extension of a simpleContent base stays valid (the `complexContent`-around-`simpleContent` idiom). Caught two invalid schemas: invalid-schemas-accepted 235 → 233, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): two more schema-for-schemas structural rules. A named model group's compositor (`all`/`choice`/`sequence`) may not carry `minOccurs`/`maxOccurs` (those belong on a group reference), and an attribute in the XML Schema namespace (such as `xsd:type`) is rejected since the schema vocabulary defines no namespaced attributes (a foreign attribute in any other namespace stays the author's own). Caught nine invalid schemas: invalid-schemas-accepted 244 → 235, no other bucket moved.

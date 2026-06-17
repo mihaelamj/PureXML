@@ -83,8 +83,12 @@ struct XSTSSuiteTests {
     /// two more invalid schemas; an attribute-only complexContent extension of a
     /// simpleContent base stays valid. Invalid-schemas accepted 235 → 233, no other
     /// bucket moved.
+    /// Rejecting a complexContent extension that adds element content on top of a
+    /// base whose whole content is an `all` group (the all would be nested in the
+    /// joining sequence; cos-all-limited) then caught one more invalid schema:
+    /// invalid-schemas accepted 233 → 232, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 233
+    private let knownSchemaInvalidAccepted = 232
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
