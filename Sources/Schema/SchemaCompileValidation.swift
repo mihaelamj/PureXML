@@ -244,10 +244,10 @@ extension PureXML.Validation {
             Validator<PureXML.Schema.SchemaCompileContext>.defaults(
                 nonReference: [
                     AnyValidation(idAttributesValid), AnyValidation(schemaStructureValid),
-                    AnyValidation(componentNamesUnique),
-                    AnyValidation(simpleTypeFinalControlsValid),
+                    AnyValidation(componentNamesUnique), AnyValidation(simpleTypeFinalControlsValid),
                     AnyValidation(contentModelsDeterministic),
                     AnyValidation(referencedSchemasResolveToSchemas), AnyValidation(redefinitionsDeriveFromThemselves),
+                    AnyValidation(redefineGroupSelfReferencesAreUnit),
                 ],
                 reference: [
                     AnyValidation(typeDerivationAcyclic),

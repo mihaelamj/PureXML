@@ -92,6 +92,7 @@ struct ValidationConfigurationTests {
             "Schema content models are deterministic (UPA)",
             "A resolved schemaLocation reference is a valid schema",
             "A redefined type restricts or extends itself",
+            "A redefined group's self-reference occurs exactly once",
             "Type derivation chains contain no cycles",
             "Schema type references contain no cycles",
             "xs:all group references appear only where permitted",

@@ -25,6 +25,15 @@ extension PureXML.Validation.SchemaCompile {
         }
     }
 
+    /// src-redefine.6.1.2: a redefined group's self-reference has minOccurs = maxOccurs = 1.
+    static var redefineGroupSelfReferencesAreUnit: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A redefined group's self-reference occurs exactly once") { document in
+            PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.redefineGroupSelfReferenceErrors(document.containers),
+            )
+        }
+    }
+
     /// Facet definition validity and pattern syntax validity (XSD Part 2 4.3): a
     /// constraining facet must be applicable to and valid for its base type, and a
     /// `pattern` must compile. These are gathered during simple-type compilation

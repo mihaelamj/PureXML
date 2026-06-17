@@ -66,6 +66,34 @@ struct SchemaIncludeTests {
         #expect((try? PureXML.Schema.Document(selfRedefine, schemaLoader: loader)) != nil)
     }
 
+    /// src-redefine.6.1.2: a group inside xs:redefine may reference itself, but that
+    /// self-reference must occur exactly once (minOccurs = maxOccurs = 1). A
+    /// self-reference with minOccurs="0" or maxOccurs="unbounded" is invalid; a unit
+    /// self-reference (or absent occurrence, defaulting to 1) is valid.
+    @Test("a redefined group's self-reference must occur exactly once")
+    func test_redefineGroupSelfReferenceOccurrence() {
+        let original = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a">
+          <xs:group name="g"><xs:choice><xs:element name="x" type="xs:string"/></xs:choice></xs:group>
+        </xs:schema>
+        """
+        let loader: (String) -> String? = { $0 == "a.xsd" ? original : nil }
+        func redefine(_ selfRef: String) -> String {
+            """
+            <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a" xmlns="urn:a">
+              <xs:redefine schemaLocation="a.xsd">
+                <xs:group name="g"><xs:choice><xs:element name="y" type="xs:string"/>\(selfRef)</xs:choice></xs:group>
+              </xs:redefine>
+            </xs:schema>
+            """
+        }
+        // A non-unit self-reference is invalid.
+        #expect((try? PureXML.Schema.Document(redefine(#"<xs:group ref="g" minOccurs="0"/>"#), schemaLoader: loader)) == nil)
+        #expect((try? PureXML.Schema.Document(redefine(#"<xs:group ref="g" maxOccurs="unbounded"/>"#), schemaLoader: loader)) == nil)
+        // A unit self-reference is valid.
+        #expect((try? PureXML.Schema.Document(redefine(#"<xs:group ref="g"/>"#), schemaLoader: loader)) != nil)
+    }
+
     /// src-resolve: when an include/import/redefine schemaLocation IS resolved (the
     /// loader returns content), that content must be a well-formed schema. Not-well-
     /// formed XML, or well-formed XML that is not an xs:schema, is rejected. A

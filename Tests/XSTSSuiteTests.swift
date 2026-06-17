@@ -148,10 +148,11 @@ struct XSTSSuiteTests {
     /// (cos-valid-default), attribute type must be simple (au-props-correct), resolved
     /// schemaLocation must be a schema (src-resolve), import namespace matches the
     /// imported target (src-import.3), redefined type derives from itself
-    /// (src-redefine.5), local complexType is anonymous, and a local element has a
-    /// name or ref.
+    /// (src-redefine.5), local complexType is anonymous, a local element has a name
+    /// or ref, and a redefined group's self-reference occurs exactly once
+    /// (src-redefine.6.1.2).
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 79
+    private let knownSchemaInvalidAccepted = 77
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 
