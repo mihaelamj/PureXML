@@ -21,9 +21,30 @@ extension PureXML.Schema.XSDParser {
         guard local == "selector" || local == "field",
               let xpath = PureXML.Schema.XSDNode.attribute(node, "xpath")
         else { return [] }
-        return validXPath(xpath, isField: local == "field")
-            ? []
-            : ["the \(local) xpath '\(xpath)' is not a valid identity-constraint path"]
+        if !validXPath(xpath, isField: local == "field") {
+            return ["the \(local) xpath '\(xpath)' is not a valid identity-constraint path"]
+        }
+        // Every namespace prefix a name test uses must be declared in scope; the
+        // implicit `xml` prefix is always bound. An unbound prefix is invalid.
+        let bindings = namespaceBindingsInScope(of: node, defaultBindings: [:])
+        for prefix in xpathNameTestPrefixes(xpath) where prefix != "xml" && bindings[prefix] == nil {
+            return ["the \(local) xpath '\(xpath)' uses the undeclared namespace prefix '\(prefix)'"]
+        }
+        return []
+    }
+
+    /// The set of namespace prefixes used in the name tests of a (syntactically
+    /// valid) identity-constraint xpath. A name test is `prefix:local` or
+    /// `prefix:*`; an unprefixed name, `*`, `.`, or an axis keyword has no prefix.
+    private static func xpathNameTestPrefixes(_ xpath: String) -> [String] {
+        guard let tokens = tokenize(xpath) else { return [] }
+        var prefixes: [String] = []
+        for case let .name(name) in tokens {
+            guard let colon = name.firstIndex(of: ":") else { continue }
+            let prefix = String(name[name.startIndex ..< colon])
+            if !prefix.isEmpty { prefixes.append(prefix) }
+        }
+        return prefixes
     }
 
     private enum XPathToken: Equatable {

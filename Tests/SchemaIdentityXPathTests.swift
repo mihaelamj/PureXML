@@ -13,7 +13,7 @@ struct SchemaIdentityXPathTests {
     private func compile(_ selector: String, fields: [String] = ["@v"]) throws {
         let fieldElements = fields.map { #"<xs:field xpath="\#($0)"/>"# }.joined()
         _ = try PureXML.Schema.Document(#"""
-        <xs:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+        <xs:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:ns="urn:ns">
           <xs:element name="root" type="xs:string"/>
           <xs:element name="r">
             <xs:complexType><xs:sequence><xs:element ref="root"/></xs:sequence></xs:complexType>
@@ -83,6 +83,17 @@ struct SchemaIdentityXPathTests {
         </xs:schema>
         """#
         return (try? PureXML.Schema.Document(document)) != nil
+    }
+
+    /// A name-test prefix in a selector/field xpath must be a declared namespace
+    /// prefix; an undeclared prefix is invalid. The implicitly-bound `xml` prefix and
+    /// a prefix bound by the schema's own `xmlns:` declarations are valid.
+    @Test("an identity-constraint xpath may not use an undeclared namespace prefix")
+    func test_xpathUndeclaredPrefix() throws {
+        try compile("xs:a")
+        try compile("root", fields: ["xs:v"])
+        #expect(rejectsSelector("imp:a"))
+        #expect(rejectsField("imp:v"))
     }
 
     @Test("an identity constraint requires one selector then one or more fields")

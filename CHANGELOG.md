@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): an identity-constraint `selector`/`field` xpath may not use an undeclared namespace prefix. Every prefix in a name test must be a declared `xmlns:` prefix in scope (the implicit `xml` prefix excepted); a `selector`/`field` whose xpath names an unbound prefix is rejected. invalid-schemas-accepted 77 → 75, no false positive (valid-schemas-rejected held at 0; an adversarial review confirmed declared prefixes on the schema root or any ancestor resolve correctly), no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#161): a `group` inside `xs:redefine` may reference itself at most once, and that self-reference must occur exactly once, `minOccurs` = `maxOccurs` = 1 (`src-redefine.6.1.2`). A self-reference with `minOccurs="0"`, `maxOccurs="unbounded"`, or any count above 1 is rejected. The self-reference is matched by namespace, not local name alone, so a reference to an imported group that merely shares the local name is unconstrained (no false positive). invalid-schemas-accepted 79 → 77, no false positive (valid-schemas-rejected held at 0), no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a local `element` declaration must identify itself with a `name` or a `ref`; an element with neither is rejected. invalid-schemas-accepted 80 → 79, no false positive (valid-schemas-rejected held at 0), no other bucket moved.
