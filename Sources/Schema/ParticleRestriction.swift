@@ -268,7 +268,13 @@ extension PureXML.Schema {
 
         /// Whether the restricted wildcard admits no namespace the base refuses.
         private static func narrows(_ restricted: Wildcard, _ base: Wildcard) -> Bool {
-            switch (restricted.namespace, base.namespace) {
+            // Wildcard Subset (XSD 1.0 §3.10.6): the restriction's processContents
+            // must be identical to or STRONGER than the base's (strict > lax > skip);
+            // a restriction may not weaken validation. Namespace narrowing is below.
+            guard processContentsRank(restricted.processContents) >= processContentsRank(base.processContents) else {
+                return false
+            }
+            return switch (restricted.namespace, base.namespace) {
             case (_, .any):
                 true
             case (.other, .other):
@@ -284,6 +290,16 @@ extension PureXML.Schema {
 
         private static func sameName(_ lhs: PureXML.Model.QualifiedName, _ rhs: PureXML.Model.QualifiedName) -> Bool {
             lhs.localName == rhs.localName && (lhs.namespaceURI ?? "") == (rhs.namespaceURI ?? "")
+        }
+
+        /// Validation strength of a wildcard's `processContents`, for the Wildcard
+        /// Subset rule: `strict` is stronger than `lax` is stronger than `skip`.
+        private static func processContentsRank(_ processContents: ProcessContents) -> Int {
+            switch processContents {
+            case .skip: 0
+            case .lax: 1
+            case .strict: 2
+            }
         }
 
         /// NameAndTypeOK value-constraint clause: when the base element is `fixed`,

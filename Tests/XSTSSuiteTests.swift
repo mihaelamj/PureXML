@@ -105,8 +105,11 @@ struct XSTSSuiteTests {
     /// Requiring a `simpleContent` restriction's base to be a complex type, not a
     /// built-in or user simple type (src-ct.2), then caught five more invalid
     /// schemas: invalid-schemas accepted 142 → 137, no other bucket moved.
+    /// Requiring a restricting wildcard's `processContents` to be at least as strong
+    /// as the base's (strict > lax > skip; Wildcard Subset §3.10.6) then caught three
+    /// more invalid schemas: invalid-schemas accepted 137 → 134, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 137
+    private let knownSchemaInvalidAccepted = 134
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
