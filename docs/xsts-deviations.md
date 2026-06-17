@@ -163,3 +163,39 @@ the spec text, fix the owning code, add a focused regression test, re-run
 ratchet the baseline in `Tests/XSTSSuiteTests.swift` down to the new value.
 Tracking issues: #145 (invalid schema accepted), #146 (valid instance
 rejected), #147 (invalid instance accepted), #148 (valid schema rejected).
+
+## Autopilot accounting (2026-06-18): labelled-suite invalid-schemas-accepted = 74
+
+The `XSTSSuiteTests` ratchet (settled-expectation labelled subset) now stands at
+**0 valid-schemas-rejected, 74 invalid-schemas-accepted, 0 valid-instances-rejected,
+133 invalid-instances-accepted**. False positives have been held at 0 across the
+whole campaign (the hard gate). The remaining 74 are the hard tail; every clean,
+zero-false-positive structural rule has been harvested. They partition as:
+
+### Fixable debt (genuine bugs, but intricate and false-positive-prone)
+
+| Cluster | ~Count | Root cause | Why deferred |
+|---|---|---|---|
+| `schL`, `schM`, `attgZ` | ~12 | redefine RESTRICTION: a redefined group/attributeGroup must be a valid *restriction* of the original (src-redefine.6.1.2/7.2.2); a redefined attributeGroup may not drop or widen an attribute. | reuses `ParticleRestriction` + attribute-restriction (the most false-positive-prone machinery); needs the original resolved across containers. Fresh focus. |
+| `particlesIk` (011/025/027) | ~3 | NameAndTypeOK union membership: a restricting element's type must derive from a *member* of the base element's union type. | deliberately bypassed earlier to avoid a false positive (`string` is a valid member of `union(decimal\|string)`); chain-walk cannot model union membership. |
+| `wildI`, `wildZ` | ~4 | Unique Particle Attribution for WILDCARDS: two overlapping `<any>` (or `any` vs element) make a non-deterministic content model. | `ContentModelDeterminism` is the most false-positive-prone area; wildcard overlap must be added carefully. |
+| `schN`, `schI`, `schZ011`, `schO`, `schZ006`, `schN10` | ~12 | chameleon / cross-namespace include-import-redefine, self-pointing redefine, duplicate-in-redefine. | cross-document namespace semantics; intricate. |
+| `particlesEa/Fb/Ha/Hb/K/M/V`, `elemZ`, `ctZ`, `stZ`, `addB`, `test`, `xsd*.e` | ~28 | heterogeneous particle-restriction edges, element derivation/substitution, anySimpleType edges, adhoc grab-bags. | per-case triage; several need PSVI/model enrichment. |
+
+### Irreducible by design / disclosed (document, do not "fix")
+
+| Cluster | ~Count | Reason |
+|---|---|---|
+| `particlesZ` (RecurseAsIfGroup / MapAndSum ambiguities, e.g. Z001) | a few | the test's own documentation calls the rule ambiguous; matches the Xerces strict reading (Category D). |
+| `reK`, `RegexTest_*` | ~3 | the pattern engine deliberately tolerates `.unsupported`/`.badEscape` categories to avoid rejecting valid-but-unsupported patterns (a disclosed under-rejection, not a defect). |
+
+### Process note
+
+Three autopilot rules this session (redefine self-reference, identity-constraint
+xpath prefix, redefined attributeGroup self-reference count) each passed an
+adversarial critic pass before merge; the critic caught three genuine false
+positives the W3C suite and the differential both missed (two namespace-collision,
+one nesting-boundary), each fixed before merge. Any rule that resolves names or
+walks references MUST namespace-gate and bound its walk, and MUST go through the
+critic loop. The intricate clusters above are best executed supervised, one at a
+time, with that loop.
