@@ -101,12 +101,13 @@ extension PureXML.Schema.XSDParser {
         return xsdErrors + simpleContentErrors + errors + redefineComponentExistenceErrors(containers)
     }
 
-    /// XSD 1.0 `src-redefine.6.1.1`/`6.2.1`/`7.2.1`: each component a `redefine`
-    /// names must have a same-kind component of that name in the redefined schema.
-    /// Runs only past the cross-document skip guard above, so the redefined schema
-    /// is loaded; a redefinition whose name matches nothing in any non-`redefine`
-    /// container (the loaded targets and the root) names a component that does not
-    /// exist and is invalid.
+    /// XSD 1.0 `src-redefine.6`/`7.2.1`/`7.2.2`: each component a `redefine` names
+    /// must have a same-kind component of that name in the redefined schema, and a
+    /// `redefine` may redefine a given component at most once. Runs only past the
+    /// cross-document skip guard above, so the redefined schema is loaded; a
+    /// redefinition whose name matches nothing in any non-`redefine` container (the
+    /// loaded targets and the root) names a component that does not exist, and a
+    /// name redefined twice in one `redefine` is a duplicate redefinition.
     private static func redefineComponentExistenceErrors(_ containers: [XSDTree]) -> [String] {
         let kinds = ["complexType", "simpleType", "group", "attributeGroup"]
         var defined: [String: Set<String>] = [:]
@@ -121,10 +122,13 @@ extension PureXML.Schema.XSDParser {
         }
         var errors: [String] = []
         for container in containers where PureXML.Schema.XSDNode.localName(container) == "redefine" {
+            var redefinedHere: [String: Set<String>] = [:]
             for kind in kinds {
                 for node in PureXML.Schema.XSDNode.children(container, named: kind) {
                     guard let name = PureXML.Schema.XSDNode.attribute(node, "name") else { continue }
-                    if defined[kind]?.contains(name) != true {
+                    if !redefinedHere[kind, default: []].insert(name).inserted {
+                        errors.append("a redefine redefines \(kind) '\(name)' more than once")
+                    } else if defined[kind]?.contains(name) != true {
                         errors.append("a redefine of \(kind) '\(name)' has no '\(name)' to redefine in the redefined schema")
                     }
                 }

@@ -73,11 +73,9 @@ struct XSTSSuiteTests {
     /// `{37,17}`) as schema-invalid, while staying lenient on constructs the
     /// engine merely does not support, then caught eighteen invalid schemas:
     /// invalid-schemas-accepted 262 → 244, no other bucket moved.
-    /// Two schema-for-schemas structural rules then caught nine more invalid
-    /// schemas: a named group's compositor may not carry minOccurs/maxOccurs (those
-    /// belong on a reference), and an attribute in the XML Schema namespace (e.g.
-    /// `xsd:type`) is never valid. Invalid-schemas accepted 244 → 235, no other
-    /// bucket moved.
+    /// Two schema-for-schemas structural rules (a named group's compositor may not
+    /// carry minOccurs/maxOccurs; an attribute in the XML Schema namespace is never
+    /// valid) then caught nine more: invalid-schemas accepted 244 → 235.
     /// Rejecting a complexContent extension that adds element content (a model
     /// group) on top of a simpleContent base (cos-ct-extends.1.4.2.2) then caught
     /// two more invalid schemas; an attribute-only complexContent extension of a
@@ -152,8 +150,11 @@ struct XSTSSuiteTests {
     /// the redefined schema once that schema is loaded (src-redefine.6/7.2.1) then
     /// caught one more invalid schema: invalid-schemas accepted 183 → 182, no other
     /// bucket moved.
+    /// Rejecting a `redefine` that redefines the same component twice (src-redefine.7.2.2)
+    /// then caught one more invalid schema: invalid-schemas accepted 182 → 181, no
+    /// other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 182
+    private let knownSchemaInvalidAccepted = 181
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
