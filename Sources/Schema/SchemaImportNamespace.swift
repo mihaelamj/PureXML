@@ -29,4 +29,19 @@ extension PureXML.Schema.XSDParser {
         }
         return errors
     }
+
+    /// src-redefine.5: a type inside `xs:redefine` must restrict or extend the type it
+    /// redefines, which lives in the redefining schema's OWN target namespace. So a
+    /// base bound to an EXPLICIT different namespace (for example an imported type
+    /// with the same local name) is not self and is invalid. A base with no resolvable
+    /// namespace is left alone, which keeps this from ever over-rejecting a
+    /// same-local-name self-reference.
+    static func redefineBaseIsForeign(_ type: XSDTree, _ rawBase: String?) -> Bool {
+        guard let rawBase else { return false }
+        let schema = ImportNode.schemaOwner(type)
+        let targetNamespace = ImportNode.attribute(schema, "targetNamespace")
+        let bindings = ImportNode.namespaceBindings(of: schema)
+        guard let baseNamespace = ImportNode.referenceNamespace(rawBase, bindings) else { return false }
+        return baseNamespace != targetNamespace
+    }
 }

@@ -24,6 +24,48 @@ struct SchemaIncludeTests {
         #expect(try !doc.validate("<code xmlns=\"urn:main\">abc</code>").isEmpty)
     }
 
+    /// src-redefine.5: a type inside xs:redefine must restrict/extend the type it
+    /// redefines, which lives in the redefining schema's own target namespace. A base
+    /// bound to a foreign namespace with the same local name (an imported type) is not
+    /// self and is rejected; an unprefixed/own-namespace self-reference is valid.
+    @Test("a redefined type must derive from itself, not a same-named foreign type")
+    func test_redefineBaseMustBeSelfNamespace() {
+        let redefined = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a">
+          <xs:complexType name="T"><xs:sequence><xs:element name="x" type="xs:string"/></xs:sequence></xs:complexType>
+        </xs:schema>
+        """
+        let imported = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:foo">
+          <xs:complexType name="T"><xs:sequence/></xs:complexType>
+        </xs:schema>
+        """
+        let loader: (String) -> String? = { $0 == "a.xsd" ? redefined : ($0 == "foo.xsd" ? imported : nil) }
+        // Redefine of T whose extension base is foo:T (a foreign same-local-name type).
+        let foreign = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a" xmlns:foo="urn:foo">
+          <xs:import namespace="urn:foo" schemaLocation="foo.xsd"/>
+          <xs:redefine schemaLocation="a.xsd">
+            <xs:complexType name="T"><xs:complexContent><xs:extension base="foo:T">
+              <xs:sequence><xs:element name="y" type="xs:string"/></xs:sequence>
+            </xs:extension></xs:complexContent></xs:complexType>
+          </xs:redefine>
+        </xs:schema>
+        """
+        #expect((try? PureXML.Schema.Document(foreign, schemaLoader: loader)) == nil)
+        // A proper self-redefine (base resolves to the redefining target namespace).
+        let selfRedefine = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:a" xmlns:a="urn:a">
+          <xs:redefine schemaLocation="a.xsd">
+            <xs:complexType name="T"><xs:complexContent><xs:extension base="a:T">
+              <xs:sequence><xs:element name="y" type="xs:string"/></xs:sequence>
+            </xs:extension></xs:complexContent></xs:complexType>
+          </xs:redefine>
+        </xs:schema>
+        """
+        #expect((try? PureXML.Schema.Document(selfRedefine, schemaLoader: loader)) != nil)
+    }
+
     /// src-resolve: when an include/import/redefine schemaLocation IS resolved (the
     /// loader returns content), that content must be a well-formed schema. Not-well-
     /// formed XML, or well-formed XML that is not an xs:schema, is rejected. A

@@ -149,9 +149,11 @@ struct XSTSSuiteTests {
     /// type is a simple type (au-props-correct) 96->95; a resolved include/import/
     /// redefine schemaLocation must be a well-formed schema (src-resolve) 95->87; and
     /// an import's namespace must equal the imported targetNamespace (src-import.3)
-    /// 87->84.
+    /// 87->84; and a redefined type must derive from the type it redefines in the
+    /// redefining schema's own namespace, not a same-named foreign one (src-redefine.5)
+    /// 84->81.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 84
+    private let knownSchemaInvalidAccepted = 81
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

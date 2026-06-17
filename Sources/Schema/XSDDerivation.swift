@@ -304,7 +304,14 @@ extension PureXML.Schema.XSDParser {
         for container in containers where XSDDerivNode.localName(container) == "redefine" {
             for type in XSDDerivNode.children(container, named: "complexType") {
                 guard let name = XSDDerivNode.attribute(type, "name") else { continue }
-                if derivationInfo(type)?.base != name { throw SchemaFault.redefineIncompatible(type: name) }
+                let derivationContainer = XSDDerivNode.firstChild(type, named: "complexContent")
+                    ?? XSDDerivNode.firstChild(type, named: "simpleContent")
+                let rawBase = derivationContainer
+                    .flatMap { XSDDerivNode.firstChild($0, named: "extension") ?? XSDDerivNode.firstChild($0, named: "restriction") }
+                    .flatMap { XSDDerivNode.attribute($0, "base") }
+                if derivationInfo(type)?.base != name || redefineBaseIsForeign(type, rawBase) {
+                    throw SchemaFault.redefineIncompatible(type: name)
+                }
             }
             for type in XSDDerivNode.children(container, named: "simpleType") {
                 try checkRedefinedSimpleType(type)
@@ -314,10 +321,11 @@ extension PureXML.Schema.XSDParser {
 
     private static func checkRedefinedSimpleType(_ type: XSDTree) throws {
         guard let name = XSDDerivNode.attribute(type, "name") else { return }
-        let base = XSDDerivNode.firstChild(type, named: "restriction")
+        let rawBase = XSDDerivNode.firstChild(type, named: "restriction")
             .flatMap { XSDDerivNode.attribute($0, "base") }
-            .map(XSDDerivNode.stripPrefix)
-        if base != name { throw SchemaFault.redefineIncompatible(type: name) }
+        if rawBase.map(XSDDerivNode.stripPrefix) != name || redefineBaseIsForeign(type, rawBase) {
+            throw SchemaFault.redefineIncompatible(type: name)
+        }
     }
 
     /// Drops from each substitution group the members a head's `block` forbids: a
