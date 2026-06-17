@@ -151,9 +151,10 @@ struct XSTSSuiteTests {
     /// an import's namespace must equal the imported targetNamespace (src-import.3)
     /// 87->84; and a redefined type must derive from the type it redefines in the
     /// redefining schema's own namespace, not a same-named foreign one (src-redefine.5)
-    /// 84->81.
+    /// 84->81; and a complexType nested in an element must be anonymous (no name)
+    /// 81->80.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 81
+    private let knownSchemaInvalidAccepted = 80
     private let knownInstanceValidRejected = 0
     private let knownInstanceInvalidAccepted = 133
 

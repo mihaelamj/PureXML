@@ -130,6 +130,7 @@ extension PureXML.Schema.XSDParser {
         case "complexType":
             errors += elementDeclsConsistentErrors(node)
             errors += complexTypeOrderErrors(node)
+            errors += localComplexTypeNameErrors(node)
         case "complexContent":
             errors += complexContentOrderErrors(node)
         case "simpleContent":

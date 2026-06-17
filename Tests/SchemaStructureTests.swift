@@ -371,4 +371,24 @@ struct SchemaStructureOrderTests {
         </xs:group>
         """#))
     }
+
+    /// A complexType nested in an element is a local (anonymous) type and must not
+    /// carry a name; only a top-level complexType is named.
+    @Test("a local complexType may not have a name")
+    func test_localComplexTypeMustBeAnonymous() {
+        #expect(rejects(#"""
+        <xs:element name="e">
+          <xs:complexType name="fooType">
+            <xs:sequence><xs:element name="c" type="xs:string"/></xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        """#))
+        // A top-level named complexType, and an anonymous local one, are both valid.
+        try? compile(#"<xs:complexType name="t"><xs:sequence/></xs:complexType>"#)
+        #expect(!rejects(#"""
+        <xs:element name="e">
+          <xs:complexType><xs:sequence><xs:element name="c" type="xs:string"/></xs:sequence></xs:complexType>
+        </xs:element>
+        """#))
+    }
 }

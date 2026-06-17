@@ -227,6 +227,18 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// A `complexType` nested in an `element` is a local (anonymous) type and must
+    /// not carry a `name`; only a top-level `complexType` (a child of `schema`, or a
+    /// `redefine` redefinition) is named. A local type definition has no name.
+    static func localComplexTypeNameErrors(_ node: XSDTree) -> [String] {
+        guard PureXML.Schema.XSDNode.attribute(node, "name") != nil,
+              let parent = node.parent,
+              parent.name?.namespaceURI == xsdNamespace,
+              PureXML.Schema.XSDNode.localName(parent) == "element"
+        else { return [] }
+        return ["a complexType nested in an element must not have a 'name' attribute"]
+    }
+
     /// The content model of an identity constraint (`unique`/`key`/`keyref`) is
     /// `(annotation?, selector, field+)`: exactly one `selector`, then one or more
     /// `field`s, in that order. A `field` before the `selector`, a second
