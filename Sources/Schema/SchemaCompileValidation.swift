@@ -247,7 +247,7 @@ extension PureXML.Validation {
                     AnyValidation(schemaStructureValid),
                     AnyValidation(componentNamesUnique),
                     AnyValidation(simpleTypeFinalControlsValid),
-                    AnyValidation(contentModelsDeterministic),
+                    AnyValidation(contentModelsDeterministic), AnyValidation(referencedSchemasResolveToSchemas),
                 ],
                 reference: [
                     AnyValidation(typeDerivationAcyclic),
@@ -341,6 +341,17 @@ extension PureXML.Validation {
 }
 
 extension PureXML.Validation.SchemaCompile {
+    /// src-resolve: a resolved include/import/redefine schemaLocation must be a schema.
+    static var referencedSchemasResolveToSchemas: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A resolved schemaLocation reference is a valid schema") { document in
+            PureXML.Schema.SchemaLocatedFinding.unlocated(
+                document.context.failedSchemaReferences.map {
+                    "the referenced schema document '\($0)' is not a valid schema"
+                },
+            )
+        }
+    }
+
     /// au-props-correct: an attribute's type is a simple type, never complex.
     static var attributeTypesSimple: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("An attribute's type is a simple type") { document in

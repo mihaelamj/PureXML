@@ -9,11 +9,6 @@ public extension PureXML.Schema {
         /// an element with `maxOccurs` at most 1, and the group itself may occur at
         /// most once.
         case invalidAllGroup(reason: String)
-        /// An `xs:include`/`xs:import`/`xs:redefine` `schemaLocation` resolved (the
-        /// loader returned content) to something that is not a well-formed schema
-        /// document. An unresolved location (the loader returned nothing) is not an
-        /// error, since resolution is the processor's choice.
-        case invalidSchemaReference(location: String)
         /// A RELAX NG schema document does not match the RELAX NG grammar or
         /// its restrictions (sections 3, 4.16-4.18).
         case invalidRelaxNG(reason: String)
@@ -30,8 +25,6 @@ public extension PureXML.Schema {
                 "redefined type '\(type)' must derive from itself"
             case let .invalidAllGroup(reason):
                 "invalid xs:all group: \(reason)"
-            case let .invalidSchemaReference(location):
-                "the referenced schema document '\(location)' is not a valid schema"
             case let .invalidRelaxNG(reason):
                 "invalid RELAX NG schema: \(reason)"
             case let .inconsistent(findings):

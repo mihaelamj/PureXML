@@ -128,12 +128,15 @@ extension PureXML.Schema {
         /// returns content), that content must be a well-formed schema document. A
         /// location the loader does not resolve (returns nil) is not an error, since
         /// resolution is the processor's choice. Mirrors `collectContainers`' walk,
-        /// recursing through resolved documents, cycle-guarded by `visited`.
-        static func checkSchemaLocations(
+        /// recursing through resolved documents, cycle-guarded by `visited`. Returns
+        /// every location whose resolved content is not a schema, for a validation to
+        /// report; it does not throw, so the finding flows through the validator.
+        static func failedSchemaReferences(
             _ schema: XSDTree,
             _ loader: (String) -> String?,
             _ visited: inout Set<String>,
-        ) throws {
+        ) -> [String] {
+            var failures: [String] = []
             for child in elementChildren(schema) {
                 let kind = localName(child)
                 guard kind == "include" || kind == "import" || kind == "redefine",
@@ -144,10 +147,12 @@ extension PureXML.Schema {
                 guard let root = try? PureXML.parseTree(content),
                       let sub = elementChildren(root).first(where: { localName($0) == "schema" })
                 else {
-                    throw PureXML.Schema.SchemaError.invalidSchemaReference(location: location)
+                    failures.append(location)
+                    continue
                 }
-                try checkSchemaLocations(sub, loader, &visited)
+                failures += failedSchemaReferences(sub, loader, &visited)
             }
+            return failures
         }
 
         /// True when at least one external schema document was loaded (not merely
@@ -328,6 +333,11 @@ extension PureXML.Schema {
         var blockDefault: String?
         /// The location of each container schema document.
         var containerLocations: [ObjectIdentifier: String?] = [:]
+        /// Schema-location references (`include`/`import`/`redefine`) that the loader
+        /// resolved to content which is not a well-formed schema document. Recorded
+        /// during composition so a validation can report each (`src-resolve`); an
+        /// unresolved location (the loader returned nothing) is not recorded.
+        var failedSchemaReferences: [String] = []
         /// Target namespace imposed on an included schema with no `targetNamespace`
         /// (chameleon include), keyed by that included schema container.
         var chameleonTargetNamespaces: [ObjectIdentifier: String] = [:]

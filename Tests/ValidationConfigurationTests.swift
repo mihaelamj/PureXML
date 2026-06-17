@@ -90,6 +90,7 @@ struct ValidationConfigurationTests {
             "Global schema component names are unique within their symbol spaces",
             "Simple-type final controls are declared consistently",
             "Schema content models are deterministic (UPA)",
+            "A resolved schemaLocation reference is a valid schema",
             "Type derivation chains contain no cycles",
             "Schema type references contain no cycles",
             "xs:all group references appear only where permitted",
