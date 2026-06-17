@@ -76,6 +76,48 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 `cos-ct-extends.1.4.3.2.2.1`: a `complexContent` extension's mixedness
+    /// must match its base type's. The effective content joins the base content and
+    /// the extension's, so a mixed extension may extend only a mixed base and an
+    /// element-only extension only an element-only base. Checked for a self-contained
+    /// schema, and only when the base content is definitely element-only or mixed (an
+    /// empty or simple-content base is governed by other rules and is left alone).
+    static func extensionMixedAgreementErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        let bindings = context.namespaceBindings
+        var errors: [String] = []
+        for content in descendants(schema, named: "complexContent") {
+            guard let ext = ExtAllNode.firstChild(content, named: "extension"),
+                  let base = ExtAllNode.attribute(ext, "base"),
+                  ExtAllNode.referenceNamespace(base, bindings) == context.targetNamespace,
+                  case let .complex(complex)? = types[ExtAllNode.stripPrefix(base)]
+            else { continue }
+            let baseIsMixed: Bool
+            switch complex.content {
+            case .mixed: baseIsMixed = true
+            case .elementOnly: baseIsMixed = false
+            case .empty, .simpleContent: continue
+            }
+            // An extension that does not state `mixed` inherits the base's, so there
+            // is no conflict; only an EXPLICIT `mixed` that disagrees is invalid.
+            guard let derivedMixed = explicitMixed(content) else { continue }
+            if baseIsMixed != derivedMixed {
+                errors.append("a complexContent extension of '\(ExtAllNode.stripPrefix(base))' must have the same mixed setting as its base")
+            }
+        }
+        return errors
+    }
+
+    /// The EXPLICIT `mixed` of a `complexContent` derivation: its own `mixed`
+    /// attribute when present, otherwise the enclosing `complexType`'s, or nil when
+    /// neither states it (an extension then inherits its base's mixedness). `true`
+    /// and `1` are mixed.
+    private static func explicitMixed(_ complexContent: XSDTree) -> Bool? {
+        if let own = ExtAllNode.attribute(complexContent, "mixed") { return own == "true" || own == "1" }
+        if let parent = complexContent.parent, let outer = ExtAllNode.attribute(parent, "mixed") { return outer == "true" || outer == "1" }
+        return nil
+    }
+
     /// Whether a `complexContent` extension adds element content: an `element` or
     /// a wildcard `any` somewhere in its model group. An empty group (`<sequence/>`)
     /// or an attribute-only extension adds no element content, so it keeps the

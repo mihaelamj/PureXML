@@ -342,10 +342,11 @@ extension PureXML.Validation.SchemaCompile {
     /// cos-ct-extends.1.4.2.2: a complexContent extension adding element content
     /// must have a base with complex (or empty) content, not simpleContent.
     static var complexExtensionBaseValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
-        compileRule("A complexContent extension's base has complex content") { document in
+        compileRule("A complexContent extension is consistent with its base type") { document in
             guard let namedTypes = document.namedTypes else { return [] }
             return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.simpleContentExtensionBaseErrors(document.schema, document.context, namedTypes),
+                PureXML.Schema.XSDParser.simpleContentExtensionBaseErrors(document.schema, document.context, namedTypes)
+                    + PureXML.Schema.XSDParser.extensionMixedAgreementErrors(document.schema, document.context, namedTypes),
             )
         }
     }

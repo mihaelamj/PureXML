@@ -129,8 +129,13 @@ struct XSTSSuiteTests {
     /// `restriction` or `extension` (an empty `<complexContent/>` has none) then
     /// caught three more invalid schemas: invalid-schemas accepted 200 → 197, no
     /// other bucket moved.
+    /// Requiring a `complexContent` extension that explicitly states `mixed` to agree
+    /// with its base's mixedness (cos-ct-extends.1.4.3.2.2.1; an extension that omits
+    /// `mixed` inherits the base's, so only an explicit conflict is invalid) then
+    /// caught three more invalid schemas: invalid-schemas accepted 197 → 194, no
+    /// other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 197
+    private let knownSchemaInvalidAccepted = 194
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
