@@ -91,8 +91,13 @@ struct XSTSSuiteTests {
     /// value constraint but contradicts it (a value-space-differing `fixed`, or a
     /// `default`; au-props-correct.2) then caught two more invalid schemas:
     /// invalid-schemas accepted 232 → 230, no other bucket moved.
+    /// Rejecting a `pattern` facet whose regular expression ends mid-token (a
+    /// trailing `\` with no escaped character, or a `[` character class never
+    /// closed with `]`), both unambiguously invalid and never an engine
+    /// limitation, then caught thirteen more invalid schemas: invalid-schemas
+    /// accepted 230 → 217, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 230
+    private let knownSchemaInvalidAccepted = 217
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 

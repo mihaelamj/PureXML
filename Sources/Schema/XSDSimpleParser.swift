@@ -79,7 +79,8 @@ extension PureXML.Schema {
         /// pattern. Conservative: only the unambiguous structural errors reject.
         private static func rejectsPattern(_ error: PureXML.Regex.RegexError) -> Bool {
             switch error {
-            case .unbalanced, .danglingQuantifier, .reversedRange, .emptyClass, .reversedQuantifier:
+            case .unbalanced, .danglingQuantifier, .reversedRange, .emptyClass, .reversedQuantifier,
+                 .incompleteEscape, .unterminatedClass:
                 true
             case .unsupported, .badQuantifier, .badEscape, .badClass:
                 false

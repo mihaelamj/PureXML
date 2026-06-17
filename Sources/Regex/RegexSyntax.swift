@@ -14,6 +14,12 @@ extension PureXML.Regex {
         case emptyClass
         /// A bounded quantifier whose minimum exceeds its maximum (`{37,17}`).
         case reversedQuantifier
+        /// A `\` with no following character (`a\`): an escape was opened but the
+        /// expression ended. Unambiguously invalid, never an engine limitation.
+        case incompleteEscape
+        /// A character class opened with `[` that the expression ends before
+        /// closing with `]` (`a[`, `[a[:xyz:`). Unambiguously invalid.
+        case unterminatedClass
 
         var description: String {
             switch self {
@@ -26,6 +32,8 @@ extension PureXML.Regex {
             case .reversedRange: "character-class range is reversed"
             case .emptyClass: "empty character class"
             case .reversedQuantifier: "quantifier minimum exceeds maximum"
+            case .incompleteEscape: "an escape '\\' has no following character"
+            case .unterminatedClass: "a character class is not closed with ']'"
             }
         }
     }

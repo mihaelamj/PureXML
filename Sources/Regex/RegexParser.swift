@@ -106,7 +106,7 @@ extension PureXML.Regex {
         // MARK: Escapes
 
         private mutating func parseEscape() throws -> CharClass {
-            guard let character = peek() else { throw RegexError.badEscape("") }
+            guard let character = peek() else { throw RegexError.incompleteEscape }
             advance()
             if let single = Self.singleEscape(character) {
                 return .single(single)
@@ -189,7 +189,7 @@ extension PureXML.Regex {
                 }
                 try parseClassMember(into: &cls)
             }
-            guard peek() == "]" else { throw RegexError.badClass }
+            guard peek() == "]" else { throw RegexError.unterminatedClass }
             advance()
             return cls
         }
@@ -224,10 +224,10 @@ extension PureXML.Regex {
         }
 
         private mutating func nextClassMember() throws -> ClassMember {
-            guard let character = peek() else { throw RegexError.badClass }
+            guard let character = peek() else { throw RegexError.unterminatedClass }
             advance()
             guard character == "\\" else { return .scalar(scalar(of: character)) }
-            guard let escaped = peek() else { throw RegexError.badClass }
+            guard let escaped = peek() else { throw RegexError.incompleteEscape }
             advance()
             if let single = Self.singleEscape(escaped) { return .scalar(single) }
             if let member = Self.classEscape(escaped) { return member }

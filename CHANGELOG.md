@@ -22,6 +22,8 @@ Second pre-release. Continues the W3C XSTS schema-validity campaign: **invalid-s
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): a `pattern` facet whose regular expression ends mid-token is now rejected as a schema-validity error. A trailing `\` with no character to escape (`a\`) raises `RegexError.incompleteEscape`, and a `[` character class the expression ends before closing with `]` (`a[`, `[a[:xyz:`) raises `RegexError.unterminatedClass`; both are unambiguously invalid rather than an engine limitation on an otherwise-valid pattern, so they reject. Caught thirteen invalid schemas: invalid-schemas-accepted 230 → 217, no other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): an attribute use that references a global attribute carrying a `fixed` value constraint may not contradict it. A `fixed` on the reference whose value differs from the global's (compared in the attribute type's value space, so `1` and `01` are not wrongly flagged), or a `default` on a reference to a fixed global, is invalid (`au-props-correct.2`). A reference that omits its own value constraint inherits the global's fixed value and stays valid. Caught two invalid schemas: invalid-schemas-accepted 232 → 230, no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that adds element content may not extend a base whose whole content is a non-empty `all` group; the base's `all` would be nested in the sequence joining base and extension content (`cos-all-limited`). An empty-`all` base, or an attribute-only extension, stays valid. Caught one invalid schema: invalid-schemas-accepted 233 → 232, no other bucket moved.

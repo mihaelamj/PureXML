@@ -112,6 +112,26 @@ struct RegexTests {
         #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern("*ab") }
     }
 
+    @Test("An incomplete trailing escape is rejected")
+    func test_incompleteEscape() throws {
+        // A `\` with nothing after it is never a valid XSD pattern.
+        #expect(throws: PureXML.Regex.RegexError.incompleteEscape) { _ = try PureXML.Regex.Pattern("a\\") }
+        #expect(throws: PureXML.Regex.RegexError.incompleteEscape) { _ = try PureXML.Regex.Pattern("[a\\") }
+        // A completed escape stays valid: `\[` is a literal bracket.
+        #expect(try matches("a\\[", "a["))
+    }
+
+    @Test("An unterminated character class is rejected")
+    func test_unterminatedClass() throws {
+        // A `[` the expression ends before closing with `]` is invalid.
+        #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("a[") }
+        #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("[a[:xyz:") }
+        #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("[a-") }
+        // A closed class, and a class whose only `]` is escaped, stay valid.
+        #expect(try matches("[abc]", "b"))
+        #expect(try matches("[a\\]]", "]"))
+    }
+
     @Test("The empty pattern is valid and matches only the empty string")
     func test_emptyPattern() throws {
         // XSD grammar (Datatypes Appendix F): branch ::= piece*, so a branch
