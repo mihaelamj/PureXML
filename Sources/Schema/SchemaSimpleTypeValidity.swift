@@ -33,6 +33,19 @@ extension PureXML.Schema.XSDParser {
                 if !isForeign, isListOrUnionContainingList(item) {
                     errors.append("the item type of a list must be atomic or union of atomic, not a list or union containing list")
                 }
+                // src-simple-type.2: a list has its item type from EITHER the
+                // itemType attribute OR an inline simpleType child, never both and
+                // never neither.
+                if hasItemTypeAttribute(node) == hasSimpleTypeChild(node) {
+                    errors.append("a list must have either an 'itemType' attribute or an inline simpleType child, but not both")
+                }
+            }
+
+            // src-simple-type.3: a union draws its members from a memberTypes
+            // attribute, inline simpleType children, or both, so it must declare at
+            // least one of them (an empty union has no member type definitions).
+            if isEmptyUnion(node, local) {
+                errors.append("a union must declare at least one member type, through 'memberTypes' or an inline simpleType child")
             }
 
             for child in PureXML.Schema.XSDNode.elementChildren(node) {
@@ -42,6 +55,22 @@ extension PureXML.Schema.XSDParser {
 
         check(schema)
         return errors
+    }
+
+    /// A `union` element in the schema namespace that declares no member types at
+    /// all: neither a `memberTypes` attribute nor an inline `simpleType` child.
+    private static func isEmptyUnion(_ node: XSDTree, _ local: String?) -> Bool {
+        node.name?.namespaceURI == xsdNamespace && local == "union"
+            && PureXML.Schema.XSDNode.attribute(node, "memberTypes") == nil
+            && !hasSimpleTypeChild(node)
+    }
+
+    private static func hasItemTypeAttribute(_ node: XSDTree) -> Bool {
+        PureXML.Schema.XSDNode.attribute(node, "itemType") != nil
+    }
+
+    private static func hasSimpleTypeChild(_ node: XSDTree) -> Bool {
+        PureXML.Schema.XSDNode.elementChildren(node).contains { PureXML.Schema.XSDNode.localName($0) == "simpleType" }
     }
 
     private static func inScopeNamespaceBindings(of node: XSDTree) -> [String: String] {

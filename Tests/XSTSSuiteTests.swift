@@ -100,8 +100,13 @@ struct XSTSSuiteTests {
     /// type declares no `final` of its own (so `finalDefault="list"`/`"union"`
     /// blocks the matching list/union derivation) then caught two more invalid
     /// schemas: invalid-schemas accepted 217 → 215, no other bucket moved.
+    /// Requiring a `list` to draw its item type from exactly one of `itemType` or an
+    /// inline simpleType child, and a `union` to declare at least one member through
+    /// `memberTypes` or an inline simpleType child (src-simple-type.2/.3), then
+    /// caught one more invalid schema: invalid-schemas accepted 215 → 214, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 215
+    private let knownSchemaInvalidAccepted = 214
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
