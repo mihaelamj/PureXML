@@ -197,4 +197,22 @@ extension PureXML.Schema.XSDParser {
         }
         return errors
     }
+
+    /// The finding, if any, for occurrence on a named group's compositor: the
+    /// `all`/`choice`/`sequence` directly inside a top-level `xs:group` definition
+    /// must not carry `minOccurs`/`maxOccurs` (those belong on a group reference).
+    static func namedGroupOccurrenceErrors(_ group: XSDTree) -> [String] {
+        let xsd = PureXML.Schema.XSDParser.xsdNamespace
+        for child in PureXML.Schema.XSDNode.elementChildren(group) where child.name?.namespaceURI == xsd {
+            guard let local = PureXML.Schema.XSDNode.localName(child),
+                  local == "all" || local == "choice" || local == "sequence"
+            else { continue }
+            let hasOccurrence = PureXML.Schema.XSDNode.attribute(child, "minOccurs") != nil
+                || PureXML.Schema.XSDNode.attribute(child, "maxOccurs") != nil
+            if hasOccurrence {
+                return ["the compositor in a named group must not specify minOccurs or maxOccurs"]
+            }
+        }
+        return []
+    }
 }

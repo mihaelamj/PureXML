@@ -96,6 +96,7 @@ extension PureXML.Schema.XSDParser {
         }
         if node.name?.namespaceURI == xsdNamespace, let local {
             append(attributeValueErrors(node, bindings: currentBindings), at: node, into: &findings)
+            append(xsdNamespaceAttributeErrors(node, bindings: currentBindings), at: node, into: &findings)
             append(occurrenceOrderErrors(node), at: node, into: &findings)
             append(attributeApplicabilityErrors(node, local: local), at: node, into: &findings)
             let names = children.filter { $0.name?.namespaceURI == xsdNamespace }.compactMap(PureXML.Schema.XSDNode.localName)
@@ -123,6 +124,7 @@ extension PureXML.Schema.XSDParser {
         switch local {
         case "group" where PureXML.Schema.XSDNode.attribute(node, "name") != nil:
             errors += namedGroupErrors(names)
+            errors += namedGroupOccurrenceErrors(node)
         case "complexType":
             errors += elementDeclsConsistentErrors(node)
             errors += complexTypeOrderErrors(node)
@@ -217,6 +219,18 @@ extension PureXML.Schema.XSDParser {
                 }
             }
             return nil
+        }
+    }
+
+    /// Findings for attributes in the XML Schema namespace on a schema element
+    /// (e.g. `xsd:type`): the schema vocabulary defines no namespaced attributes,
+    /// so an XSD-namespace-qualified attribute is never valid (a foreign attribute
+    /// in any OTHER namespace is the author's own and is left alone). Namespace
+    /// declarations themselves (`xmlns`/`xmlns:p`) are not attributes here.
+    private static func xsdNamespaceAttributeErrors(_ node: XSDTree, bindings: [String: String]) -> [String] {
+        node.attributes.compactMap { attribute in
+            guard let prefix = attribute.name.prefix, prefix != "xmlns", bindings[prefix] == xsdNamespace else { return nil }
+            return "attribute '\(prefix):\(attribute.name.localName)' is in the XML Schema namespace, which defines no attributes"
         }
     }
 

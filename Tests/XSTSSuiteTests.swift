@@ -73,8 +73,13 @@ struct XSTSSuiteTests {
     /// `{37,17}`) as schema-invalid, while staying lenient on constructs the
     /// engine merely does not support, then caught eighteen invalid schemas:
     /// invalid-schemas-accepted 262 → 244, no other bucket moved.
+    /// Two schema-for-schemas structural rules then caught nine more invalid
+    /// schemas: a named group's compositor may not carry minOccurs/maxOccurs (those
+    /// belong on a reference), and an attribute in the XML Schema namespace (e.g.
+    /// `xsd:type`) is never valid. Invalid-schemas accepted 244 → 235, no other
+    /// bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 244
+    private let knownSchemaInvalidAccepted = 235
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
