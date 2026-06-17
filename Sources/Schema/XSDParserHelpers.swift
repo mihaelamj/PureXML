@@ -46,7 +46,7 @@ extension PureXML.Schema.XSDParser {
                             }
                             continue
                         }
-                        if let type = identityFieldType(field, host: element, constraint: constraint, context) {
+                        if let type = identityFieldType(field, host: element, constraint: constraint, containers: containers, context) {
                             types[identityFieldKey(constraint: constraint, field: field)] = type
                         }
                     }
@@ -76,11 +76,25 @@ extension PureXML.Schema.XSDParser {
         _ field: String,
         host: XSDTree,
         constraint: PureXML.Schema.IdentityConstraint,
+        containers: [XSDTree],
         _ context: PureXML.Schema.XSDContext,
     ) -> PureXML.Schema.SimpleType? {
         if field.hasPrefix("@") {
             let attributeName = identityFieldAttributeName(field)
-            return attributeType(named: attributeName, under: host, context)
+            if let type = attributeType(named: attributeName, under: host, context) { return type }
+            // The selector's target may be a global element referenced from the
+            // host rather than nested under it; the attribute is then on that
+            // element's own complex type, so field values compare in its value
+            // space (e.g. 3.0 and 3 are the same xsd:decimal key).
+            guard let target = selectorTargetLocalName(constraint.selector),
+                  let element = globalElementNode(named: target, containers),
+                  let complex = PureXML.Schema.XSDNode.firstChild(element, named: "complexType")
+            else { return nil }
+            for attribute in descendants(complex, named: "attribute") {
+                guard PureXML.Schema.XSDNode.attribute(attribute, "name") == attributeName else { continue }
+                if let use = PureXML.Schema.XSDParser.attributeUse(attribute, context) { return use.type }
+            }
+            return nil
         }
         if field == "." {
             let local = selectorTargetLocalName(constraint.selector)
@@ -98,6 +112,19 @@ extension PureXML.Schema.XSDParser {
     private static func selectorTargetLocalName(_ selector: String) -> String? {
         let token = selector.split(separator: "/").last.map(String.init) ?? selector
         return PureXML.Schema.XSDNode.stripPrefix(token)
+    }
+
+    /// The top-level (global) element declaration node of the given local name.
+    private static func globalElementNode(named local: String, _ containers: [XSDTree]) -> XSDTree? {
+        for container in containers {
+            for child in PureXML.Schema.XSDNode.elementChildren(container) {
+                guard PureXML.Schema.XSDNode.localName(child) == "element",
+                      PureXML.Schema.XSDNode.attribute(child, "name") == local
+                else { continue }
+                return child
+            }
+        }
+        return nil
     }
 
     private static func declaredElementSimpleType(

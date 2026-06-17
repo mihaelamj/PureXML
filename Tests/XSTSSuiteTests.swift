@@ -63,10 +63,15 @@ struct XSTSSuiteTests {
     /// the instance document then caught ten more (the idc004/5/6 cluster and
     /// namespace-resolution cases): invalid accepted 143 → 133, no other bucket
     /// moved.
+    ///
+    /// Resolving an identity-constraint attribute field's type through the
+    /// selector's target global element (not just the host's descendants) lets a
+    /// `unique`/`key` compare values in their value space (3.0 and 3 are the same
+    /// xsd:decimal key): invalid accepted 133 → 132, no other bucket moved.
     private let knownSchemaValidRejected = 1
     private let knownSchemaInvalidAccepted = 262
     private let knownInstanceValidRejected = 3
-    private let knownInstanceInvalidAccepted = 133
+    private let knownInstanceInvalidAccepted = 132
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
