@@ -68,84 +68,13 @@ struct XSTSSuiteTests {
     /// selector's target global element (not just the host's descendants) lets a
     /// `unique`/`key` compare values in their value space (3.0 and 3 are the same
     /// xsd:decimal key): invalid accepted 133 → 132, no other bucket moved.
-    /// Rejecting unambiguously malformed regex in `pattern` facets (a reversed
-    /// character-class range `[b-a]`, an empty class `[]`, a reversed quantifier
-    /// `{37,17}`) as schema-invalid, while staying lenient on constructs the
-    /// engine merely does not support, then caught eighteen invalid schemas:
-    /// invalid-schemas-accepted 262 → 244, no other bucket moved.
-    /// Two schema-for-schemas structural rules (a named group's compositor may not
-    /// carry minOccurs/maxOccurs; an attribute in the XML Schema namespace is never
-    /// valid) then caught nine more: invalid-schemas accepted 244 → 235.
-    /// Rejecting a complexContent extension that adds element content (a model
-    /// group) on top of a simpleContent base (cos-ct-extends.1.4.2.2) then caught
-    /// two more invalid schemas; an attribute-only complexContent extension of a
-    /// simpleContent base stays valid. Invalid-schemas accepted 235 → 233, no other
-    /// bucket moved.
-    /// Rejecting a complexContent extension that adds element content on top of a
-    /// base whose whole content is an `all` group (the all would be nested in the
-    /// joining sequence; cos-all-limited) then caught one more invalid schema:
-    /// invalid-schemas accepted 233 → 232, no other bucket moved.
-    /// Rejecting an attribute use that references a global attribute with a `fixed`
-    /// value constraint but contradicts it (a value-space-differing `fixed`, or a
-    /// `default`; au-props-correct.2) then caught two more invalid schemas:
-    /// invalid-schemas accepted 232 → 230, no other bucket moved.
-    /// Rejecting a `pattern` facet whose regular expression ends mid-token (a
-    /// trailing `\` with no escaped character, or a `[` character class never
-    /// closed with `]`), both unambiguously invalid and never an engine
-    /// limitation, then caught thirteen more invalid schemas: invalid-schemas
-    /// accepted 230 → 217, no other bucket moved.
-    /// Inheriting the schema's `finalDefault` as a simple type's `{final}` when the
-    /// type declares no `final` of its own (so `finalDefault="list"`/`"union"`
-    /// blocks the matching list/union derivation) then caught two more invalid
-    /// schemas: invalid-schemas accepted 217 → 215, no other bucket moved.
-    /// Requiring a `list` to draw its item type from exactly one of `itemType` or an
-    /// inline simpleType child, and a `union` to declare at least one member through
-    /// `memberTypes` or an inline simpleType child (src-simple-type.2/.3), then
-    /// caught one more invalid schema: invalid-schemas accepted 215 → 214, no other
-    /// bucket moved.
-    /// Enforcing the `(annotation?)` content model of an `xsd:notation` declaration
-    /// (no element child other than an annotation, no non-whitespace character
-    /// content) then caught three more invalid schemas: invalid-schemas accepted
-    /// 214 → 211, no other bucket moved.
-    /// Adding notations to the component-name uniqueness check (they have their own
-    /// symbol space; two notations of the same name and namespace clash) then caught
-    /// one more invalid schema: invalid-schemas accepted 211 → 210, no other bucket
-    /// moved.
-    /// Holding a referencing `attributeGroup` (one with `ref`) to its `(annotation?)`
-    /// content model, so it may not also declare attributes, nested attributeGroup
-    /// references, or an anyAttribute, then caught three more invalid schemas:
-    /// invalid-schemas accepted 210 → 207, no other bucket moved.
-    /// Rejecting an attribute `ref` that also carries `form` (src-attribute.3.2) and
-    /// an attribute declaration named `xmlns` (no-xmlns) then caught four more
-    /// invalid schemas: invalid-schemas accepted 207 → 203, no other bucket moved.
-    /// Rejecting a `\p{...}` property whose name can be no XSD charProp under any
-    /// repertoire (empty, the bare `Is`, a non-block name with a non-letter, or `Is`
-    /// followed by a non-block character: `\p{\L}`, `\p{Is}`) while staying lenient
-    /// on a well-formed but unrecognised block name then caught three more invalid
-    /// schemas: invalid-schemas accepted 203 → 200, no other bucket moved.
-    /// Requiring a `complexContent` or `simpleContent` to contain exactly one
-    /// `restriction` or `extension` (an empty `<complexContent/>` has none) then
-    /// caught three more invalid schemas: invalid-schemas accepted 200 → 197, no
-    /// other bucket moved.
-    /// Requiring a `complexContent` extension that explicitly states `mixed` to agree
-    /// with its base's mixedness (cos-ct-extends.1.4.3.2.2.1; an extension that omits
-    /// `mixed` inherits the base's, so only an explicit conflict is invalid) then
-    /// caught three more invalid schemas: invalid-schemas accepted 197 → 194, no
-    /// other bucket moved.
-    /// Forbidding the global-only properties `abstract`, `final`, and
-    /// `substitutionGroup` on a LOCAL element declaration (an element particle, not a
-    /// direct child of schema; invalid at any value, so `abstract="false"` is rejected
-    /// too) then caught five more invalid schemas: invalid-schemas accepted 194 → 189,
-    /// no other bucket moved.
-    /// Inheriting the schema's `finalDefault` as a complex type's `{final}` when the
-    /// type states no `final` of its own (so `finalDefault="#all"`/`"restriction"`
-    /// blocks a restriction or extension derivation from it; explicit `final=""`
-    /// overrides) then caught four more invalid schemas: invalid-schemas accepted
-    /// 189 → 185, no other bucket moved.
-    /// Validating an element/attribute `default`/`fixed` against an INLINE type (an
-    /// inline simpleType, or an inline complex type with simpleContent) the same way
-    /// a named `type` reference already is, then caught two more invalid schemas:
-    /// invalid-schemas accepted 185 → 183, no other bucket moved.
+    /// The invalid-schemas-accepted bucket has since been driven 262 → 181 across
+    /// many schema-validity rules (regex `pattern` validity, schema-for-schemas
+    /// structure, derivation/`final`/`finalDefault`, notation, attribute and
+    /// attributeGroup constraints, value constraints, and `redefine` resolution);
+    /// each rule and its exact bucket delta is recorded per-entry in CHANGELOG.md.
+    /// The remaining residue is the cos-particle-restrict, redefine/composition, and
+    /// wildcard-restriction tail (see schema-validity-burndown notes). Recent steps:
     /// Requiring each component a `redefine` names to exist (same kind, same name) in
     /// the redefined schema once that schema is loaded (src-redefine.6/7.2.1) then
     /// caught one more invalid schema: invalid-schemas accepted 183 → 182, no other
