@@ -66,17 +66,19 @@ extension PureXML.Schema {
                 return emptiable(base)
             }
             switch (restricted.term, base.term) {
-            case let (.element(restrictedName, _, restrictedTypeName, restrictedValue, restrictedBlock), .element(baseName, baseType, baseTypeName, baseValue, baseBlock)):
+            case let (.element(rName, _, rTypeName, rValue, rBlock, rNil), .element(bName, bType, bTypeName, bValue, bBlock, bNil)):
                 // NameAndTypeOK: beyond name, occurrence, and type derivation, the
-                // restricting element's {disallowed substitutions} must be a superset
-                // of the base's (a restriction may block more, never fewer), and if
-                // the base is fixed the restriction must be fixed to the same value.
+                // restriction's {disallowed substitutions} must be a superset of the
+                // base's (it may block more, never fewer); if the base is fixed the
+                // restriction must be fixed to the same value; and it may not be
+                // nillable unless the base element is.
                 return rangeSubsumed(restricted, base)
-                    && sameName(restrictedName, baseName)
-                    && restrictedBlock.isSuperset(of: baseBlock)
-                    && fixedValueOK(restrictedValue, baseValue, baseType, types)
-                    && elementTypeRestrictionOK(restrictedTypeName, baseTypeName, types, derivation)
-            case let (.element(name, _, _, _, _), .wildcard(wildcard)):
+                    && sameName(rName, bName)
+                    && rBlock.isSuperset(of: bBlock)
+                    && (!rNil || bNil)
+                    && fixedValueOK(rValue, bValue, bType, types)
+                    && elementTypeRestrictionOK(rTypeName, bTypeName, types, derivation)
+            case let (.element(name, _, _, _, _, _), .wildcard(wildcard)):
                 return rangeSubsumed(restricted, base) && wildcard.admits(name)
             case let (.wildcard(restrictedWildcard), .wildcard(baseWildcard)):
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
@@ -91,7 +93,7 @@ extension PureXML.Schema {
                 // element restricting a once-or-more base group.
                 return rangeWithinWildcard(derivedMin: 1, derivedMax: 1, wildcardMin: base.minOccurs, wildcardMax: base.maxOccurs)
                     && groupValid(Group(compositor: .sequence, particles: [restricted]), baseGroup, types, derivation)
-            case let (.group, .element(baseName, _, baseTypeName, _, _)):
+            case let (.group, .element(baseName, _, baseTypeName, _, _, _)):
                 // The mirror of RecurseAsIfGroup, by the same cardinality argument as
                 // group/wildcard: a base element accepts only its own name, its own
                 // occurrence count of times. The derived group is a valid restriction
@@ -310,7 +312,7 @@ extension PureXML.Schema {
         /// element by name, a nested wildcard by narrowing.
         private static func leavesAdmitted(_ particle: Particle, by wildcard: Wildcard) -> Bool {
             switch particle.term {
-            case let .element(name, _, _, _, _): wildcard.admits(name)
+            case let .element(name, _, _, _, _, _): wildcard.admits(name)
             case let .wildcard(inner): narrows(inner, wildcard)
             case let .group(group): group.particles.allSatisfy { leavesAdmitted($0, by: wildcard) }
             }
@@ -328,7 +330,7 @@ extension PureXML.Schema {
             _ derivation: [String: TypeDerivation],
         ) -> Bool {
             switch particle.term {
-            case let .element(name, _, typeName, _, _):
+            case let .element(name, _, typeName, _, _, _):
                 sameName(name, baseName) && elementTypeRestrictionOK(typeName, baseTypeName, types, derivation)
             case .wildcard:
                 false

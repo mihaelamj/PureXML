@@ -74,6 +74,7 @@ extension PureXML.Schema.XSDParser {
                 typeName: elementTypeName(node),
                 valueConstraint: valueConstraint(of: node),
                 block: methodSet(XSDNode.attribute(node, "block") ?? context.blockDefault),
+                nillable: ["true", "1"].contains(XSDNode.attribute(node, "nillable")),
             ),
         )
     }

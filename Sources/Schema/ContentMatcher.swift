@@ -247,7 +247,7 @@ extension PureXML.Schema {
 
         private mutating func term(_ term: PureXML.Schema.Term) -> (start: Int, accept: Int) {
             switch term {
-            case let .element(name, type, _, constraint, _):
+            case let .element(name, type, _, constraint, _, _):
                 let fragment = labeled(.name(name))
                 states[fragment.start].elementType = type
                 states[fragment.start].valueConstraint = constraint

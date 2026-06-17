@@ -107,7 +107,14 @@ public extension PureXML.Schema {
         /// `block` is the element's `{disallowed substitutions}` (its own `block`, or
         /// the schema's `blockDefault`), needed for the NameAndTypeOK block-superset
         /// rule in Particle Valid (Restriction); empty when nothing is blocked.
-        case element(name: PureXML.Model.QualifiedName, type: ElementType?, typeName: String?, valueConstraint: ValueConstraint? = nil, block: Set<DerivationMethod> = [])
+        case element(
+            name: PureXML.Model.QualifiedName,
+            type: ElementType?,
+            typeName: String?,
+            valueConstraint: ValueConstraint? = nil,
+            block: Set<DerivationMethod> = [],
+            nillable: Bool = false,
+        )
         case group(Group)
         case wildcard(Wildcard)
     }

@@ -99,8 +99,11 @@ struct XSTSSuiteTests {
     /// base element must be fixed to the same value, compared in the base type's
     /// value space) then caught four more invalid schemas: invalid-schemas accepted
     /// 148 → 144, no other bucket moved.
+    /// Enforcing the NameAndTypeOK nillable clause (a restriction may not be nillable
+    /// unless the base element is) then caught two more invalid schemas:
+    /// invalid-schemas accepted 144 → 142, no other bucket moved.
     private let knownSchemaValidRejected = 1
-    private let knownSchemaInvalidAccepted = 144
+    private let knownSchemaInvalidAccepted = 142
     private let knownInstanceValidRejected = 3
     private let knownInstanceInvalidAccepted = 132
 
