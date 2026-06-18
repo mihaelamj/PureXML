@@ -43,4 +43,22 @@ struct SchemaRedefineAttributeGroupTests {
             base: "<xs:attribute name='a' use='required' type='xs:string'/><xs:attribute name='p' use='prohibited' type='xs:string'/><xs:attribute name='o' type='xs:string'/>",
         )
     }
+
+    @Test("relaxing a fixed value in the redefinition is rejected")
+    func test_relaxFixedRejected() throws {
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attribute name='a' type='xs:string' default='abc'/>",
+                base: "<xs:attribute name='a' type='xs:string' fixed='abc'/>",
+            )
+        }
+    }
+
+    @Test("keeping the same fixed value in the redefinition is valid")
+    func test_keepFixedAccepted() throws {
+        _ = try redefine(
+            group: "<xs:attribute name='a' type='xs:string' fixed='abc'/>",
+            base: "<xs:attribute name='a' type='xs:string' fixed='abc'/>",
+        )
+    }
 }

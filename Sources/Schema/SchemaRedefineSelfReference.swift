@@ -90,29 +90,42 @@ extension PureXML.Schema.XSDParser {
     private static func attributeGroupRestrictionErrors(name: String, base: XSDTree, redefinition: XSDTree) -> [String] {
         var errors: [String] = []
         let children = RedefineNode.elementChildren(redefinition)
-        // The redefinition's attributes by name -> `use`; re-declaring a base
-        // prohibited attribute AS prohibited keeps it prohibited (valid), so the
-        // re-introduction check needs the use, not mere presence of the name.
-        var redefinedUse: [String: String] = [:]
+        // The redefinition's attributes by name, so a check can read the `use` (a
+        // re-declared prohibited attribute kept prohibited is valid) and the `fixed`
+        // value (a restriction may not relax the original's fixed constraint).
+        var redefined: [String: XSDTree] = [:]
         for attribute in children where RedefineNode.localName(attribute) == "attribute" {
-            if let attrName = RedefineNode.attribute(attribute, "name") {
-                redefinedUse[attrName] = RedefineNode.attribute(attribute, "use") ?? "optional"
-            }
+            if let attrName = RedefineNode.attribute(attribute, "name") { redefined[attrName] = attribute }
         }
+        let use: (String) -> String? = { redefined[$0].map { RedefineNode.attribute($0, "use") ?? "optional" } }
         let hasReference = children.contains { RedefineNode.localName($0) == "attributeGroup" }
         let baseHasWildcard = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "anyAttribute" }
         for attribute in RedefineNode.children(base, named: "attribute") {
             guard let attrName = RedefineNode.attribute(attribute, "name") else { continue }
+            // A restriction may not relax a fixed value: if the original fixes an
+            // attribute, the redefinition's matching (non-prohibited) attribute must
+            // fix it to the same value.
+            if relaxesFixedValue(base: attribute, redefined: redefined[attrName], use: use(attrName)) {
+                errors.append("a redefined attribute group '\(name)' may not relax the fixed value of '\(attrName)'")
+            }
             switch RedefineNode.attribute(attribute, "use") {
-            case "required" where !hasReference && redefinedUse[attrName] == nil:
+            case "required" where !hasReference && redefined[attrName] == nil:
                 errors.append("a redefined attribute group '\(name)' may not eliminate the required attribute '\(attrName)'")
-            case "prohibited" where !baseHasWildcard && redefinedUse[attrName] != nil && redefinedUse[attrName] != "prohibited":
+            case "prohibited" where !baseHasWildcard && use(attrName) != nil && use(attrName) != "prohibited":
                 errors.append("a redefined attribute group '\(name)' may not re-introduce the prohibited attribute '\(attrName)'")
             default:
                 break
             }
         }
         return errors
+    }
+
+    /// A base attribute with a `fixed` value is relaxed when the redefinition declares
+    /// a matching, non-prohibited attribute whose `fixed` value differs (or is absent).
+    /// Prohibiting or omitting the attribute is not relaxation, so it is left alone.
+    private static func relaxesFixedValue(base: XSDTree, redefined: XSDTree?, use: String?) -> Bool {
+        guard let fixed = RedefineNode.attribute(base, "fixed"), let redefined, use != "prohibited" else { return false }
+        return RedefineNode.attribute(redefined, "fixed") != fixed
     }
 
     /// The reference NODES of `kind` nested directly in `node`'s model, stopping at
