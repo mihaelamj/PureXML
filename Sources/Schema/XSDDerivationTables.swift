@@ -81,25 +81,40 @@ extension PureXML.Schema.XSDParser {
 
     private static func gatherElement(_ element: XSDTree, in namespace: String?, into tables: inout DerivationTables) {
         guard let name = XSDDerivNode.attribute(element, "name") else { return }
-        let key = derivationKey(name, in: namespace)
+        let isGlobal = element.parent.map {
+            $0.name?.namespaceURI == xsdNamespace && XSDDerivNode.localName($0) == "schema"
+        } ?? false
+        // A global element is always in the target namespace; a local element is in
+        // it only when qualified (its `form`, else the schema's elementFormDefault),
+        // so its namespaced key matches the instance element's qualified name.
+        let elementNamespace = isGlobal ? namespace : localElementNamespace(element, in: namespace)
+        let key = derivationKey(name, in: elementNamespace)
         if XSDDerivNode.attribute(element, "abstract") == "true" { tables.abstractElements.insert(name) }
         let block = blockMethods(of: element, admitting: [.extension, .restriction, .substitution])
         if !block.isEmpty {
             tables.elementBlock[name] = block
             tables.nsElementBlock[key] = block
         }
-
-        let isGlobal = element.parent.map {
-            $0.name?.namespaceURI == xsdNamespace && XSDDerivNode.localName($0) == "schema"
-        } ?? false
         if isGlobal {
             let finalSet = finalMethods(of: element)
             if !finalSet.isEmpty { tables.elementFinal[name] = finalSet }
         }
-
         if let type = XSDDerivNode.attribute(element, "type") {
             tables.elementTypeNames[name] = XSDDerivNode.stripPrefix(type)
             tables.nsElementTypeNames[key] = resolvedKey(of: type, on: element, default: namespace)
+        }
+    }
+
+    /// The namespace a local element's name takes at instance level: the target
+    /// namespace when the element is qualified (its own `form`, else the schema's
+    /// `elementFormDefault`), otherwise no namespace.
+    private static func localElementNamespace(_ element: XSDTree, in namespace: String?) -> String? {
+        switch XSDDerivNode.attribute(element, "form") {
+        case "qualified": return namespace
+        case "unqualified": return nil
+        default:
+            let schema = XSDDerivNode.schemaOwner(element)
+            return XSDDerivNode.attribute(schema, "elementFormDefault") == "qualified" ? namespace : nil
         }
     }
 
