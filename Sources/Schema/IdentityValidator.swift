@@ -36,9 +36,27 @@ private struct FieldValue: Equatable {
             if lhsType.base == rhsType.base {
                 return lhsType.valueMatches(lhs.string, literal: rhs.string)
             }
-            return false
+            return Self.numericallyEqual(lhs.string, lhsType.base, rhs.string, rhsType.base)
         }
         return lhs.string == rhs.string
+    }
+
+    /// Whether two values denote the same number across the decimal-derived
+    /// numeric family. `decimal` and the integer types share one value space, so
+    /// `1` (decimal) equals `1` (unsignedByte). Distinct primitive spaces (a
+    /// number versus a string, or `float`/`double`) are excluded, so they never
+    /// compare equal here.
+    private static func numericallyEqual(
+        _ left: String,
+        _ leftBase: PureXML.Schema.BuiltinType,
+        _ right: String,
+        _ rightBase: PureXML.Schema.BuiltinType,
+    ) -> Bool {
+        guard leftBase.isDecimalDerived, rightBase.isDecimalDerived,
+              let leftValue = PureXML.Schema.DecimalValue(left, allowFraction: true),
+              let rightValue = PureXML.Schema.DecimalValue(right, allowFraction: true)
+        else { return false }
+        return leftValue == rightValue
     }
 
     private var qnameValue: (uri: String?, local: String)? {

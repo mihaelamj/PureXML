@@ -153,8 +153,10 @@ struct XSTSSuiteTests {
     /// Instance bucket: xsi:type must derive from the declared type (cvc-elt.4.3.2.1,
     /// 133 -> 107); block="substitution" bars all members whether or not the head is
     /// typed (107 -> 101); the ur-type `xsd:anyType` processes its wildcards as `lax`
-    /// (XSD 1.0 §3.4.7), validating declared children/attributes (101 -> 95).
-    private let knownInstanceInvalidAccepted = 95
+    /// (XSD 1.0 §3.4.7), validating declared children/attributes (101 -> 95);
+    /// identity-constraint fields compare across the decimal-derived numeric family
+    /// (1 decimal equals 1 unsignedByte, 95 -> 94).
+    private let knownInstanceInvalidAccepted = 94
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

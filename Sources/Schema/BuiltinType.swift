@@ -98,6 +98,15 @@ public extension PureXML.Schema {
             return false
         }
 
+        /// Whether this type's value space is the `decimal` value space: `decimal`
+        /// itself or any of the integer family (which derive from it). Values from
+        /// two such types compare in the one shared value space, so `1` (decimal)
+        /// equals `1` (unsignedByte). `float` and `double` are distinct primitive
+        /// value spaces and are deliberately excluded.
+        var isDecimalDerived: Bool {
+            self == .decimal || Self.integerLike.contains(self)
+        }
+
         var primitive: Primitive {
             if let primitive = Self.stringLike[self] { return primitive }
             if Self.integerLike.contains(self) { return .integer }
