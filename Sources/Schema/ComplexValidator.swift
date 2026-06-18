@@ -275,7 +275,7 @@ public extension PureXML.Schema {
             // reference so re-entry does not re-read the same xsi:type. A `block` on
             // the declared type can forbid the substitution; an abstract declared
             // type requires one.
-            if let xsiError = xsiTypeOverrideError(declared: declared, child: child, at: path) {
+            if let xsiError = xsiTypeOverrideError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) {
                 errors.append(xsiError)
                 return
             }

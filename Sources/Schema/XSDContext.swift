@@ -162,42 +162,6 @@ extension PureXML.Schema {
                 tuple.location != nil && localName(tuple.tree) == "schema"
             }
         }
-
-        /// The transitive substitution-group membership across all definition
-        /// containers: each head element maps to every element that may substitute
-        /// for it, directly or through a chain of heads.
-        static func substitutionMembers(_ containers: [XSDTree]) -> [String: [String]] {
-            var direct: [String: [String]] = [:]
-            for container in containers {
-                for element in children(container, named: "element") {
-                    guard let name = attribute(element, "name"), let head = attribute(element, "substitutionGroup") else {
-                        continue
-                    }
-                    direct[stripPrefix(head), default: []].append(name)
-                }
-            }
-            var closure: [String: [String]] = [:]
-            for head in direct.keys {
-                // Breadth-first in document order: a `popLast()` stack would reverse the
-                // members, but the substitution-group expansion must stay in declaration
-                // order. The order-preserving RecurseLax restriction check relies on it
-                // (a base `choice(head, m1, m2)` must list `m1` before `m2` so a derived
-                // `choice(m1, m2)` maps in order).
-                var members: [String] = []
-                var queue = direct[head] ?? []
-                var seen: Set<String> = []
-                var index = 0
-                while index < queue.count {
-                    let member = queue[index]
-                    index += 1
-                    guard seen.insert(member).inserted else { continue }
-                    members.append(member)
-                    queue += direct[member] ?? []
-                }
-                closure[head] = members
-            }
-            return closure
-        }
     }
 
     /// The result of compiling a schema document: its global element
@@ -213,19 +177,29 @@ extension PureXML.Schema {
         var nillableElements: Set<String> = []
         /// The `default`/`fixed` value constraint declared on each element name.
         var elementConstraints: [String: ValueConstraint] = [:]
-        /// Local names of complex types declared `abstract="true"`: an element of
-        /// such a type must supply an `xsi:type` naming a concrete derived type.
+        /// Local names of complex types declared `abstract="true"`. Bare-keyed, for
+        /// the schema-consistency rules and direct unit tests.
         var abstractTypes: Set<String> = []
         /// Local names of element declarations declared `abstract="true"`: they may
         /// not appear in an instance directly, only through a substitution member.
         var abstractElements: Set<String> = []
         /// Derivation methods the named type forbids when used through `xsi:type`.
+        /// Bare-keyed.
         var typeBlock: [String: Set<DerivationMethod>] = [:]
         /// Derivation methods each element declaration forbids through `xsi:type`.
+        /// Bare-keyed.
         var elementBlock: [String: Set<DerivationMethod>] = [:]
         /// Each named complex type's base type and derivation method, the backbone
-        /// the `block` check walks from an `xsi:type` to its declared type.
+        /// the schema-consistency rules walk. Bare-keyed.
         var typeDerivation: [String: TypeDerivation] = [:]
+        /// Namespaced (`{ns}local`) views of the abstract-type set, `block` tables,
+        /// and derivation backbone, for the INSTANCE-validity subsystem, where two
+        /// imported types sharing a local name in different namespaces must not
+        /// collide.
+        var nsAbstractTypes: Set<String> = []
+        var nsTypeBlock: [String: Set<DerivationMethod>] = [:]
+        var nsElementBlock: [String: Set<DerivationMethod>] = [:]
+        var nsTypeDerivation: [String: TypeDerivation] = [:]
         /// Derivation methods each named type declares `final`, for the
         /// schema-consistency rules.
         var typeFinal: [String: Set<DerivationMethod>] = [:]

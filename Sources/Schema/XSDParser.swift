@@ -41,7 +41,7 @@ extension PureXML.Schema {
             var locationCheckVisited: Set<String> = []
             let failedSchemaReferences = XSDNode.failedSchemaReferences(schema, wrappedLoader, &locationCheckVisited)
             let containers = containerTuples.map(\.tree)
-            let derivation = derivationTables(containers)
+            let derivation = derivationTables(containers, mainTargetNamespace: XSDNode.attribute(schema, "targetNamespace"))
             let containerLocations = containerLocationMap(containerTuples, rootLocation: rootLocation)
             let compositionLoaded = XSDNode.compositionLoaded(from: containerTuples)
             var context = createContext(
@@ -76,12 +76,17 @@ extension PureXML.Schema.XSDParser {
         containerLocations: [ObjectIdentifier: String?],
         compositionLoaded: Bool,
     ) -> PureXML.Schema.XSDContext {
+        let mainTargetNamespace = XSDNode.attribute(schema, "targetNamespace")
+        let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: mainTargetNamespace)
         var context = XSDContext(
             simpleTypes: [:],
             attributeGroups: indexByName(allChildren(containers, named: "attributeGroup")),
             groups: indexByName(allChildren(containers, named: "group")),
-            targetNamespace: XSDNode.attribute(schema, "targetNamespace"),
-            substitutions: filterSubstitutions(XSDNode.substitutionMembers(containers), derivation),
+            targetNamespace: mainTargetNamespace,
+            substitutions: filterSubstitutions(
+                XSDNode.substitutionMembers(containers, namespaceMap: namespaceMap, mainTargetNamespace: mainTargetNamespace),
+                derivation,
+            ),
             abstractElements: derivation.abstractElements,
             compositionLoaded: compositionLoaded,
             containerLocations: containerLocations,
@@ -188,6 +193,10 @@ extension PureXML.Schema.XSDParser {
             typeBlock: build.derivation.typeBlock,
             elementBlock: build.derivation.elementBlock,
             typeDerivation: build.derivation.typeDerivation,
+            nsAbstractTypes: build.derivation.nsAbstractTypes,
+            nsTypeBlock: build.derivation.nsTypeBlock,
+            nsElementBlock: build.derivation.nsElementBlock,
+            nsTypeDerivation: build.derivation.nsTypeDerivation,
             typeFinal: build.derivation.typeFinal,
             targetNamespace: build.context.targetNamespace,
             schemaErrors: build.context.diagnostics.deduplicated,

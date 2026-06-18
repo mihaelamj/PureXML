@@ -213,6 +213,17 @@ extension PureXML.Schema.XSDParser {
         "element:\(name)"
     }
 
+    /// Splits a namespaced identity key (`{ns}local`, as produced by
+    /// ``ComplexValidator/key(_:)``) into its local name and namespace. An empty
+    /// namespace segment is reported as nil (no namespace). A key with no namespace
+    /// braces is treated as a bare local name in no namespace.
+    static func unpackElementName(_ key: String) -> (String, String?) {
+        guard key.hasPrefix("{"), let close = key.firstIndex(of: "}") else { return (key, nil) }
+        let uri = String(key[key.index(after: key.startIndex) ..< close])
+        let local = String(key[key.index(after: close)...])
+        return (local, uri.isEmpty ? nil : uri)
+    }
+
     /// The local name from a type-table key (`type:{namespace}local` or a legacy bare name).
     static func bareTypeLocalName(_ reference: String) -> String {
         guard reference.hasPrefix("type:") else { return reference }

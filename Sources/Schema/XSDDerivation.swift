@@ -12,6 +12,20 @@ extension PureXML.Schema.XSDParser {
     /// `block`, `final`, and abstract usage. The structural subset check for a
     /// complex-type restriction ("Particle Valid (Restriction)" in XSD 1.0) runs
     /// separately at schema compile, see ``ParticleRestriction``.
+    /// The derivation control facts.
+    ///
+    /// The original fields (`typeDerivation`, `typeBlock`, etc.) are keyed by BARE
+    /// local name and feed the schema-validity machinery (``ParticleRestriction``,
+    /// ``CompiledSchemaFacts``, ``substitutionTypeErrors(_:_:_:_:_:)``), which
+    /// resolves component references to local names and is the single-namespace
+    /// consistent identity those rules compare by.
+    ///
+    /// The `ns`-prefixed fields are keyed by namespaced identity (`{ns}local`,
+    /// matching ``ComplexValidator/key(_:)``) and feed the INSTANCE-validity
+    /// derivation/substitution subsystem, where two imported types with the same
+    /// local name in different namespaces must not collide. They are built from the
+    /// same nodes through each container's resolved target namespace and its prefix
+    /// bindings.
     struct DerivationTables {
         var typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:]
         var abstractTypes: Set<String> = []
@@ -21,65 +35,17 @@ extension PureXML.Schema.XSDParser {
         var elementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
         var elementFinal: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
         var elementTypeNames: [String: String] = [:]
-    }
 
-    static func derivationTables(_ containers: [XSDTree]) -> DerivationTables {
-        var tables = DerivationTables()
-        for container in containers {
-            for type in descendants(container, named: "complexType") {
-                gatherType(type, into: &tables)
-            }
-            for type in descendants(container, named: "simpleType") {
-                gatherSimpleType(type, into: &tables)
-            }
-            for element in descendants(container, named: "element") {
-                gatherElement(element, into: &tables)
-            }
-        }
-        return tables
-    }
-
-    /// Records a named `simpleType`'s restriction derivation and `final` controls.
-    /// A `simpleType` derives from its `restriction`'s `base`; a `list`/`union`
-    /// constructs a new type (deriving from `anySimpleType`), so it is left
-    /// unrecorded, which keeps two independent list/union types correctly
-    /// non-derivable from one another.
-    private static func gatherSimpleType(_ type: XSDTree, into tables: inout DerivationTables) {
-        guard let name = XSDDerivNode.attribute(type, "name") else { return }
-        let finalSet = methodSet(XSDDerivNode.attribute(type, "final"))
-        if !finalSet.isEmpty { tables.typeFinal[name] = finalSet }
-        guard let restriction = XSDDerivNode.firstChild(type, named: "restriction"),
-              let base = XSDDerivNode.attribute(restriction, "base") else { return }
-        tables.typeDerivation[name] = PureXML.Schema.TypeDerivation(base: XSDDerivNode.stripPrefix(base), method: .restriction)
-    }
-
-    private static func gatherType(_ type: XSDTree, into tables: inout DerivationTables) {
-        guard let name = XSDDerivNode.attribute(type, "name") else { return }
-        if XSDDerivNode.attribute(type, "abstract") == "true" { tables.abstractTypes.insert(name) }
-        let block = methodSet(XSDDerivNode.attribute(type, "block"))
-        if !block.isEmpty { tables.typeBlock[name] = block }
-        let finalSet = finalMethods(of: type)
-        if !finalSet.isEmpty { tables.typeFinal[name] = finalSet }
-        if let derivation = derivationInfo(type) { tables.typeDerivation[name] = derivation }
-    }
-
-    private static func gatherElement(_ element: XSDTree, into tables: inout DerivationTables) {
-        guard let name = XSDDerivNode.attribute(element, "name") else { return }
-        if XSDDerivNode.attribute(element, "abstract") == "true" { tables.abstractElements.insert(name) }
-        let block = methodSet(XSDDerivNode.attribute(element, "block"))
-        if !block.isEmpty { tables.elementBlock[name] = block }
-
-        let isGlobal = element.parent.map {
-            $0.name?.namespaceURI == xsdNamespace && XSDDerivNode.localName($0) == "schema"
-        } ?? false
-        if isGlobal {
-            let finalSet = finalMethods(of: element)
-            if !finalSet.isEmpty { tables.elementFinal[name] = finalSet }
-        }
-
-        if let type = XSDDerivNode.attribute(element, "type") {
-            tables.elementTypeNames[name] = XSDDerivNode.stripPrefix(type)
-        }
+        /// Namespaced (`{ns}local`) derivation backbone for instance validation.
+        var nsTypeDerivation: [String: PureXML.Schema.TypeDerivation] = [:]
+        /// Namespaced complex types declared `abstract`.
+        var nsAbstractTypes: Set<String> = []
+        /// Namespaced type `{prohibited substitutions}`.
+        var nsTypeBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
+        /// Namespaced element `{disallowed substitutions}`.
+        var nsElementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
+        /// Namespaced element name (`{ns}elem`) to namespaced declared type (`{ns}type`).
+        var nsElementTypeNames: [String: String] = [:]
     }
 
     /// Parses a `block`/`final`/`substitutionGroup`-style value: `#all` for every
@@ -336,7 +302,7 @@ extension PureXML.Schema.XSDParser {
     static func filterSubstitutions(_ subs: [String: [String]], _ tables: DerivationTables) -> [String: [String]] {
         var result: [String: [String]] = [:]
         for (head, members) in subs {
-            guard let blocked = tables.elementBlock[head] else {
+            guard let blocked = tables.nsElementBlock[head] else {
                 result[head] = members
                 continue
             }
@@ -350,13 +316,13 @@ extension PureXML.Schema.XSDParser {
             }
             // The type-derivation block (extension/restriction) drops only members
             // reaching the head's type by a blocked method; it needs the head's type.
-            guard let headType = tables.elementTypeNames[head] else {
+            guard let headType = tables.nsElementTypeNames[head] else {
                 result[head] = members
                 continue
             }
             result[head] = members.filter { member in
-                guard let memberType = tables.elementTypeNames[member],
-                      let methods = derivationMethods(from: memberType, to: headType, tables.typeDerivation)
+                guard let memberType = tables.nsElementTypeNames[member],
+                      let methods = derivationMethods(from: memberType, to: headType, tables.nsTypeDerivation)
                 else {
                     return true
                 }

@@ -130,11 +130,11 @@ public extension PureXML.Schema {
             identityFieldTypes = compiled.identityFieldTypes
             nillableElements = compiled.nillableElements
             elementConstraints = compiled.elementConstraints
-            abstractTypes = compiled.abstractTypes
+            abstractTypes = compiled.nsAbstractTypes
             abstractElements = compiled.abstractElements
-            typeBlock = compiled.typeBlock
-            elementBlock = compiled.elementBlock
-            typeDerivation = compiled.typeDerivation
+            typeBlock = compiled.nsTypeBlock
+            elementBlock = compiled.nsElementBlock
+            typeDerivation = compiled.nsTypeDerivation
             targetNamespace = compiled.targetNamespace
             globalAttributes = compiled.globalAttributes
             // Schema consistency through the validation framework: every named

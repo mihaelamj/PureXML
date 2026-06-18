@@ -63,12 +63,33 @@ extension PureXML.Schema.XSDParser {
         return []
     }
 
+    /// The `{prohibited substitutions}` (complex type) or `{disallowed
+    /// substitutions}` (element) of a component: its own `block` when present,
+    /// otherwise the enclosing schema's `blockDefault`, each intersected with the
+    /// methods that component admits (`admitting`). An explicit `block=""` overrides
+    /// the default back to no restriction (XSD 1.0 Structures §3.3.2/§3.4.2).
+    static func blockMethods(of node: XSDTree, admitting: Set<PureXML.Schema.DerivationMethod>) -> Set<PureXML.Schema.DerivationMethod> {
+        if let own = PureXML.Schema.XSDNode.attribute(node, "block") {
+            return methodSet(own).intersection(admitting)
+        }
+        if let blockDefault = schemaDefault(of: node, named: "blockDefault") {
+            return methodSet(blockDefault).intersection(admitting)
+        }
+        return []
+    }
+
     /// The `finalDefault` of the `schema` enclosing `node`, or nil.
     static func schemaFinalDefault(of node: XSDTree) -> String? {
+        schemaDefault(of: node, named: "finalDefault")
+    }
+
+    /// The named attribute (`finalDefault`/`blockDefault`) of the `schema` element
+    /// enclosing `node`, or nil.
+    private static func schemaDefault(of node: XSDTree, named attribute: String) -> String? {
         var current: XSDTree? = node
         while let element = current {
             if element.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(element) == "schema" {
-                return PureXML.Schema.XSDNode.attribute(element, "finalDefault")
+                return PureXML.Schema.XSDNode.attribute(element, attribute)
             }
             current = element.parent
         }

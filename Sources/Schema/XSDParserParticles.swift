@@ -118,8 +118,12 @@ extension PureXML.Schema.XSDParser {
         let bindings = node.map { PureXML.Schema.XSDParser.namespaceBindingsInScope(of: $0, defaultBindings: context.namespaceBindings) }
             ?? context.namespaceBindings
         let refNamespace = PureXML.Schema.XSDNode.referenceNamespace(ref, bindings)
+        let headKey = PureXML.Schema.XSDParser.derivationKey(name, in: refNamespace)
         let head: [(String, String?)] = context.abstractElements.contains(name) ? [] : [(name, refNamespace)]
-        let alternatives = head + (context.substitutions[name] ?? []).map { ($0, context.elementNamespaces[$0] ?? context.targetNamespace) }
+        // Members are namespaced keys (`{ns}local`): unpack each to its local name
+        // and namespace so the choice over the head and its members keeps every
+        // member's own namespace, even across imported namespaces.
+        let alternatives = head + (context.substitutions[headKey] ?? []).map { PureXML.Schema.XSDParser.unpackElementName($0) }
         if alternatives.count == 1 {
             return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1))
         }
