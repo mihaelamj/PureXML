@@ -106,6 +106,11 @@ public extension PureXML.Schema {
             at path: XSDPath,
         ) -> [XSDFailure] {
             guard let fixed = particleFixed ?? elementConstraints[element.name.localName]?.fixedValue else { return [] }
+            // A fixed element's content is its fixed character value: it may not carry
+            // element children, even under a mixed content type (cvc-elt.5.2.2.2.1).
+            if !element.children.compactMap(\.element).isEmpty {
+                return [XSDFailure(reason: "fixed element '\(element.name.localName)' must not have element children", at: path)]
+            }
             let text = Self.rawTextContent(element)
             // An empty element takes the fixed value; only present content must equal it.
             if text.isEmpty { return [] }
