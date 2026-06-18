@@ -95,6 +95,63 @@ public extension PureXML.Schema {
             if left == .lax || right == .lax { return .lax }
             return .skip
         }
+
+        /// The intersection of two wildcard constraints (XSD 1.0 `cos-aw-intersect`),
+        /// used to combine the `anyAttribute` wildcards a complex type or attribute
+        /// group draws from its own declaration and its referenced attribute groups:
+        /// the effective wildcard admits only what every source admits.
+        func intersection(with other: Wildcard) -> Wildcard {
+            Wildcard(
+                namespace: Self.intersectNamespace(self, other),
+                processContents: Self.intersectProcessContents(processContents, other.processContents),
+                targetNamespace: targetNamespace ?? other.targetNamespace,
+            )
+        }
+
+        /// Combines optional wildcards from several sources by intersection. A nil
+        /// source contributes no constraint (the unconstrained `##any` identity), so
+        /// a single wildcard is returned unchanged: only a type drawing on two or
+        /// more `anyAttribute`s narrows.
+        static func intersection(_ left: Wildcard?, _ right: Wildcard?) -> Wildcard? {
+            switch (left, right) {
+            case (nil, nil): nil
+            case (let left?, nil): left
+            case (nil, let right?): right
+            case let (left?, right?): left.intersection(with: right)
+            }
+        }
+
+        private static func intersectNamespace(_ left: Wildcard, _ right: Wildcard) -> WildcardNamespace {
+            switch (left.namespace, right.namespace) {
+            case (.any, _): right.namespace
+            case (_, .any): left.namespace
+            case let (.enumerated(lhs), .enumerated(rhs)): .enumerated(lhs.intersection(rhs))
+            case let (.enumerated(uris), .other): .enumerated(Self.exclude(uris, otherThan: right.targetNamespace))
+            case let (.other, .enumerated(uris)): .enumerated(Self.exclude(uris, otherThan: left.targetNamespace))
+            case (.other, .other):
+                // Two `##other`s with the same target namespace intersect to the
+                // same `##other`; with different targets the true intersection
+                // (neither target, nor absent) is not expressible in XSD 1.0, so
+                // keep the less restrictive `##other` rather than over-reject.
+                .other
+            }
+        }
+
+        /// The URIs of `uris` that `##other` (relative to `targetNamespace`) also
+        /// admits: a non-empty namespace other than the target. The empty string
+        /// (absent / `##local`) and the target namespace are dropped.
+        private static func exclude(_ uris: Set<String>, otherThan targetNamespace: String?) -> Set<String> {
+            uris.filter { !$0.isEmpty && $0 != (targetNamespace ?? "") }
+        }
+
+        private static func intersectProcessContents(_ left: ProcessContents, _ right: ProcessContents) -> ProcessContents {
+            // When the two differ the intersection is strictly not expressible; keep
+            // the less strict so a matched attribute is never validated more harshly
+            // than either source asked for (under-validation, not over-rejection).
+            if left == right { return left }
+            if left == .skip || right == .skip { return .skip }
+            return .lax
+        }
     }
 
     /// The term of a particle: an element declaration, a nested model group, or a

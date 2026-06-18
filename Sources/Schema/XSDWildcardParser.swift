@@ -6,9 +6,14 @@ extension PureXML.Schema.XSDParser {
         _ context: PureXML.Schema.XSDContext,
         visited: Set<String> = [],
     ) -> PureXML.Schema.Wildcard? {
+        // A complex type's (or attribute group's) effective {attribute wildcard} is
+        // the INTERSECTION of the wildcards it draws from its own `anyAttribute` and
+        // from every referenced attribute group (XSD 1.0 `cos-aw-intersect`): an
+        // attribute is admitted only if every source admits it. (An extension's
+        // union with its base wildcard is handled separately, in XSDComplexContent.)
         var combined: PureXML.Schema.Wildcard?
         if let direct = PureXML.Schema.XSDNode.firstChild(node, named: "anyAttribute").map({ wildcard($0, context) }) {
-            combined = PureXML.Schema.Wildcard.union(combined, direct)
+            combined = PureXML.Schema.Wildcard.intersection(combined, direct)
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
             guard PureXML.Schema.XSDNode.localName(child) == "attributeGroup",
@@ -20,13 +25,13 @@ extension PureXML.Schema.XSDParser {
                       let base = context.baseAttributeGroups[name],
                       let found = attributeWildcard(under: base, context, visited: visited)
                 else { continue }
-                combined = PureXML.Schema.Wildcard.union(combined, found)
+                combined = PureXML.Schema.Wildcard.intersection(combined, found)
                 continue
             }
             guard let group = context.attributeGroups[name] else { continue }
             let scoped = context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(group))
             if let found = attributeWildcard(under: group, scoped, visited: visited.union([name])) {
-                combined = PureXML.Schema.Wildcard.union(combined, found)
+                combined = PureXML.Schema.Wildcard.intersection(combined, found)
             }
         }
         return combined
