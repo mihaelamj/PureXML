@@ -40,4 +40,22 @@ struct SchemaListUnionXsiTypeTests {
         #expect(try schema(declaredType: "xs:anySimpleType").validate(doc("myList", "1 2")).isEmpty)
         #expect(try schema(declaredType: "xs:anySimpleType").validate(doc("myUnion", "x")).isEmpty)
     }
+
+    /// The declared type is resolved through the element-ref chain: a list/union
+    /// xsi:type on an element reached via `<xs:element ref>` (whose global
+    /// declaration is atomic) is still rejected.
+    @Test("a list/union xsi:type on a ref'd atomic element is rejected")
+    func test_listUnionOnReferencedAtomicRejected() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="root"><xs:complexType><xs:sequence>
+            <xs:element ref="leaf"/>
+          </xs:sequence></xs:complexType></xs:element>
+          <xs:element name="leaf" type="xs:int"/>
+          <xs:simpleType name="myList"><xs:list itemType="xs:int"/></xs:simpleType>
+        </xs:schema>
+        """)
+        let xml = #"<root><leaf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="myList">1 2</leaf></root>"#
+        #expect(try !schema.validate(xml).isEmpty)
+    }
 }

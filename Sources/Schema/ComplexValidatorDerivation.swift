@@ -52,22 +52,31 @@ extension PureXML.Schema.ComplexValidator {
     /// admitting, so the list/union check stays silent rather than risk a false
     /// positive on an inline or unknown declared type.
     private func declaredAdmitsAnySimpleType(_ declared: PureXML.Schema.ElementType) -> Bool {
-        switch declared {
+        let resolved: PureXML.Schema.ElementType? = switch declared {
+        case .simple, .complex: declared
+        case let .typeReference(reference): resolvedDeclaredType(reference)
+        }
+        switch resolved {
         case let .simple(type): return type.isAnySimpleType || Self.isListOrUnion(type)
         case let .complex(type): return Self.isUrType(type)
-        case let .typeReference(reference):
-            guard case let .simple(type)? = Self.resolveNamedType(reference, in: types) else {
-                if case .complex? = Self.resolveNamedType(reference, in: types) { return urReference(reference) }
-                return true
-            }
-            return type.isAnySimpleType || Self.isListOrUnion(type)
+        default: return true
         }
     }
 
-    /// Whether a reference resolving to a complex type is the complex ur-type.
-    private func urReference(_ reference: String) -> Bool {
-        guard case let .complex(type)? = Self.resolveNamedType(reference, in: types) else { return false }
-        return Self.isUrType(type)
+    /// Follows an element-ref / type-reference chain (`element:foo` -> concrete type)
+    /// to the concrete declared type (a `.simple` or `.complex`), or nil when the
+    /// chain does not resolve. The name-returning ``resolvedDeclaredTypeName`` walks
+    /// the same chain for the backbone key.
+    private func resolvedDeclaredType(_ reference: String) -> PureXML.Schema.ElementType? {
+        var key = reference
+        var resolved = types[key] ?? Self.resolveNamedType(key, in: types)
+        var steps = 0
+        while case let .typeReference(next)? = resolved, steps <= types.count {
+            key = next
+            resolved = types[key] ?? Self.resolveNamedType(key, in: types)
+            steps += 1
+        }
+        return resolved
     }
 
     /// Whether a simple type is a list or union (deriving only from `anySimpleType`).
