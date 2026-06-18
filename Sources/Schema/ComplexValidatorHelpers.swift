@@ -148,15 +148,17 @@ extension PureXML.Schema.ComplexValidator {
     }
 
     /// Whether `complex` is the ur-type `xsd:anyType`: no declared attributes, a
-    /// skip attribute wildcard, and mixed content of a single unbounded skip
-    /// element wildcard. The ur-type admits any `xsi:type` substitution.
+    /// `lax` attribute wildcard, and mixed content of a single unbounded `lax`
+    /// element wildcard (XSD 1.0 §3.4.7). The ur-type admits any `xsi:type`
+    /// substitution. A `skip` wildcard is also accepted so any legacy construction
+    /// of the ur-type still reads as the ur-type.
     static func isUrType(_ complex: PureXML.Schema.ComplexType) -> Bool {
         guard complex.attributes.isEmpty,
-              complex.attributeWildcard?.processContents == .skip,
+              complex.attributeWildcard?.processContents != .strict,
               case let .mixed(particle) = complex.content,
               particle.minOccurs == 0, particle.maxOccurs == nil,
               case let .wildcard(wildcard) = particle.term,
-              wildcard.processContents == .skip
+              wildcard.processContents != .strict
         else { return false }
         return true
     }
@@ -247,14 +249,7 @@ extension PureXML.Schema.ComplexValidator {
             return .simple(PureXML.Schema.SimpleType(base: .string, isAnySimpleType: true))
         }
         if name == "anyType" {
-            return .complex(PureXML.Schema.ComplexType(
-                attributeWildcard: PureXML.Schema.Wildcard(processContents: .skip),
-                content: .mixed(PureXML.Schema.Particle(
-                    minOccurs: 0,
-                    maxOccurs: nil,
-                    term: .wildcard(PureXML.Schema.Wildcard(processContents: .skip)),
-                )),
-            ))
+            return .complex(Self.urComplexType)
         }
         if let item = PureXML.Schema.XSDSimpleParser.listBuiltinItem(name) {
             return .simple(.list(item: PureXML.Schema.SimpleType(base: item), isBuiltinList: true))
@@ -278,17 +273,22 @@ extension PureXML.Schema.ComplexValidator {
             return .simple(PureXML.Schema.SimpleType(base: .string, isAnySimpleType: true))
         }
         if local == "anyType" {
-            return .complex(PureXML.Schema.ComplexType(
-                attributeWildcard: PureXML.Schema.Wildcard(processContents: .skip),
-                content: .mixed(PureXML.Schema.Particle(
-                    minOccurs: 0,
-                    maxOccurs: nil,
-                    term: .wildcard(PureXML.Schema.Wildcard(processContents: .skip)),
-                )),
-            ))
+            return .complex(urComplexType)
         }
         return nil
     }
+
+    /// The ur-type `xsd:anyType`. Per XSD 1.0 §3.4.7 its element and attribute
+    /// wildcards are `lax` (not skip): declared children and attributes are
+    /// validated against their global declarations, undeclared content is admitted.
+    static let urComplexType = PureXML.Schema.ComplexType(
+        attributeWildcard: PureXML.Schema.Wildcard(processContents: .lax),
+        content: .mixed(PureXML.Schema.Particle(
+            minOccurs: 0,
+            maxOccurs: nil,
+            term: .wildcard(PureXML.Schema.Wildcard(processContents: .lax)),
+        )),
+    )
 
     /// The instance resolver over this validator's type table.
     func resolveReference(_ type: PureXML.Schema.ElementType) -> PureXML.Schema.TypeResolution {

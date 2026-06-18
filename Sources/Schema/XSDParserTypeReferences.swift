@@ -47,10 +47,13 @@ extension PureXML.Schema.XSDParser {
         return .typeReference(typeDeclarationKey(local, namespaceURI: uri))
     }
 
+    /// The ur-type `xsd:anyType`. Per XSD 1.0 §3.4.7 its element and attribute
+    /// wildcards are `lax`, not skip: a child or attribute that has a global
+    /// declaration is validated against it, while undeclared content is admitted.
     private static var anyType: ComplexType {
         ComplexType(
-            attributeWildcard: Wildcard(processContents: .skip),
-            content: .mixed(Particle(minOccurs: 0, maxOccurs: nil, term: .wildcard(Wildcard(processContents: .skip)))),
+            attributeWildcard: Wildcard(processContents: .lax),
+            content: .mixed(Particle(minOccurs: 0, maxOccurs: nil, term: .wildcard(Wildcard(processContents: .lax)))),
         )
     }
 }

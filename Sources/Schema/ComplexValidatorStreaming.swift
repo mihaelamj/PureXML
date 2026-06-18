@@ -73,7 +73,7 @@ public extension PureXML.Schema.ComplexValidator {
         case let .elementOnly(particle), let .mixed(particle):
             if Self.elementTypes(in: particle.term)[Self.key(child)] != nil { return nil }
             guard Self.wildcardMatch(for: child, in: particle.term) == .strict,
-                  types["element:\(child.localName)"] == nil
+                  types[PureXML.Schema.XSDParser.elementDeclarationKey(child)] == nil
             else { return nil }
             return PureXML.Validation.ValidationError(
                 reason: "no declaration for wildcard-matched element '\(child.localName)'",
@@ -105,8 +105,10 @@ public extension PureXML.Schema.ComplexValidator {
         case .skip:
             return nil
         case .lax, .strict:
+            // Match the global declaration by full qualified name only; a global is
+            // always in the target namespace, so the namespaced key already covers a
+            // no-namespace global without conflating distinct namespaces.
             return types[PureXML.Schema.XSDParser.elementDeclarationKey(name)]
-                ?? types["element:\(name.localName)"]
         }
     }
 

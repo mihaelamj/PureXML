@@ -219,11 +219,13 @@ public extension PureXML.Schema {
         /// nothing, lax validates against a global declaration when one exists, and
         /// strict requires one.
         private func globalElementDeclaration(for name: PureXML.Model.QualifiedName) -> PureXML.Schema.ElementType? {
-            if let declaration = types[PureXML.Schema.XSDParser.elementDeclarationKey(name)] {
-                return declaration
-            }
-            guard name.namespaceURI == nil else { return nil }
-            return types["element:\(name.localName)"]
+            // A global element declaration is always in the schema's target
+            // namespace, so an instance element matches one only by full qualified
+            // name. The namespaced key already covers a no-namespace global (its key
+            // is `element:{}local`); matching an unqualified instance against a
+            // namespaced global by bare local name would conflate namespaces, e.g.
+            // accepting unqualified text where a namespaced `xs:short` is declared.
+            types[PureXML.Schema.XSDParser.elementDeclarationKey(name)]
         }
 
         private func validateWildcardChild(
