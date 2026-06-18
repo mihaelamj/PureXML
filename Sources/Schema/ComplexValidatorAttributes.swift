@@ -21,6 +21,42 @@ extension PureXML.Schema.ComplexValidator {
             }
         }
         validateWildcardAttributes(present, element: element, type: type, at: path, into: &errors)
+        if idTypedAttributeCount(present, type, on: element) > 1 {
+            errors.append(PureXML.Validation.ValidationError(
+                reason: "an element may carry at most one attribute of type ID",
+                at: path,
+            ))
+        }
+    }
+
+    /// The number of `present` attributes whose effective type is `xs:ID` (an
+    /// element may carry at most one; XSD 1.0 §3.4.6, cvc-complex-type). An
+    /// attribute's type is its declared use's type when it matches one, otherwise
+    /// the global declaration a matching wildcard admits.
+    private func idTypedAttributeCount(
+        _ present: [PureXML.Model.Attribute],
+        _ type: PureXML.Schema.ComplexType,
+        on element: PureXML.Model.Element,
+    ) -> Int {
+        present.reduce(into: 0) { count, attribute in
+            if isIDTyped(attribute, type, on: element) { count += 1 }
+        }
+    }
+
+    /// Whether `attribute`'s effective type is `xs:ID`: the type of the declared
+    /// use it matches, or the global declaration a matching wildcard admits.
+    private func isIDTyped(
+        _ attribute: PureXML.Model.Attribute,
+        _ type: PureXML.Schema.ComplexType,
+        on element: PureXML.Model.Element,
+    ) -> Bool {
+        if let use = type.attributes.first(where: { Self.attributeMatches(attribute.name, declared: $0.name, use: $0, on: element.name) }) {
+            return use.type.isID
+        }
+        guard let wildcard = type.attributeWildcard, wildcard.admits(attribute.name),
+              let use = globalAttributeUse(for: attribute.name)
+        else { return false }
+        return use.type.isID
     }
 
     /// Whether an instance attribute satisfies a declared use. Chameleon-included
