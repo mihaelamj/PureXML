@@ -65,7 +65,7 @@ extension PureXML.Schema.XSDParser {
         append(valueConstraintErrors(schema), at: schema, into: &findings)
         append(topLevelDeclarationErrors(schema), at: schema, into: &findings)
         append(nestedNamedDefinitionErrors(schema), at: schema, into: &findings)
-        append(anySimpleTypeRestrictionErrors(schema), at: schema, into: &findings)
+        append(anySimpleTypeRestrictionErrors(schema) + anySimpleTypeFacetErrors(schema), at: schema, into: &findings)
         append(emptyNamespaceErrors(schema), at: schema, into: &findings)
         return findings
     }

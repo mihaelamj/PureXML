@@ -302,4 +302,69 @@ extension PureXML.Schema.XSDParser {
             forEachRestrictionInSimpleType(child, visit)
         }
     }
+
+    /// A constraining facet may not be applied where a `simpleContent` restriction's
+    /// base chain resolves to `xs:anySimpleType`, the ur simple type, which carries no
+    /// constraining facets (XSD Part 2 §3.2.1): e.g. a complex type extending
+    /// `xs:anySimpleType`, restricted by another adding `minLength`. The chain is
+    /// followed through local complex types' own simpleContent bases; a base that is a
+    /// built-in other than anySimpleType, a simple-type, or external/unresolved is left
+    /// alone, so no valid facet is rejected. A restriction supplying its own nested
+    /// `simpleType` base is also skipped (the facet applies to that, not anySimpleType).
+    static func anySimpleTypeFacetErrors(_ schema: XSDTree) -> [String] {
+        let bindings = namespaceBindings(schema)
+        let target = PureXML.Schema.XSDNode.attribute(schema, "targetNamespace")
+        var errors: [String] = []
+        forEachSimpleContentRestriction(schema) { restriction in
+            guard PureXML.Schema.XSDNode.firstChild(restriction, named: "simpleType") == nil,
+                  let base = PureXML.Schema.XSDNode.attribute(restriction, "base"),
+                  hasConstrainingFacet(restriction),
+                  simpleContentBaseIsAnySimpleType(base, schema, bindings, target, [])
+            else { return }
+            errors.append("a constraining facet may not be applied to anySimpleType-based simpleContent")
+        }
+        return errors
+    }
+
+    private static func hasConstrainingFacet(_ restriction: XSDTree) -> Bool {
+        PureXML.Schema.XSDNode.elementChildren(restriction)
+            .compactMap(PureXML.Schema.XSDNode.localName)
+            .contains { facetNames.contains($0) }
+    }
+
+    /// Whether the `simpleContent` `base` chain bottoms at `xs:anySimpleType`. Follows a
+    /// base naming a local complex type's `simpleContent` to that type's own base;
+    /// stops (false) at any other built-in, a simple-type base, or an unresolved one.
+    private static func simpleContentBaseIsAnySimpleType(
+        _ base: String, _ schema: XSDTree, _ bindings: [String: String], _ target: String?, _ visited: Set<String>,
+    ) -> Bool {
+        let (prefix, local) = splitQName(base)
+        let uri = prefix.map { bindings[$0] } ?? bindings[""]
+        if uri == xsdNamespace { return local == "anySimpleType" }
+        guard uri == target, !visited.contains(local),
+              let complexType = globalComplexType(named: local, schema),
+              let simpleContent = PureXML.Schema.XSDNode.firstChild(complexType, named: "simpleContent"),
+              let derivation = PureXML.Schema.XSDNode.firstChild(simpleContent, named: "extension")
+              ?? PureXML.Schema.XSDNode.firstChild(simpleContent, named: "restriction"),
+              let baseRef = PureXML.Schema.XSDNode.attribute(derivation, "base")
+        else { return false }
+        return simpleContentBaseIsAnySimpleType(baseRef, schema, bindings, target, visited.union([local]))
+    }
+
+    private static func globalComplexType(named name: String, _ schema: XSDTree) -> XSDTree? {
+        PureXML.Schema.XSDNode.elementChildren(schema).first {
+            PureXML.Schema.XSDNode.localName($0) == "complexType" && PureXML.Schema.XSDNode.attribute($0, "name") == name
+        }
+    }
+
+    private static func forEachSimpleContentRestriction(_ node: XSDTree, _ visit: (XSDTree) -> Void) {
+        let local = PureXML.Schema.XSDNode.localName(node)
+        if local == "appinfo" || local == "documentation" { return }
+        if local == "simpleContent", let restriction = PureXML.Schema.XSDNode.firstChild(node, named: "restriction") {
+            visit(restriction)
+        }
+        for child in PureXML.Schema.XSDNode.elementChildren(node) {
+            forEachSimpleContentRestriction(child, visit)
+        }
+    }
 }
