@@ -377,7 +377,7 @@ extension PureXML.Schema.XSDParser {
         let baseType = simpleContentBaseType(baseName, uri: uri, context, visited: visited)
         var facets = baseType.facets
         XSDSimpleParser.applyFacets(inner, into: &facets)
-        return SimpleType(base: baseType.base, facets: facets)
+        return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety, isBuiltinList: baseType.isBuiltinList)
     }
 
     /// The simple type a `simpleContent` derivation derives from: an XSD built-in, a
