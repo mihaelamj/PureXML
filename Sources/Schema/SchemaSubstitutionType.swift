@@ -91,6 +91,13 @@ extension PureXML.Schema.XSDParser {
             memberType = headType
             isDerived = true
         }
+        // A member whose type is a list or union derives only from anySimpleType, so
+        // it may affiliate only to a head typed anySimpleType (or to the same type, or
+        // as a recorded restriction of the head's type, both of which `isDerived`
+        // covers). Affiliating it to any other head type is not a valid derivation.
+        if isListOrUnion(memberType, types), !isDerived, headType != "anySimpleType", headType != "anyType" {
+            return ["element '\(member)' may not be in the substitution group of '\(head)': its list or union type is not derived from '\(headType)'"]
+        }
         guard !isListOrUnion(memberType, types), !isListOrUnion(headType, types) else { return [] }
         if !isDerived {
             return ["element '\(member)' may not be in the substitution group of '\(head)': its type is not derived from '\(headType)'"]

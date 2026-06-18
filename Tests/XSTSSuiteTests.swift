@@ -148,7 +148,7 @@ struct XSTSSuiteTests {
     /// and the cross-document composition family (src-resolve, src-import.3,
     /// src-redefine.5/6.1/7.2.1, redefine cross-namespace, required schemaLocation).
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 69
+    private let knownSchemaInvalidAccepted = 67
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 31), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex, then atomic and list/union, resolved through the element-ref chain);
