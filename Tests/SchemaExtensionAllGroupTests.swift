@@ -35,6 +35,39 @@ struct SchemaExtensionAllGroupTests {
         #expect(compiles(seqBase + ext(base: "myType", content: "<xs:sequence><xs:element name=\"b\" type=\"xs:string\"/></xs:sequence>")))
     }
 
+    @Test("A complexContent extension must match its base mixedness")
+    func test_complexContentExtensionMixedAgreement() {
+        let mixedBase = "<xs:complexType name=\"base\" mixed=\"true\"><xs:sequence>"
+            + "<xs:element name=\"bar\" minOccurs=\"0\" maxOccurs=\"unbounded\" type=\"xs:string\"/>"
+            + "</xs:sequence></xs:complexType>"
+        let extensionParticle = "<xs:sequence>"
+            + "<xs:element name=\"bar2\" minOccurs=\"0\" maxOccurs=\"unbounded\" type=\"xs:string\"/>"
+            + "</xs:sequence>"
+
+        // XSTS ctZ010d: omitting mixed on the derived complex type defaults it to
+        // false, which disagrees with the mixed base.
+        #expect(!compiles(mixedBase + ext(base: "base", content: extensionParticle)))
+
+        let explicitMixedDerived = "<xs:complexType name=\"fooType\" mixed=\"true\"><xs:complexContent>"
+            + "<xs:extension base=\"base\">\(extensionParticle)</xs:extension>"
+            + "</xs:complexContent></xs:complexType>"
+        #expect(compiles(mixedBase + explicitMixedDerived))
+
+        // XSTS ctZ012b: without an extension particle, the base content is
+        // inherited unchanged and the omitted mixed setting is valid.
+        #expect(compiles(mixedBase + "<xs:complexType name=\"derived\"><xs:complexContent><xs:extension base=\"base\"/></xs:complexContent></xs:complexType>"))
+
+        let elementOnlyBase = "<xs:complexType name=\"elementOnly\"><xs:sequence>"
+            + "<xs:element name=\"bar\" type=\"xs:string\"/></xs:sequence></xs:complexType>"
+        #expect(compiles(elementOnlyBase + ext(base: "elementOnly", content: extensionParticle)))
+
+        // XSTS ctF008: explicit mixed=true conflicts with an element-only base,
+        // even when the extension adds no element particle.
+        let emptyMixedExtension = "<xs:complexType name=\"mixedDerived\"><xs:complexContent mixed=\"true\">"
+            + "<xs:extension base=\"elementOnly\"/></xs:complexContent></xs:complexType>"
+        #expect(!compiles(elementOnlyBase + emptyMixedExtension))
+    }
+
     @Test("An all group as the whole content of a complex type compiles")
     func test_allAsWholeContentAccepted() {
         #expect(compiles("<xs:complexType name=\"t\">\(allContent)</xs:complexType>"))

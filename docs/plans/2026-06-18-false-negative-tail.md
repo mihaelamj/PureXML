@@ -8,7 +8,7 @@ ratchet one clause at a time.
 
 ## Current measurement
 
-Measured from `/tmp/xsts-failures.txt`, last written 2026-06-18 21:31 local time
+Measured from `/tmp/xsts-failures.txt`, last written 2026-06-18 22:27 local time
 by `XSTSSuiteTests`.
 
 ```sh
@@ -20,7 +20,7 @@ Result:
 | Bucket | Count |
 |---|---:|
 | valid schema rejected | 0 |
-| invalid schema accepted | 47 |
+| invalid schema accepted | 46 |
 | valid instance rejected | 0 |
 | invalid instance accepted | 31 |
 
@@ -28,8 +28,9 @@ The false-positive buckets are already zero. That is the non-negotiable gate:
 every task below must keep them at zero.
 
 Progress since the starting 48/31 snapshot: `particlesZ018` is closed by the
-simpleContent inline type-restriction rule, dropping the schema false-negative
-bucket by one with both false-positive buckets still at zero.
+simpleContent inline type-restriction rule, and `ctZ010d` is closed by the
+complexContent mixed-agreement rule. The schema false-negative bucket is down by
+two with both false-positive buckets still at zero.
 
 ## File map
 
@@ -63,7 +64,7 @@ not a proof. Before code, read the XSTS fixture, the matching PureXMLResearch
 reference, and the XSD 1.0 rule text; update the lane if the evidence says this
 classification is wrong.
 
-### Invalid schemas accepted: 47
+### Invalid schemas accepted: 46
 
 | Lane | Cases | First owning surface |
 |---|---|---|
@@ -72,7 +73,6 @@ classification is wrong.
 | Attribute group restriction triage | `attgC028` | `SchemaAttributeRestriction`, redefine machinery |
 | Attribute type/use triage | `attKa015`, `attKb018a` | `SchemaAttributeApplicability`, `SchemaAttributeRestriction` |
 | Attribute identity/composition triage | `attQ011`, `attQ016`, `attQ017`, `attQ018` | Attribute restrictions and per-document composition |
-| Complex/simple derivation edge | `ctZ010d` | `SchemaStructureDerivation`, `SimpleType` |
 | Substitution-group head/member modeling | `elemZ026`, `elemZ027_c`, `elemZ028e` | `SchemaSubstitutionType`, `XSDSubstitutionMembers` |
 | ParticleRestriction exactness | `particlesEa025`, `particlesFb003`, `particlesHa161`, `particlesHb011`, `particlesIg004`, `particlesIj008`, `particlesIk011`, `particlesIk025`, `particlesIk027`, `particlesK006`, `particlesM034`, `particlesV020` | `ParticleRestriction*` |
 | UPA / wildcard determinism | `particlesZ022`, `particlesZ030_d`, `particlesZ039` | `ContentModelDeterminism` |
@@ -126,8 +126,8 @@ awk -F': ' '/invalid schema accepted/ {schema++} /invalid instance accepted/ {in
 `Sources/Schema/SchemaSimpleTypeValidity.swift`, focused `Tests/Schema*Tests.swift`
 
 **Does:** Start with cases that do not route through `ParticleRestriction`:
-`stZ048`, `ctZ010d`, datatype instance cases, and regex cases. `particlesZ018`
-is closed by the first pass.
+`stZ048`, datatype instance cases, and regex cases. `particlesZ018` and
+`ctZ010d` are closed by the first passes.
 For regex, first decide whether each case is a genuine unsupported-pattern
 under-rejection or a spec-backed error. Disclosed cases must be documented, not
 silently left in the bucket.

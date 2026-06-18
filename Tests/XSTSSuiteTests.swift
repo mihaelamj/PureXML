@@ -142,13 +142,12 @@ struct XSTSSuiteTests {
     /// non-starter and under-rejection is recoverable; this debt is recovered by the
     /// full effective-total-range Particle-Valid-Restriction (tracked).
     /// Further rules, each with valid-schemas-rejected held at 0 (see CHANGELOG and
-    /// docs/xsts-deviations.md), drove invalid-schemas-accepted 130 -> 69: model-group
-    /// occurrence, identity-constraint content model and xpath prefixes, derivation
-    /// base-type kind and value-constraint content type, attribute/simple-type rules,
-    /// and the cross-document composition family (src-resolve, src-import.3,
-    /// src-redefine.5/6.1/7.2.1, redefine cross-namespace, required schemaLocation).
+    /// docs/xsts-deviations.md), drove invalid-schemas-accepted 130 -> 46 across
+    /// model-group occurrence, identity-constraint content, derivation base kind,
+    /// attribute/simple-type rules, composition, simpleContent inline-type checks,
+    /// and the complexContent mixedness tail.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 47
+    private let knownSchemaInvalidAccepted = 46
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 31), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex, then atomic and list/union, resolved through the element-ref chain);

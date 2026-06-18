@@ -40,6 +40,12 @@ entries removed about 70 apparent deviations that were never bugs.
 
 Counts are against *settled* W3C expectations (queried/disputed entries excluded).
 
+Current ratchet (2026-06-18): `valid schema rejected = 0`,
+`invalid schema accepted = 46`, `valid instance rejected = 0`,
+`invalid instance accepted = 31`. The historical table above is retained as the
+published baseline snapshot; the active burn-down is in
+`docs/plans/2026-06-18-false-negative-tail.md`.
+
 XSTS is a deliberately adversarial, exhaustive corpus; mature validators
 (Xerces, libxml2) do not pass it fully. The goal is not a green number. It is to
 fix the deviations that are genuine correctness bugs affecting real documents,
@@ -164,13 +170,14 @@ ratchet the baseline in `Tests/XSTSSuiteTests.swift` down to the new value.
 Tracking issues: #145 (invalid schema accepted), #146 (valid instance
 rejected), #147 (invalid instance accepted), #148 (valid schema rejected).
 
-## Autopilot accounting (2026-06-18): labelled-suite invalid-schemas-accepted = 74
+## Historical autopilot accounting (2026-06-18): labelled-suite invalid-schemas-accepted = 74
 
-The `XSTSSuiteTests` ratchet (settled-expectation labelled subset) now stands at
+At this earlier snapshot, the `XSTSSuiteTests` ratchet
+(settled-expectation labelled subset) stood at
 **0 valid-schemas-rejected, 74 invalid-schemas-accepted, 0 valid-instances-rejected,
 133 invalid-instances-accepted**. False positives have been held at 0 across the
-whole campaign (the hard gate). The remaining 74 are the hard tail; every clean,
-zero-false-positive structural rule has been harvested. They partition as:
+whole campaign (the hard gate). The remaining 74 were the hard tail at that
+snapshot. They partitioned as:
 
 ### Fixable debt (genuine bugs, but intricate and false-positive-prone)
 
