@@ -87,6 +87,17 @@ extension PureXML.Schema.ComplexValidator {
         }
     }
 
+    /// Whether a substitute type participates in the not-derived check: a complex
+    /// type, or an ATOMIC simple type. A list or union substitute is excluded here
+    /// (it is handled by ``listUnionSubstitutionError``).
+    static func isAtomicOrComplex(_ type: PureXML.Schema.ElementType) -> Bool {
+        switch type {
+        case .complex: true
+        case let .simple(simple): !isListOrUnion(simple)
+        case .typeReference: false
+        }
+    }
+
     /// The error when an element's declared type is an abstract complex type and
     /// the element supplies no `xsi:type` to name a concrete derived type. An
     /// abstract type cannot itself be the type of an instance element.
@@ -141,13 +152,14 @@ extension PureXML.Schema.ComplexValidator {
     }
 
     /// cvc-elt.4.3.2.1: an `xsi:type` must resolve to a type DERIVED from the
-    /// element's declared type. This flags ONLY the case where both the declared
-    /// type and the substitute resolve to COMPLEX types recorded in the derivation
-    /// backbone and there is no derivation path between them (a different branch of
-    /// the hierarchy). It deliberately does NOT touch a simple/list/union substitute,
-    /// a substitute or declared type absent from the backbone, or the ur-types: there
-    /// the relationship cannot be confirmed from the complex-type backbone alone, so
-    /// the rule stays silent (under-reject) rather than risk a false positive.
+    /// element's declared type. This flags the case where both the declared type and
+    /// the substitute resolve to complex or atomic-simple types recorded in the
+    /// derivation backbone and there is no derivation path between them (a different
+    /// branch of the hierarchy, including a substitute that is the declared type's
+    /// own ancestor). A list or union substitute is handled separately by
+    /// ``listUnionSubstitutionError``; a substitute or declared type ABSENT from the
+    /// backbone (a built-in, or the ur-types) leaves the relationship unconfirmable,
+    /// so the rule stays silent (under-reject) rather than risk a false positive.
     func notDerivedSubstitutionError(
         declared: PureXML.Schema.ElementType,
         child: PureXML.Model.Element,
@@ -157,7 +169,8 @@ extension PureXML.Schema.ComplexValidator {
         guard case let .typeReference(reference) = declared,
               let substituteLabel = Self.xsiTypeName(child),
               let substituteRef = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings),
-              case .complex? = Self.resolveNamedType(substituteRef, in: types)
+              let substituteType = Self.resolveNamedType(substituteRef, in: types),
+              Self.isAtomicOrComplex(substituteType)
         else { return nil }
         let substituteKey = Self.derivationKey(fromReference: substituteRef)
         let declaredName = resolvedDeclaredTypeName(reference)

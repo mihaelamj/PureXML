@@ -58,4 +58,29 @@ struct SchemaListUnionXsiTypeTests {
         let xml = #"<root><leaf xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="myList">1 2</leaf></root>"#
         #expect(try !schema.validate(xml).isEmpty)
     }
+
+    /// The not-derived check also covers ATOMIC substitutes recorded in the
+    /// backbone: an `xsi:type` naming a sibling type, or the declared type's own
+    /// ancestor, is rejected; a genuinely derived restriction is accepted.
+    @Test("an atomic xsi:type not derived from the declared type is rejected")
+    func test_atomicNotDerivedRejected() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="e" type="A"/>
+          <xs:simpleType name="Base"><xs:restriction base="xs:int"/></xs:simpleType>
+          <xs:simpleType name="A"><xs:restriction base="Base"><xs:minInclusive value="0"/></xs:restriction></xs:simpleType>
+          <xs:simpleType name="Sibling"><xs:restriction base="Base"><xs:maxInclusive value="9"/></xs:restriction></xs:simpleType>
+          <xs:simpleType name="Derived"><xs:restriction base="A"><xs:maxInclusive value="9"/></xs:restriction></xs:simpleType>
+        </xs:schema>
+        """)
+        func doc(_ type: String) -> String {
+            #"<e xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="\#(type)">5</e>"#
+        }
+        // A sibling (also restricts Base) is not derived from A: rejected.
+        #expect(try !schema.validate(doc("Sibling")).isEmpty)
+        // The declared type's own ancestor Base is not derived from A: rejected.
+        #expect(try !schema.validate(doc("Base")).isEmpty)
+        // A genuine restriction of A is validly derived: accepted.
+        #expect(try schema.validate(doc("Derived")).isEmpty)
+    }
 }
