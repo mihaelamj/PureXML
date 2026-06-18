@@ -47,39 +47,12 @@ extension PureXML.Schema.XSDParser {
     }
 
     static func attributeUse(_ node: XSDTree, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.AttributeUse? {
-        // An `<attribute ref="...">` references a global attribute declaration:
-        // take its name (always target-namespace qualified) and type from the
-        // global node, but `use`/`default`/`fixed` from this reference site.
         if let ref = PureXML.Schema.XSDNode.attribute(node, "ref") {
-            let refName = PureXML.Schema.XSDNode.stripPrefix(ref)
-            let bindings = namespaceBindingsInScope(of: node, defaultBindings: context.namespaceBindings)
-            let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, bindings)
-            if namespace == "http://www.w3.org/XML/1998/namespace", refName == "base" {
-                return PureXML.Schema.AttributeUse(
-                    name: PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace),
-                    type: PureXML.Schema.SimpleType(base: .anyURI),
-                    required: PureXML.Schema.XSDNode.attribute(node, "use") == "required",
-                    valueConstraint: valueConstraint(of: node),
-                )
-            }
-            guard let declaration = context.globalAttributes[refName],
-                  var use = attributeUse(declaration, context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(declaration)))
-            else { return nil }
-            let declContext = context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(declaration))
-            if let target = declContext.targetNamespace, !target.isEmpty {
-                use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: target)
-                use.chameleonUnprefixed = isChameleonSchema(PureXML.Schema.XSDNode.schemaOwner(declaration))
-            } else {
-                let bindings = namespaceBindingsInScope(of: node, defaultBindings: context.namespaceBindings)
-                let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, bindings)
-                use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace)
-            }
-            if PureXML.Schema.XSDNode.attribute(node, "use") == "required" { use.required = true }
-            if let constraint = valueConstraint(of: node) { use.valueConstraint = constraint }
-            return use
+            return referencedAttributeUse(node, ref: ref, context)
         }
         guard let name = PureXML.Schema.XSDNode.attribute(node, "name") else { return nil }
-        let required = PureXML.Schema.XSDNode.attribute(node, "use") == "required"
+        let use = PureXML.Schema.XSDNode.attribute(node, "use")
+        let required = use == "required"
         let type: PureXML.Schema.SimpleType = if let typeName = PureXML.Schema.XSDNode.attribute(node, "type") {
             PureXML.Schema.XSDSimpleParser.simpleTypeReference(typeName, context)
         } else if let inline = PureXML.Schema.XSDNode.firstChild(node, named: "simpleType") {
@@ -98,7 +71,39 @@ extension PureXML.Schema.XSDParser {
             required: required,
             valueConstraint: valueConstraint(of: node),
             chameleonUnprefixed: qualified && isChameleonSchema(owner),
+            prohibited: use == "prohibited",
         )
+    }
+
+    /// An `<attribute ref="...">` use: it takes its name (always target-namespace
+    /// qualified) and type from the referenced global declaration, but its
+    /// `use`/`default`/`fixed` from this reference site.
+    private static func referencedAttributeUse(_ node: XSDTree, ref: String, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.AttributeUse? {
+        let refName = PureXML.Schema.XSDNode.stripPrefix(ref)
+        let bindings = namespaceBindingsInScope(of: node, defaultBindings: context.namespaceBindings)
+        let namespace = PureXML.Schema.XSDNode.referenceNamespace(ref, bindings)
+        if namespace == "http://www.w3.org/XML/1998/namespace", refName == "base" {
+            return PureXML.Schema.AttributeUse(
+                name: PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace),
+                type: PureXML.Schema.SimpleType(base: .anyURI),
+                required: PureXML.Schema.XSDNode.attribute(node, "use") == "required",
+                valueConstraint: valueConstraint(of: node),
+            )
+        }
+        guard let declaration = context.globalAttributes[refName],
+              var use = attributeUse(declaration, context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(declaration)))
+        else { return nil }
+        let declContext = context.scoped(for: PureXML.Schema.XSDNode.schemaOwner(declaration))
+        if let target = declContext.targetNamespace, !target.isEmpty {
+            use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: target)
+            use.chameleonUnprefixed = isChameleonSchema(PureXML.Schema.XSDNode.schemaOwner(declaration))
+        } else {
+            use.name = PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace)
+        }
+        if PureXML.Schema.XSDNode.attribute(node, "use") == "required" { use.required = true }
+        if PureXML.Schema.XSDNode.attribute(node, "use") == "prohibited" { use.prohibited = true }
+        if let constraint = valueConstraint(of: node) { use.valueConstraint = constraint }
+        return use
     }
 
     /// A schema document with no explicit `targetNamespace` (a chameleon include).

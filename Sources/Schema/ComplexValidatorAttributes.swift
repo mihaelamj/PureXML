@@ -6,7 +6,7 @@ extension PureXML.Schema.ComplexValidator {
         into errors: inout [PureXML.Validation.ValidationError],
     ) {
         let present = element.attributes.filter { !Self.isNamespaceDeclaration($0) && !Self.isSchemaInstanceAttribute($0) }
-        for use in type.attributes {
+        for use in type.attributes where !use.prohibited {
             let match = present.first { Self.attributeMatches($0.name, declared: use.name, use: use, on: element.name) }
             if let match {
                 if let error = use.type.validate(match.value) {
@@ -50,7 +50,7 @@ extension PureXML.Schema.ComplexValidator {
         _ type: PureXML.Schema.ComplexType,
         on element: PureXML.Model.Element,
     ) -> Bool {
-        if let use = type.attributes.first(where: { Self.attributeMatches(attribute.name, declared: $0.name, use: $0, on: element.name) }) {
+        if let use = type.attributes.first(where: { !$0.prohibited && Self.attributeMatches(attribute.name, declared: $0.name, use: $0, on: element.name) }) {
             return use.type.isID
         }
         guard let wildcard = type.attributeWildcard, wildcard.admits(attribute.name),
@@ -82,7 +82,10 @@ extension PureXML.Schema.ComplexValidator {
         at path: [PureXML.Validation.PathKey],
         into errors: inout [PureXML.Validation.ValidationError],
     ) {
-        let declared = type.attributes
+        // A `use="prohibited"` use is excluded from the effective {attribute uses},
+        // so a prohibited attribute is treated as undeclared and left to the
+        // attribute wildcard (which may still admit it) or reported as undeclared.
+        let declared = type.attributes.filter { !$0.prohibited }
         let elementName = element.name
         let wildcard = type.attributeWildcard
         for attribute in present where !declared.contains(where: { Self.attributeMatches(attribute.name, declared: $0.name, use: $0, on: elementName) }) {

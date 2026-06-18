@@ -240,6 +240,10 @@ public extension PureXML.Schema {
         /// When true, an unprefixed instance attribute may match this use if the
         /// element is in the same namespace (chameleon include only).
         public var chameleonUnprefixed: Bool
+        /// `use="prohibited"`: the attribute is excluded from the type's effective
+        /// {attribute uses}, so it must not appear on an instance. The use is kept
+        /// (rather than dropped) so schema-validity checks still see the declaration.
+        public var prohibited: Bool
 
         public init(
             name: PureXML.Model.QualifiedName,
@@ -247,12 +251,14 @@ public extension PureXML.Schema {
             required: Bool = false,
             valueConstraint: ValueConstraint? = nil,
             chameleonUnprefixed: Bool = false,
+            prohibited: Bool = false,
         ) {
             self.name = name
             self.type = type
             self.required = required
             self.valueConstraint = valueConstraint
             self.chameleonUnprefixed = chameleonUnprefixed
+            self.prohibited = prohibited
         }
     }
 
