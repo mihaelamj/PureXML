@@ -56,27 +56,12 @@ extension PureXML.Schema.XSDParser {
     /// prohibited check fires only when the original has no attribute wildcard (which
     /// could otherwise admit the attribute).
     static func redefineAttributeGroupRestrictionErrors(_ containers: [XSDTree]) -> [String] {
-        // Key the base by NAMESPACED identity: an attribute group is identified by
-        // {name, target namespace}, and a redefinition's base is in the redefining
-        // schema's own target namespace, so a same-local-name group imported from a
-        // different namespace must not be mistaken for the base (matching the
-        // namespace guard `redefineSelfReferenceErrors` already uses).
-        var base: [String: XSDTree] = [:]
-        for container in containers where RedefineNode.localName(container) != "redefine" {
-            for group in RedefineNode.children(container, named: "attributeGroup") {
-                if let name = RedefineNode.attribute(group, "name") { base[namespacedKey(name, owner: group)] = group }
-            }
-        }
+        let base = baseComponents(in: containers, named: "attributeGroup")
         var errors: [String] = []
         for container in containers where RedefineNode.localName(container) == "redefine" {
             for redefinition in RedefineNode.children(container, named: "attributeGroup") {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
-                      // The redefined schema's components are in the redefining schema's
-                      // own namespace, or in none when it is a chameleon (no
-                      // targetNamespace); try both. A base with a different explicit
-                      // namespace keys under neither, so no cross-namespace group is
-                      // mistaken for the original.
-                      let baseGroup = base[namespacedKey(name, owner: redefinition)] ?? base["{}\(name)"]
+                      let baseGroup = resolveBaseComponent(base, name: name, owner: redefinition)
                 else { continue }
                 errors += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
             }
@@ -90,6 +75,31 @@ extension PureXML.Schema.XSDParser {
     private static func namespacedKey(_ name: String, owner node: XSDTree) -> String {
         let target = RedefineNode.attribute(RedefineNode.schemaOwner(node), "targetNamespace") ?? ""
         return "{\(target)}\(name)"
+    }
+
+    /// Named components of `kind` declared directly in the non-redefine containers,
+    /// keyed by namespaced identity: an attribute group or model group is identified by
+    /// {name, target namespace}, so a same-local-name component imported from a
+    /// different namespace is not mistaken for the redefinition's base (the namespace
+    /// guard `redefineSelfReferenceErrors` already uses). This is the pool a
+    /// redefinition's base is drawn from.
+    private static func baseComponents(in containers: [XSDTree], named kind: String) -> [String: XSDTree] {
+        var base: [String: XSDTree] = [:]
+        for container in containers where RedefineNode.localName(container) != "redefine" {
+            for component in RedefineNode.children(container, named: kind) {
+                if let name = RedefineNode.attribute(component, "name") { base[namespacedKey(name, owner: component)] = component }
+            }
+        }
+        return base
+    }
+
+    /// The base component a redefinition redefines: looked up by namespaced identity,
+    /// then by the chameleon `{}name` key, since a redefined schema with no
+    /// `targetNamespace` is absorbed into the redefining schema's namespace. A base in a
+    /// DIFFERENT explicit namespace keys under neither, so no cross-namespace component
+    /// is mistaken for the original.
+    private static func resolveBaseComponent(_ base: [String: XSDTree], name: String, owner: XSDTree) -> XSDTree? {
+        base[namespacedKey(name, owner: owner)] ?? base["{}\(name)"]
     }
 
     private static func attributeGroupRestrictionErrors(name: String, base: XSDTree, redefinition: XSDTree) -> [String] {
@@ -167,23 +177,13 @@ extension PureXML.Schema.XSDParser {
         types: [String: PureXML.Schema.ElementType],
         derivation: [String: PureXML.Schema.TypeDerivation],
     ) -> [String] {
-        var base: [String: XSDTree] = [:]
-        for container in containers where RedefineNode.localName(container) != "redefine" {
-            for group in RedefineNode.children(container, named: "group") {
-                if let name = RedefineNode.attribute(group, "name") { base[namespacedKey(name, owner: group)] = group }
-            }
-        }
+        let base = baseComponents(in: containers, named: "group")
         var errors: [String] = []
         for container in containers where RedefineNode.localName(container) == "redefine" {
             for redefinition in RedefineNode.children(container, named: "group") {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
                       !hasGroupSelfReference(redefinition, name: name),
-                      // The redefined schema's components live in the redefining schema's
-                      // own namespace, or in none when it is a chameleon (no
-                      // targetNamespace) absorbed on redefine; try both keys. A base with
-                      // a DIFFERENT explicit namespace keys under neither, so no
-                      // cross-namespace component is mistaken for the original.
-                      let original = base[namespacedKey(name, owner: redefinition)] ?? base["{}\(name)"],
+                      let original = resolveBaseComponent(base, name: name, owner: redefinition),
                       let redefined = modelGroup(in: redefinition, context),
                       let baseline = modelGroup(in: original, context),
                       // A `maxOccurs=0` ("pointless") member in the original puts the
