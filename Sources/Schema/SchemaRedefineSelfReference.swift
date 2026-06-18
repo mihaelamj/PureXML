@@ -71,7 +71,12 @@ extension PureXML.Schema.XSDParser {
         for container in containers where RedefineNode.localName(container) == "redefine" {
             for redefinition in RedefineNode.children(container, named: "attributeGroup") {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
-                      let baseGroup = base[namespacedKey(name, owner: redefinition)]
+                      // The redefined schema's components are in the redefining schema's
+                      // own namespace, or in none when it is a chameleon (no
+                      // targetNamespace); try both. A base with a different explicit
+                      // namespace keys under neither, so no cross-namespace group is
+                      // mistaken for the original.
+                      let baseGroup = base[namespacedKey(name, owner: redefinition)] ?? base["{}\(name)"]
                 else { continue }
                 errors += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
             }
@@ -100,6 +105,24 @@ extension PureXML.Schema.XSDParser {
         let use: (String) -> String? = { redefined[$0].map { RedefineNode.attribute($0, "use") ?? "optional" } }
         let hasReference = children.contains { RedefineNode.localName($0) == "attributeGroup" }
         let baseHasWildcard = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "anyAttribute" }
+        // A restriction may not ADD an attribute the original does not have (a superset).
+        // Checked only when the original's attribute set is fully known from its direct
+        // declarations (no nested attributeGroup reference could supply the name), and
+        // only when the redefinition itself carries no attributeGroup reference: a
+        // self-reference brings in the original's attributes, so declaring further ones
+        // alongside it is a valid redefine (W3C attgC007/attgC038/groupB018), not an
+        // addition. Both guards keep the check from mistaking an inherited attribute for
+        // a newly added one.
+        let baseNames = Set(RedefineNode.children(base, named: "attribute").compactMap { RedefineNode.attribute($0, "name") })
+        let baseHasReference = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "attributeGroup" }
+        if !baseHasReference, !hasReference {
+            // A `use="prohibited"` attribute forbids the name rather than permitting it,
+            // so declaring one the base lacks does not widen the usable set; like the
+            // re-introduce and fixed-value checks, it is left alone.
+            for attrName in redefined.keys.sorted() where !baseNames.contains(attrName) && use(attrName) != "prohibited" {
+                errors.append("a redefined attribute group '\(name)' may not add the attribute '\(attrName)'")
+            }
+        }
         for attribute in RedefineNode.children(base, named: "attribute") {
             guard let attrName = RedefineNode.attribute(attribute, "name") else { continue }
             // A restriction may not relax a fixed value: if the original fixes an

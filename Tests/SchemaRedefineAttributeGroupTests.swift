@@ -61,4 +61,42 @@ struct SchemaRedefineAttributeGroupTests {
             base: "<xs:attribute name='a' type='xs:string' fixed='abc'/>",
         )
     }
+
+    @Test("adding an attribute not in the original is rejected (superset)")
+    func test_addAttributeRejected() throws {
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attribute name='a' type='xs:string'/><xs:attribute name='b' type='xs:string'/>",
+                base: "<xs:attribute name='a' type='xs:string'/>",
+            )
+        }
+    }
+
+    @Test("declaring a prohibited attribute the base lacks is valid (not a superset)")
+    func test_addProhibitedAccepted() throws {
+        _ = try redefine(
+            group: "<xs:attribute name='a' type='xs:string'/><xs:attribute name='z' use='prohibited' type='xs:string'/>",
+            base: "<xs:attribute name='a' type='xs:string'/>",
+        )
+    }
+
+    @Test("adding an attribute alongside a self-reference is valid")
+    func test_addWithSelfReferenceAccepted() throws {
+        _ = try redefine(
+            group: "<xs:attributeGroup ref='g'/><xs:attribute name='b' type='xs:string'/>",
+            base: "<xs:attribute name='a' type='xs:string'/>",
+        )
+    }
+
+    @Test("re-declaring an attribute the base inherits via a reference is valid")
+    func test_redeclareInheritedAccepted() throws {
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>"
+            + "<xs:attribute name='x' type='xs:string'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='inner'><xs:attribute name='x' type='xs:string'/></xs:attributeGroup>"
+            + "<xs:attributeGroup name='g'><xs:attributeGroup ref='inner'/></xs:attributeGroup></xs:schema>"
+        _ = try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
 }
