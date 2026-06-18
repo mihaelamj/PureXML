@@ -12,6 +12,13 @@ At the start of a session, read this file and the rules under `docs/rules/` that
 match the task. Confirm by replying with `rules-loaded` and name the files you
 loaded.
 
+The canonical upstream Swift rule set is vendored at
+`docs/rules/rules-swift/` and mirrored from
+`/Volumes/Code/DeveloperExt/public/rules-swift`. Use it when a local
+`docs/rules/` copy is missing or has drifted, but keep the PureXML-specific
+constraints in this file and `docs/rules/README.md` as stronger project
+overrides.
+
 For code changes, load at minimum:
 
 - `docs/rules/code-style.md`
@@ -21,6 +28,10 @@ For code changes, load at minimum:
 - `docs/rules/verification.md`
 - `docs/rules/commits.md`
 - `docs/rules/research-first.md` (when stuck: read the research repo and the literature before guessing)
+- `docs/rules/rules-swift/core/no-shortcuts-first-principles.md`
+- `docs/rules/rules-swift/core/proof-discipline.md` (when making correctness or conformance claims)
+- `docs/rules/rules-swift/parsing-rules.md` (when changing parser behavior)
+- `docs/rules/rules-swift/validation-rules.md` (when changing validation behavior)
 
 ## What PureXML Is
 

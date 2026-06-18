@@ -1,0 +1,12 @@
+name: leak-gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  leak-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the public-safe leak gate
+        run: sh scripts/leak-gate.sh

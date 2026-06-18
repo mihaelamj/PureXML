@@ -1,0 +1,18 @@
+#!/bin/sh
+# commit-msg hook: reject AI/tool attribution and em dashes in the message.
+# Install per clone (hooks are not cloned): git config core.hooksPath .githooks
+# See core/commits.md and core/git-discipline.md.
+
+msg_file="$1"
+
+if grep -qiE 'co-authored-by:[[:space:]]*(claude|cursor|copilot|codex|gpt|gemini|antigravity)|generated (with|by) (claude|cursor|copilot|codex|gpt|gemini|antigravity)|generated with .*code|powered by|robot' "$msg_file"; then
+    echo "commit-msg: remove tool attribution (co-author trailer, 'generated with', 'powered by', robot emoji)." >&2
+    exit 1
+fi
+
+if grep -q "$(printf '\xe2\x80\x94')" "$msg_file"; then
+    echo "commit-msg: no em dashes in commit messages; use commas, colons, or restructure." >&2
+    exit 1
+fi
+
+exit 0

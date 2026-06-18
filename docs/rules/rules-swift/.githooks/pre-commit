@@ -1,0 +1,29 @@
+#!/bin/sh
+# Pre-commit hook: leak gate on every commit, then format and lint staged Swift files.
+# Install per clone (hooks are not cloned): git config core.hooksPath .githooks
+# See formatting-and-linting.md. CI re-runs both over the whole tree as the hard gate.
+
+set -e
+
+# Public-safe leak gate runs on EVERY commit (this repo is mostly markdown, so it must
+# not be gated behind staged Swift files). See scripts/leak-gate.sh.
+sh "$(dirname "$0")/../scripts/leak-gate.sh"
+
+# Lint only the Swift this commit touches. A commit with no Swift files (docs, config,
+# this rules repo) has nothing to format or lint, so stop here.
+swift_files=$(git diff --cached --name-only --diff-filter=ACM -- '*.swift')
+if [ -z "$swift_files" ]; then
+    exit 0
+fi
+
+if command -v swiftformat >/dev/null 2>&1; then
+    printf '%s\n' "$swift_files" | xargs swiftformat --lint --config .swiftformat
+else
+    echo "pre-commit: swiftformat not found; install it so formatting is enforced locally." >&2
+fi
+
+if command -v swiftlint >/dev/null 2>&1; then
+    printf '%s\n' "$swift_files" | xargs swiftlint lint --strict --config .swiftlint.yml
+else
+    echo "pre-commit: swiftlint not found; install it so linting is enforced locally." >&2
+fi
