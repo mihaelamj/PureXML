@@ -35,6 +35,16 @@ extension PureXML.Validation.SchemaCompile {
         }
     }
 
+    /// src-redefine: a redefinition of an attribute group restricts the original, so
+    /// it may not eliminate a required attribute use the original declares.
+    static var redefinedAttributeGroupsKeepRequired: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A redefined attribute group keeps the original's required attributes") { document in
+            PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.redefineAttributeGroupRestrictionErrors(document.containers),
+            )
+        }
+    }
+
     /// Facet definition validity and pattern syntax validity (XSD Part 2 4.3): a
     /// constraining facet must be applicable to and valid for its base type, and a
     /// `pattern` must compile. These are gathered during simple-type compilation

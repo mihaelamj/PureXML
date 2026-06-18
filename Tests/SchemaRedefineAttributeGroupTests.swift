@@ -1,0 +1,46 @@
+@testable import PureXML
+import Testing
+
+/// A redefinition of an attribute group restricts the original (src-redefine), so
+/// it may neither eliminate a required attribute nor re-introduce a prohibited one
+/// as usable. Keeping a required attribute, and re-declaring a prohibited attribute
+/// as prohibited, are both valid (W3C attgZ002/attgZ003, schT3).
+@Suite("redefined attribute group restriction")
+struct SchemaRedefineAttributeGroupTests {
+    private func redefine(group body: String, base: String) throws -> PureXML.Schema.Document {
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>\(body)</xs:attributeGroup></xs:redefine>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='g'>\(base)</xs:attributeGroup></xs:schema>"
+        return try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
+
+    @Test("eliminating a required attribute is rejected")
+    func test_dropRequiredRejected() throws {
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attribute name='b' type='xs:string'/>",
+                base: "<xs:attribute name='a' use='required' type='xs:string'/><xs:attribute name='b' type='xs:string'/>",
+            )
+        }
+    }
+
+    @Test("re-introducing a prohibited attribute as usable is rejected")
+    func test_reintroduceProhibitedRejected() throws {
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attribute name='a' type='xs:string'/>",
+                base: "<xs:attribute name='a' use='prohibited' type='xs:string'/>",
+            )
+        }
+    }
+
+    @Test("keeping a required attribute and re-prohibiting a prohibited one is valid")
+    func test_validRedefinitionAccepted() throws {
+        _ = try redefine(
+            group: "<xs:attribute name='a' use='required' type='xs:string'/><xs:attribute name='p' use='prohibited' type='xs:string'/>",
+            base: "<xs:attribute name='a' use='required' type='xs:string'/><xs:attribute name='p' use='prohibited' type='xs:string'/><xs:attribute name='o' type='xs:string'/>",
+        )
+    }
+}

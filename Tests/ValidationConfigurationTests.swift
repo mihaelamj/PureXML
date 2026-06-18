@@ -93,6 +93,7 @@ struct ValidationConfigurationTests {
             "A resolved schemaLocation reference is a valid schema",
             "A redefined type restricts or extends itself",
             "A redefined group or attribute group has a well-formed self-reference",
+            "A redefined attribute group keeps the original's required attributes",
             "Type derivation chains contain no cycles",
             "Schema type references contain no cycles",
             "xs:all group references appear only where permitted",

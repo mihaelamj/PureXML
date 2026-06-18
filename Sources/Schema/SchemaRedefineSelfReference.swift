@@ -47,6 +47,74 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// A redefinition of an `attributeGroup` is a RESTRICTION of the original
+    /// (src-redefine / cos-ct-restricts), so it may neither eliminate a REQUIRED
+    /// attribute the original declares, nor re-introduce one the original prohibits.
+    /// To stay false-positive-free: the drop-required check fires only when the
+    /// redefinition declares its attributes directly (no nested `attributeGroup`
+    /// reference, which could re-introduce the attribute); the re-introduced-
+    /// prohibited check fires only when the original has no attribute wildcard (which
+    /// could otherwise admit the attribute).
+    static func redefineAttributeGroupRestrictionErrors(_ containers: [XSDTree]) -> [String] {
+        // Key the base by NAMESPACED identity: an attribute group is identified by
+        // {name, target namespace}, and a redefinition's base is in the redefining
+        // schema's own target namespace, so a same-local-name group imported from a
+        // different namespace must not be mistaken for the base (matching the
+        // namespace guard `redefineSelfReferenceErrors` already uses).
+        var base: [String: XSDTree] = [:]
+        for container in containers where RedefineNode.localName(container) != "redefine" {
+            for group in RedefineNode.children(container, named: "attributeGroup") {
+                if let name = RedefineNode.attribute(group, "name") { base[namespacedKey(name, owner: group)] = group }
+            }
+        }
+        var errors: [String] = []
+        for container in containers where RedefineNode.localName(container) == "redefine" {
+            for redefinition in RedefineNode.children(container, named: "attributeGroup") {
+                guard let name = RedefineNode.attribute(redefinition, "name"),
+                      let baseGroup = base[namespacedKey(name, owner: redefinition)]
+                else { continue }
+                errors += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
+            }
+        }
+        return errors
+    }
+
+    /// The `{target-namespace}name` identity of a named component, keyed by its
+    /// owning schema's `targetNamespace` so same-local-name components in different
+    /// namespaces stay distinct.
+    private static func namespacedKey(_ name: String, owner node: XSDTree) -> String {
+        let target = RedefineNode.attribute(RedefineNode.schemaOwner(node), "targetNamespace") ?? ""
+        return "{\(target)}\(name)"
+    }
+
+    private static func attributeGroupRestrictionErrors(name: String, base: XSDTree, redefinition: XSDTree) -> [String] {
+        var errors: [String] = []
+        let children = RedefineNode.elementChildren(redefinition)
+        // The redefinition's attributes by name -> `use`; re-declaring a base
+        // prohibited attribute AS prohibited keeps it prohibited (valid), so the
+        // re-introduction check needs the use, not mere presence of the name.
+        var redefinedUse: [String: String] = [:]
+        for attribute in children where RedefineNode.localName(attribute) == "attribute" {
+            if let attrName = RedefineNode.attribute(attribute, "name") {
+                redefinedUse[attrName] = RedefineNode.attribute(attribute, "use") ?? "optional"
+            }
+        }
+        let hasReference = children.contains { RedefineNode.localName($0) == "attributeGroup" }
+        let baseHasWildcard = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "anyAttribute" }
+        for attribute in RedefineNode.children(base, named: "attribute") {
+            guard let attrName = RedefineNode.attribute(attribute, "name") else { continue }
+            switch RedefineNode.attribute(attribute, "use") {
+            case "required" where !hasReference && redefinedUse[attrName] == nil:
+                errors.append("a redefined attribute group '\(name)' may not eliminate the required attribute '\(attrName)'")
+            case "prohibited" where !baseHasWildcard && redefinedUse[attrName] != nil && redefinedUse[attrName] != "prohibited":
+                errors.append("a redefined attribute group '\(name)' may not re-introduce the prohibited attribute '\(attrName)'")
+            default:
+                break
+            }
+        }
+        return errors
+    }
+
     /// The reference NODES of `kind` nested directly in `node`'s model, stopping at
     /// `element`/`complexType`/`simpleType`/`attribute` scopes so a reference inside a
     /// nested element's content (a data-structure recursion, not a redefinition
