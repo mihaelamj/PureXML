@@ -25,6 +25,11 @@ Project-specific overrides:
 The broader rule files are retained for detailed guidance. When they include
 generic examples, apply the PureXML-specific overrides above.
 
-Canonical Swift rules live at `/Volumes/Code/DeveloperExt/private/rules-swift`
+Canonical Swift rules live at `/Volumes/Code/DeveloperExt/public/rules-swift`
 (especially `validation-rules.md` and `parsing-rules.md`). Prefer that source
-when `docs/rules/` copies drift.
+when `docs/rules/` copies drift. PureXML's committed `.swiftlint.yml` and
+`.swiftformat` are the coherent project tuning of that canon: they adopt its
+opt-in rule set and shared formatter directives, keep stricter safety
+(`force_unwrapping`/`force_try`/`force_cast` = error), and resolve the canon's
+`--commas always` vs default-`trailing_comma` mismatch by mandating trailing
+commas in both tools.
