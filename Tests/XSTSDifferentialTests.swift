@@ -77,7 +77,11 @@ struct XSTSDifferentialTests {
     // MARK: - libxml2 oracle
 
     private func xmllintAvailable() -> Bool {
-        FileManager.default.isExecutableFile(atPath: "/usr/bin/xmllint")
+        #if os(WASI)
+            return false
+        #else
+            FileManager.default.isExecutableFile(atPath: "/usr/bin/xmllint")
+        #endif
     }
 
     /// libxml2's schema-validity verdict for one `.xsd`, or nil if it could not be
@@ -86,18 +90,22 @@ struct XSTSDifferentialTests {
     /// empty) always fails to parse, which is ignored -- only schema-compile errors
     /// count toward schema validity.
     private func xmllintSchemaValid(_ path: String) -> Bool? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xmllint")
-        process.arguments = ["--noout", "--schema", path, "/dev/null"]
-        let pipe = Pipe()
-        process.standardError = pipe
-        process.standardOutput = Pipe()
-        do { try process.run() } catch { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let output = String(decoding: data, as: UTF8.self)
-        if output.contains("Schemas parser error") || output.contains("failed to compile") { return false }
-        return true
+        #if os(WASI)
+            return nil
+        #else
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xmllint")
+            process.arguments = ["--noout", "--schema", path, "/dev/null"]
+            let pipe = Pipe()
+            process.standardError = pipe
+            process.standardOutput = Pipe()
+            do { try process.run() } catch { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            let output = String(decoding: data, as: UTF8.self)
+            if output.contains("Schemas parser error") || output.contains("failed to compile") { return false }
+            return true
+        #endif
     }
 
     private func xsdFiles(under directory: String) -> [String] {

@@ -138,6 +138,39 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// XSD 1.0 Derivation Valid (Restriction, Simple): when a `simpleContent`
+    /// restriction supplies an inline `simpleType`, that inline type must itself be
+    /// a valid restriction of the base complex type's simple content type. A list
+    /// of `xs:int`, for example, is not a restriction of `xs:decimal` because it
+    /// changes the variety from atomic to list (W3C msData particlesZ018).
+    ///
+    /// Only local, resolved complex bases with simple content are checked. Built-in,
+    /// foreign, unresolved, and composed bases are left to the surrounding base-kind
+    /// and cross-document rules so this cannot reject a schema whose base type is
+    /// unknown to this compile pass.
+    static func simpleContentRestrictionTypeErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+        guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
+        var errors: [String] = []
+        for content in descendants(schema, named: "simpleContent") {
+            guard let restriction = ExtAllNode.firstChild(content, named: "restriction"),
+                  let inline = ExtAllNode.firstChild(restriction, named: "simpleType"),
+                  let base = ExtAllNode.attribute(restriction, "base")
+            else { continue }
+            let bindings = namespaceBindingsInScope(of: restriction, defaultBindings: context.namespaceBindings)
+            let namespace = ExtAllNode.referenceNamespace(base, bindings)
+            let baseName = ExtAllNode.stripPrefix(base)
+            guard namespace == context.targetNamespace,
+                  case let .complex(complex)? = types[baseName],
+                  case let .simpleContent(baseSimpleType) = complex.content
+            else { continue }
+            let derivedSimpleType = scopedSimpleType(inline, context)
+            if !isSimpleTypeRestrictionOK(derived: derivedSimpleType, base: baseSimpleType) {
+                errors.append("the inline simpleType in a simpleContent restriction is not a valid restriction of base type '\(baseName)'")
+            }
+        }
+        return errors
+    }
+
     /// XSD 1.0 `src-ct.1`: the base of a `complexContent` derivation (restriction or
     /// extension) must be a COMPLEX type. The ur-type `xs:anyType` is complex and is
     /// the legitimate base of most complex types; every other XSD built-in, and a

@@ -366,35 +366,4 @@ extension PureXML.Schema.XSDParser {
         }
         return ComplexType(attributes: attributes, attributeWildcard: wildcard, content: mixed ? .mixed(particle) : .elementOnly(particle))
     }
-
-    private static func simpleContentType(_ node: XSDTree, _ context: XSDContext, visited: Set<String> = []) -> SimpleType {
-        guard let inner = derivation(node) else { return SimpleType(base: .string) }
-        let rawBase = XSDNode.attribute(inner, "base") ?? "string"
-        let baseName = XSDNode.stripPrefix(rawBase)
-        let bindings = PureXML.Schema.XSDParser.namespaceBindingsInScope(of: inner, defaultBindings: context.namespaceBindings)
-        let uri = XSDNode.referenceNamespace(rawBase, bindings)
-
-        let baseType = simpleContentBaseType(baseName, uri: uri, context, visited: visited)
-        var facets = baseType.facets
-        XSDSimpleParser.applyFacets(inner, into: &facets)
-        return SimpleType(base: baseType.base, facets: facets, variety: baseType.variety, isBuiltinList: baseType.isBuiltinList)
-    }
-
-    /// The simple type a `simpleContent` derivation derives from: an XSD built-in, a
-    /// named simple type, or, when the base is another complex type with simpleContent,
-    /// that type's own resolved simple type (so `Test` restricting `Test2` extending
-    /// `xs:int` resolves to `int`). A cycle in the base chain falls back to `string`.
-    private static func simpleContentBaseType(_ baseName: String, uri: String?, _ context: XSDContext, visited: Set<String>) -> SimpleType {
-        if uri == PureXML.Schema.XSDParser.xsdNamespace {
-            return SimpleType(base: BuiltinType(rawValue: baseName) ?? .string)
-        }
-        if let simple = context.simpleTypes[baseName] {
-            return simple
-        }
-        guard !visited.contains(baseName),
-              let complexNode = context.complexTypeNodes[baseName],
-              let baseSimpleContent = XSDNode.firstChild(complexNode, named: "simpleContent")
-        else { return SimpleType(base: .string) }
-        return simpleContentType(baseSimpleContent, context, visited: visited.union([baseName]))
-    }
 }

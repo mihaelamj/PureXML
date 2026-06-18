@@ -6,7 +6,7 @@ evidence, what actually stands between the current engine and a 1.0 fit to put i
 front of a developer as the authority on XML/XSD correctness.
 
 Snapshot at time of writing: v0.2.0 released; full 2006-11-06 XSTS archive (14383
-groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 48`,
+groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 47`,
 `valid-instances-rejected = 0`, `invalid-instances-accepted = 31`.
 
 ## Status against the four stoppers
@@ -16,7 +16,7 @@ groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 48`,
    libxml2 differential over 9618 schemas. **Met.** This is the doc's bar to be "an
    authority"; it is cleared on the measured corpora.
 2. **Silently accepting faulty input (false negatives).** `invalid-schemas-accepted
-   = 48`, `invalid-instances-accepted = 31`. **Not at 0.** This is the bulk of named
+   = 47`, `invalid-instances-accepted = 31`. **Not at 0.** This is the bulk of named
    milestone work (M2, M3) and the subject of Part 1 below.
 3. **Uncharacterized correctness.** Differential harness vs libxml2 and a fuzz
    suite exist (M1, ~done). Gap: real-world corpora beyond XSTS, and the silent
@@ -28,7 +28,7 @@ groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 48`,
 
 ## The biggest hurdle, stated plainly
 
-Driving the false-negative buckets (`invalid-schemas-accepted = 48`,
+Driving the false-negative buckets (`invalid-schemas-accepted = 47`,
 `invalid-instances-accepted = 31`) to zero is the largest remaining body of named
 work, and it is hard for a specific reason: **the ~95% already closed were the
 tractable cases; every case left fights the cardinal rule.** The remainder sits in
@@ -57,7 +57,7 @@ chose to under-approximate to stay false-positive-free.
 | particlesK006, M034 | RecurseAsIfGroup (Elt:All, Elt:Sequence) | "a documented, bounded under-rejection… over-rejection is the non-starter" (ParticleRestriction.swift:298) |
 | particlesEa025, Fb003, Ha161, Hb011 | pointless-particle / extension-from-`any` / forbidden sequence:elt | partial |
 | elemZ026/027/028 | element-decl restriction where base is a substitution-group head | not modelled |
-| particlesZ018 | list-of-int ⊄ decimal (simple-type derivation, a *different* oracle) | separate |
+| particlesZ018 | list-of-int ⊄ decimal (simple-type derivation, a *different* oracle) | closed by inline simpleContent type restriction check |
 | particlesZ022/030 | non-deterministic wildcards (UPA, not restriction) | determinism check is deliberately QName-only |
 
 **Why this is the risk, by fan-in.** `ParticleRestriction.violation` is called from

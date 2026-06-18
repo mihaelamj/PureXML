@@ -376,6 +376,7 @@ extension PureXML.Validation.SchemaCompile {
                 PureXML.Schema.XSDParser.simpleContentExtensionBaseErrors(document.schema, document.context, namedTypes)
                     + PureXML.Schema.XSDParser.extensionMixedAgreementErrors(document.schema, document.context, namedTypes)
                     + PureXML.Schema.XSDParser.simpleContentRestrictionBaseErrors(document.schema, document.context, namedTypes)
+                    + PureXML.Schema.XSDParser.simpleContentRestrictionTypeErrors(document.schema, document.context, namedTypes)
                     + PureXML.Schema.XSDParser.complexContentBaseKindErrors(document.schema, document.context, namedTypes)
                     + PureXML.Schema.XSDParser.simpleContentExtensionBaseKindErrors(document.schema, document.context, namedTypes)
                     + PureXML.Schema.XSDParser.elementValueConstraintContentErrors(document.schema, document.context, namedTypes),
