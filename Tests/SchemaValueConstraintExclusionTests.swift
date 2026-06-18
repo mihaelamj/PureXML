@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD default/fixed value-constraint mutual exclusion (src-element.1 / src-attribute.1)")
 struct SchemaValueConstraintExclusionTests {

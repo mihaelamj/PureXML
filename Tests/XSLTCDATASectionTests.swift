@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSLT xsl:output cdata-section-elements")
 struct XSLTCDATASectionTests {

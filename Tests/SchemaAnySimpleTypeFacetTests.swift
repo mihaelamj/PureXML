@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A constraining facet may not be applied where a `simpleContent` restriction's base
 /// chain resolves to `xs:anySimpleType`, the ur simple type, which carries no

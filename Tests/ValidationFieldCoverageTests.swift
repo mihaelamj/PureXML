@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Meta-tests for validation-rules.md full field coverage: every stored property
 /// (or ``Model/Node`` case) on validation document/subject types must map to a rule

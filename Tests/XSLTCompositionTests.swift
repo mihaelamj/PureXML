@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Stylesheet composition behaviors of the xalan burn-down (#130): import
 /// precedence and apply-imports scoping, relative include/import chains,

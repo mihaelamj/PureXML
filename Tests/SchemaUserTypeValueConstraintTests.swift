@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD value constraint valid against a user type (e-props-correct.2 / a-props-correct.2)")
 struct SchemaUserTypeValueConstraintTests {

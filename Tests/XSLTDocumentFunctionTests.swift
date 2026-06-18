@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSLT document() fragments and base-URI resolution")
 struct XSLTDocumentFunctionTests {

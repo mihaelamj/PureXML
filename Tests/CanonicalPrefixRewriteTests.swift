@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Canonical XML 2.0: sequential prefix rewrite and QName-aware values")
 struct CanonicalPrefixRewriteTests {

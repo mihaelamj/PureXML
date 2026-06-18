@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Source spans on the ranged tree, and the bridge that maps a validation
 /// finding's coding path to a source range: the keystone for editor use.

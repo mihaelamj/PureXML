@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD located content-model errors")
 struct XSDLocatedContentTests {

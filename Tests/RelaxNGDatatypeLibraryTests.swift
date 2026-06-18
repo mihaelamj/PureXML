@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("RELAX NG datatypeLibrary resolution and nsName subtraction")
 struct RelaxNGDatatypeLibraryTests {

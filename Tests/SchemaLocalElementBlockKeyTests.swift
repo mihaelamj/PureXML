@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A `block` on a LOCAL element declaration applies to that element by its instance
 /// (qualified) name. When the schema is unqualified (no elementFormDefault), the

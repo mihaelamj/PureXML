@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An element with a `fixed` value constraint must carry its fixed character value
 /// and no element children, even under a mixed content type (cvc-elt.5.2.2.2.1).

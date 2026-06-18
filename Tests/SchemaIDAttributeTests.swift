@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The `id` attribute on any XSD component is of type `xs:ID`: its value must be
 /// a valid NCName and unique within the schema document (XSD Structures). Such a

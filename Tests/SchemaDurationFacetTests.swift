@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Ordering facets on `xs:duration` (#147). Duration is a partial order (a month
 /// is 28 to 31 days), compared by adding to four reference dateTimes. The bounds

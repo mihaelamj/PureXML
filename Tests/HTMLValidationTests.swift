@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("HTML conformance validator (composable Validation rules)")
 struct HTMLValidationTests {

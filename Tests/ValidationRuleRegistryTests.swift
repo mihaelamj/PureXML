@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Meta-tests for validation-rules.md exhaustive coverage: every shipped builtin
 /// rule must have a fail and a near-miss succeed isolation test in

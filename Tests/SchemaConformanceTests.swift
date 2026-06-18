@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Cross-cutting conformance fixtures for both schema languages: realistic
 /// schemas validated against valid and invalid instances.

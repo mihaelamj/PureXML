@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The recovering reader (`PureXML.read`) never throws and never crashes: it
 /// returns the maximal best-effort tree plus one located diagnostic per problem.

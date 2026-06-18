@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD attribute default requires use=optional (src-attribute.2)")
 struct SchemaAttributeDefaultUseTests {

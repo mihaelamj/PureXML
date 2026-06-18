@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Identity-constraint field values are compared in their shared value space. Two
 /// fields typed by different members of the decimal-derived numeric family (e.g.

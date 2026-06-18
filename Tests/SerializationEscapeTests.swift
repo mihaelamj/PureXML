@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Serialization: CDATA-as-text and ASCII-only")
 struct SerializationEscapeTests {

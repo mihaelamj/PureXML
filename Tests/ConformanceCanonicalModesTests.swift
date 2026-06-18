@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Canonical XML exclusive and 2.0 mode conformance, driven through the
 /// validation framework (its own suite to keep the main corpus under the cap).

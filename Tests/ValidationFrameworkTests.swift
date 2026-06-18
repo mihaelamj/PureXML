@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Unit tests for the validation framework primitives: the `Validation` value,
 /// the erased wrapper's type guard, and the combinator algebra exercised as pure

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("RELAX NG typed <value> value-space comparison")
 struct RelaxNGValueSpaceTests {

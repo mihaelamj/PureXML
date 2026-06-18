@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An identity-constraint field that selects an absent attribute or an empty
 /// element whose declaration carries a `default`/`fixed` takes that value as its

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `validate(_:schemaLoader:)` honors an instance's `xsi:schemaLocation`,
 /// loading the referenced schema documents so a strict (or lax) wildcard can

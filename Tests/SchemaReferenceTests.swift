@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Every QName a schema names (a `type`/`base`/`itemType`/`memberTypes` type, an
 /// element/attribute/group/attributeGroup `ref`, an element `substitutionGroup`)

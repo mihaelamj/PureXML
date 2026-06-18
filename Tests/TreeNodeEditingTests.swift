@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("TreeNode editing: attributes, copy, order, normalize")
 struct TreeNodeEditingTests {

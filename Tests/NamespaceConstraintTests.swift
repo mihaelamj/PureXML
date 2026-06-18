@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The Namespaces 1.0 constraints (#136): reserved prefixes and namespace
 /// names, qualified-name shape, duplicate expanded-name attributes, NCName

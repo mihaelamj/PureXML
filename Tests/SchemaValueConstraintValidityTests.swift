@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An element/attribute `default`/`fixed` value must be a valid value of its
 /// `type` (Attribute/Element Locally Valid, XSD 1.0), checked at compile time.

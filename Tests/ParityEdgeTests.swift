@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Parity edges: C14N 2.0, catalog delegation, XPath number formatting")
 struct ParityEdgeTests {

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Per-entity base-URI tracking (#138): a relative system identifier inside
 /// an external entity resolves against that entity's own URI, not the

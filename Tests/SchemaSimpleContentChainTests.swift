@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A `simpleContent` derivation whose base is another complex type with
 /// simpleContent resolves through the chain to the underlying simple type, so the

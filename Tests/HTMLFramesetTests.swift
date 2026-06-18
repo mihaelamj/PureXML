@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("HTML5 frameset documents")
 struct HTMLFramesetTests {

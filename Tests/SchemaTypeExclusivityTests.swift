@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD type attribute excludes an inline type")
 struct SchemaTypeExclusivityTests {

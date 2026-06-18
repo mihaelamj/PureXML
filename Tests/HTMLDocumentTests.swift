@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("HTML5 document tree construction")
 struct HTMLDocumentTests {

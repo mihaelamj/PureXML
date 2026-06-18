@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The output-method behaviors of XSLT 1.0 section 16 added in the xalan
 /// burn-down (#130): disable-output-escaping (including its 16.4 fragment

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("DTD conditional sections, notations, NDATA")
 struct DTDConditionalNotationTests {

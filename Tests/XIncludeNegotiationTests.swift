@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XInclude content negotiation, cycle detection, text+fragment")
 struct XIncludeNegotiationTests {

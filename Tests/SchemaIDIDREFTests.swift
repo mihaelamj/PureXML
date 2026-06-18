@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Document-scoped xs:ID/xs:IDREF validation (#147, XSTS idConstrDefs set):
 /// every xs:ID value is unique across the document, and every xs:IDREF/xs:IDREFS

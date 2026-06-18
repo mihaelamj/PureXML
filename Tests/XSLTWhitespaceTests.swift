@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSLT strip-space / preserve-space")
 struct XSLTWhitespaceTests {

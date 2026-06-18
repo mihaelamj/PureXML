@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("DTD ID and IDREF validation")
 struct DTDIdentifierTests {

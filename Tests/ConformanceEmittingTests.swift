@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Serializer options-matrix conformance, driven through the validation
 /// framework: each case pins the exact output of one option against the

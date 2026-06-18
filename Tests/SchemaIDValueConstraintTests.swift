@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD ID-typed declarations have no value constraint")
 struct SchemaIDValueConstraintTests {

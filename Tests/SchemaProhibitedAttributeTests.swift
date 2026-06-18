@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `use="prohibited"` excludes an attribute from a complex type's effective
 /// {attribute uses} (XSD 1.0 §3.4.2): the attribute is then undeclared, so its

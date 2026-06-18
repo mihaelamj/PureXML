@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the W3C XML Conformance Test Suite's xmltest section
 /// (James Clark's cases). The suite's license permits redistribution only as

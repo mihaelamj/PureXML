@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Configuration-pin tests: every validator variant lists exactly its active rule
 /// descriptions, so adding or rewording a rule fails a test before it is accidental.

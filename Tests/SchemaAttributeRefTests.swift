@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An `<xs:attribute ref="...">` resolves to a global attribute declaration,
 /// taking its type from the global node and its use/default/fixed from the

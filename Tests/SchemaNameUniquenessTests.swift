@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Component-name uniqueness (XSD 1.0 symbol-space constraints): within a schema,
 /// global type names (simpleType and complexType share one space), global element

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The XML 1.0 errata behaviors from the eduni burn-down: 3.3.3 attribute-
 /// value normalization, the lenient undeclared-entity path (production 68),

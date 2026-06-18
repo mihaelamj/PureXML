@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD all-group placement (cos-all-limited)")
 struct SchemaAllGroupPlacementTests {

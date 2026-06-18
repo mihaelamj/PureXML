@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// HTML5 depth conformance, driven through the validation framework (#119, the
 /// zone that produced #109): the spec-fidelity cases go through the document

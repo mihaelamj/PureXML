@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schematron dynamic messages and phases")
 struct SchematronDynamicTests {

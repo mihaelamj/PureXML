@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD top-level attributeGroup applicability (topLevelAttributeGroup)")
 struct SchemaTopLevelAttributeGroupTests {

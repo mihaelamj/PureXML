@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the W3C XML Conformance Test Suite's japanese section:
 /// the same prose encoded as UTF-8, UTF-16 (both orders), Shift_JIS, EUC-JP,

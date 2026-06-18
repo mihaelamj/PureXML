@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The worked examples of Canonical XML 1.0 section 3 (W3C Recommendation,
 /// https://www.w3.org/TR/xml-c14n, W3C Software and Document License), run as

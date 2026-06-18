@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Serialization options: quotes, line endings, xml:space, writer NS")
 struct SerializationOptionsTests {

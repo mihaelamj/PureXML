@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Scalar-level lexing (#135): a combining mark directly after an ASCII
 /// delimiter must not merge with it into one grapheme cluster, so Fifth

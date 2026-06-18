@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `pattern` and `enumeration` are the only constraining facets XSD allows on a
 /// union, and both must be enforced on top of member-type membership (#147).

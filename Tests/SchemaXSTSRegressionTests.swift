@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in regressions drawn from XSTS clusters fixed for #146. Requires
 /// `XSTS_ROOT` pointing at the 2006-11-06 suite (same as ``XSTSSuiteTests``).

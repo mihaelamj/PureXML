@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Quick-fixes derived from the structured schema completions, with precise
 /// placement from content spans. The strongest check: applying a fix yields XML

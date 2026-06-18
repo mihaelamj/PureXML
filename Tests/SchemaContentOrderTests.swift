@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Content-model order and cardinality for the derivation contexts whose model
 /// the set-membership table cannot express: a `simpleContent` derivation (facets

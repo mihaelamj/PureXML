@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Schema-correctness validation (#131): a RELAX NG schema document must
 /// itself match the RELAX NG grammar (section 3) and the restrictions of

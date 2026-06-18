@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Encoding-declaration contradictions are fatal (#137, 4.3.3): a declared
 /// 16/32-bit encoding over 8-bit bytes, a declaration outside the BOM's

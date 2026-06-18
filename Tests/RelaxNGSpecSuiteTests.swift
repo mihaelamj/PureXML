@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for James Clark's RELAX NG spec test suite (`spectest.xml`,
 /// distributed with jing-trang under its BSD license). Point `RNG_TS_ROOT` at

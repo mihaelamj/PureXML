@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `block` on an element declaration forbids substituting a type derived from
 /// the declared type by a listed method via `xsi:type`, distinct from `block`

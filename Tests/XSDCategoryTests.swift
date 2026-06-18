@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Each XSD constraint category exercised against `ComplexValidator` directly with
 /// crafted inputs, so it is verifiable on its own (the OpenAPIKit isolation recipe

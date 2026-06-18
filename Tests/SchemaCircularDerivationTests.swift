@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD circular type derivation")
 struct SchemaCircularDerivationTests {

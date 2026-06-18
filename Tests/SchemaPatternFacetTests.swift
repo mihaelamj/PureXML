@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A `pattern` facet value must be a valid XSD regular expression. The pattern
 /// was only compiled lazily at instance time (`try?`), so an unparseable one was

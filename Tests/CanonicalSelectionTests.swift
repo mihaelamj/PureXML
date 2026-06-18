@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Canonical XML: node-set (position-based) selection")
 struct CanonicalSelectionTests {

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Length facets on the built-in list datatypes (`NMTOKENS`, `IDREFS`,
 /// `ENTITIES`) count list items, not characters (#146). A restriction of one of

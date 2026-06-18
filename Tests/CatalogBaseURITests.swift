@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Catalog xml:base and RFC 3986 URI resolution")
 struct CatalogBaseURITests {

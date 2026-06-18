@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// XPath 1.0 axis and predicate conformance, driven through the validation
 /// framework (its own suite to keep the main corpus under the cap).

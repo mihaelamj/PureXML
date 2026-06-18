@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("TreeNode DOM identity: structural kinds, ownerDocument, adoption")
 struct TreeNodeIdentityTests {

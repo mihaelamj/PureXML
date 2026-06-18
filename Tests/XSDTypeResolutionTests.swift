@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD type resolution: unknown xsi:type and circular references")
 struct XSDTypeResolutionTests {

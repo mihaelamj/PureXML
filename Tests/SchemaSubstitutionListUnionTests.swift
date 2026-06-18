@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A substitution-group member whose type is a list or union derives only from
 /// `anySimpleType`, so it may affiliate only to a head typed `anySimpleType` (or

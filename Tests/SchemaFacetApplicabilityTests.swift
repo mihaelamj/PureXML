@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Facet applicability to a simple type's variety (XSD 1.0 Part 2, 4.3): a `list`
 /// admits only the length-family, `pattern`, `enumeration`, `whiteSpace`; a `union`

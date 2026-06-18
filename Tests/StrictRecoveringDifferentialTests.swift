@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Locks the strict and recovering parse paths together: the recovery code
 /// synthesizes events through machinery the strict path never exercises, so

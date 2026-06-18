@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schematron schema- and pattern-level let")
 struct SchematronScopedLetTests {

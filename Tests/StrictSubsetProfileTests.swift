@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The strict internal-subset profile (#128): under
 /// `Limits(strictInternalSubset: true)` the internal DTD subset is held to

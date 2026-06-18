@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD whiteSpace facet valid restriction (Part 2 §4.3.6)")
 struct SchemaWhiteSpaceRestrictionTests {

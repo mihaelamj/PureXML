@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The validity constraints added with the Sun-section burn-down: declaration-
 /// level checks (reported at the document root), the root/DOCTYPE name match,

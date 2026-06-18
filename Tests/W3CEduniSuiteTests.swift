@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the W3C XML Conformance Test Suite's eduni (Edinburgh)
 /// sections: the XML 1.0 errata suites (2e, 3e, and the 5th-edition 4e), the

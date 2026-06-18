@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD include composition (#161)")
 struct SchemaIncludeTests {

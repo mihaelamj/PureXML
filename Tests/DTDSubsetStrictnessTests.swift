@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The DTD-subset strictness landed with the OASIS/NIST conformance pass:
 /// unknown or malformed markup declarations, the exact `%name;` parameter-

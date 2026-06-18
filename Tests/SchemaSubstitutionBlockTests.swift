@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `block="substitution"` on a substitution-group head forbids any member from
 /// standing in for it, regardless of the member's type derivation (#147, XSTS

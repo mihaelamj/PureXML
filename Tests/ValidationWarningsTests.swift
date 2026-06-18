@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Tests for the validation-rules.md warnings channel: advisory findings are
 /// collected separately from errors and promoted only under `strict: true`.

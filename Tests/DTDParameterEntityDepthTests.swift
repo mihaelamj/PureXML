@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("DTD parameter-entity and external-subset depth")
 struct DTDParameterEntityDepthTests {

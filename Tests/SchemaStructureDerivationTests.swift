@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schema structural derivation validity")
 struct SchemaStructureDerivationTests {

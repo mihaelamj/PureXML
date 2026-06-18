@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The `namespace` constraint of an `any`/`anyAttribute` wildcard (XSD 1.0
 /// Structures): `('##any' | '##other')` standing alone, or a list of namespace

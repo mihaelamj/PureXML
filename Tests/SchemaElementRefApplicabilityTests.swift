@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD element-ref applicability (src-element.2.2)")
 struct SchemaElementRefApplicabilityTests {

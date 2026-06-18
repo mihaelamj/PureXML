@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XML catalog group-level prefer override")
 struct CatalogGroupPreferTests {

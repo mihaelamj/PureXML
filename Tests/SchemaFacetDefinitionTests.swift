@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Schema-validity of constraining-facet definitions (XSD Part 2 Datatypes 4.3):
 /// a length-family facet value must be a valid `nonNegativeInteger`

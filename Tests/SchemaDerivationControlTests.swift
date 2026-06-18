@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Value-space validity of the `final`/`block` derivation-control attributes
 /// (XSD 1.0): `#all` or a whitespace list of method tokens, with the admitted

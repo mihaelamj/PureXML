@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD simple-type final: list/union derivation (st-props-correct)")
 struct SchemaSimpleTypeFinalTests {

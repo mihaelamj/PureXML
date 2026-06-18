@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The QName datatype's dual-context value space (#131): the schema side
 /// resolves the literal against the schema's xmlns/ns scope at compile, and

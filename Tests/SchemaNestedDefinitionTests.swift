@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD nested definitions may not be named (localSimpleType / attributeGroup ref)")
 struct SchemaNestedDefinitionTests {

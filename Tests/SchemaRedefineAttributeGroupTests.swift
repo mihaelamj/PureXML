@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A redefinition of an attribute group restricts the original (src-redefine), so
 /// it may neither eliminate a required attribute nor re-introduce a prohibited one

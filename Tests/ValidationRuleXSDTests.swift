@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Per-rule isolation tests (Validation rules XSD).
 @Suite("Validation rules XSD")

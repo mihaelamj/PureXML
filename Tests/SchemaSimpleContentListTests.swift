@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A complex type whose `simpleContent` derives from a list or union simple type
 /// keeps that variety, so its element content is validated as a list/union rather

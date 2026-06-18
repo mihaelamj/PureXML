@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schematron abstract rules and extends")
 struct SchematronAbstractTests {

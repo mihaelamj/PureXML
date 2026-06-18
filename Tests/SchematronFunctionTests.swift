@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schematron key()/document()/current() in tests")
 struct SchematronFunctionTests {

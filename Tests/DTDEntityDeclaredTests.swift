@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The IBM-section burn-down behaviors: a document needs a root element
 /// (production 1), entity references in literals must be lexical Names (P66),

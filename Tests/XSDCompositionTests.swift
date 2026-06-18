@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD list, union, groups, and references")
 struct XSDCompositionTests {

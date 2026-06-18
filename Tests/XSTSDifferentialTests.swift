@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Differential schema-validity harness (production-readiness stopper #3:
 /// correctness must be characterised against an independent reference, not just a

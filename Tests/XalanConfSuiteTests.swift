@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the Apache xalan-test XSLT 1.0 conformance corpus (the
 /// de facto OASIS-era suite: per-category stylesheet/source pairs with gold

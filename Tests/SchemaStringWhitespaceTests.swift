@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// xs:string has whiteSpace="preserve", so a simple-content value keeps its
 /// leading/trailing and whitespace-only content; validation no longer trims it

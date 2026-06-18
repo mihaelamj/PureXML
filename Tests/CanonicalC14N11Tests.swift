@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Canonical XML 1.1: xml:base merging and xml:id")
 struct CanonicalC14N11Tests {

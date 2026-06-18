@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("RELAX NG compact annotations and div grouping")
 struct RelaxNGCompactAnnotationTests {

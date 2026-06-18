@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Unique Particle Attribution (cos-nonambig, XSD 1.0 3.8.6): a content model
 /// must be deterministic, so each element in an instance is attributable to a

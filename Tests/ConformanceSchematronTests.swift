@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Schematron conformance, driven through the validation framework (kept in its
 /// own suite so the main corpus stays under the type-body cap).

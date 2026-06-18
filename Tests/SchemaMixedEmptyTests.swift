@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A `mixed="true"` complex type with no content model (only attributes) still
 /// permits character data: it is mixed content over an empty particle, not the

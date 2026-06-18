@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The XSD 1.0 restricted-XPath subset (Part 1, 3.11.6) for an identity
 /// constraint's `selector` and `field`. A `selector` is a path of abbreviated

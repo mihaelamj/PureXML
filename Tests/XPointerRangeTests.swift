@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XPointer range(), range-to(), string-range()")
 struct XPointerRangeTests {

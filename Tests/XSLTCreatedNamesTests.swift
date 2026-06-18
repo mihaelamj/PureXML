@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Namespaced name creation and result-tree namespace fixup (#130):
 /// xsl:attribute/xsl:element honor the namespace attribute and resolve

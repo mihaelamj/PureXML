@@ -18,6 +18,8 @@
 --wrapparameters before-first
 --wrapcollections before-first
 --self remove
+# Adopted from canonical rules-swift: @testable imports group at the bottom.
+--importgrouping testable-bottom
 --exclude .build,DerivedData
 
 # PureXML uses OpenAPIKit-style `test_...` method names with Swift Testing.

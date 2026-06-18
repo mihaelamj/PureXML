@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// XSD regex (`xs:pattern`) conformance, driven through the validation
 /// framework (Tier 2): the XML Schema regex flavor against its spec semantics,

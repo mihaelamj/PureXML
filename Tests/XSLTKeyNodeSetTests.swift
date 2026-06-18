@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSLT key() with the context node and node-set values")
 struct XSLTKeyNodeSetTests {

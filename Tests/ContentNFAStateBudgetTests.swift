@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Guards the content-model NFA builder against occurrence-explosion (#129).
 /// The per-particle unroll cap bounds one repetition, but nested high-`maxOccurs`

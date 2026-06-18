@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// XInclude and XPointer conformance, driven through the validation framework
 /// (Tier 2): inclusion semantics, fallback, fragment selection, and the

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An element may carry at most one attribute whose type is `xs:ID` (XSD 1.0
 /// §3.4.6, cvc-complex-type). Two ID-typed attributes on one element, whether

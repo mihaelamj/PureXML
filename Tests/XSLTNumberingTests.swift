@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The full `xsl:number` of XSLT 1.0 section 7.7 (#130): level
 /// single/multiple/any with count and from patterns, the format-token engine

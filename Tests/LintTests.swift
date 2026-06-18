@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The unified lint surface: one source-ranged, severity-tagged list merging
 /// parse recovery and schema validation, the way an editor consumes it.

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD restriction: content-free and substitution-group order")
 struct XSDRestrictionContentFreeAndOrderTests {

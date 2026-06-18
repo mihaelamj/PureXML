@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The instance-validity derivation/substitution subsystem keys its `block`,
 /// abstract-type, and derivation-backbone tables by namespaced identity

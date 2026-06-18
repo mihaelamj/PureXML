@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// cvc-elt.4.3.2.1 for a list or union `xsi:type`: a list or union simple type
 /// derives only from `anySimpleType`, so it can validly stand in only for an

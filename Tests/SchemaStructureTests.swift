@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Structural validity of a schema document against the schema-for-schemas
 /// content model (XSD 1.0 Structures): each component's children must be

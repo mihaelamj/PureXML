@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD all-group in extension (cos-all-limited.1.2 via extension)")
 struct SchemaExtensionAllGroupTests {

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Unit tests for the schema-consistency validation rules (final respected,
 /// Particle Valid (Restriction)) exercised directly per the framework idiom,

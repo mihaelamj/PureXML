@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A `block` on a substitution-group head's TYPE (its `{prohibited substitutions}`),
 /// not only on the head element, bars a member whose type reaches the head's type

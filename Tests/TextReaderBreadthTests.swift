@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("TextReader breadth: attributes, namespaces, lang, position")
 struct TextReaderBreadthTests {

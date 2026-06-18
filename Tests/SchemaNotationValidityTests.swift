@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Schema notation validity tests")
 struct SchemaNotationValidityTests {

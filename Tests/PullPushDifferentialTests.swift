@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Locks the pull and push tokenizers together (#115): EventReader and the
 /// resumable PushScanner implement the XML token grammar twice, so the same

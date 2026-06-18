@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Content splicing (4.4.2 Included, #133): a general entity whose replacement
 /// text contains markup is reparsed as content, so elements inside an entity

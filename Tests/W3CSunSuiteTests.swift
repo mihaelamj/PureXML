@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the W3C XML Conformance Test Suite's Sun section, the
 /// first section to exercise the validity layer: `valid` documents must parse

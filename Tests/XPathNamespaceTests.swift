@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XPath eval-time namespaces and XPointer schemes")
 struct XPathNamespaceTests {

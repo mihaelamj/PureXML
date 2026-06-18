@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The ur-type `xsd:anyType` processes its element and attribute wildcards as
 /// `lax`, not `skip` (XSD 1.0 §3.4.7). A child or attribute of an untyped element

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// DTD content-model conformance, driven through the validation framework (its
 /// own suite to keep the main corpus under the cap).

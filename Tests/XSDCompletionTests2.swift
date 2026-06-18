@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Schema-driven completions: the exact follow-set of allowed next elements,
 /// whether content may end, and attribute required/present status. The basis for

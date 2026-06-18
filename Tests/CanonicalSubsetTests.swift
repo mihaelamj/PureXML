@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Canonical XML: node-subset canonicalization and xml:* inheritance")
 struct CanonicalSubsetTests {

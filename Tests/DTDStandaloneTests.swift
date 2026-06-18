@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// The standalone validity constraints (2.9) and the standalone entity WFC:
 /// a document declaring standalone='yes' must not depend on declarations in

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Schema compile findings carry validation coding paths that resolve to source
 /// spans on a ranged schema tree, the IDE underline flow for #169.

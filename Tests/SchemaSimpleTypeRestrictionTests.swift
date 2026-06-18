@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("SimpleType restriction and top-level constraints")
 struct SchemaSimpleTypeRestrictionTests {

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An `xsi:type` may not name an abstract type: an abstract type cannot be the
 /// type of an instance element (cvc-elt.4.3.2), so it is invalid as a substitution

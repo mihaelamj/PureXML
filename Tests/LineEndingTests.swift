@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Line-ending normalization and XML 1.1")
 struct LineEndingTests {

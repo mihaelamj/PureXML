@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in runner for the W3C XML Schema Test Suite (XSTS, the 2006-11-06
 /// release; W3C Document License, never vendored). Point `XSTS_ROOT` at the

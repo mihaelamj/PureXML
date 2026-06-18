@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// An element with a `default` or `fixed` value takes that value when it appears
 /// empty, so the empty content is valid even when the type would reject an empty

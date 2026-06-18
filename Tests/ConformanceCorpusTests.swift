@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A first Tier-2 conformance corpus, driven through the validation framework:
 /// each case runs a PureXML subsystem and the `Conformance` validation rule

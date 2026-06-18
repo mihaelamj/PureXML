@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A complex type's effective `{attribute wildcard}` is the INTERSECTION of the
 /// wildcards it draws from its own `anyAttribute` and from each referenced

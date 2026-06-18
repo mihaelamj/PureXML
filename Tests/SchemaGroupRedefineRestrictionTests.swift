@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A non-self-referencing model group redefined inside `xs:redefine` must be a valid
 /// restriction of the group it redefines (XSD 1.0 cos-group-restrict / src-redefine

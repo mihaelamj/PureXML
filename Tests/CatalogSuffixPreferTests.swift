@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("Catalog suffix entries and prefer attribute")
 struct CatalogSuffixPreferTests {

@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSLT functions: generate-id, system-property, *-available")
 struct XSLTFunctionTests {

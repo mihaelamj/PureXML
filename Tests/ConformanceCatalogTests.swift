@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// OASIS XML Catalog conformance, driven through the validation framework
 /// (Tier 2): entry kinds and the precedence the spec prescribes.

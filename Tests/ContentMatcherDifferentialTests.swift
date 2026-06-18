@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Locks the two content-model matchers together (#115): the DTD matcher
 /// (positional set closure) and the XSD matcher (Thompson NFA) solve the same

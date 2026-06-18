@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// A schema `blockDefault` supplies the `{disallowed substitutions}` of an element
 /// and the `{prohibited substitutions}` of a complex type that state no `block` of

@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Reproducible xorshift64* generator: a seed that triggers a crash or hang
 /// reproduces the exact input, so a fuzz failure is debuggable rather than a

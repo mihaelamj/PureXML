@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 @Suite("XSD substitution-group member type derivation (e-props-correct.4)")
 struct SchemaSubstitutionTypeTests {

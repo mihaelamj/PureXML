@@ -1,6 +1,6 @@
 import Foundation
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// Opt-in diagnostics for XSTS valid-instance rejections. Set `XSTS_ROOT` and
 /// `XSTS_DIAG=1` to print validation errors for every remaining #146 failure.

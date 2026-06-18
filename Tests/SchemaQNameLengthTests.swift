@@ -1,5 +1,5 @@
-@testable import PureXML
 import Testing
+@testable import PureXML
 
 /// `length`, `minLength`, and `maxLength` on `xs:QName` do not constrain the
 /// value: XSD 1.0 Datatypes 4.3.1 leaves the unit of length unspecified for
