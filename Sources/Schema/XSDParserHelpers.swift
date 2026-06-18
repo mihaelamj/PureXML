@@ -56,6 +56,99 @@ extension PureXML.Schema.XSDParser {
         return types
     }
 
+    /// The `default`/`fixed` value constraints declared on identity-constraint
+    /// field targets, keyed by ``identityFieldKey(constraint:field:)``. Mirrors
+    /// ``identityFieldTypes(_:_:)``'s traversal and keying: for an `@attr` field
+    /// the matched attribute use's value constraint, for a `.` field the
+    /// selector-target element's own `default`/`fixed`. Only fields whose target
+    /// declares a default or fixed value appear, so an absent attribute or empty
+    /// element takes that value as its identity tuple component (idG011/idG012,
+    /// idF016/idF017).
+    static func identityFieldConstraints(_ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String: PureXML.Schema.ValueConstraint] {
+        var constraints: [String: PureXML.Schema.ValueConstraint] = [:]
+        for container in containers {
+            for element in descendants(container, named: "element") {
+                let declared = PureXML.Schema.XSDNode.elementChildren(element).compactMap(constraint)
+                guard !declared.isEmpty else { continue }
+                for constraint in declared {
+                    for field in constraint.fields {
+                        if field == ".", selectorBranches(constraint.selector).count > 1 {
+                            for branch in selectorBranches(constraint.selector) {
+                                if let value = declaredElementValueConstraint(named: branch, under: element, containers) {
+                                    constraints[identityFieldKey(constraint: constraint, field: field, targetLocal: branch)] = value
+                                }
+                            }
+                            continue
+                        }
+                        if let value = identityFieldValueConstraint(field, host: element, constraint: constraint, containers: containers, context) {
+                            constraints[identityFieldKey(constraint: constraint, field: field)] = value
+                        }
+                    }
+                }
+            }
+        }
+        return constraints
+    }
+
+    private static func identityFieldValueConstraint(
+        _ field: String,
+        host: XSDTree,
+        constraint: PureXML.Schema.IdentityConstraint,
+        containers: [XSDTree],
+        _ context: PureXML.Schema.XSDContext,
+    ) -> PureXML.Schema.ValueConstraint? {
+        if field.hasPrefix("@") {
+            let attributeName = identityFieldAttributeName(field)
+            return attributeValueConstraint(named: attributeName, host: host, constraint: constraint, containers: containers, context)
+        }
+        if field == "." {
+            return declaredElementValueConstraint(named: selectorTargetLocalName(constraint.selector), under: host, containers)
+        }
+        return nil
+    }
+
+    /// The value constraint of the attribute an `@attr` field names: the use under
+    /// the host first, else (when the selector targets a referenced global element)
+    /// the use on that element's own complex type. Mirrors
+    /// ``identityFieldType(_:host:constraint:containers:_:)``'s attribute search.
+    private static func attributeValueConstraint(
+        named attributeName: String,
+        host: XSDTree,
+        constraint: PureXML.Schema.IdentityConstraint,
+        containers: [XSDTree],
+        _ context: PureXML.Schema.XSDContext,
+    ) -> PureXML.Schema.ValueConstraint? {
+        for element in descendants(host, named: "element") {
+            guard let complex = PureXML.Schema.XSDNode.firstChild(element, named: "complexType") else { continue }
+            for attribute in descendants(complex, named: "attribute") where PureXML.Schema.XSDNode.attribute(attribute, "name") == attributeName {
+                if let use = PureXML.Schema.XSDParser.attributeUse(attribute, context), let value = use.valueConstraint { return value }
+            }
+        }
+        guard let target = selectorTargetLocalName(constraint.selector),
+              let element = globalElementNode(named: target, containers),
+              let complex = PureXML.Schema.XSDNode.firstChild(element, named: "complexType")
+        else { return nil }
+        for attribute in descendants(complex, named: "attribute") where PureXML.Schema.XSDNode.attribute(attribute, "name") == attributeName {
+            if let use = PureXML.Schema.XSDParser.attributeUse(attribute, context), let value = use.valueConstraint { return value }
+        }
+        return nil
+    }
+
+    /// The `default`/`fixed` of the selector-target element a `.` field denotes:
+    /// the global element of that local name (the selector targets a referenced
+    /// global), else the locally declared element of that name under the host.
+    private static func declaredElementValueConstraint(named local: String?, under host: XSDTree, _ containers: [XSDTree]) -> PureXML.Schema.ValueConstraint? {
+        guard let local else { return valueConstraint(of: host) }
+        if let element = globalElementNode(named: local, containers), let value = valueConstraint(of: element) {
+            return value
+        }
+        guard let complex = PureXML.Schema.XSDNode.firstChild(host, named: "complexType") else { return nil }
+        for child in descendants(complex, named: "element") where PureXML.Schema.XSDNode.attribute(child, "name") == local {
+            if let value = valueConstraint(of: child) { return value }
+        }
+        return nil
+    }
+
     static func identityFieldKey(constraint: PureXML.Schema.IdentityConstraint, field: String, targetLocal: String? = nil) -> String {
         if let targetLocal { return "\(constraint.name)|\(field)|\(targetLocal)" }
         return "\(constraint.name)|\(field)"

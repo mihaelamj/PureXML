@@ -142,6 +142,7 @@ extension PureXML.Schema.XSDParser {
         var derivation: DerivationTables
         var context: XSDContext
         var identityFieldTypes: [String: SimpleType]
+        var identityFieldConstraints: [String: ValueConstraint]
     }
 
     static func finishCompile(
@@ -176,6 +177,7 @@ extension PureXML.Schema.XSDParser {
             derivation: derivation,
             context: context,
             identityFieldTypes: identityFieldTypes(containers, context),
+            identityFieldConstraints: identityFieldConstraints(containers, context),
         ))
     }
 
@@ -186,6 +188,7 @@ extension PureXML.Schema.XSDParser {
             types: build.types,
             constraints: identityConstraints(build.containers),
             identityFieldTypes: build.identityFieldTypes,
+            identityFieldConstraints: build.identityFieldConstraints,
             nillableElements: nillable,
             elementConstraints: elementConstraints,
             abstractTypes: build.derivation.abstractTypes,

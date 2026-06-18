@@ -14,6 +14,7 @@ public extension PureXML.Validation {
         public let typeDerivation: [String: PureXML.Schema.TypeDerivation]
         public let globalAttributes: [String: PureXML.Schema.AttributeUse]
         public let identityFieldTypes: [String: PureXML.Schema.SimpleType]
+        public let identityFieldConstraints: [String: PureXML.Schema.ValueConstraint]
 
         public init(
             types: [String: PureXML.Schema.ElementType],
@@ -27,6 +28,7 @@ public extension PureXML.Validation {
             typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:],
             globalAttributes: [String: PureXML.Schema.AttributeUse] = [:],
             identityFieldTypes: [String: PureXML.Schema.SimpleType] = [:],
+            identityFieldConstraints: [String: PureXML.Schema.ValueConstraint] = [:],
         ) {
             self.types = types
             self.constraints = constraints
@@ -39,6 +41,7 @@ public extension PureXML.Validation {
             self.typeDerivation = typeDerivation
             self.globalAttributes = globalAttributes
             self.identityFieldTypes = identityFieldTypes
+            self.identityFieldConstraints = identityFieldConstraints
         }
     }
 }
@@ -100,6 +103,7 @@ public extension PureXML.Validation {
                     return PureXML.Schema.IdentityValidator(
                         constraints: context.document.constraints,
                         fieldTypes: context.document.identityFieldTypes,
+                        fieldConstraints: context.document.identityFieldConstraints,
                         types: context.document.types,
                     ).validate(PureXML.Model.TreeNode(context.subject), at: [.element(root.name.description)])
                 },

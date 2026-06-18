@@ -46,6 +46,7 @@ public extension PureXML.Schema {
         private let types: [String: ElementType]
         private let constraints: [String: [IdentityConstraint]]
         private let identityFieldTypes: [String: SimpleType]
+        private let identityFieldConstraints: [String: ValueConstraint]
         private let nillableElements: Set<String>
         private let elementConstraints: [String: ValueConstraint]
         private let abstractTypes: Set<String>
@@ -64,6 +65,7 @@ public extension PureXML.Schema {
             types: [String: ElementType],
             constraints: [String: [IdentityConstraint]],
             identityFieldTypes: [String: SimpleType] = [:],
+            identityFieldConstraints: [String: ValueConstraint] = [:],
             nillableElements: Set<String>,
             elementConstraints: [String: ValueConstraint],
             abstractTypes: Set<String>,
@@ -78,6 +80,7 @@ public extension PureXML.Schema {
             self.types = types
             self.constraints = constraints
             self.identityFieldTypes = identityFieldTypes
+            self.identityFieldConstraints = identityFieldConstraints
             self.nillableElements = nillableElements
             self.elementConstraints = elementConstraints
             self.abstractTypes = abstractTypes
@@ -106,6 +109,7 @@ public extension PureXML.Schema {
                 types: mineFirst(types, other.types),
                 constraints: mineFirst(constraints, other.constraints),
                 identityFieldTypes: mineFirst(identityFieldTypes, other.identityFieldTypes),
+                identityFieldConstraints: mineFirst(identityFieldConstraints, other.identityFieldConstraints),
                 nillableElements: nillableElements.union(other.nillableElements),
                 elementConstraints: mineFirst(elementConstraints, other.elementConstraints),
                 abstractTypes: abstractTypes.union(other.abstractTypes),
@@ -128,6 +132,7 @@ public extension PureXML.Schema {
             types = compiled.types
             constraints = compiled.constraints
             identityFieldTypes = compiled.identityFieldTypes
+            identityFieldConstraints = compiled.identityFieldConstraints
             nillableElements = compiled.nillableElements
             elementConstraints = compiled.elementConstraints
             abstractTypes = compiled.nsAbstractTypes
@@ -183,35 +188,6 @@ public extension PureXML.Schema {
                 combined = combined.merging(other)
             }
             return combined
-        }
-
-        /// The schema-document locations an instance points at through
-        /// `xsi:schemaLocation` (the second token of each namespace/location pair)
-        /// and `xsi:noNamespaceSchemaLocation` (a single location).
-        private static func hintedSchemaLocations(in node: PureXML.Model.Node) -> [String] {
-            guard case let .document(children) = node, let root = children.compactMap(\.element).first else {
-                return []
-            }
-            var locations: [String] = []
-            for attribute in root.attributes {
-                let isInstance = attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance"
-                    || attribute.name.prefix == "xsi"
-                guard isInstance else { continue }
-                switch attribute.name.localName {
-                case "schemaLocation":
-                    let tokens = attribute.value.split(whereSeparator: \.isWhitespace).map(String.init)
-                    var index = 1
-                    while index < tokens.count {
-                        locations.append(tokens[index])
-                        index += 2
-                    }
-                case "noNamespaceSchemaLocation":
-                    locations.append(attribute.value)
-                default:
-                    break
-                }
-            }
-            return locations
         }
 
         /// Validates `xml` against the schema while it is pulled event by event (the
@@ -279,6 +255,7 @@ public extension PureXML.Schema {
             return PureXML.Schema.IdentityValidator(
                 constraints: constraints,
                 fieldTypes: identityFieldTypes,
+                fieldConstraints: identityFieldConstraints,
                 types: types,
             )
             .validate(PureXML.Model.TreeNode(.element(root)), at: [.element(root.name.description)])
@@ -317,6 +294,7 @@ public extension PureXML.Schema {
                 typeDerivation: typeDerivation,
                 globalAttributes: globalAttributes,
                 identityFieldTypes: identityFieldTypes,
+                identityFieldConstraints: identityFieldConstraints,
             )
             return PureXML.Validation.XSD.validator().errors(for: .element(root), in: context)
         }

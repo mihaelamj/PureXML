@@ -173,6 +173,10 @@ extension PureXML.Schema {
         var constraints: [String: [IdentityConstraint]]
         /// Simple types for identity-constraint field paths.
         var identityFieldTypes: [String: SimpleType] = [:]
+        /// `default`/`fixed` value constraints on identity-constraint field
+        /// targets, so an absent attribute or empty element takes that value as its
+        /// identity-tuple component.
+        var identityFieldConstraints: [String: ValueConstraint] = [:]
         /// Local names of elements declared `nillable="true"`.
         var nillableElements: Set<String> = []
         /// The `default`/`fixed` value constraint declared on each element name.
