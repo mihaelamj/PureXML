@@ -150,13 +150,13 @@ struct XSTSSuiteTests {
     private let knownSchemaValidRejected = 0
     private let knownSchemaInvalidAccepted = 69
     private let knownInstanceValidRejected = 0
-    /// Instance bucket (133 -> 34), per-step deltas in CHANGELOG.md: xsi:type must derive from the
+    /// Instance bucket (133 -> 32), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex, then atomic and list/union, resolved through the element-ref chain);
     /// block/blockDefault (incl. "substitution" and an untyped head) bar substitutions after the
     /// derivation backbone was re-keyed by namespace; ur-type `xsd:anyType` wildcards are `lax`;
     /// identity fields compare in the decimal value space and take a declared default/fixed when
     /// absent or empty; a complex type's attribute wildcard is the INTERSECTION of its sources.
-    private let knownInstanceInvalidAccepted = 34
+    private let knownInstanceInvalidAccepted = 32
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

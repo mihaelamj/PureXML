@@ -17,8 +17,28 @@ extension PureXML.Schema.ComplexValidator {
         if let blocked = blockedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return blocked }
         if let notDerived = notDerivedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return notDerived }
         if let listUnion = listUnionSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return listUnion }
+        if let abstractType = abstractXsiTypeError(child: child, at: path, namespaceBindings: namespaceBindings) { return abstractType }
         if case let .typeReference(name) = declared { return abstractTypeError(named: name, child: child, at: path) }
         return nil
+    }
+
+    /// The error when an instance `xsi:type` names an ABSTRACT type: an abstract
+    /// type cannot be the type of an instance element (cvc-elt.4.3.2), so it may not
+    /// be used as a substitution. Distinct from ``abstractTypeError``, which covers
+    /// an abstract DECLARED type with no `xsi:type`.
+    func abstractXsiTypeError(
+        child: PureXML.Model.Element,
+        at path: [PureXML.Validation.PathKey],
+        namespaceBindings: [String: String],
+    ) -> PureXML.Validation.ValidationError? {
+        guard let label = Self.xsiTypeName(child),
+              let reference = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings),
+              abstractTypes.contains(Self.derivationKey(fromReference: reference))
+        else { return nil }
+        return PureXML.Validation.ValidationError(
+            reason: "xsi:type '\(label)' names an abstract type and may not be used as a substitution",
+            at: path,
+        )
     }
 
     /// cvc-elt.4.3.2.1 for a list or union `xsi:type`: a list or union simple type
