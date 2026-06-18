@@ -8,7 +8,7 @@ ratchet one clause at a time.
 
 ## Current measurement
 
-Measured from `/tmp/xsts-failures.txt`, last written 2026-06-18 22:27 local time
+Measured from `/tmp/xsts-failures.txt`, last written 2026-06-18 22:59 local time
 by `XSTSSuiteTests`.
 
 ```sh
@@ -20,7 +20,7 @@ Result:
 | Bucket | Count |
 |---|---:|
 | valid schema rejected | 0 |
-| invalid schema accepted | 46 |
+| invalid schema accepted | 45 |
 | valid instance rejected | 0 |
 | invalid instance accepted | 31 |
 
@@ -29,8 +29,9 @@ every task below must keep them at zero.
 
 Progress since the starting 48/31 snapshot: `particlesZ018` is closed by the
 simpleContent inline type-restriction rule, and `ctZ010d` is closed by the
-complexContent mixed-agreement rule. The schema false-negative bucket is down by
-two with both false-positive buckets still at zero.
+complexContent mixed-agreement rule. `stZ048` is closed by the substitution-head
+`xs:anySimpleType` member content check. The schema false-negative bucket is down
+by three with both false-positive buckets still at zero.
 
 ## File map
 
@@ -64,7 +65,7 @@ not a proof. Before code, read the XSTS fixture, the matching PureXMLResearch
 reference, and the XSD 1.0 rule text; update the lane if the evidence says this
 classification is wrong.
 
-### Invalid schemas accepted: 46
+### Invalid schemas accepted: 45
 
 | Lane | Cases | First owning surface |
 |---|---|---|
@@ -78,7 +79,6 @@ classification is wrong.
 | UPA / wildcard determinism | `particlesZ022`, `particlesZ030_d`, `particlesZ039` | `ContentModelDeterminism` |
 | Regex disclosed-vs-fixable triage | `reK88`, `RegexTest_993`, `RegexTest_1477` | `Sources/Regex/*`, `SimpleType` |
 | Redefine / composition | `schG10`, `schM4`, `schM8`, `schN10`, `schN12`, `schZ011_a`, `schZ011_b`, `schZ011_c`, `schZ011_d` | `SchemaReferences`, `SchemaRedefineSelfReference`, `ParticleRestriction` |
-| Simple-type validity | `stZ048` | `SchemaSimpleTypeValidity`, `SimpleType` |
 | Wildcard UPA | `wildI009`, `wildI013`, `wildI014`, `wildZ013` | `ContentModelDeterminism` |
 
 ### Invalid instances accepted: 31
@@ -126,8 +126,8 @@ awk -F': ' '/invalid schema accepted/ {schema++} /invalid instance accepted/ {in
 `Sources/Schema/SchemaSimpleTypeValidity.swift`, focused `Tests/Schema*Tests.swift`
 
 **Does:** Start with cases that do not route through `ParticleRestriction`:
-`stZ048`, datatype instance cases, and regex cases. `particlesZ018` and
-`ctZ010d` are closed by the first passes.
+datatype instance cases and regex cases. `particlesZ018`, `ctZ010d`, and
+`stZ048` are closed by the first passes.
 For regex, first decide whether each case is a genuine unsupported-pattern
 under-rejection or a spec-backed error. Disclosed cases must be documented, not
 silently left in the bucket.

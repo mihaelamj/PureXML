@@ -41,7 +41,7 @@ entries removed about 70 apparent deviations that were never bugs.
 Counts are against *settled* W3C expectations (queried/disputed entries excluded).
 
 Current ratchet (2026-06-18): `valid schema rejected = 0`,
-`invalid schema accepted = 46`, `valid instance rejected = 0`,
+`invalid schema accepted = 45`, `valid instance rejected = 0`,
 `invalid instance accepted = 31`. The historical table above is retained as the
 published baseline snapshot; the active burn-down is in
 `docs/plans/2026-06-18-false-negative-tail.md`.
@@ -53,7 +53,7 @@ and to document the remainder as spec-justified, deliberate exclusions.
 
 ## Category A: genuine correctness bugs
 
-### Fixed (thirty-one root causes, ~2255 deviations cleared)
+### Fixed (thirty-two root causes, ~2256 deviations cleared)
 
 list-datatype length facets (#146) · union pattern/enumeration facets · duration
 partial-order facets · QName length non-constraining · the full XSD `\p{Is...}`
@@ -68,8 +68,9 @@ identity fields comparing in value space when the node carries an `xsi:type`) ·
 compile-time constraining-facet definition validity (length-family facets are
 `nonNegativeInteger`, co-occurrence and range order) · value-bound facet
 validity (`min`/`maxInclusive`, `min`/`maxExclusive`, `enumeration` values valid
-in the base space; inclusive/exclusive exclusions; bound ordering) · `gMonth`
-`--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
+in the base space; inclusive/exclusive exclusions; bound ordering) ·
+substitution-group heads typed `xs:anySimpleType` only admitting simple and
+simpleContent members · `gMonth` `--MM--` lexical form · schema `id` attribute validity (`xs:ID`: NCName and
 unique within the document). The schema-validity work brought invalid schemas
 accepted 2461 to 264 (schema-document structural validity: content model + complexType content shape, attribute values, name/reference + pattern-regex lexical validity, and reference resolution, against the schema-for-schemas, plus simpleType variety constraints on list itemType and union memberTypes, plus targetNamespace scope matching on local schema references, plus substitution group exclusions based on element final and schema finalDefault attributes, duplicate schema container validation across separate files with identical content, schema element order, and import constraints validation); see `schema-validity-burndown.md`.
 Plus the measurement fix (exclude W3C-disputed `status="queried"` entries).

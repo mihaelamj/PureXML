@@ -79,7 +79,7 @@ extension PureXML.Schema.XSDParser {
         guard let headType = globalElementType[headKey] else { return [] }
         if isInlineListOrUnion(element) { return [] }
         let inlineDeriv = inlineTypeDerivation(element)
-        let isDerived: Bool
+        var isDerived: Bool
         let memberType: String
         if let inlineDeriv {
             memberType = "anonymous"
@@ -88,8 +88,12 @@ extension PureXML.Schema.XSDParser {
             memberType = typeAttr
             isDerived = PureXML.Schema.ParticleRestriction.typeDerivesOrEqual(memberType, headType, tables.typeDerivation, types)
         } else {
+            // A member without its own type uses the substitution head's type definition.
             memberType = headType
             isDerived = true
+        }
+        if isBuiltinAnySimpleType(headType, types) {
+            isDerived = inlineMemberHasSimpleContent(element) ?? memberTypeHasSimpleContent(memberType, types) ?? isDerived
         }
         // A member whose type is a list or union derives only from anySimpleType, so
         // it may affiliate only to a head typed anySimpleType (or to the same type, or
@@ -229,5 +233,44 @@ extension PureXML.Schema.XSDParser {
         case .atomic: return false
         case .list, .union: return true
         }
+    }
+
+    private static func isBuiltinAnySimpleType(_ name: String, _ types: [String: PureXML.Schema.ElementType]) -> Bool {
+        name == "anySimpleType" && types[name] == nil
+    }
+
+    /// Whether a member type can derive from the simple ur-type. Unknown types are
+    /// left undecided so the reference-resolution rule, not this check, owns them.
+    private static func memberTypeHasSimpleContent(_ name: String, _ types: [String: PureXML.Schema.ElementType]) -> Bool? {
+        if name == "anySimpleType" { return true }
+        if name == "anyType" { return false }
+        if PureXML.Schema.BuiltinType(rawValue: name) != nil { return true }
+        var current: PureXML.Schema.ElementType? = types[name]
+        var steps = 0
+        while let resolved = current, steps <= types.count {
+            switch resolved {
+            case .simple:
+                return true
+            case let .complex(complex):
+                if case .simpleContent = complex.content { return true }
+                return false
+            case let .typeReference(key):
+                current = types[key]
+                steps += 1
+            }
+        }
+        return nil
+    }
+
+    private static func inlineMemberHasSimpleContent(_ element: XSDTree) -> Bool? {
+        if SubTypeNode.elementChildren(element).contains(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "simpleType"
+        }) {
+            return true
+        }
+        guard let complex = SubTypeNode.elementChildren(element).first(where: {
+            $0.name?.namespaceURI == xsdNamespace && SubTypeNode.localName($0) == "complexType"
+        }) else { return nil }
+        return SubTypeNode.firstChild(complex, named: "simpleContent") != nil
     }
 }

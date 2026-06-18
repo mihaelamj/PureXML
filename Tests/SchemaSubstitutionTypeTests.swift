@@ -45,6 +45,47 @@ struct SchemaSubstitutionTypeTests {
         ))
     }
 
+    @Test("An anySimpleType substitution head admits only simple-content members")
+    func test_anySimpleTypeHeadRequiresSimpleContentMember() {
+        #expect(compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:simpleType name=\"S\"><xs:restriction base=\"xs:string\"/></xs:simpleType>"
+                + "<xs:complexType name=\"SC\"><xs:simpleContent><xs:extension base=\"xs:string\"/></xs:simpleContent></xs:complexType>"
+                + "<xs:element name=\"simple\" substitutionGroup=\"head\" type=\"S\"/>"
+                + "<xs:element name=\"simpleContent\" substitutionGroup=\"head\" type=\"SC\"/>",
+        ))
+        #expect(!compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:complexType name=\"CT\"><xs:sequence><xs:element name=\"e\"/></xs:sequence></xs:complexType>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"CT\"/>",
+        ))
+        #expect(!compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:complexType name=\"CT\"><xs:attribute name=\"a\"/></xs:complexType>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\" type=\"CT\"/>",
+        ))
+        #expect(compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\"/>",
+        ))
+    }
+
+    @Test("An inline anySimpleType substitution member must also have simple content")
+    func test_inlineAnySimpleTypeMemberRequiresSimpleContent() {
+        #expect(compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\">"
+                + "<xs:complexType><xs:simpleContent><xs:extension base=\"xs:string\"/></xs:simpleContent></xs:complexType>"
+                + "</xs:element>",
+        ))
+        #expect(!compiles(
+            "<xs:element name=\"head\" type=\"xs:anySimpleType\"/>"
+                + "<xs:element name=\"member\" substitutionGroup=\"head\">"
+                + "<xs:complexType><xs:sequence><xs:element name=\"e\"/></xs:sequence></xs:complexType>"
+                + "</xs:element>",
+        ))
+    }
+
     /// `cos-st-derived-ok` clause 2.4: a type validly derives from a union when it
     /// derives from one of the union's member types. List/union derivation is not
     /// modelled, so the check stands down: an integer member of a union-typed head
