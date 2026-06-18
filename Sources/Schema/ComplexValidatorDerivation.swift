@@ -16,8 +16,66 @@ extension PureXML.Schema.ComplexValidator {
     ) -> PureXML.Validation.ValidationError? {
         if let blocked = blockedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return blocked }
         if let notDerived = notDerivedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return notDerived }
+        if let listUnion = listUnionSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return listUnion }
         if case let .typeReference(name) = declared { return abstractTypeError(named: name, child: child, at: path) }
         return nil
+    }
+
+    /// cvc-elt.4.3.2.1 for a list or union `xsi:type`: a list or union simple type
+    /// is derived only from `anySimpleType`, so it can validly stand in only for an
+    /// element whose declared type is a ur-type (`anySimpleType`/`anyType`). Naming a
+    /// list or union type on an element of any more specific atomic or complex type
+    /// is not a valid derivation. When the declared type is itself a list or union
+    /// the check stays silent (an inline list/union identity cannot be matched), so
+    /// it biases to under-reject and never over-rejects.
+    func listUnionSubstitutionError(
+        declared: PureXML.Schema.ElementType,
+        child: PureXML.Model.Element,
+        at path: [PureXML.Validation.PathKey],
+        namespaceBindings: [String: String],
+    ) -> PureXML.Validation.ValidationError? {
+        guard let label = Self.xsiTypeName(child),
+              let reference = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings),
+              case let .simple(substitute)? = Self.resolveNamedType(reference, in: types),
+              Self.isListOrUnion(substitute),
+              !declaredAdmitsAnySimpleType(declared)
+        else { return nil }
+        return PureXML.Validation.ValidationError(
+            reason: "xsi:type '\(label)' is a list or union type not validly derived from the declared type of '\(child.name.localName)'",
+            at: path,
+        )
+    }
+
+    /// Whether a list or union substitute may validly stand in for `declared`: only
+    /// the ur-types (`anySimpleType`/`anyType`) admit one. A declared type that is
+    /// itself a list or union, or an unresolvable reference, is also treated as
+    /// admitting, so the list/union check stays silent rather than risk a false
+    /// positive on an inline or unknown declared type.
+    private func declaredAdmitsAnySimpleType(_ declared: PureXML.Schema.ElementType) -> Bool {
+        switch declared {
+        case let .simple(type): return type.isAnySimpleType || Self.isListOrUnion(type)
+        case let .complex(type): return Self.isUrType(type)
+        case let .typeReference(reference):
+            guard case let .simple(type)? = Self.resolveNamedType(reference, in: types) else {
+                if case .complex? = Self.resolveNamedType(reference, in: types) { return urReference(reference) }
+                return true
+            }
+            return type.isAnySimpleType || Self.isListOrUnion(type)
+        }
+    }
+
+    /// Whether a reference resolving to a complex type is the complex ur-type.
+    private func urReference(_ reference: String) -> Bool {
+        guard case let .complex(type)? = Self.resolveNamedType(reference, in: types) else { return false }
+        return Self.isUrType(type)
+    }
+
+    /// Whether a simple type is a list or union (deriving only from `anySimpleType`).
+    static func isListOrUnion(_ type: PureXML.Schema.SimpleType) -> Bool {
+        switch type.variety {
+        case .atomic: false
+        case .list, .union: true
+        }
     }
 
     /// The error when an element's declared type is an abstract complex type and

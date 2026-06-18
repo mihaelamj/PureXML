@@ -151,12 +151,12 @@ struct XSTSSuiteTests {
     private let knownSchemaInvalidAccepted = 69
     private let knownInstanceValidRejected = 0
     /// Instance bucket: xsi:type must derive from the declared type (133 -> 107);
-    /// block="substitution" bars all members even for an untyped head (107 -> 101);
-    /// `xsd:anyType` wildcards are `lax` (101 -> 95); identity fields compare in the
-    /// decimal value space (95 -> 94); a type's attribute wildcard is the INTERSECTION
-    /// of its sources (94 -> 89); `blockDefault` supplies an element's/type's
-    /// `block` when it states none, after re-keying derivation by namespace (89 -> 81).
-    private let knownInstanceInvalidAccepted = 81
+    /// block="substitution" bars members even for an untyped head (107 -> 101); ur-type
+    /// `xsd:anyType` wildcards are `lax` (101 -> 95); identity fields compare in the decimal
+    /// value space (95 -> 94); attribute wildcard is the INTERSECTION of its sources (94 -> 89);
+    /// `blockDefault` supplies a missing `block` after re-keying derivation by namespace
+    /// (89 -> 81); a list/union xsi:type is not derived from a non-ur type (81 -> 78).
+    private let knownInstanceInvalidAccepted = 78
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
