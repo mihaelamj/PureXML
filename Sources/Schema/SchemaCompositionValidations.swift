@@ -45,6 +45,24 @@ extension PureXML.Validation.SchemaCompile {
         }
     }
 
+    /// cos-group-restrict: a model group redefined through `xs:redefine` restricts the
+    /// original, so its content model must accept a subset of the original's. Reuses
+    /// the particle-restriction oracle; runs after named types resolve so element type
+    /// compatibility is available.
+    static var redefinedGroupsRestrictBase: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("A redefined model group restricts the group it redefines") { document in
+            guard let namedTypes = document.namedTypes, let derivation = document.derivation else { return [] }
+            return PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.redefineGroupRestrictionErrors(
+                    document.containers,
+                    context: document.context,
+                    types: namedTypes,
+                    derivation: derivation.typeDerivation,
+                ),
+            )
+        }
+    }
+
     /// Facet definition validity and pattern syntax validity (XSD Part 2 4.3): a
     /// constraining facet must be applicable to and valid for its base type, and a
     /// `pattern` must compile. These are gathered during simple-type compilation

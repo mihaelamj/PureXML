@@ -107,6 +107,7 @@ struct ValidationConfigurationTests {
             "Complex types extending xs:all groups satisfy XSD placement rules",
             "Anonymous complex-type restrictions accept a subset of their base's",
             "A content-model derivation is consistent with its base type",
+            "A redefined model group restricts the group it redefines",
             "Attribute restrictions are faithful to their bases",
             "Simple types do not derive from complex types",
             "Simple-type varieties are declared consistently",

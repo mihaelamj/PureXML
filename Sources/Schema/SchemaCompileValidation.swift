@@ -267,7 +267,7 @@ extension PureXML.Validation {
                     AnyValidation(userTypeValueConstraintsValid),
                     AnyValidation(extensionAllGroupsValid),
                     AnyValidation(anonymousRestrictionsValid),
-                    AnyValidation(complexExtensionBaseValid),
+                    AnyValidation(complexExtensionBaseValid), AnyValidation(redefinedGroupsRestrictBase),
                     AnyValidation(attributeRestrictionsFaithful),
                     AnyValidation(simpleTypeBasesAreSimple),
                     AnyValidation(simpleTypeVarietiesValid),

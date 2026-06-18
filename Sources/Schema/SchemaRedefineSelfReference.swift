@@ -128,6 +128,77 @@ extension PureXML.Schema.XSDParser {
         return RedefineNode.attribute(redefined, "fixed") != fixed
     }
 
+    /// cos-group-restrict: a model group redefined inside `xs:redefine` is a
+    /// RESTRICTION of the group it redefines, so its content model must accept a
+    /// subset of the original's. The check reuses the same particle-restriction
+    /// oracle as complex-type restriction (`ParticleRestriction.violation`). To stay
+    /// false-positive-free it runs only when the original group resolves by namespaced
+    /// identity and when the redefinition has NO self-reference (a `<group ref>` to its
+    /// own name expands to the original and is governed by the self-reference
+    /// well-formedness rule instead, and cannot be re-parsed reliably here). An
+    /// order-independent `all` reordering accepts the same language, so the oracle
+    /// correctly does not flag it; only a genuine content widening is reported.
+    static func redefineGroupRestrictionErrors(
+        _ containers: [XSDTree],
+        context: PureXML.Schema.XSDContext,
+        types: [String: PureXML.Schema.ElementType],
+        derivation: [String: PureXML.Schema.TypeDerivation],
+    ) -> [String] {
+        var base: [String: XSDTree] = [:]
+        for container in containers where RedefineNode.localName(container) != "redefine" {
+            for group in RedefineNode.children(container, named: "group") {
+                if let name = RedefineNode.attribute(group, "name") { base[namespacedKey(name, owner: group)] = group }
+            }
+        }
+        var errors: [String] = []
+        for container in containers where RedefineNode.localName(container) == "redefine" {
+            for redefinition in RedefineNode.children(container, named: "group") {
+                guard let name = RedefineNode.attribute(redefinition, "name"),
+                      !hasGroupSelfReference(redefinition, name: name),
+                      // The redefined schema's components live in the redefining schema's
+                      // own namespace, or in none when it is a chameleon (no
+                      // targetNamespace) absorbed on redefine; try both keys. A base with
+                      // a DIFFERENT explicit namespace keys under neither, so no
+                      // cross-namespace component is mistaken for the original.
+                      let original = base[namespacedKey(name, owner: redefinition)] ?? base["{}\(name)"],
+                      let redefined = modelGroup(in: redefinition, context),
+                      let baseline = modelGroup(in: original, context),
+                      // A `maxOccurs=0` ("pointless") member in the original puts the
+                      // redefine into contested cos-group-restrict territory (the spec's
+                      // normalization removes it, yet XSTS accepts a redefinition that
+                      // re-enables that very member, e.g. mgO013). Decline to judge such
+                      // a base rather than risk over-rejecting a valid redefine; this
+                      // only withholds a rejection, so it cannot introduce a false positive.
+                      !hasPointlessParticle(baseline)
+                else { continue }
+                if let reason = PureXML.Schema.ParticleRestriction.violation(
+                    restricted: .elementOnly(redefined), base: .elementOnly(baseline), types: types, derivation: derivation,
+                ) {
+                    errors.append("a redefined model group '\(name)' must restrict the group it redefines: \(reason)")
+                }
+            }
+        }
+        return errors
+    }
+
+    /// Whether `particle` or any of its descendants can never occur (`maxOccurs=0`), a
+    /// "pointless particle" whose normalization in the redefine-restriction check is
+    /// contested.
+    private static func hasPointlessParticle(_ particle: PureXML.Schema.Particle) -> Bool {
+        if particle.maxOccurs == 0 { return true }
+        if case let .group(group) = particle.term { return group.particles.contains(where: hasPointlessParticle) }
+        return false
+    }
+
+    /// Whether a redefinition group contains a self-reference (`<group ref>` to its own
+    /// name within its bounded model), which expands to the original and is handled by
+    /// the self-reference well-formedness rule rather than re-parsed here.
+    private static func hasGroupSelfReference(_ redefinition: XSDTree, name: String) -> Bool {
+        boundedSelfReferenceNodes(redefinition, "group").contains { ref in
+            RedefineNode.attribute(ref, "ref").map(RedefineNode.stripPrefix) == name
+        }
+    }
+
     /// The reference NODES of `kind` nested directly in `node`'s model, stopping at
     /// `element`/`complexType`/`simpleType`/`attribute` scopes so a reference inside a
     /// nested element's content (a data-structure recursion, not a redefinition
