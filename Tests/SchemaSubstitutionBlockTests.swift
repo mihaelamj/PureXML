@@ -40,6 +40,22 @@ struct SchemaSubstitutionBlockTests {
         #expect(try schema(headBlock: "").validate(withMember).isEmpty)
     }
 
+    /// block="substitution" bars members even when the head is an ABSTRACT, UNTYPED
+    /// element (the substitution block is type-independent). Previously the filter was
+    /// skipped for a head with no type, so a member still substituted (particlesDc).
+    @Test("block='substitution' on an untyped abstract head bars members")
+    func test_substitutionBlockedOnUntypedAbstractHead() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:s" targetNamespace="urn:s" elementFormDefault="qualified">
+          <xs:element name="doc"><xs:complexType><xs:sequence><xs:element ref="h"/></xs:sequence></xs:complexType></xs:element>
+          <xs:element name="h" abstract="true" block="substitution"/>
+          <xs:element name="m" substitutionGroup="h"/>
+        </xs:schema>
+        """)
+        // A member substituting the substitution-blocked head is invalid.
+        #expect(try !schema.validate(#"<doc xmlns="urn:s"><m/></doc>"#).isEmpty)
+    }
+
     /// cvc-elt.4.3.2.1: an xsi:type naming a complex type must be derived from the
     /// element's declared type. A complex type on a different branch of the
     /// hierarchy is rejected; the declared type itself is valid.

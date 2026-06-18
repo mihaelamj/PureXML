@@ -151,10 +151,11 @@ struct XSTSSuiteTests {
     private let knownSchemaInvalidAccepted = 69
     private let knownInstanceValidRejected = 0
     /// Instance bucket: an xsi:type naming a complex type must be derived from the
-    /// element's declared type (cvc-elt.4.3.2.1); a non-derived complex substitute is
-    /// rejected, conservatively scoped to the complex-type derivation backbone so no
-    /// valid instance is over-rejected. 133 -> 107.
-    private let knownInstanceInvalidAccepted = 107
+    /// element's declared type (cvc-elt.4.3.2.1), conservatively scoped to the
+    /// complex-type derivation backbone (133 -> 107); and block="substitution" on a
+    /// substitution-group head bars all members whether or not the head is typed
+    /// (107 -> 101).
+    private let knownInstanceInvalidAccepted = 101
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

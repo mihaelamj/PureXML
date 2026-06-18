@@ -336,14 +336,25 @@ extension PureXML.Schema.XSDParser {
     static func filterSubstitutions(_ subs: [String: [String]], _ tables: DerivationTables) -> [String: [String]] {
         var result: [String: [String]] = [:]
         for (head, members) in subs {
-            guard let blocked = tables.elementBlock[head], let headType = tables.elementTypeNames[head] else {
+            guard let blocked = tables.elementBlock[head] else {
+                result[head] = members
+                continue
+            }
+            // `block="substitution"` (or a block set containing it, including `#all`)
+            // forbids substitution-group substitution outright: no member may stand
+            // in for the head, whatever its type, and whether or not the head is
+            // typed. This is independent of the type-derivation block below.
+            if blocked.contains(.substitution) {
+                result[head] = []
+                continue
+            }
+            // The type-derivation block (extension/restriction) drops only members
+            // reaching the head's type by a blocked method; it needs the head's type.
+            guard let headType = tables.elementTypeNames[head] else {
                 result[head] = members
                 continue
             }
             result[head] = members.filter { member in
-                // `block="substitution"` forbids substitution-group substitution
-                // outright: no member may stand in for the head, whatever its type.
-                guard !blocked.contains(.substitution) else { return false }
                 guard let memberType = tables.elementTypeNames[member],
                       let methods = derivationMethods(from: memberType, to: headType, tables.typeDerivation)
                 else {
