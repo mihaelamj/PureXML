@@ -302,21 +302,25 @@ extension PureXML.Schema.XSDParser {
     static func filterSubstitutions(_ subs: [String: [String]], _ tables: DerivationTables) -> [String: [String]] {
         var result: [String: [String]] = [:]
         for (head, members) in subs {
-            guard let blocked = tables.nsElementBlock[head] else {
-                result[head] = members
-                continue
-            }
+            let elementBlock = tables.nsElementBlock[head] ?? []
             // `block="substitution"` (or a block set containing it, including `#all`)
-            // forbids substitution-group substitution outright: no member may stand
-            // in for the head, whatever its type, and whether or not the head is
-            // typed. This is independent of the type-derivation block below.
-            if blocked.contains(.substitution) {
+            // on the head element forbids substitution-group substitution outright:
+            // no member may stand in, whatever its type. A type's `{prohibited
+            // substitutions}` never carries `substitution`, so this stays element-only.
+            if elementBlock.contains(.substitution) {
                 result[head] = []
                 continue
             }
-            // The type-derivation block (extension/restriction) drops only members
-            // reaching the head's type by a blocked method; it needs the head's type.
+            // The extension/restriction block drops a member reaching the head's type
+            // by a blocked method. The effective block is the union of the head
+            // element's `{disallowed substitutions}` and the head type's `{prohibited
+            // substitutions}`, so a `block` on the head's TYPE bars the substitution too.
             guard let headType = tables.nsElementTypeNames[head] else {
+                result[head] = members
+                continue
+            }
+            let blocked = elementBlock.union(tables.nsTypeBlock[headType] ?? [])
+            guard !blocked.isEmpty else {
                 result[head] = members
                 continue
             }
