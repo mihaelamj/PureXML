@@ -39,4 +39,28 @@ struct SchemaSubstitutionBlockTests {
     func test_memberAllowedWithoutBlock() throws {
         #expect(try schema(headBlock: "").validate(withMember).isEmpty)
     }
+
+    /// cvc-elt.4.3.2.1: an xsi:type naming a complex type must be derived from the
+    /// element's declared type. A complex type on a different branch of the
+    /// hierarchy is rejected; the declared type itself is valid.
+    @Test("an xsi:type must be derived from the element's declared type")
+    func test_xsiTypeMustDeriveFromDeclared() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:s" targetNamespace="urn:s" elementFormDefault="qualified">
+          <xs:complexType name="B"><xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence></xs:complexType>
+          <xs:complexType name="De"><xs:complexContent><xs:extension base="B"/></xs:complexContent></xs:complexType>
+          <xs:complexType name="Dr"><xs:complexContent><xs:restriction base="B">
+            <xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence>
+          </xs:restriction></xs:complexContent></xs:complexType>
+          <xs:element name="e" type="De"/>
+        </xs:schema>
+        """)
+        func doc(_ type: String) -> String {
+            #"<e xmlns="urn:s" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="\#(type)"><f>x</f></e>"#
+        }
+        // Dr (restriction of B) is on a different branch, not derived from De: invalid.
+        #expect(try !schema.validate(doc("Dr")).isEmpty)
+        // The declared type itself is valid.
+        #expect(try schema.validate(doc("De")).isEmpty)
+    }
 }
