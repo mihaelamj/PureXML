@@ -83,4 +83,34 @@ struct SchemaListUnionXsiTypeTests {
         // A genuine restriction of A is validly derived: accepted.
         #expect(try schema.validate(doc("Derived")).isEmpty)
     }
+
+    /// A complex substitute that records no base of its own derives only from
+    /// `anyType`, so it cannot validly substitute for a non-ur complex declared
+    /// type: naming the declared type's complex ancestor, or an unrelated baseless
+    /// complex type, is rejected; a genuine extension/restriction is accepted.
+    @Test("a baseless or ancestor complex xsi:type is rejected, a derived one accepted")
+    func test_baselessComplexNotDerivedRejected() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="e" type="Dr"/>
+          <xs:complexType name="B"><xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence></xs:complexType>
+          <xs:complexType name="Dr"><xs:complexContent><xs:restriction base="B">
+            <xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence>
+          </xs:restriction></xs:complexContent></xs:complexType>
+          <xs:complexType name="Drr"><xs:complexContent><xs:restriction base="Dr">
+            <xs:sequence><xs:element name="f" type="xs:string"/></xs:sequence>
+          </xs:restriction></xs:complexContent></xs:complexType>
+          <xs:complexType name="Other"/>
+        </xs:schema>
+        """)
+        func doc(_ type: String) -> String {
+            #"<e xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="\#(type)"><f>x</f></e>"#
+        }
+        // B is Dr's ancestor (Dr restricts B), not derived from Dr: rejected.
+        #expect(try !schema.validate(doc("B")).isEmpty)
+        // Other is an unrelated baseless complex type: rejected.
+        #expect(try !schema.validate(#"<e xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="Other"/>"#).isEmpty)
+        // Drr restricts Dr: validly derived, accepted.
+        #expect(try schema.validate(doc("Drr")).isEmpty)
+    }
 }

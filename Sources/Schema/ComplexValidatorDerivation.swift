@@ -98,6 +98,12 @@ extension PureXML.Schema.ComplexValidator {
         }
     }
 
+    /// Whether an element type resolves to a complex type.
+    static func isComplexType(_ type: PureXML.Schema.ElementType) -> Bool {
+        if case .complex = type { return true }
+        return false
+    }
+
     /// The error when an element's declared type is an abstract complex type and
     /// the element supplies no `xsi:type` to name a concrete derived type. An
     /// abstract type cannot itself be the type of an instance element.
@@ -174,8 +180,14 @@ extension PureXML.Schema.ComplexValidator {
         else { return nil }
         let substituteKey = Self.derivationKey(fromReference: substituteRef)
         let declaredName = resolvedDeclaredTypeName(reference)
+        // A complex substitute is in scope even when it records no base of its own:
+        // a baseless complex type derives only from `anyType`, so it cannot derive
+        // from the declared (non-ur) type and is correctly flagged. An atomic
+        // substitute must be in the backbone, so a built-in (which derives by the
+        // primitive hierarchy the backbone does not record) stays silent.
+        let substituteInScope = Self.isComplexType(substituteType) || typeDerivation[substituteKey] != nil
         guard substituteKey != declaredName,
-              typeDerivation[substituteKey] != nil,
+              substituteInScope,
               typeDerivation[declaredName] != nil || isComplexBackboneRoot(declaredName),
               PureXML.Schema.XSDParser.derivationMethods(from: substituteKey, to: declaredName, typeDerivation) == nil
         else { return nil }
