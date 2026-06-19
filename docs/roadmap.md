@@ -13,14 +13,16 @@ Parallel: **#130** (XSLT suite), **#139** (performance epic; tasks [#175](https:
 
 **M1 done:** #171 schema differential harness (closed; opt-in; 231 XSTS oracle disagreements pinned) + generative fuzz + validation framework (#92).
 
-## XSTS gates (v0.2.0 baselines)
+## XSTS gates (current enforced baselines)
+
+These mirror the ratchet asserted in `Tests/XSTSSuiteTests.swift`; update both together.
 
 | Gate | Now | Issue |
 |---|---|---|
-| Valid schemas rejected | 1 | [#148](https://github.com/mihaelamj/PureXML/issues/148) |
-| Invalid schemas accepted | 261 | [#145](https://github.com/mihaelamj/PureXML/issues/145) |
-| Valid instances rejected | 99 | [#146](https://github.com/mihaelamj/PureXML/issues/146) |
-| Invalid instances accepted | 147 | [#147](https://github.com/mihaelamj/PureXML/issues/147) |
+| Valid schemas rejected | 0 | [#148](https://github.com/mihaelamj/PureXML/issues/148) |
+| Invalid schemas accepted | 43 | [#145](https://github.com/mihaelamj/PureXML/issues/145) |
+| Valid instances rejected | 0 | [#146](https://github.com/mihaelamj/PureXML/issues/146) |
+| Invalid instances accepted | 31 | [#147](https://github.com/mihaelamj/PureXML/issues/147) |
 
 Gates are **metric trackers**, not implementation tasks. Pick up **task** issues; ratchet baselines in `Tests/XSTSSuiteTests.swift` when counts fall.
 

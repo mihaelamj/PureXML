@@ -20,7 +20,7 @@ PureXML is an XML/XSD validator. Its single most important quality is:
 > **Never reject a valid schema or a valid document.**
 
 In the conformance numbers (Section 5) this is the bucket
-`valid-schemas-rejected`. It is currently **1** and must **never go up**. A
+`valid-schemas-rejected`. It is currently **0** and must **never go up**. A
 change that fixes ten bad schemas but wrongly rejects one good schema is a
 **failure** and must not be merged. When in doubt, do less: it is always
 acceptable to *miss* an invalid schema (under-reject); it is never acceptable to
@@ -133,10 +133,10 @@ top of that file:
 
 | Constant | Meaning | Current value | Direction |
 |---|---|---|---|
-| `knownSchemaValidRejected`   | valid schemas we wrongly **reject**   | **1**   | must NEVER rise; drive toward 0 |
-| `knownSchemaInvalidAccepted` | invalid schemas we wrongly **accept** | **390** | drive DOWN |
-| `knownInstanceValidRejected` | valid instances we wrongly **reject** | **180** | must not rise; drive toward 0 |
-| `knownInstanceInvalidAccepted`| invalid instances we wrongly accept  | **160→158** (158) | drive down |
+| `knownSchemaValidRejected`   | valid schemas we wrongly **reject**   | **0**  | must NEVER rise; hold at 0 |
+| `knownSchemaInvalidAccepted` | invalid schemas we wrongly **accept** | **43** | drive DOWN |
+| `knownInstanceValidRejected` | valid instances we wrongly **reject** | **0**  | must not rise; hold at 0 |
+| `knownInstanceInvalidAccepted`| invalid instances we wrongly accept  | **31** | drive down |
 
 The runner asserts these counts **exactly**. So:
 
@@ -406,12 +406,12 @@ Representative existing checks to imitate (read these as templates):
 
 ---
 
-## 11. Current state (snapshot, post v0.1.0)
+## 11. Current state (snapshot, post v0.2.0)
 
-- Pinned baselines: **valid-schemas-rejected 1**, **invalid-schemas-accepted
-  390**, **valid-instances-rejected 180**, **invalid-instances-accepted 158**.
-  (v0.1.0 was tagged at invalid-accepted 394; the count has since dropped to
-  390. Always read the live constants in `Tests/XSTSSuiteTests.swift`.)
+- Pinned baselines: **valid-schemas-rejected 0**, **invalid-schemas-accepted
+  43**, **valid-instances-rejected 0**, **invalid-instances-accepted 31**.
+  (These ratchet down as conformance work lands; always read the live constants
+  in `Tests/XSTSSuiteTests.swift`.)
 - The clean structural / applicability rule families are largely **done**:
   facet validity, structural content-model, UPA determinism, content order,
   identity-constraint XPath subset, wildcard namespace, final/block value space,
