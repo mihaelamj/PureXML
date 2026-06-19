@@ -483,7 +483,7 @@ held at zero.
 - [ ] `bash scripts/check-style.sh`, `check-namespacing.sh`, `check-wasm.sh` pass.
 - [ ] `swift test` is fully green (all unit tests).
 - [ ] The XSTS differential shows `invalid-schemas-accepted` down and **no other
-      bucket up** (`valid-schemas-rejected` still 1).
+      bucket up** (`valid-schemas-rejected` still 0).
 - [ ] An adversarial critic found **zero** valid schemas your change rejects.
 - [ ] New unit tests cover both a rejected case and several accepted cases.
 - [ ] The pinned baseline in `Tests/XSTSSuiteTests.swift` matches the new count.
