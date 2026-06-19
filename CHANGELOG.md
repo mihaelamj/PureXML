@@ -28,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bounded the content-model matcher's active-configuration set per counter
+  (`ContentNFA`/`ContentMatcher`). Each occurrence counter now saturates at
+  `min(maximum, inputLength + 1)`, and an unbounded counter at its `minimum`
+  (every higher count is matching-equivalent, since `canExit` only tests the
+  minimum and `belowMaximum` is vacuous), instead of every counter sharing one
+  `inputLength + 1` ceiling. Validating a document with a long run of one element
+  against a content model with nested occurrence bounds (e.g.
+  `sequence{1,1000}(e1{1,unbounded})` over ~1000 elements) no longer expands the
+  epsilon-closure toward `inputLength` raised to the counter count: the XSTS
+  `particlesQ005` instance went from a multi-minute near-hang to about two
+  seconds, with identical validation results (the full XSTS suite still settles
+  at 0/43/0/31, and the suite, which previously did not terminate, now completes).
+
 - Silenced an optional-interpolation warning in the union dedup signature
   (`XSDParserUnion`): the `localName` interpolation now guards with `?? ""` to
   match the `name`-attribute interpolation on the same line. The signature is an
