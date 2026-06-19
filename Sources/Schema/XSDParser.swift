@@ -104,6 +104,7 @@ extension PureXML.Schema.XSDParser {
         context.namespaceBindings = XSDNode.namespaceBindings(of: schema)
         context.complexTypeNodes = indexByName(allChildren(containers, named: "complexType"))
         context.globalAttributes = indexByName(allChildren(containers, named: "attribute"))
+        context.globalElements = globalElementNodes(containers, namespaceMap: namespaceMap, mainTargetNamespace: mainTargetNamespace)
         let redefinedAttributeGroups = PureXML.Schema.XSDParser.redefinedNames(containers, "attributeGroup")
         let redefinedGroups = PureXML.Schema.XSDParser.redefinedNames(containers, "group")
         let redefinedComplexTypes = PureXML.Schema.XSDParser.redefinedNames(containers, "complexType")
@@ -311,6 +312,24 @@ extension PureXML.Schema.XSDParser {
 
     private static func allChildren(_ containers: [XSDTree], named name: String) -> [XSDTree] {
         containers.flatMap { XSDNode.children($0, named: name) }
+    }
+
+    private static func globalElementNodes(
+        _ containers: [XSDTree],
+        namespaceMap: [Int: String?],
+        mainTargetNamespace: String?,
+    ) -> [String: XSDTree] {
+        var index: [String: XSDTree] = [:]
+        for containerIndex in containers.indices {
+            let container = containers[containerIndex]
+            guard XSDNode.localName(container) == "schema" else { continue }
+            let namespace = namespaceMap[containerIndex] ?? mainTargetNamespace
+            for node in XSDNode.children(container, named: "element") {
+                guard let name = XSDNode.attribute(node, "name"), XSDNode.attribute(node, "ref") == nil else { continue }
+                index[derivationKey(name, in: namespace)] = node
+            }
+        }
+        return index
     }
 
     /// Named component definitions from every container except `redefine`

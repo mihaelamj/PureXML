@@ -146,8 +146,9 @@ struct XSTSSuiteTests {
     /// model-group occurrence, identity-constraint content, derivation base kind,
     /// attribute/simple-type rules, composition, simpleContent inline-type checks,
     /// complexContent mixedness, and substitution-group anySimpleType checks.
+    /// Substitution closure barriers and element-ref metadata moved 45 -> 43.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 44
+    private let knownSchemaInvalidAccepted = 43
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 31), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex, then atomic and list/union, resolved through the element-ref chain);

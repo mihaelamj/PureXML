@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): global element references now carry the
+  referenced declaration's type name, fixed/default constraint, nillable flag,
+  and `block` metadata into Particle-Valid-Restriction. A local element with an
+  implicit `xs:anyType` therefore no longer satisfies NameAndTypeOK against a
+  same-named global ref typed as `xs:decimal`, closing elemZ028e while preserving
+  a valid narrowing to `xs:short`. invalid-schemas-accepted 44 -> 43, no false
+  positive (valid-schemas-rejected and valid-instances-rejected held at 0), no
+  other bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): substitution-group closure now stops
   chaining through an intermediate member whose own `block` contains
   `substitution`. The blocked element itself may still substitute for its direct

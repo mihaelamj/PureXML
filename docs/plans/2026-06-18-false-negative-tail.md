@@ -8,7 +8,7 @@ ratchet one clause at a time.
 
 ## Current measurement
 
-Measured from `/tmp/xsts-failures.txt`, last written 2026-06-19 08:20 local time
+Measured from `/tmp/xsts-failures.txt`, last written 2026-06-19 08:47 local time
 by `XSTSSuiteTests`.
 
 ```sh
@@ -20,7 +20,7 @@ Result:
 | Bucket | Count |
 |---|---:|
 | valid schema rejected | 0 |
-| invalid schema accepted | 44 |
+| invalid schema accepted | 43 |
 | valid instance rejected | 0 |
 | invalid instance accepted | 31 |
 
@@ -32,8 +32,10 @@ simpleContent inline type-restriction rule, and `ctZ010d` is closed by the
 complexContent mixed-agreement rule. `stZ048` is closed by the substitution-head
 `xs:anySimpleType` member content check. `elemZ027_c` is closed by making
 substitution-group closure stop chaining through members whose own `block`
-contains `substitution`. The schema false-negative bucket is down by four with
-both false-positive buckets still at zero.
+contains `substitution`. `elemZ028e` is closed by carrying global element-ref
+declaration metadata into NameAndTypeOK, so a local implicit-`anyType` element
+cannot widen a typed global ref. The schema false-negative bucket is down by
+five with both false-positive buckets still at zero.
 
 ## File map
 
@@ -67,7 +69,7 @@ not a proof. Before code, read the XSTS fixture, the matching PureXMLResearch
 reference, and the XSD 1.0 rule text; update the lane if the evidence says this
 classification is wrong.
 
-### Invalid schemas accepted: 44
+### Invalid schemas accepted: 43
 
 | Lane | Cases | First owning surface |
 |---|---|---|
@@ -76,7 +78,7 @@ classification is wrong.
 | Attribute group restriction triage | `attgC028` | `SchemaAttributeRestriction`, redefine machinery |
 | Attribute type/use triage | `attKa015`, `attKb018a` | `SchemaAttributeApplicability`, `SchemaAttributeRestriction` |
 | Attribute identity/composition triage | `attQ011`, `attQ016`, `attQ017`, `attQ018` | Attribute restrictions and per-document composition |
-| Substitution-group head/member modeling | `elemZ026`, `elemZ028e` | `SchemaSubstitutionType`, `XSDSubstitutionMembers` |
+| Substitution-group head/member modeling | `elemZ026` | `SchemaSubstitutionType`, `XSDSubstitutionMembers` |
 | ParticleRestriction exactness | `particlesEa025`, `particlesFb003`, `particlesHa161`, `particlesHb011`, `particlesIg004`, `particlesIj008`, `particlesIk011`, `particlesIk025`, `particlesIk027`, `particlesK006`, `particlesM034`, `particlesV020` | `ParticleRestriction*` |
 | UPA / wildcard determinism | `particlesZ022`, `particlesZ030_d`, `particlesZ039` | `ContentModelDeterminism` |
 | Regex disclosed-vs-fixable triage | `reK88`, `RegexTest_993`, `RegexTest_1477` | `Sources/Regex/*`, `SimpleType` |
@@ -170,7 +172,7 @@ XSTS_ROOT=/private/tmp/xsts/xmlschema2006-11-06 swift test -c release --filter X
 `Tests/SchemaSubstitutionTypeTests.swift`,
 `Tests/SchemaSubstitutionBlockTests.swift`
 
-**Does:** Model the remaining `elemZ026`/`elemZ028e` schema failures and
+**Does:** Model the remaining `elemZ026` schema failure and
 the `disallowedsubst*` instance failures without changing the general
 MapAndSum/RecurseAsIfGroup logic. The key safety check is that a substitution
 head/member graph must be namespace-exact and must not conflate same-local names.

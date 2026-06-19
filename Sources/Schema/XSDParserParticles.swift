@@ -125,19 +125,22 @@ extension PureXML.Schema.XSDParser {
         // member's own namespace, even across imported namespaces.
         let alternatives = head + (context.substitutions[headKey] ?? []).map { PureXML.Schema.XSDParser.unpackElementName($0) }
         if alternatives.count == 1 {
-            return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1))
+            return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1, context))
         }
-        let members = alternatives.map { PureXML.Schema.Particle(term: elementReferenceTerm($0.0, $0.1)) }
+        let members = alternatives.map { PureXML.Schema.Particle(term: elementReferenceTerm($0.0, $0.1, context)) }
         return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(.init(compositor: .choice, particles: members)))
     }
 
     /// The term for a reference to a global element, in the resolved `namespace`.
-    static func elementReferenceTerm(_ name: String, _ namespace: String?) -> PureXML.Schema.Term {
-        .element(
+    static func elementReferenceTerm(_ name: String, _ namespace: String?, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.Term {
+        let definition = context.globalElements[derivationKey(name, in: namespace)]
+        return .element(
             name: PureXML.Model.QualifiedName(localName: name, namespaceURI: namespace),
             type: .typeReference(elementKey(name)),
-            typeName: nil,
-            valueConstraint: nil,
+            typeName: definition.flatMap(elementTypeName),
+            valueConstraint: definition.flatMap(valueConstraint),
+            block: definition.map { blockMethods(of: $0, admitting: [.extension, .restriction, .substitution]) } ?? [],
+            nillable: definition.map { ["true", "1"].contains(XSDNode.attribute($0, "nillable")) } ?? false,
         )
     }
 }

@@ -276,6 +276,11 @@ extension PureXML.Schema {
         /// Top-level (global) attribute declaration nodes by name, so an
         /// `<attribute ref="...">` resolves to the global declaration's type.
         var globalAttributes: [String: XSDTree] = [:]
+        /// Top-level (global) element declaration nodes keyed by namespaced
+        /// component identity (`{namespace}local`), so an `<element ref="...">`
+        /// particle can carry the referenced declaration's type and metadata into
+        /// the restriction oracle.
+        var globalElements: [String: XSDTree] = [:]
         var groups: [String: XSDTree]
         /// Model-group definitions before a `redefine` overlay.
         var baseGroups: [String: XSDTree] = [:]
