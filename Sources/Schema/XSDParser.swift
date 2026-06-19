@@ -84,7 +84,14 @@ extension PureXML.Schema.XSDParser {
             groups: indexByName(allChildren(containers, named: "group")),
             targetNamespace: mainTargetNamespace,
             substitutions: filterSubstitutions(
-                XSDNode.substitutionMembers(containers, namespaceMap: namespaceMap, mainTargetNamespace: mainTargetNamespace),
+                XSDNode.substitutionMembers(
+                    containers,
+                    namespaceMap: namespaceMap,
+                    mainTargetNamespace: mainTargetNamespace,
+                    chainBlockedBySubstitution: Set(derivation.nsElementBlock.compactMap { element, block in
+                        block.contains(.substitution) ? element : nil
+                    }),
+                ),
                 derivation,
             ),
             abstractElements: derivation.abstractElements,

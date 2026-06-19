@@ -56,6 +56,38 @@ struct SchemaSubstitutionBlockTests {
         #expect(try !schema.validate(#"<doc xmlns="urn:s"><m/></doc>"#).isEmpty)
     }
 
+    @Test("an intermediate substitution block stops descendants from restricting an ancestor head")
+    func test_substitutionBlockedHeadDoesNotChainDescendants() {
+        #expect((try? PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="a" substitutionGroup="b" type="xs:anyType"/>
+          <xs:element name="b" substitutionGroup="c" type="xs:anyType" block="substitution"/>
+          <xs:element name="c" substitutionGroup="d" type="xs:anyType"/>
+          <xs:element name="d" type="xs:anyType"/>
+          <xs:complexType name="base"><xs:sequence><xs:element ref="d"/></xs:sequence></xs:complexType>
+          <xs:complexType name="derived"><xs:complexContent><xs:restriction base="base">
+            <xs:sequence><xs:choice><xs:element ref="a"/></xs:choice></xs:sequence>
+          </xs:restriction></xs:complexContent></xs:complexType>
+        </xs:schema>
+        """)) == nil)
+    }
+
+    @Test("a substitution-blocked member can still restrict its own ancestor head")
+    func test_substitutionBlockedHeadItselfStillRestrictsAncestor() {
+        #expect((try? PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="a" substitutionGroup="b" type="xs:anyType"/>
+          <xs:element name="b" substitutionGroup="c" type="xs:anyType"/>
+          <xs:element name="c" substitutionGroup="d" type="xs:anyType" block="substitution"/>
+          <xs:element name="d" type="xs:anyType"/>
+          <xs:complexType name="base"><xs:sequence><xs:element ref="d"/></xs:sequence></xs:complexType>
+          <xs:complexType name="derived"><xs:complexContent><xs:restriction base="base">
+            <xs:sequence><xs:choice><xs:element ref="c"/></xs:choice></xs:sequence>
+          </xs:restriction></xs:complexContent></xs:complexType>
+        </xs:schema>
+        """)) != nil)
+    }
+
     /// cvc-elt.4.3.2.1: an xsi:type naming a complex type must be derived from the
     /// element's declared type. A complex type on a different branch of the
     /// hierarchy is rejected; the declared type itself is valid.

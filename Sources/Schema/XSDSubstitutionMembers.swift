@@ -4,11 +4,14 @@ extension PureXML.Schema.XSDNode {
     /// it, directly or through a chain of heads. Keyed by namespaced identity
     /// (`{ns}local`), so a head and a member with the same local name in different
     /// namespaces stay distinct. `namespaceMap` gives each container's resolved
-    /// target namespace by index.
+    /// target namespace by index. A member whose own `block` contains
+    /// `substitution` remains a member of its direct head but is not chained
+    /// through to add its own members to an ancestor head.
     static func substitutionMembers(
         _ containers: [XSDTree],
         namespaceMap: [Int: String?],
         mainTargetNamespace: String?,
+        chainBlockedBySubstitution: Set<String>,
     ) -> [String: [String]] {
         var direct: [String: [String]] = [:]
         for index in containers.indices {
@@ -41,6 +44,7 @@ extension PureXML.Schema.XSDNode {
                 index += 1
                 guard seen.insert(member).inserted else { continue }
                 members.append(member)
+                guard !chainBlockedBySubstitution.contains(member) else { continue }
                 queue += direct[member] ?? []
             }
             closure[head] = members

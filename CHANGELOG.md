@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- XSTS invalid-schemas-accepted (#145): substitution-group closure now stops
+  chaining through an intermediate member whose own `block` contains
+  `substitution`. The blocked element itself may still substitute for its direct
+  ancestor, but its descendants are no longer added to higher ancestor heads, so
+  elemZ027_c (a restriction through `a -> b(block=substitution) -> c -> d`) is
+  rejected while the valid sibling where the blocked member itself is used
+  remains accepted. invalid-schemas-accepted 45 -> 44, no false positive
+  (valid-schemas-rejected and valid-instances-rejected held at 0), no other
+  bucket moved.
+
 - XSTS invalid-schemas-accepted (#145): a substitution-group head typed `xs:anySimpleType` now admits simple type members and complex types with `simpleContent`, but rejects element-only, empty, and mixed complex-type members. The shared derivation oracle treats `anySimpleType` as a broad ur-type for other restriction checks, so the substitution-group rule now adds its own value-space guard before accepting the affiliation. stZ048 is rejected while the valid simple/simpleContent near-misses remain accepted. invalid-schemas-accepted 46 → 45, no false positive (valid-schemas-rejected and valid-instances-rejected held at 0), no other bucket moved.
 
 - XSTS invalid-schemas-accepted (#145): a `complexContent` extension that explicitly changes mixedness, or that adds element content while defaulting to `mixed="false"`, must match the base type's mixed setting. This rejects ctZ010d (mixed base extended with new element content by an omitted/default-false derived type) while preserving the valid ctZ012b near-miss (empty extension inherits the mixed base) and the invalid ctF008 explicit mixed mismatch. invalid-schemas-accepted 47 → 46, no false positive (valid-schemas-rejected and valid-instances-rejected held at 0), no other bucket moved.
