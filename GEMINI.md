@@ -8,7 +8,7 @@ rule here and a guideline elsewhere conflict, this file wins.
 
 PureXML is an XML/XSD validator. **Never reject a valid schema or a valid
 document.** In the conformance counts this is `valid-schemas-rejected`; it is
-**1** and must **never rise**. Under-rejecting (missing an invalid schema) is
+**0** and must **never rise**. Under-rejecting (missing an invalid schema) is
 acceptable; over-rejecting (rejecting a valid one) is a failure and must not be
 merged. When unsure, do less.
 
@@ -67,6 +67,6 @@ merged. When unsure, do less.
 ## Definition of done
 
 All gates green; conformance differential shows invalid-accepted down and **no
-other bucket up** (valid-rejected still 1); the critic found zero false
+other bucket up** (valid-rejected still 0); the critic found zero false
 positives; baseline/CHANGELOG/burndown updated. If you rejected even one valid
 schema, the change is wrong regardless of how many invalid ones it caught.

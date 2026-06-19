@@ -100,7 +100,7 @@ flowchart TB
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
   Epic122["#122 conformance suite maintenance: complete (#130 survivor)"]:::epic
-  XSTS["#129 XSTS runner shipped; gates #145-#148 at 1/264/173/155 (v0.2.0)"]:::review
+  XSTS["#129 XSTS runner shipped; gates #145-#148 at 0/43/0/31"]:::review
   XSLTTS["#130 XSLT 1.0 suite (xalan-test): ~126 baseline failures"]:::review
   Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
   Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
@@ -139,11 +139,11 @@ flowchart TB
 
 ## Status
 
-**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (v0.2.0): **1 / 264 / 173 / 155**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
+**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (valid schemas rejected / invalid schemas accepted / valid instances rejected / invalid instances accepted), enforced in `Tests/XSTSSuiteTests.swift`: **0 / 43 / 0 / 31**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
-currently runs **986 tests in 169 suites** (`swift test`).
+currently runs **1448 tests in 258 suites** (`swift test`).
 
 ### Shipped (libxml2-aligned surface)
 
@@ -156,8 +156,10 @@ currently runs **986 tests in 169 suites** (`swift test`).
   (libxml2 `xmlTextReader`). Handles elements, attributes, text, predefined and
   numeric entities, comments, CDATA, and processing instructions. Namespace
   bindings (`xmlns`) are resolved to URIs on parse.
-- **Encoding**: UTF-8/16/32 (with BOM sniffing), ISO-8859-1, and Windows-1252
-  from raw bytes or streaming byte input.
+- **Encoding**: UTF-8/16/32 (with BOM sniffing) from raw bytes or streaming byte
+  input, plus the ISO-8859 single-byte family, the Windows code pages
+  (1250-1258), KOI8-R/U, and the CJK multi-byte encodings (Shift-JIS,
+  EUC-JP/KR/TW, GBK, GB18030, Big5, ISO-2022-JP).
 - **DTD (opt-in)**: `<!DOCTYPE>` is **off by default** (`Limits.allowDoctype:
   false`) to keep XXE and entity-expansion closed. When enabled, the internal
   subset is parsed; internal general entities expand with a bounded cap; external
@@ -206,25 +208,21 @@ subset validation or internal entities, and wire a resolver only for trusted,
 in-memory replacements. Network fetching (`nanohttp`/`nanoftp`) and libxml2's
 threading/memory infrastructure are deliberate non-goals.
 
-### Remaining toward full libxml2 feature parity
+### Remaining work
 
-The original parity epics (the core I/O stack, query, transform, the schema
-languages, the validation framework, and editor integration) are all shipped. The
-remaining work is the depth gaps a read-only conformance audit surfaced, tracked
-under epic **#71** (and its parser-breadth sub-epic **#74**):
+Feature parity with libxml2's documented surface is **complete**: the core I/O
+stack, the query and transform layers, all four schema languages, the validation
+framework, editor integration, and the encoding set (the ISO-8859 family, the
+Windows code pages, and the CJK multi-byte encodings) are shipped. The
+beyond-parity audit epics (**#71**, its parser-breadth sub-epic **#74**) and the
+parity-frontier epic (**#105**) are closed.
 
-| Open work | Issues | What it adds |
-|---|---|---|
-| XSLT 1.0 breadth | #81 #82 | Missing top-level elements and functions, html output |
-| HTML5 | #83 #84 | Full tree construction, tokenizer states, entity table |
-| C14N | #85 | Node-subset canonicalization, `xml:*` inheritance, 2.0 prefix rewrite |
-| Legacy encodings | #97 #99 #102 #103 | Single-byte, CJK multi-byte, full GB18030, and Big5 to-Unicode tables |
-| Validator decomposition | #101 | Inner XSD/DTD validators as composable rules |
-| Partial follow-ups | #79 #80 #86 #87 #88 #90 #91 | Remaining bullets on already-advanced areas |
-
-Each open issue carries a checklist of done vs remaining bullets. The encoding
-tables (#97, #99) are deferred until they can be vendored from authoritative
-Unicode mapping files rather than transcribed.
+The remaining distance is **production readiness for IDE use**, tracked under epic
+**#167**: driving the XSTS conformance buckets toward zero (currently
+**0 / 43 / 0 / 31**), located schema diagnostics (#169), the schema differential
+oracle (#171), and cross-document composition (#161). The one active runner
+burn-down is **#130** (the XSLT 1.0 xalan suite). See
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## Usage
 
@@ -287,6 +285,9 @@ That command expands to:
 bash scripts/check-style.sh
 bash scripts/check-namespacing.sh
 bash scripts/check-forbidden-patterns.sh
+bash scripts/check-validation-coverage.sh
+bash scripts/check-validation-fields.sh
+bash scripts/check-changelog-touched.sh
 swiftformat . --config .swiftformat --lint
 swiftlint --config .swiftlint.yml --strict
 swift build

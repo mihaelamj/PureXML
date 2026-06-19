@@ -67,7 +67,7 @@ extension PureXML.Schema.XSDParser {
         guard XSDNode.localName(tree) == "schema" else { return nil }
         guard let namespace = XSDNode.attribute(tree, "targetNamespace"), !namespace.isEmpty else { return nil }
         let components = XSDNode.elementChildren(tree)
-            .map { "\(XSDNode.localName($0)):\(XSDNode.attribute($0, "name") ?? "")" }
+            .map { "\(XSDNode.localName($0) ?? ""):\(XSDNode.attribute($0, "name") ?? "")" }
             .sorted()
         return "\(namespace)\u{1}\(components.joined(separator: "\u{1}"))"
     }

@@ -28,6 +28,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Silenced an optional-interpolation warning in the union dedup signature
+  (`XSDParserUnion`): the `localName` interpolation now guards with `?? ""` to
+  match the `name`-attribute interpolation on the same line. The signature is an
+  internal dedup key compared only against same-run signatures, so the change is
+  behavior-preserving (it removes the `Optional("…")` rendering, not any key
+  collisions).
+
+- Documentation accuracy sweep: brought stale current-state figures into line with
+  the code and the enforced gate. The README test count (986/169 -> 1448/258) and
+  XSTS status quad, the roadmap gates table, and the Antigravity onboarding
+  baselines now read the enforced `0 / 43 / 0 / 31`; the encoding coverage (the
+  README feature list and the `Parsing.InputEncoding` doc comment) now lists the
+  full shipped set (the ISO-8859 family, Windows code pages 1250-1258, KOI8-R/U,
+  and the CJK multi-byte encodings) instead of a three-entry subset; the
+  "remaining parity" section now states that libxml2 documented-surface parity is
+  complete (epics #71/#74/#105 closed) with production readiness (#167) as the
+  remaining work; the README `check-all.sh` expansion lists the validation-coverage,
+  validation-field, and changelog gates; and the SECURITY.md reporting address is
+  corrected.
+
 - Replaced XSD content-model occurrence unrolling with a counted automaton.
   `ContentMatcher` now tracks occurrence counters in active configurations instead
   of copying particle bodies into states, preserving exact finite `{m,n}` behavior
