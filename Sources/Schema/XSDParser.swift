@@ -64,7 +64,11 @@ extension PureXML.Schema.XSDParser {
     ) -> [ObjectIdentifier: String?] {
         var containerLocations: [ObjectIdentifier: String?] = [:]
         for (loc, tree) in containerTuples {
-            containerLocations[ObjectIdentifier(tree)] = loc ?? rootLocation
+            // The map value is itself `String?`, so the explicit annotation keeps
+            // `??` at the `String` level; without it the fallback binds at the
+            // outer optional and the compile root (no location) maps to nil.
+            let location: String? = loc ?? rootLocation
+            containerLocations[ObjectIdentifier(tree)] = location
         }
         return containerLocations
     }

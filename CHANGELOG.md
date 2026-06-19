@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Fixed a dead `rootLocation` fallback in `XSDParser.containerLocationMap`. The
+  map value type is itself `String?`, so `loc ?? rootLocation` bound the
+  coalescing at the outer optional and never used `rootLocation` (the compiler
+  flagged it), leaving the compile root mapped to nil even when a circular import
+  had loaded it under a `schemaLocation`. An explicit `String?` annotation keeps
+  the coalescing at the `String` level so the root inherits its location.
+  Conformance is unchanged (XSTS still settles at 0/43/0/31); the
+  `SchemaNameUniqueness` root-index dedup case is retained, not removed, because
+  removing it on the theory it was now redundant regressed three valid schemas to
+  rejected, so it does real work beyond the fixed fallback.
+
 - Bounded the content-model matcher's active-configuration set per counter
   (`ContentNFA`/`ContentMatcher`). Each occurrence counter now saturates at
   `min(maximum, inputLength + 1)`, and an unbounded counter at its `minimum`
