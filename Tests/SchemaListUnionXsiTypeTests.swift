@@ -113,4 +113,25 @@ struct SchemaListUnionXsiTypeTests {
         // Drr restricts Dr: validly derived, accepted.
         #expect(try schema.validate(doc("Drr")).isEmpty)
     }
+
+    @Test("xsi:type=anyType cannot substitute for an anySimpleType-declared element")
+    func test_anyTypeForAnySimpleType() throws {
+        let xsi = "http://www.w3.org/2001/XMLSchema-instance"
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="item" type="xs:anySimpleType"/>
+          <xs:element name="root">
+            <xs:complexType><xs:sequence><xs:element ref="item" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """)
+        func root(_ type: String, _ value: String) -> String {
+            #"<root xmlns:xsi="\#(xsi)" xmlns:xs="http://www.w3.org/2001/XMLSchema"><item xsi:type="\#(type)">\#(value)</item></root>"#
+        }
+        // anyType is anySimpleType's supertype, not derived from it: rejected, for that reason.
+        #expect(try schema.validate(root("xs:anyType", "x")).contains { $0.reason.contains("anySimpleType declared type") })
+        // anySimpleType (reflexive) and a derived atomic type are valid substitutes.
+        #expect(try schema.validate(root("xs:anySimpleType", "x")).isEmpty)
+        #expect(try schema.validate(root("xs:int", "123")).isEmpty)
+    }
 }
