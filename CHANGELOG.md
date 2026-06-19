@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replaced XSD content-model occurrence unrolling with a counted automaton.
+  `ContentMatcher` now tracks occurrence counters in active configurations instead
+  of copying particle bodies into states, preserving exact finite `{m,n}` behavior
+  for high numeric bounds and removing the instance-time silent widening at the old
+  state ceilings. XSD occurrence attributes are preserved as decimal magnitudes
+  beyond `Int` range so `maxOccurs="100000000000000000000"` no longer falls back
+  to the default `1`.
+
 - XSTS invalid-schemas-accepted (#145): global element references now carry the
   referenced declaration's type name, fixed/default constraint, nillable flag,
   and `block` metadata into Particle-Valid-Restriction. A local element with an

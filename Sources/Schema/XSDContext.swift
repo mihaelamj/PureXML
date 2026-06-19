@@ -83,10 +83,23 @@ extension PureXML.Schema {
         }
 
         static func occurrence(_ node: XSDTree) -> (min: Int, max: Int?) {
-            let minimum = attribute(node, "minOccurs").flatMap(Int.init) ?? 1
-            let maximumText = attribute(node, "maxOccurs")
-            let maximum: Int? = maximumText == "unbounded" ? nil : (maximumText.flatMap(Int.init) ?? 1)
-            return (minimum, maximum)
+            let range = occurrenceRange(node)
+            return (
+                range.minimum.clamped(to: Int.max),
+                range.maximum.clamped(to: Int.max),
+            )
+        }
+
+        static func occurrenceRange(_ node: XSDTree) -> OccurrenceRange {
+            let minimum = attribute(node, "minOccurs")
+                .flatMap { NonNegativeDecimal(lexical: $0) } ?? NonNegativeDecimal(1)
+            let maximumText = attribute(node, "maxOccurs")?.trimmingXMLWhitespace()
+            let maximum: OccurrenceUpper = if maximumText == "unbounded" {
+                .unbounded
+            } else {
+                .finite(maximumText.flatMap { NonNegativeDecimal(lexical: $0) } ?? NonNegativeDecimal(1))
+            }
+            return OccurrenceRange(minimum: minimum, maximum: maximum)
         }
 
         /// Collects the schema's own element and a transitive closure of the

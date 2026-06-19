@@ -14,9 +14,54 @@ extension PureXML.Schema {
         }
     }
 
-    /// One state of the content-model automaton.
+    /// A guard on a counted epsilon transition.
+    enum ContentCounterGuard: Sendable {
+        case canExit(counter: Int, minimum: NonNegativeDecimal, nullableBody: Bool)
+        case belowMaximum(counter: Int, maximum: OccurrenceUpper)
+
+        func accepts(_ values: [Int]) -> Bool {
+            switch self {
+            case let .canExit(counter, minimum, nullableBody):
+                nullableBody || minimum.isLessThanOrEqual(to: values[counter])
+            case let .belowMaximum(counter, maximum):
+                maximum.isGreaterThan(values[counter])
+            }
+        }
+    }
+
+    /// An action on a counted epsilon transition.
+    enum ContentCounterAction: Sendable {
+        case reset(Int)
+        case increment(Int)
+
+        func apply(to values: inout [Int], limit: Int) {
+            switch self {
+            case let .reset(counter):
+                values[counter] = 0
+            case let .increment(counter):
+                if values[counter] < limit {
+                    values[counter] += 1
+                }
+            }
+        }
+    }
+
+    /// One epsilon transition in the counted content-model automaton.
+    struct ContentEpsilonEdge: Sendable {
+        var target: Int
+        var guards: [ContentCounterGuard] = []
+        var actions: [ContentCounterAction] = []
+    }
+
+    /// One occurrence counter in the counted content-model automaton.
+    struct ContentCounterScope: Sendable {
+        var range: OccurrenceRange
+        var nullableBody: Bool
+    }
+
+    /// One state of the counted content-model automaton.
     struct ContentState: Sendable {
-        var epsilon: [Int] = []
+        var epsilon: [ContentEpsilonEdge] = []
         var label: TermLabel?
         var target: Int?
         /// The declared type and value constraint of the element particle this
@@ -36,17 +81,26 @@ extension PureXML.Schema {
         case wildcard(Wildcard)
     }
 
-    /// A Thompson NFA over element names compiled from a ``Particle``. `all` groups
-    /// are validated separately by ``ContentMatcher`` and are not represented here.
+    /// One active configuration in the counted content-model automaton.
+    struct ContentConfiguration: Sendable, Hashable {
+        var state: Int
+        var counters: [Int]
+    }
+
+    /// A counted automaton over element names compiled from a ``Particle``. `all`
+    /// groups are validated separately by ``ContentMatcher`` and are not represented
+    /// here.
     struct ContentNFA: Sendable {
         var states: [ContentState]
+        var counters: [ContentCounterScope]
         var start: Int
         var accept: Int
 
         func matchesWhole(_ names: [PureXML.Model.QualifiedName]) -> Bool {
-            var current = startStates()
+            let inputLength = names.count
+            var current = startStates(inputLength: inputLength)
             for name in names {
-                guard let next = step(current, over: name) else { return false }
+                guard let next = step(current, over: name, inputLength: inputLength) else { return false }
                 current = next
             }
             return isComplete(current)
@@ -58,9 +112,10 @@ extension PureXML.Schema {
         /// whether something is still required. Returns an empty, not-complete
         /// result when the prefix is already invalid.
         func follow(after names: [PureXML.Model.QualifiedName]) -> (allowed: [TermLabel], complete: Bool) {
-            var current = startStates()
+            let inputLength = names.count
+            var current = startStates(inputLength: inputLength)
             for name in names {
-                guard let next = step(current, over: name) else { return ([], false) }
+                guard let next = step(current, over: name, inputLength: inputLength) else { return ([], false) }
                 current = next
             }
             return (admissible(from: current), isComplete(current))
@@ -69,22 +124,23 @@ extension PureXML.Schema {
         // MARK: Incremental matching
 
         //
-        // The active set is the epsilon-closure of the states reachable after some
+        // The active set is the epsilon-closure of the configurations reachable after some
         // prefix of children. Callers that scan a child sequence advance it one
         // child at a time (`startStates` then `step` per child) rather than calling
         // `follow(after:)` on a growing prefix, which re-walks the whole prefix each
         // time and is quadratic in the child count over a content model (#129).
 
         /// The active set before any child: the closure of the start state.
-        func startStates() -> Set<Int> {
-            closure([start])
+        func startStates(inputLength: Int = 0) -> Set<ContentConfiguration> {
+            let seed = ContentConfiguration(state: start, counters: Array(repeating: 0, count: counters.count))
+            return closure([seed], counterLimit: counterLimit(for: inputLength))
         }
 
         /// The labels admissible from `current`, for diagnostics and completions.
-        func admissible(from current: Set<Int>) -> [TermLabel] {
+        func admissible(from current: Set<ContentConfiguration>) -> [TermLabel] {
             var labels: [TermLabel] = []
-            for state in current where states[state].target != nil {
-                if let label = states[state].label { labels.append(label) }
+            for configuration in current where states[configuration.state].target != nil {
+                if let label = states[configuration.state].label { labels.append(label) }
             }
             return labels
         }
@@ -100,207 +156,95 @@ extension PureXML.Schema {
         /// reproducible rather than left to `Set` iteration order: a named particle
         /// is preferred over a wildcard, then the lowest state index wins.
         func matchedParticles(_ names: [PureXML.Model.QualifiedName]) -> [MatchedParticle?] {
-            var current = startStates()
+            let inputLength = names.count
+            var current = startStates(inputLength: inputLength)
             var result: [MatchedParticle?] = []
             for name in names {
-                var next: Set<Int> = []
-                var namedMatch: Int?
-                var anyMatch: Int?
-                for state in current {
+                var next: Set<ContentConfiguration> = []
+                var namedMatch: ContentConfiguration?
+                var namedState: Int?
+                var anyMatch: ContentConfiguration?
+                var anyState: Int?
+                for configuration in current {
+                    let state = configuration.state
                     guard let label = states[state].label, let target = states[state].target, label.matches(name) else { continue }
-                    next.insert(target)
-                    if anyMatch.map({ state < $0 }) ?? true { anyMatch = state }
-                    if case .name = label, namedMatch.map({ state < $0 }) ?? true { namedMatch = state }
+                    next.insert(ContentConfiguration(state: target, counters: configuration.counters))
+                    if anyState.map({ state < $0 }) ?? true {
+                        anyState = state
+                        anyMatch = configuration
+                    }
+                    if case .name = label, namedState.map({ state < $0 }) ?? true {
+                        namedState = state
+                        namedMatch = configuration
+                    }
                 }
-                guard let chosen = namedMatch ?? anyMatch, !next.isEmpty else {
+                guard let chosenState = namedState ?? anyState, (namedMatch ?? anyMatch) != nil, !next.isEmpty else {
                     result.append(contentsOf: Array(repeating: nil, count: names.count - result.count))
                     return result
                 }
-                let matched = states[chosen]
+                let matched = states[chosenState]
                 if case let .wildcard(wildcard) = matched.label {
                     result.append(.wildcard(wildcard))
                 } else {
                     result.append(.element(type: matched.elementType, valueConstraint: matched.valueConstraint))
                 }
-                current = closure(next)
+                current = closure(next, counterLimit: counterLimit(for: inputLength))
             }
             return result
         }
 
         /// Advances `current` by consuming one element `name`, or nil when `name`
         /// is not admissible there.
-        func step(_ current: Set<Int>, over name: PureXML.Model.QualifiedName) -> Set<Int>? {
-            var next: Set<Int> = []
-            for state in current {
+        func step(_ current: Set<ContentConfiguration>, over name: PureXML.Model.QualifiedName, inputLength: Int = 0) -> Set<ContentConfiguration>? {
+            var next: Set<ContentConfiguration> = []
+            for configuration in current {
+                let state = configuration.state
                 if let label = states[state].label, let target = states[state].target, label.matches(name) {
-                    next.insert(target)
+                    next.insert(ContentConfiguration(state: target, counters: configuration.counters))
                 }
             }
             if next.isEmpty { return nil }
-            return closure(next)
+            return closure(next, counterLimit: counterLimit(for: inputLength))
         }
 
         /// Whether the content may legally end at `current`.
-        func isComplete(_ current: Set<Int>) -> Bool {
-            current.contains(accept)
+        func isComplete(_ current: Set<ContentConfiguration>) -> Bool {
+            current.contains { $0.state == accept }
         }
 
-        private func closure(_ seed: Set<Int>) -> Set<Int> {
+        private func closure(_ seed: Set<ContentConfiguration>, counterLimit: Int) -> Set<ContentConfiguration> {
             var seen = seed
             var stack = Array(seed)
-            while let state = stack.popLast() {
-                for next in states[state].epsilon where seen.insert(next).inserted {
+            while let configuration = stack.popLast() {
+                for edge in states[configuration.state].epsilon {
+                    guard let next = apply(edge, to: configuration, counterLimit: counterLimit),
+                          seen.insert(next).inserted
+                    else {
+                        continue
+                    }
                     stack.append(next)
                 }
             }
             return seen
         }
-    }
 
-    /// Builds a ``ContentNFA`` from a particle by Thompson construction.
-    struct ContentNFABuilder {
-        private var states: [ContentState] = []
-
-        static func build(_ particle: PureXML.Schema.Particle) -> ContentNFA {
-            var builder = ContentNFABuilder()
-            let fragment = builder.particle(particle)
-            return ContentNFA(states: builder.states, start: fragment.start, accept: fragment.accept)
-        }
-
-        private mutating func addState() -> Int {
-            states.append(ContentState())
-            return states.count - 1
-        }
-
-        /// Occurrence counts unroll into automaton states, so they are
-        /// capped: beyond the cap a repetition is treated as unbounded, the
-        /// libxml2 posture (its cap is 16384). Without this, a schema with
-        /// maxOccurs in the trillions allocates until the process dies
-        /// (found by XSTS groupF009v, #129).
-        private static let occursUnrollCap = 16384
-
-        /// The per-particle cap bounds one repetition, but nested particles
-        /// multiply: a sequence of 16384 holding a choice of 16384 is 2.7e8
-        /// states even though each particle is individually capped. So the
-        /// total state count is also capped; once an NFA reaches the ceiling
-        /// every further repetition degrades to star, the same posture the
-        /// per-particle cap already takes. Legitimate content models are tens
-        /// of states, so only the pathological XSTS particle schemas (the
-        /// msMeta Particles set, which OOM-killed the suite at 8 GB, #129)
-        /// reach it. The ceiling sits well above a single maxed particle
-        /// (~33k states) so capped-but-not-nested schemas are unaffected.
-        private static let totalStateCap = 1 << 20
-
-        private var stateBudgetExhausted: Bool {
-            states.count >= Self.totalStateCap
-        }
-
-        private mutating func particle(_ particle: PureXML.Schema.Particle) -> (start: Int, accept: Int) {
-            let start = addState()
-            var current = start
-            let boundedMin = Swift.min(particle.minOccurs, Self.occursUnrollCap)
-            var unrolledMin = 0
-            for _ in 0 ..< boundedMin {
-                if stateBudgetExhausted { break }
-                let part = term(particle.term)
-                states[current].epsilon.append(part.start)
-                current = part.accept
-                unrolledMin += 1
+        private func apply(
+            _ edge: ContentEpsilonEdge,
+            to configuration: ContentConfiguration,
+            counterLimit: Int,
+        ) -> ContentConfiguration? {
+            for guardCondition in edge.guards where !guardCondition.accepts(configuration.counters) {
+                return nil
             }
-            let accept = addState()
-            if stateBudgetExhausted || unrolledMin < boundedMin || particle.minOccurs > Self.occursUnrollCap {
-                // The tail of an absurd minOccurs, or a run that hit the total
-                // state ceiling mid-unroll, is approximated as star.
-                appendStar(particle.term, from: current, to: accept)
-            } else if let maximum = particle.maxOccurs, maximum - boundedMin <= Self.occursUnrollCap {
-                appendOptional(particle.term, count: maximum - boundedMin, from: current, to: accept)
-            } else {
-                appendStar(particle.term, from: current, to: accept)
+            var values = configuration.counters
+            for action in edge.actions {
+                action.apply(to: &values, limit: counterLimit)
             }
-            return (start, accept)
+            return ContentConfiguration(state: edge.target, counters: values)
         }
 
-        private mutating func appendOptional(_ term: PureXML.Schema.Term, count: Int, from: Int, to accept: Int) {
-            var current = from
-            for _ in 0 ..< Swift.max(0, count) {
-                if stateBudgetExhausted {
-                    // Ran out of state budget: let the remainder repeat freely
-                    // (star) rather than keep allocating bounded optionals.
-                    appendStar(term, from: current, to: accept)
-                    return
-                }
-                let part = self.term(term)
-                states[current].epsilon.append(part.start)
-                states[current].epsilon.append(accept)
-                current = part.accept
-            }
-            states[current].epsilon.append(accept)
-        }
-
-        private mutating func appendStar(_ term: PureXML.Schema.Term, from current: Int, to accept: Int) {
-            let part = self.term(term)
-            states[current].epsilon.append(part.start)
-            states[current].epsilon.append(accept)
-            states[part.accept].epsilon.append(part.start)
-            states[part.accept].epsilon.append(accept)
-        }
-
-        private mutating func term(_ term: PureXML.Schema.Term) -> (start: Int, accept: Int) {
-            switch term {
-            case let .element(name, type, _, constraint, _, _):
-                let fragment = labeled(.name(name))
-                states[fragment.start].elementType = type
-                states[fragment.start].valueConstraint = constraint
-                return fragment
-            case let .wildcard(wildcard):
-                return labeled(.wildcard(wildcard))
-            case let .group(group):
-                return self.group(group)
-            }
-        }
-
-        private mutating func labeled(_ label: TermLabel) -> (start: Int, accept: Int) {
-            let start = addState()
-            let accept = addState()
-            states[start].label = label
-            states[start].target = accept
-            return (start, accept)
-        }
-
-        private mutating func group(_ group: PureXML.Schema.Group) -> (start: Int, accept: Int) {
-            // `all` is validated by counting, not in the NFA; treat it as a
-            // sequence here so a nested occurrence still parses.
-            group.compositor == .choice ? choice(group.particles) : sequence(group.particles)
-        }
-
-        private mutating func sequence(_ particles: [PureXML.Schema.Particle]) -> (start: Int, accept: Int) {
-            guard !particles.isEmpty else { return labeledEmpty() }
-            var first: Int?
-            var last: Int?
-            for member in particles {
-                let part = particle(member)
-                if let previous = last { states[previous].epsilon.append(part.start) } else { first = part.start }
-                last = part.accept
-            }
-            return (first ?? addState(), last ?? addState())
-        }
-
-        private mutating func choice(_ particles: [PureXML.Schema.Particle]) -> (start: Int, accept: Int) {
-            let start = addState()
-            let accept = addState()
-            for member in particles {
-                let part = particle(member)
-                states[start].epsilon.append(part.start)
-                states[part.accept].epsilon.append(accept)
-            }
-            return (start, accept)
-        }
-
-        private mutating func labeledEmpty() -> (start: Int, accept: Int) {
-            let start = addState()
-            let accept = addState()
-            states[start].epsilon.append(accept)
-            return (start, accept)
+        private func counterLimit(for inputLength: Int) -> Int {
+            inputLength == Int.max ? Int.max : inputLength + 1
         }
     }
 }

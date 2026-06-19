@@ -9,9 +9,10 @@ extension PureXML.Schema.ComplexValidator {
         let steps = Self.childSteps(children)
         // Advance one active state-set across the children rather than re-walking
         // the prefix per child (which is quadratic over the content model, #129).
-        var current = nfa.startStates()
+        let inputLength = children.count
+        var current = nfa.startStates(inputLength: inputLength)
         for (index, child) in children.enumerated() {
-            guard let next = nfa.step(current, over: child.name) else {
+            guard let next = nfa.step(current, over: child.name, inputLength: inputLength) else {
                 let allowed = nfa.admissible(from: current)
                 errors.append(XSDFailure(reason: "element '\(child.name.localName)' is not allowed here\(Self.expectation(allowed))", at: path + [steps[index]]))
                 return

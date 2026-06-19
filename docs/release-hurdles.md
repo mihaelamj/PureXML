@@ -82,7 +82,7 @@ critic for latent FPs the corpus misses), not a pattern sweep. A few (contested
 spec: schM4 reorder, attQ per-document vs per-composition id-scope) need adjudication,
 not code.
 
-## Part 2: the caps are band-aids because matching unrolls occurrence values, not text
+## Part 2: the remaining cap is UPA determinism, not instance matching
 
 Two engines, two postures.
 
@@ -93,35 +93,30 @@ pathological nested group references; when hit it **silently skips the UPA check
 (`return nil`, ContentModelDeterminism.swift:85): a hidden false negative and a
 stopper-3 silent gap, but rare.
 
-**Instance-time matcher (`ContentMatcher`)**, the one that runs on keystrokes, is
-the real problem. It builds the NFA by **unrolling** occurrences into states
-(`for _ in 0..<boundedMin { … addState() }`, ContentMatcher.swift:203–208), so NFA
-size is proportional to the **numeric value** of the occurrence bound, not the
-schema text: `maxOccurs="1000000000"` is 10 bytes that want a billion states. The
-caps (`occursUnrollCap = 16384` per particle, `totalStateCap = 2²⁰` total) clip it,
-but on hitting the ceiling the repetition **"degrades to star"** (treats a bounded
-`{m,n}` as unbounded → accepts content it should reject, a false negative;
-ContentMatcher.swift:211–214). This OOM-killed the suite at 8 GB before the cap
-(#129).
+**Instance-time matcher (`ContentMatcher`)**, the one that runs on keystrokes, no
+longer unrolls occurrences into states. The 2026-06-19 counted matcher stores XSD
+occurrence bounds as decimal magnitudes (`NonNegativeDecimal` / `OccurrenceRange`)
+and compiles each particle occurrence to a guarded counter loop. That deletes the
+old `occursUnrollCap` / `totalStateCap` path and its bounded-to-star widening. The
+regression tests now assert exact finite bounds, nested finite bounds, huge finite
+upper bounds beyond `Int`, and follow-set behavior before a huge required prefix is
+satisfied.
 
 **Why a cap cannot become a bound by tuning.** The blowup is structural: unrolling
 encodes an O(log n)-byte numeric bound as n states. No ceiling fixes that without
 changing semantics at the ceiling.
 
-**What an actual proof requires.** Replace unroll-into-states with a **counting
-automaton**: represent `{m,n}` with a counter/register, not m copies. Then:
+**What the remaining proof requires.** The instance matcher now uses a **counting
+automaton**: `{m,n}` is represented with a counter/register, not m copies. The
+remaining release proof has two parts:
 
-- build size = O(schema text size), independent of the numeric bounds;
-- instance matching = O(input length × schema size), counter values bounded by the
-  log-encoded bounds → polynomial, no blowup;
-- determinism-with-counters is decidable in polynomial time (Gelade–Martens–Neven /
-  Kilpeläinen–Tuhkanen line on regexes with numeric occurrence constraints).
+- keep the implementation proof aligned with `docs/design/counted-content-automaton.md`
+  for the counted matcher (`ContentMatcher.swift`);
+- replace the compile-time UPA `positionCap` skip with counted determinism.
 
-That yields a provable worst-case time/space bound, removes **all** the caps, and
-closes the silent star-degradation and the `positionCap` skip. Stopper 4 (proven
-bounds) and stopper 3 (no silent debt) are the same fix here. It is a
-re-architecture of the matcher core, not a tweak, which is what makes it
-foundational rather than incremental.
+When both are done, Part 2 closes stopper 4 (proven bounds) and the remaining
+stopper-3 silent gap. Until then, the instance-time star-degradation is closed,
+but `positionCap` remains a named release blocker.
 
 ## If turned into work
 
@@ -129,8 +124,8 @@ foundational rather than incremental.
   paired with the FP-guard test matrix (valid restrictions that must still pass)
   before tightening. Drive `invalid-schemas-accepted` / `invalid-instances-accepted`
   to 0 (M2, M3), FP gate sacred.
-- **Part 2:** a counter-automaton design for `ContentMatcher` (and the determinism
-  automaton), with acceptance criteria = the `occursUnrollCap` / `totalStateCap` /
-  `positionCap` caps deleted and a stated worst-case bound, no silent star-degradation
-  (M4 "proven bounds"). Aligns with the performance epic (#139, #175–178). The
-  design is now pinned in `docs/design/counted-content-automaton.md`.
+- **Part 2:** the `ContentMatcher` counter automaton has landed; the remaining
+  acceptance criteria are deleting `ContentModelDeterminism.positionCap`, keeping
+  the stated worst-case bound/proof current, and preserving no silent
+  star-degradation (M4 "proven bounds"). Aligns with the performance epic (#139,
+  #175–178). The design is pinned in `docs/design/counted-content-automaton.md`.
