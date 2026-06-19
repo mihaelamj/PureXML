@@ -34,12 +34,12 @@ extension PureXML.Schema {
         case reset(Int)
         case increment(Int)
 
-        func apply(to values: inout [Int], limit: Int) {
+        func apply(to values: inout [Int], caps: [Int]) {
             switch self {
             case let .reset(counter):
                 values[counter] = 0
             case let .increment(counter):
-                if values[counter] < limit {
+                if values[counter] < caps[counter] {
                     values[counter] += 1
                 }
             }
@@ -133,7 +133,7 @@ extension PureXML.Schema {
         /// The active set before any child: the closure of the start state.
         func startStates(inputLength: Int = 0) -> Set<ContentConfiguration> {
             let seed = ContentConfiguration(state: start, counters: Array(repeating: 0, count: counters.count))
-            return closure([seed], counterLimit: counterLimit(for: inputLength))
+            return closure([seed], caps: counterCaps(for: inputLength))
         }
 
         /// The labels admissible from `current`, for diagnostics and completions.
@@ -188,7 +188,7 @@ extension PureXML.Schema {
                 } else {
                     result.append(.element(type: matched.elementType, valueConstraint: matched.valueConstraint))
                 }
-                current = closure(next, counterLimit: counterLimit(for: inputLength))
+                current = closure(next, caps: counterCaps(for: inputLength))
             }
             return result
         }
@@ -204,7 +204,7 @@ extension PureXML.Schema {
                 }
             }
             if next.isEmpty { return nil }
-            return closure(next, counterLimit: counterLimit(for: inputLength))
+            return closure(next, caps: counterCaps(for: inputLength))
         }
 
         /// Whether the content may legally end at `current`.
@@ -212,12 +212,12 @@ extension PureXML.Schema {
             current.contains { $0.state == accept }
         }
 
-        private func closure(_ seed: Set<ContentConfiguration>, counterLimit: Int) -> Set<ContentConfiguration> {
+        private func closure(_ seed: Set<ContentConfiguration>, caps: [Int]) -> Set<ContentConfiguration> {
             var seen = seed
             var stack = Array(seed)
             while let configuration = stack.popLast() {
                 for edge in states[configuration.state].epsilon {
-                    guard let next = apply(edge, to: configuration, counterLimit: counterLimit),
+                    guard let next = apply(edge, to: configuration, caps: caps),
                           seen.insert(next).inserted
                     else {
                         continue
@@ -231,20 +231,34 @@ extension PureXML.Schema {
         private func apply(
             _ edge: ContentEpsilonEdge,
             to configuration: ContentConfiguration,
-            counterLimit: Int,
+            caps: [Int],
         ) -> ContentConfiguration? {
             for guardCondition in edge.guards where !guardCondition.accepts(configuration.counters) {
                 return nil
             }
             var values = configuration.counters
             for action in edge.actions {
-                action.apply(to: &values, limit: counterLimit)
+                action.apply(to: &values, caps: caps)
             }
             return ContentConfiguration(state: edge.target, counters: values)
         }
 
-        private func counterLimit(for inputLength: Int) -> Int {
-            inputLength == Int.max ? Int.max : inputLength + 1
+        /// The per-counter saturation point for the active-set representation.
+        ///
+        /// An occurrence counter only needs distinct values up to what its own
+        /// bound and the available input make observable. A bounded counter
+        /// saturates at `min(maximum, inputLength + 1)`. An unbounded counter
+        /// saturates at its `minimum`: once the minimum is reached every higher
+        /// count is matching-equivalent (`canExit` stays satisfied and
+        /// `belowMaximum` is vacuous), so collapsing them is exact. Clamping each
+        /// counter independently bounds the active-configuration set by the content
+        /// model instead of by `inputLength` raised to the counter count, so a long
+        /// run of one repeated element no longer makes the closure blow up.
+        private func counterCaps(for inputLength: Int) -> [Int] {
+            let reachable = inputLength == Int.max ? Int.max : inputLength + 1
+            return counters.map { scope in
+                scope.range.maximum.clamped(to: reachable) ?? scope.range.minimum.clamped(to: reachable)
+            }
         }
     }
 }
