@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsi:type` naming `anyType` is now rejected on an element whose declared type is
+  `anySimpleType` (cvc-elt.4.3.2.1). `anyType` is the ur-supertype of every type,
+  so it is never validly *derived* from `anySimpleType` (its own subtype). The
+  general not-derived check stays silent on ur-type declared types to avoid false
+  positives; this adds only the provably-invalid `anyType`-for-`anySimpleType`
+  pairing, leaving `anyType` valid on an `anyType`-declared element. XSTS
+  invalid-instances-accepted 30 -> 29 (`stZ056`), no other bucket moved.
+
 - `dateTime`, `date`, `gYearMonth`, and `gYear` now reject the year `0000`. XSD
   1.0 has no year zero (the year before `0001` is `-0001`), so `0000-01-01T00:00:00`
   and the other `0000` forms are not valid values. `DateTimeParser.parseYearOnly`

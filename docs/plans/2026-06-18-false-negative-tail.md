@@ -101,7 +101,7 @@ classification is wrong.
 | Known particle under-rejection fallout | `particlesZ001/particlesZ001.i` | `ParticleRestriction` |
 | Regex instance edges | `reT17/reT17.i`, `reT38/reT38.i`, `RegexTest_422/RegexTest_422.i`, `RegexTest_430/RegexTest_430.i`, `reZ006i/reZ006i.i` | `Sources/Regex/*`, `SimpleType` |
 | Schema composition instance fallout | `schA2/schA2.i`, `schA5/schA5.i`, `schA7/schA7.i`, `schU3/schU3.i`, `schU4/schU4.i`, `schU5/schU5.i` | schema composition and instance validator |
-| Simple-type instance edge | `stZ056/stZ056.i` | `SimpleType` |
+| Simple-type instance edge | ~~`stZ056/stZ056.i`~~ closed: `xsi:type=anyType` cannot substitute for an `anySimpleType` element (its supertype) | `ComplexValidatorDerivation` |
 | Wildcard instance matching | `wildZ013a/wildZ013a.i`, `wildZ013d/wildZ013d.i` | `ContentMatcher`, wildcard declaration lookup |
 
 ## Tasks (ordered)

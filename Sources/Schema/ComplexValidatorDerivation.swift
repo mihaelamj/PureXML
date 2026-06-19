@@ -16,6 +16,7 @@ extension PureXML.Schema.ComplexValidator {
     ) -> PureXML.Validation.ValidationError? {
         if let blocked = blockedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return blocked }
         if let notDerived = notDerivedSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return notDerived }
+        if let anyTypeSub = anyTypeForAnySimpleTypeError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return anyTypeSub }
         if let listUnion = listUnionSubstitutionError(declared: declared, child: child, at: path, namespaceBindings: namespaceBindings) { return listUnion }
         if let abstractType = abstractXsiTypeError(child: child, at: path, namespaceBindings: namespaceBindings) { return abstractType }
         if case let .typeReference(name) = declared { return abstractTypeError(named: name, child: child, at: path) }
@@ -64,6 +65,42 @@ extension PureXML.Schema.ComplexValidator {
             reason: "xsi:type '\(label)' is a list or union type not validly derived from the declared type of '\(child.name.localName)'",
             at: path,
         )
+    }
+
+    /// cvc-elt.4.3.2.1 for an `anyType` `xsi:type`: `anyType` is the ur-supertype of
+    /// every type, so it is never DERIVED from `anySimpleType` (its own subtype). An
+    /// `anyType` override on an `anySimpleType`-declared element is therefore invalid.
+    /// The general not-derived check stays silent on ur-type declared types to avoid
+    /// false positives; this rejects only the provably-invalid anyType-for-anySimpleType
+    /// pairing. `anyType` still validly substitutes for an `anyType`-declared element,
+    /// which `declaredIsAnySimpleType` excludes (that resolves to a complex ur-type).
+    func anyTypeForAnySimpleTypeError(
+        declared: PureXML.Schema.ElementType,
+        child: PureXML.Model.Element,
+        at path: [PureXML.Validation.PathKey],
+        namespaceBindings: [String: String],
+    ) -> PureXML.Validation.ValidationError? {
+        guard let label = Self.xsiTypeName(child),
+              let reference = Self.xsiTypeReference(child, namespaceBindings: namespaceBindings),
+              case let .complex(substitute)? = Self.resolveNamedType(reference, in: types),
+              Self.isUrType(substitute),
+              declaredIsAnySimpleType(declared)
+        else { return nil }
+        return PureXML.Validation.ValidationError(
+            reason: "xsi:type '\(label)' is not validly derived from the anySimpleType declared type of '\(child.name.localName)'",
+            at: path,
+        )
+    }
+
+    /// Whether `declared` resolves to the simple ur-type `anySimpleType` itself, not
+    /// `anyType` (a complex ur-type), a list/union, or any more specific type.
+    private func declaredIsAnySimpleType(_ declared: PureXML.Schema.ElementType) -> Bool {
+        let resolved: PureXML.Schema.ElementType? = switch declared {
+        case .simple, .complex: declared
+        case let .typeReference(reference): resolvedDeclaredType(reference)
+        }
+        if case let .simple(type)? = resolved { return type.isAnySimpleType }
+        return false
     }
 
     /// Whether a list or union substitute may validly stand in for `declared`: only
