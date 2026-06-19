@@ -179,13 +179,26 @@ public extension PureXML.Schema {
     /// A particle: a term with an occurrence range. `maxOccurs` nil means
     /// unbounded.
     struct Particle: Sendable {
-        public var minOccurs: Int
-        public var maxOccurs: Int?
+        public var occurrenceRange: OccurrenceRange
         public var term: Term
 
+        public var minOccurs: Int {
+            get { occurrenceRange.minimum.clamped(to: Int.max) }
+            set { occurrenceRange.minimum = NonNegativeDecimal(newValue) }
+        }
+
+        public var maxOccurs: Int? {
+            get { occurrenceRange.maximum.clamped(to: Int.max) }
+            set { occurrenceRange.maximum = OccurrenceUpper(newValue) }
+        }
+
         public init(minOccurs: Int = 1, maxOccurs: Int? = 1, term: Term) {
-            self.minOccurs = minOccurs
-            self.maxOccurs = maxOccurs
+            occurrenceRange = OccurrenceRange(minimum: minOccurs, maximum: maxOccurs)
+            self.term = term
+        }
+
+        public init(occurrenceRange: OccurrenceRange, term: Term) {
+            self.occurrenceRange = occurrenceRange
             self.term = term
         }
     }

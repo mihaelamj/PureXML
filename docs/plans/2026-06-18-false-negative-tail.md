@@ -278,7 +278,7 @@ XSTS_ROOT=/private/tmp/xsts/xmlschema2006-11-06 swift test -c release --filter X
 
 **Commit:** `fix(schema): close identity constraint instance tail`
 
-### T9. Design the counting automaton separately
+### T9. Land the counted instance matcher, then counted UPA
 
 **Files:** new `docs/design/` or `docs/plans/` design artifact,
 `Sources/Schema/ContentMatcher.swift`,
@@ -293,6 +293,9 @@ state a worst-case time and memory bound; prove high numeric occurrence bounds
 do not create proportional states.
 The design artifact is `docs/design/counted-content-automaton.md`; implementation
 must follow that proof plan rather than adding another cap.
+Status 2026-06-19: the `ContentMatcher` instance-time automaton now uses counted
+configurations and exact decimal occurrence bounds. `ContentModelDeterminism` still
+has `positionCap`, so this arc is not complete.
 
 **Verifies:**
 
@@ -302,7 +305,8 @@ swift test --filter ContentModelDeterminism
 swift test --filter ContentNFAStateBudgetTests
 ```
 
-**Commit:** `docs(schema): design counted content automaton`
+**Commits:** `docs(schema): design counted content automaton`,
+`fix(schema): count content-model occurrences`
 
 ## Constraints
 

@@ -29,22 +29,26 @@ extension PureXML.Schema.XSDParser {
         for child in XSDNode.elementChildren(node) {
             if let member = particle(child, context) { particles.append(member) }
         }
-        let (minimum, maximum) = XSDNode.occurrence(node)
-        if compositor == .all, minimum == 0 {
-            particles = particles.map { Particle(minOccurs: 0, maxOccurs: $0.maxOccurs, term: $0.term) }
+        let occurrence = XSDNode.occurrenceRange(node)
+        if compositor == .all, occurrence.minimum.isZero {
+            particles = particles.map {
+                Particle(
+                    occurrenceRange: .init(minimum: .init(0), maximum: $0.occurrenceRange.maximum),
+                    term: $0.term,
+                )
+            }
         }
         return Particle(
-            minOccurs: minimum,
-            maxOccurs: maximum,
+            occurrenceRange: occurrence,
             term: .group(Group(compositor: compositor, particles: particles)),
         )
     }
 
     private static func particle(_ node: PureXML.Model.TreeNode, _ context: XSDContext) -> Particle? {
-        let (minimum, maximum) = XSDNode.occurrence(node)
+        let occurrence = XSDNode.occurrenceRange(node)
         switch XSDNode.localName(node) {
         case "element":
-            return elementParticle(node, minimum, maximum, context)
+            return elementParticle(node, occurrence, context)
         case "sequence":
             return groupParticle(node, .sequence, context)
         case "choice":
@@ -52,22 +56,21 @@ extension PureXML.Schema.XSDParser {
         case "all":
             return groupParticle(node, .all, context)
         case "group":
-            return groupReferenceParticle(node, minimum, maximum, context)
+            return groupReferenceParticle(node, occurrence, context)
         case "any":
-            return Particle(minOccurs: minimum, maxOccurs: maximum, term: .wildcard(wildcard(node, context)))
+            return Particle(occurrenceRange: occurrence, term: .wildcard(wildcard(node, context)))
         default:
             return nil
         }
     }
 
-    private static func elementParticle(_ node: PureXML.Model.TreeNode, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle {
+    private static func elementParticle(_ node: PureXML.Model.TreeNode, _ occurrence: PureXML.Schema.OccurrenceRange, _ context: XSDContext) -> Particle {
         if let ref = XSDNode.attribute(node, "ref") {
-            return referenceParticle(ref, minimum, maximum, context, node: node)
+            return referenceParticle(ref, occurrence, context, node: node)
         }
         let name = XSDNode.attribute(node, "name") ?? ""
         return Particle(
-            minOccurs: minimum,
-            maxOccurs: maximum,
+            occurrenceRange: occurrence,
             term: .element(
                 name: localElementName(name, XSDNode.attribute(node, "form"), context),
                 type: elementType(node, context),
@@ -79,7 +82,7 @@ extension PureXML.Schema.XSDParser {
         )
     }
 
-    private static func groupReferenceParticle(_ node: PureXML.Model.TreeNode, _ minimum: Int, _ maximum: Int?, _ context: XSDContext) -> Particle? {
+    private static func groupReferenceParticle(_ node: PureXML.Model.TreeNode, _ occurrence: PureXML.Schema.OccurrenceRange, _ context: XSDContext) -> Particle? {
         guard let ref = XSDNode.attribute(node, "ref") else { return nil }
         let name = XSDNode.stripPrefix(ref)
         if context.visitingGroups.contains(name) {
@@ -92,7 +95,7 @@ extension PureXML.Schema.XSDParser {
             guard let inner = modelGroup(in: base, scoped.visiting(name)) else {
                 return nil
             }
-            return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
+            return Particle(occurrenceRange: occurrence, term: inner.term)
         }
         guard let definition = context.groups[name] else {
             return nil
@@ -101,7 +104,7 @@ extension PureXML.Schema.XSDParser {
         guard let inner = modelGroup(in: definition, scoped.visiting(name)) else {
             return nil
         }
-        return Particle(minOccurs: minimum, maxOccurs: maximum, term: inner.term)
+        return Particle(occurrenceRange: occurrence, term: inner.term)
     }
 
     /// The particle for an `<xs:element ref="...">`. An abstract head may not appear
@@ -111,6 +114,15 @@ extension PureXML.Schema.XSDParser {
         _ ref: String,
         _ minimum: Int,
         _ maximum: Int?,
+        _ context: PureXML.Schema.XSDContext,
+        node: XSDTree? = nil,
+    ) -> PureXML.Schema.Particle {
+        referenceParticle(ref, .init(minimum: minimum, maximum: maximum), context, node: node)
+    }
+
+    static func referenceParticle(
+        _ ref: String,
+        _ occurrence: PureXML.Schema.OccurrenceRange,
         _ context: PureXML.Schema.XSDContext,
         node: XSDTree? = nil,
     ) -> PureXML.Schema.Particle {
@@ -125,10 +137,10 @@ extension PureXML.Schema.XSDParser {
         // member's own namespace, even across imported namespaces.
         let alternatives = head + (context.substitutions[headKey] ?? []).map { PureXML.Schema.XSDParser.unpackElementName($0) }
         if alternatives.count == 1 {
-            return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1, context))
+            return PureXML.Schema.Particle(occurrenceRange: occurrence, term: elementReferenceTerm(alternatives[0].0, alternatives[0].1, context))
         }
         let members = alternatives.map { PureXML.Schema.Particle(term: elementReferenceTerm($0.0, $0.1, context)) }
-        return PureXML.Schema.Particle(minOccurs: minimum, maxOccurs: maximum, term: .group(.init(compositor: .choice, particles: members)))
+        return PureXML.Schema.Particle(occurrenceRange: occurrence, term: .group(.init(compositor: .choice, particles: members)))
     }
 
     /// The term for a reference to a global element, in the resolved `namespace`.

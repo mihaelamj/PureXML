@@ -1,52 +1,103 @@
 import Testing
 @testable import PureXML
 
-/// Guards the content-model NFA builder against occurrence-explosion (#129).
-/// The per-particle unroll cap bounds one repetition, but nested high-`maxOccurs`
-/// particles multiply: the XSTS msMeta Particles set drove the builder to 8 GB
-/// and OOM-killed the suite. A total state ceiling caps the whole automaton,
-/// degrading further repetition to star. This locks that ceiling in: the
-/// pathological model must build, stay bounded, and still match without
-/// crashing, while ordinary models are untouched.
-@Suite("Content NFA state budget")
+/// Guards the counted content-model automaton against occurrence explosion (#129).
+/// Occurrence bounds must affect counters, not program size, and finite bounds
+/// must stay exact instead of widening to `*`.
+@Suite("Counted content automaton")
 struct ContentNFAStateBudgetTests {
-    private func element(_ name: String, min: Int, max: Int?) -> PureXML.Schema.Particle {
+    private typealias Schema = PureXML.Schema
+    private typealias Name = PureXML.Model.QualifiedName
+
+    private func decimal(_ value: String) throws -> Schema.NonNegativeDecimal {
+        try #require(Schema.NonNegativeDecimal(lexical: value))
+    }
+
+    private func element(_ name: String, min: Int = 1, max: Int? = 1) -> Schema.Particle {
         .init(minOccurs: min, maxOccurs: max, term: .element(name: .init(name), type: nil, typeName: nil))
     }
 
-    /// A sequence repeated `min` times, each repeat holding an element repeated
-    /// `min` times: naively `min * min` automaton states.
-    private func nested(min: Int) -> PureXML.Schema.Particle {
-        let inner = element("a", min: min, max: min)
-        return .init(
-            minOccurs: min,
-            maxOccurs: min,
-            term: .group(.init(compositor: .sequence, particles: [inner])),
-        )
+    private func element(_ name: String, range: Schema.OccurrenceRange) -> Schema.Particle {
+        .init(occurrenceRange: range, term: .element(name: .init(name), type: nil, typeName: nil))
     }
 
-    @Test("A nested occurrence explosion stays bounded instead of exhausting memory")
+    private func group(_ compositor: Schema.Compositor, _ particles: [Schema.Particle], min: Int = 1, max: Int? = 1) -> Schema.Particle {
+        .init(minOccurs: min, maxOccurs: max, term: .group(.init(compositor: compositor, particles: particles)))
+    }
+
+    private func names(_ values: String...) -> [Name] {
+        values.map(Name.init)
+    }
+
+    @Test("Finite exact occurrence rejects too few and too many children")
+    func test_exactFiniteOccurrence() {
+        let nfa = Schema.ContentNFABuilder.build(element("a", min: 2, max: 2))
+        #expect(!nfa.matchesWhole(names("a")))
+        #expect(nfa.matchesWhole(names("a", "a")))
+        #expect(!nfa.matchesWhole(names("a", "a", "a")))
+    }
+
+    @Test("Finite optional tail does not widen to star")
+    func test_finiteOptionalTailDoesNotWiden() {
+        let nfa = Schema.ContentNFABuilder.build(element("a", min: 0, max: 2))
+        #expect(nfa.matchesWhole([]))
+        #expect(nfa.matchesWhole(names("a")))
+        #expect(nfa.matchesWhole(names("a", "a")))
+        #expect(!nfa.matchesWhole(names("a", "a", "a")))
+    }
+
+    @Test("Huge finite upper bound stays exact without proportional states")
+    func test_hugeFiniteUpperBound() throws {
+        let huge = try decimal("100000000000000000000")
+        let particle = element(
+            "a",
+            range: .init(minimum: .init(2), maximum: .finite(huge)),
+        )
+        let nfa = Schema.ContentNFABuilder.build(particle)
+        #expect(nfa.states.count < 16)
+        #expect(!nfa.matchesWhole(names("a")))
+        #expect(nfa.matchesWhole(names("a", "a")))
+        #expect(nfa.matchesWhole(names("a", "a", "a", "a")))
+    }
+
+    @Test("Nested finite occurrences compose exactly")
+    func test_nestedFiniteOccurrences() {
+        let inner = element("a", min: 2, max: 3)
+        let outer = group(.sequence, [inner], min: 2, max: 2)
+        let nfa = Schema.ContentNFABuilder.build(outer)
+        #expect(!nfa.matchesWhole(names("a", "a", "a")))
+        #expect(nfa.matchesWhole(names("a", "a", "a", "a")))
+        #expect(nfa.matchesWhole(names("a", "a", "a", "a", "a")))
+        #expect(nfa.matchesWhole(names("a", "a", "a", "a", "a", "a")))
+        #expect(!nfa.matchesWhole(names("a", "a", "a", "a", "a", "a", "a")))
+    }
+
+    @Test("A huge required prefix does not offer the following particle early")
+    func test_hugeMinimumFollowSet() throws {
+        let huge = try decimal("1000000000000")
+        let requiredA = element(
+            "a",
+            range: .init(minimum: huge, maximum: .finite(huge)),
+        )
+        let particle = group(.sequence, [requiredA, element("b")])
+        let nfa = Schema.ContentNFABuilder.build(particle)
+
+        let follow = nfa.follow(after: names("a", "a"))
+        let allowedNames = follow.allowed.compactMap { label -> String? in
+            if case let .name(name) = label { return name.localName }
+            return nil
+        }
+
+        #expect(Set(allowedNames) == ["a"])
+        #expect(!follow.complete)
+    }
+
+    @Test("A nested occurrence explosion stays structurally bounded")
     func test_nestedExplosionBounded() {
-        // 16384 * 16384 ~ 2.7e8 states without a total cap; the ceiling is 2^20.
-        let nfa = PureXML.Schema.ContentNFABuilder.build(nested(min: 16384))
-        // Bounded to the ceiling plus at most one in-flight term expansion,
-        // far below the naive product that previously allocated until death.
-        #expect(nfa.states.count < 1_500_000)
-        // The degraded automaton must still answer queries without crashing.
-        let names = Array(repeating: PureXML.Model.QualifiedName("a"), count: 32)
-        _ = nfa.matchesWhole(names)
-    }
-
-    @Test("Ordinary content models are unaffected by the ceiling")
-    func test_ordinaryModelUnchanged() {
-        let particle = PureXML.Schema.Particle(
-            minOccurs: 1,
-            maxOccurs: nil,
-            term: .group(.init(compositor: .sequence, particles: [element("a", min: 1, max: 1)])),
-        )
-        let nfa = PureXML.Schema.ContentNFABuilder.build(particle)
-        #expect(nfa.states.count < 64)
-        #expect(nfa.matchesWhole([.init("a"), .init("a"), .init("a")]))
-        #expect(!nfa.matchesWhole([.init("b")]))
+        let inner = element("a", min: 16384, max: 16384)
+        let nested = group(.sequence, [inner], min: 16384, max: 16384)
+        let nfa = Schema.ContentNFABuilder.build(nested)
+        #expect(nfa.states.count < 32)
+        #expect(!nfa.matchesWhole(Array(repeating: Name("a"), count: 32)))
     }
 }

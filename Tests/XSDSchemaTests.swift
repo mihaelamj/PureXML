@@ -73,6 +73,23 @@ struct XSDSchemaTests {
         #expect(try !validate(xsd, "<book isbn=\"1\"><title>T</title><year>nope</year></book>").isEmpty)
     }
 
+    @Test("A huge finite maxOccurs is preserved beyond Int range")
+    func test_hugeFiniteMaxOccurs() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="root">
+            <xs:complexType>
+              <xs:sequence>
+                <xs:element name="item" type="xs:string" maxOccurs="100000000000000000000"/>
+              </xs:sequence>
+            </xs:complexType>
+          </xs:element>
+        </xs:schema>
+        """
+        #expect(try validate(xsd, "<root><item/><item/></root>").isEmpty)
+        #expect(try !validate(xsd, "<root/>").isEmpty)
+    }
+
     @Test("A named complex type referenced by elements")
     func test_namedComplexType() throws {
         let xsd = """

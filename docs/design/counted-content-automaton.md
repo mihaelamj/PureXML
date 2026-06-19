@@ -48,8 +48,9 @@ The relevant literature line is:
 - Kilpeläinen 2011: the principled XML Schema determinism tool is a counting
   automaton, not occurrence unrolling.
 
-These are witnesses for the algorithm family. PureXML's implementation still has
-to be derived against its own `Particle` model and verified locally.
+These are witnesses for the algorithm family. PureXML's instance-time matcher now
+implements the counted shape against its own `Particle` model; counted UPA remains
+separate.
 
 ## Correctness claims
 
@@ -57,9 +58,9 @@ Every claim below is labeled per proof discipline.
 
 | Claim | Status | Meaning |
 |---|---|---|
-| Counted matcher accepts exactly the same child-name language as the XSD particle tree for `element`, `wildcard`, `sequence`, and `choice` with `minOccurs`/`maxOccurs`. | theorem target | Proved by structural induction over the particle tree once the implementation replaces `ContentNFA`. |
-| Counted matcher keeps per-child matched-particle attribution. | theorem target under UPA | For UPA-valid content models, each consumed element is matched to exactly one particle; that particle's type/value metadata is the one used by child validation. |
-| Counted matcher build size is independent of numeric occurrence magnitudes. | theorem target | Program states and counters are proportional to particle nodes, not to `minOccurs` or `maxOccurs` values. |
+| Counted matcher accepts exactly the same child-name language as the XSD particle tree for `element`, `wildcard`, `sequence`, and `choice` with `minOccurs`/`maxOccurs`. | theorem target, implemented | `ContentMatcher.swift` now uses counted configurations; the remaining work is writing the full structural proof against nullable nested particles. |
+| Counted matcher keeps per-child matched-particle attribution. | theorem target under UPA, implemented | For UPA-valid content models, each consumed element is matched to exactly one particle; that particle's type/value metadata is the one used by child validation. |
+| Counted matcher build size is independent of numeric occurrence magnitudes. | theorem, implemented | `ContentNFABuilder` allocates one counter scope per particle occurrence and a constant number of states/edges per particle; high-bound tests assert state count stays structural. |
 | Counted matcher runtime is bounded for interactive validation. | theorem target | For `N` child elements, `S` program states, and `D` counter scopes, validation is bounded by `O(N * S * D)` time and `O(S * D)` live matcher memory. The constants are schema-structural, not occurrence-magnitude structural. |
 | `all` groups remain exact. | theorem already implemented, out of scope for NFA replacement | `all` is validated by direct member counts in `ComplexValidator.matchesAll` and `allStructureErrors`; the counted automaton does not need to encode it initially. |
 | Counted UPA/determinism replaces `positionCap`. | blocked design frontier | The instance matcher can be replaced first. Deleting `positionCap` requires a separate counted determinism pass or a proof that the existing clamp is exact for XSD's admitted content models. |
@@ -296,23 +297,24 @@ current caps.
 
 ## Migration plan
 
-1. Add `NonNegativeDecimal`, `OccurrenceUpper`, and `OccurrenceRange` while
+1. Done 2026-06-19: add `NonNegativeDecimal`, `OccurrenceUpper`, and `OccurrenceRange` while
    preserving the existing `Particle` API for call sites that only need small
    integer comparisons.
-2. Add `CountedContentProgram` and a builder beside `ContentNFABuilder`.
-3. Add differential tests comparing old and counted matchers on ordinary models
+2. Done 2026-06-19: replace `ContentNFABuilder`'s unrolled body copies with a
+   counted program behind the existing `ContentNFA` surface.
+3. Keep differential tests comparing DTD and XSD matchers on ordinary models
    below the current caps.
-4. Add high-bound tests that are exact and currently impossible without language
+4. Done 2026-06-19: add high-bound tests that are exact and previously impossible without language
    widening:
    - `a{2,2}` rejects one `a` and three `a`s;
    - `a{2,100000000000000000000}` accepts two `a`s and rejects one;
    - `a{0,2}` rejects three `a`s;
    - `(a{2,3}){2,2}` accepts four to six `a`s and rejects three/seven;
    - `sequence(a{1000000000000}, b)` never offers `b` before enough `a`s.
-5. Switch `ComplexValidatorContentModel`, `XSDCompletions`, and
+5. Done 2026-06-19: switch `ComplexValidatorContentModel`, `XSDCompletions`, and
    `matchedParticles` to the counted program.
-6. Delete `occursUnrollCap` and `totalStateCap`.
-7. Replace `ContentNFAStateBudgetTests` with exact high-bound tests. The old
+6. Done 2026-06-19: delete `occursUnrollCap` and `totalStateCap`.
+7. Done 2026-06-19: replace `ContentNFAStateBudgetTests` with exact high-bound tests. The old
    state-ceiling assertion should disappear because there is no state ceiling.
 8. Design and land the counted UPA pass; then delete `positionCap`.
 
@@ -331,10 +333,10 @@ current caps.
 
 This arc is complete only when all are true:
 
-- `ContentMatcher.swift` contains no `occursUnrollCap`, `totalStateCap`, or
+- Done 2026-06-19: `ContentMatcher.swift` contains no `occursUnrollCap`, `totalStateCap`, or
   cap-triggered "degrade to star" path.
 - `ContentModelDeterminism.swift` contains no `positionCap` skip.
-- Tests include exact high-bound acceptance/rejection cases whose numeric bounds
+- Done 2026-06-19: tests include exact high-bound acceptance/rejection cases whose numeric bounds
   exceed any practical unroll count.
 - The proof labels in this document are upgraded from "theorem target" to
   "theorem" with code references.
