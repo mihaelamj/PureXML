@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added an opt-in differential schema-validity harness against libxml2 (`XSTSDifferentialTests`, production-readiness stopper #3: characterise correctness against an independent reference, not just the labelled suite). Over 9618 corpus schemas PureXML and libxml2 agree on 4912 (3161 valid, 1751 invalid); the 87 where PureXML is stricter were triaged as PureXML being more correct (libxml2 omits facet consistency, Element Declarations Consistent, whiteSpace restriction, au-props-correct, and notation rules), independently corroborating that PureXML does not over-reject. The 117 where libxml2 is stricter are a false-negative triage queue (stopper #2), written with the rest to /tmp/xsts-differential.txt. xmllint and the corpus are used only in the test harness, never the shipped package.
 
+- Added the counted-content-automaton design for the interactive resource-bound
+  arc. The design separates the language-recognition, matched-particle
+  attribution, and UPA/determinism claims; replaces occurrence unrolling with
+  counter scopes; states the target `O(N * S * D)` runtime and `O(S * D)` live
+  memory bounds; and makes deleting `occursUnrollCap`, `totalStateCap`, and
+  `positionCap` the acceptance criterion.
+
 - OpenAPIKit-style validation framework completion: `BuiltinValidation` registry (23 rules), exhaustive fail/succeed isolation tests, configuration pins, public-type and field coverage gates (`scripts/check-validation-coverage.sh`, `scripts/check-validation-fields.sh`), warnings channel with `strict:` promotion, two-tier `Validator` defaults, XSD schema compile rules as composable validations (`SchemaCompileValidation`), and `ValidationOutcome` non-throwing accessor.
 
 ### Changed

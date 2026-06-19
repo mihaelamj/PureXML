@@ -291,6 +291,8 @@ acceptance criteria for this later arc are: delete `occursUnrollCap`,
 `totalStateCap`, and `positionCap`; remove silent "degrade to star" behavior;
 state a worst-case time and memory bound; prove high numeric occurrence bounds
 do not create proportional states.
+The design artifact is `docs/design/counted-content-automaton.md`; implementation
+must follow that proof plan rather than adding another cap.
 
 **Verifies:**
 

@@ -132,4 +132,5 @@ foundational rather than incremental.
 - **Part 2:** a counter-automaton design for `ContentMatcher` (and the determinism
   automaton), with acceptance criteria = the `occursUnrollCap` / `totalStateCap` /
   `positionCap` caps deleted and a stated worst-case bound, no silent star-degradation
-  (M4 "proven bounds"). Aligns with the performance epic (#139, #175–178).
+  (M4 "proven bounds"). Aligns with the performance epic (#139, #175–178). The
+  design is now pinned in `docs/design/counted-content-automaton.md`.
