@@ -94,7 +94,7 @@ classification is wrong.
 | Nillability | `nillable00201m/nillable00201m2_n` | `XSDParserHelpers`, instance validator |
 | Type derivation | `typedef00204m/typeDef00204m1_n` | `ComplexValidatorXSIType`, derivation tables |
 | Additional-suite instance triage | `addB065/addB065.i` | to classify from fixture |
-| Datatype value-space edges | `anyURI_a004_1339/anyURI_a004_1339.i`, `dateTime011_2008/dateTime011_2008.i` | `SimpleType` |
+| Datatype value-space edges | `anyURI_a004_1339/anyURI_a004_1339.i` (open); ~~`dateTime011_2008/dateTime011_2008.i`~~ closed: XSD 1.0 has no year zero, `0000` now rejected | `SimpleType`, `DateTimeParser` |
 | Element constraints | `elemO011/elemO011.i`, `elemT074/elemT074.i` | instance validator, element declarations |
 | Identity constraints | `idG006/idG006.i`, `idK012/idK012.i`, `idZ010/idZ010.i`, `idZ012/idZ012.i` | `IdentityValidator*` |
 | Model group instance matching | `mgO013/mgO013.i`, `mgZ001/mgZ001.i` | `ContentMatcher`, `ParticleRestriction` fallout |

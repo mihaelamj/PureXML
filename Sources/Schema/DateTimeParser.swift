@@ -54,7 +54,10 @@ extension PureXML.Schema {
         private mutating func parseYearOnly() -> DateTimeValue? {
             var value = DateTimeValue()
             let negative = consume("-")
-            guard let digits = readDigits(minimum: 4) else { return nil }
+            // XSD 1.0 has no year zero: the lexical year 0000 (and -0000) is not a
+            // valid value for dateTime, date, gYearMonth, or gYear. `digits` is the
+            // magnitude, so rejecting 0 covers both signs.
+            guard let digits = readDigits(minimum: 4), digits != 0 else { return nil }
             value.year = (negative ? -1 : 1) * digits
             return value
         }

@@ -57,6 +57,18 @@ struct XSDDatatypeTests {
         #expect(!valid("2026-06-08T12:30:00+15:00", .dateTime))
     }
 
+    @Test("XSD 1.0 has no year zero: 0000 is rejected across the year-bearing types")
+    func test_yearZero() {
+        // Rejected: the prohibited year 0000 (and -0000) wherever a year appears.
+        #expect(!valid("0000-01-01T00:00:00", .dateTime))
+        #expect(!valid("0000-01-01", .date))
+        #expect(!valid("0000-01", .gYearMonth))
+        #expect(!valid("0000", .gYear) && !valid("-0000", .gYear))
+        // Accepted: the smallest magnitudes either side of zero, and a normal year.
+        #expect(valid("0001-01-01T00:00:00", .dateTime) && valid("-0001-12-31", .date))
+        #expect(valid("0001", .gYear) && valid("2026", .gYear) && valid("-0044-03", .gYearMonth))
+    }
+
     @Test("the g* date types parse their reduced forms")
     func test_gTypes() {
         #expect(valid("--02-29", .gMonthDay) && !valid("--02-30", .gMonthDay))

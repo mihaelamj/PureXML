@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `dateTime`, `date`, `gYearMonth`, and `gYear` now reject the year `0000`. XSD
+  1.0 has no year zero (the year before `0001` is `-0001`), so `0000-01-01T00:00:00`
+  and the other `0000` forms are not valid values. `DateTimeParser.parseYearOnly`
+  rejects a zero magnitude for both signs, so `-0001` and other negative years
+  still parse. XSTS invalid-instances-accepted 31 -> 30 (`dateTime011`), no other
+  bucket moved (valid-rejected held at 0).
+
 - Fixed a dead `rootLocation` fallback in `XSDParser.containerLocationMap`. The
   map value type is itself `String?`, so `loc ?? rootLocation` bound the
   coalescing at the outer optional and never used `rootLocation` (the compiler
