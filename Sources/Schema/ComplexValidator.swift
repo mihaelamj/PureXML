@@ -26,14 +26,18 @@ public extension PureXML.Schema {
         private let nillableElements: Set<String>
         /// The `default`/`fixed` value constraint declared on each element name.
         private let elementConstraints: [String: ValueConstraint]
-        /// Local names of complex types declared `abstract="true"`.
+        /// Complex types declared `abstract="true"`, keyed by namespaced identity
+        /// (`{ns}local`) so same-local-name types in different namespaces stay distinct.
         let abstractTypes: Set<String>
-        /// Derivation methods each named type forbids through `xsi:type`.
+        /// Derivation methods each named type forbids through `xsi:type`, keyed by
+        /// namespaced identity (`{ns}local`).
         let typeBlock: [String: Set<DerivationMethod>]
         /// Derivation methods each element declaration forbids through `xsi:type`
-        /// (the `block` on the element, distinct from the block on its type).
+        /// (the `block` on the element, distinct from the block on its type), keyed by
+        /// namespaced identity (`{ns}local`).
         let elementBlock: [String: Set<DerivationMethod>]
-        /// Each named complex type's base and derivation method.
+        /// Each named complex type's base and derivation method, keyed by namespaced
+        /// identity (`{ns}local`).
         let typeDerivation: [String: TypeDerivation]
         /// Global attribute declarations for strict/lax `anyAttribute` validation.
         let globalAttributes: [String: AttributeUse]
