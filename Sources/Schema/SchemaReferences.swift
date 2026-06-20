@@ -60,6 +60,7 @@ extension PureXML.Schema.XSDParser {
         let simpleContentErrors = simpleContentBaseErrors(schema, in: context)
         if skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) {
             return xsdErrors + simpleContentErrors
+                + undeclaredNamespaceReferenceErrors(schema, containers: containers)
         }
         let types = referenceBuiltins.union(context.simpleTypes.keys).union(context.complexTypeNodes.keys)
         let pools: [String: Set<String>] = [
