@@ -93,8 +93,13 @@ public extension PureXML.Validation {
             guard let frame = stack.popLast() else { return }
             if let effective = frame.effective {
                 // Apply the streaming content check as a composable Validation value
-                // (the OpenAPIKit idiom), not a bare method call.
-                let subject = PureXML.Schema.ResolvedElement(element: frame.synthesized(), type: effective)
+                // (the OpenAPIKit idiom), not a bare method call. The parent (now the
+                // stack top) supplies the matched particle's value constraint, so an
+                // empty child validates its `default`/`fixed` value as the tree does.
+                let valueConstraint = stack.last?.effective.flatMap {
+                    validator.childValueConstraint(of: $0, child: frame.name)
+                }
+                let subject = PureXML.Schema.ResolvedElement(element: frame.synthesized(), type: effective, valueConstraint: valueConstraint)
                 collected += PureXML.Schema.ComplexValidator.shallowValidity.apply(to: subject, at: frame.path, in: validator)
             }
         }

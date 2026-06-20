@@ -5,10 +5,14 @@ public extension PureXML.Schema {
     struct ResolvedElement: PureXML.Validation.Validatable {
         public let element: PureXML.Model.Element
         public let type: ElementType
+        /// The matched particle's `default`/`fixed` value constraint, when the element
+        /// is a content-model child, so an empty element validates that value.
+        public let valueConstraint: ValueConstraint?
 
-        public init(element: PureXML.Model.Element, type: ElementType) {
+        public init(element: PureXML.Model.Element, type: ElementType, valueConstraint: ValueConstraint? = nil) {
             self.element = element
             self.type = type
+            self.valueConstraint = valueConstraint
         }
     }
 }
@@ -23,7 +27,25 @@ public extension PureXML.Schema.ComplexValidator {
     /// rather than a bare method call.
     static var shallowValidity: PureXML.Validation.Validation<PureXML.Schema.ResolvedElement, PureXML.Schema.ComplexValidator> {
         .init(description: "Each streamed element is valid against its declared XSD type") { context in
-            context.document.validateShallow(context.subject.element, as: context.subject.type, at: context.codingPath)
+            context.document.validateShallow(
+                context.subject.element,
+                as: context.subject.type,
+                valueConstraint: context.subject.valueConstraint,
+                at: context.codingPath,
+            )
+        }
+    }
+
+    /// The matched particle's `default`/`fixed` value constraint for a child of
+    /// `parent`'s content model, keyed by namespaced identity (so same-local-name
+    /// elements in different types do not collide as in the flat `elementConstraints`).
+    func childValueConstraint(of parent: PureXML.Schema.ElementType, child name: PureXML.Model.QualifiedName) -> PureXML.Schema.ValueConstraint? {
+        guard case let .complex(complex) = parent else { return nil }
+        switch complex.content {
+        case let .elementOnly(particle), let .mixed(particle):
+            return Self.elementValueConstraints(in: particle.term)[Self.key(name)]
+        case .empty, .simpleContent:
+            return nil
         }
     }
 
@@ -135,12 +157,13 @@ public extension PureXML.Schema.ComplexValidator {
     func validateShallow(
         _ element: PureXML.Model.Element,
         as type: PureXML.Schema.ElementType,
+        valueConstraint: PureXML.Schema.ValueConstraint? = nil,
         at path: [PureXML.Validation.PathKey] = [],
     ) -> [PureXML.Validation.ValidationError] {
         var errors: [XSDFailure] = []
         switch type {
         case let .simple(simple):
-            validateSimpleElement(element, simple, at: path, into: &errors)
+            validateSimpleElement(element, simple, valueConstraint: valueConstraint, at: path, into: &errors)
         case let .complex(complex):
             validateAttributes(element, complex, at: path, into: &errors)
             if let nilErrors = nilErrors(element, at: path) { return errors + nilErrors }
@@ -155,13 +178,19 @@ public extension PureXML.Schema.ComplexValidator {
             case let .circular(name):
                 return [XSDFailure(reason: "circular type reference '\(name)'", at: path)]
             case let .resolved(resolved):
-                return validateShallow(element, as: resolved, at: path)
+                return validateShallow(element, as: resolved, valueConstraint: valueConstraint, at: path)
             }
         }
         return errors
     }
 
-    private func validateSimpleElement(_ element: PureXML.Model.Element, _ simple: PureXML.Schema.SimpleType, at path: XSDPath, into errors: inout [XSDFailure]) {
+    private func validateSimpleElement(
+        _ element: PureXML.Model.Element,
+        _ simple: PureXML.Schema.SimpleType,
+        valueConstraint: PureXML.Schema.ValueConstraint? = nil,
+        at path: XSDPath,
+        into errors: inout [XSDFailure],
+    ) {
         if let nilErrors = nilErrors(element, at: path) {
             errors += nilErrors
             return
@@ -169,12 +198,18 @@ public extension PureXML.Schema.ComplexValidator {
         if !element.children.compactMap(\.element).isEmpty {
             errors.append(XSDFailure(reason: "'\(element.name.localName)' must not have children", at: path))
         }
+        // An empty element takes its `default`/`fixed` value; that value (not the
+        // empty string) is what must be valid against the type, matching the tree
+        // path's validateChild.
         let text = Self.rawTextContent(element)
-        if let error = simple.validate(text) {
+        if let error = simple.validate(effectiveSimpleText(for: element, particleConstraint: valueConstraint)) {
             errors.append(XSDFailure(reason: "'\(element.name.localName)': \(error)", at: path))
         }
         recordIDs(simple, value: text, at: path)
-        errors += elementFixedErrors(element, at: path)
+        // Compare a present fixed value in the type's value space (e.g. "05" == "5"
+        // for xs:int) and against the matched particle's fixed value, as the tree
+        // path's validateChild does, not a raw string compare.
+        errors += elementFixedErrors(element, valueType: simple, particleFixed: valueConstraint?.fixedValue, at: path)
     }
 
     private func shallowContent(_ element: PureXML.Model.Element, _ content: PureXML.Schema.ContentType, at path: XSDPath, into errors: inout [XSDFailure]) {

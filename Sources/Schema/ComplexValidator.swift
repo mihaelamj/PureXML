@@ -104,6 +104,18 @@ public extension PureXML.Schema {
             return []
         }
 
+        /// The text an element's simple content is validated against: its character
+        /// content, or, when the element is empty, its `default`/`fixed` value (an
+        /// empty element takes that value, and the value, not the empty string, must
+        /// satisfy the type). The matched particle's constraint takes precedence over
+        /// the by-local-name `elementConstraints` map, exactly as the tree path's
+        /// `validateChild` resolves it.
+        func effectiveSimpleText(for element: PureXML.Model.Element, particleConstraint: ValueConstraint? = nil) -> String {
+            let text = Self.rawTextContent(element)
+            let constraint = particleConstraint ?? elementConstraints[element.name.localName]
+            return text.isEmpty ? (constraint?.value ?? text) : text
+        }
+
         /// The error from a `fixed` element value constraint: the element's text
         /// must equal the fixed value in the element type's value space when known.
         func elementFixedErrors(
@@ -314,9 +326,7 @@ public extension PureXML.Schema {
                 // (not the empty string) is what must be valid against the type,
                 // including any xsi:type override already resolved into `simple`.
                 let text = Self.rawTextContent(child)
-                let constraint = particleConstraint ?? elementConstraints[child.name.localName]
-                let effective = text.isEmpty ? (constraint?.value ?? text) : text
-                if let error = simple.validate(effective) {
+                if let error = simple.validate(effectiveSimpleText(for: child, particleConstraint: particleConstraint)) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)': \(error)", at: path))
                 }
                 recordIDs(simple, value: text, at: path)

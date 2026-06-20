@@ -75,6 +75,29 @@ extension PureXML.Schema.ComplexValidator {
         }
     }
 
+    /// The per-particle `default`/`fixed` value constraint of each named element in a
+    /// content model, keyed by namespaced identity. The streaming validator uses this
+    /// to apply a child's particle constraint (not the by-local-name `elementConstraints`
+    /// map, which collides across same-local-name elements in different types).
+    static func elementValueConstraints(in term: PureXML.Schema.Term) -> [String: PureXML.Schema.ValueConstraint] {
+        var result: [String: PureXML.Schema.ValueConstraint] = [:]
+        collectValueConstraints(term, into: &result)
+        return result
+    }
+
+    fileprivate static func collectValueConstraints(_ term: XSDTerm, into result: inout [String: PureXML.Schema.ValueConstraint]) {
+        switch term {
+        case let .element(name, _, _, valueConstraint, _, _):
+            if let valueConstraint { result[key(name)] = valueConstraint }
+        case let .group(group):
+            for member in group.particles {
+                collectValueConstraints(member.term, into: &result)
+            }
+        case .wildcard:
+            break
+        }
+    }
+
     static func key(_ name: PureXML.Model.QualifiedName) -> String {
         "{\(name.namespaceURI ?? "")}\(name.localName)"
     }

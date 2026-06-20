@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The streaming XSD validator now applies an element's `default`/`fixed` value
+  constraint to its simple content (#200): an empty element takes its constraint
+  value, and that value (not the empty string) is validated against the type
+  (cvc-elt.5.1.2 / cvc-elt.5.2.2.2). The constraint comes from the matched particle
+  (keyed by namespaced identity), not the flat by-local-name map, so two same-local-
+  name elements in different types do not collide. Both paths share one
+  `effectiveSimpleText(particleConstraint:)` helper, so an empty element with a valid
+  default is no longer falsely rejected and streaming agrees with the tree path.
+
 - The streaming XSD validator now agrees with the tree validator on `xsi:type` and
   type resolution (#186). Type resolution is keyed by namespaced identity
   (`{ns}local`) through in-scope prefix bindings accumulated down the element stack:
