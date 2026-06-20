@@ -76,6 +76,38 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
+    /// cos-all-limited: a reference to a model group whose content is an `all` group
+    /// is itself an all-group particle, so its `maxOccurs` must be 1 and its
+    /// `minOccurs` 0 or 1. ``allGroupLimitedErrors`` covers the direct `<all>` element;
+    /// this covers a `<group ref>` resolving to an all group (corpus particlesEa025).
+    static func allGroupReferenceMaxOccursErrors(_ schema: XSDTree) -> [String] {
+        let xsd = PureXML.Schema.XSDParser.xsdNamespace
+        var allGroupNames: Set<String> = []
+        for group in descendants(schema, named: "group") where group.name?.namespaceURI == xsd {
+            guard let name = PureXML.Schema.XSDNode.attribute(group, "name") else { continue }
+            let isAll = PureXML.Schema.XSDNode.elementChildren(group).contains {
+                $0.name?.namespaceURI == xsd && PureXML.Schema.XSDNode.localName($0) == "all"
+            }
+            if isAll { allGroupNames.insert(name) }
+        }
+        guard !allGroupNames.isEmpty else { return [] }
+        var errors: [String] = []
+        for group in descendants(schema, named: "group") where group.name?.namespaceURI == xsd {
+            guard let ref = PureXML.Schema.XSDNode.attribute(group, "ref"),
+                  allGroupNames.contains(PureXML.Schema.XSDNode.stripPrefix(ref))
+            else { continue }
+            let maxOccurs = PureXML.Schema.XSDNode.attribute(group, "maxOccurs")?.trimmingXMLWhitespace()
+            if let maxOccurs, maxOccurs == "unbounded" || (isNonNegativeInteger(maxOccurs) && canonicalMagnitude(maxOccurs) != "1") {
+                errors.append("the maxOccurs of a reference to an all group must be 1")
+            }
+            let minOccurs = PureXML.Schema.XSDNode.attribute(group, "minOccurs")?.trimmingXMLWhitespace()
+            if let minOccurs, isNonNegativeInteger(minOccurs), !["0", "1"].contains(canonicalMagnitude(minOccurs)) {
+                errors.append("the minOccurs of a reference to an all group must be 0 or 1")
+            }
+        }
+        return errors
+    }
+
     static func exceeds(_ lhs: String, _ rhs: String) -> Bool {
         let left = canonicalMagnitude(lhs), right = canonicalMagnitude(rhs)
         return left.count != right.count ? left.count > right.count : left > right

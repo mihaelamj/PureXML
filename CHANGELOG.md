@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A reference to a model group whose content is an `all` group must have `maxOccurs`
+  of 1 and `minOccurs` of 0 or 1 (XSD 1.0 cos-all-limited, #158). A `<group ref>` that
+  resolves to an `<xs:all>` group with `maxOccurs="2"` is now rejected (corpus
+  particlesEa025); the direct `<all>` element was already checked. XSTS
+  invalid-schemas-accepted 36 -> 35, valid-schemas-rejected held at 0.
+
 - A complexContent restriction that narrows an element to a type derived from the
   base element's type by **extension** is now rejected (XSD 1.0 cos-particle-restrict
   NameAndTypeOK.2.2, #158): the element-type-derivation check follows the derivation
