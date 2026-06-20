@@ -54,7 +54,12 @@ extension PureXML.Schema.ParticleRestriction {
         }
 
         if baseIsUnion(baseTypeName, types) { return true }
-        return typeDerivesOrEqual(restrictedTypeName, baseTypeName, derivation, types)
+        // NameAndTypeOK.2.2: a restricting element's type must be validly derived from
+        // the base element's type EXCLUDING extension (and list/union), i.e. by
+        // restriction only. A type that reaches the base through an extension step is
+        // not a valid restriction. (Union-base cases are still handled above; the
+        // by-name restriction-derivation of a union member is a separate clause.)
+        return typeDerivesByRestriction(restrictedTypeName, baseTypeName, derivation, types)
     }
 
     /// Whether the named type resolves (through the type table) to a `union`
@@ -104,6 +109,33 @@ extension PureXML.Schema.ParticleRestriction {
         while visited.insert(current).inserted {
             if current == base { return true }
             guard let step = derivation[current] else { break }
+            current = step.base
+        }
+        if let derivedBuiltin = PureXML.Schema.BuiltinType(rawValue: current), let baseBuiltin = PureXML.Schema.BuiltinType(rawValue: base) {
+            return derivedBuiltin.derives(from: baseBuiltin)
+        }
+        return current == base
+    }
+
+    /// As ``typeDerivesOrEqual``, but the user-declared chain is followed ONLY across
+    /// `restriction` steps (an `extension` step breaks the walk), so a type derived by
+    /// extension does not count as a restriction of its base. Built-in derivation is
+    /// always by restriction, so the lattice continuation is unchanged. A `restriction`
+    /// of a union (declared `<restriction base="thatUnion">`) is reached through the
+    /// chain; an unrelated union with subset members is not. The ur-type base stays
+    /// permissive (any type restricts the ur-type), matching ``typeDerivesOrEqual``.
+    static func typeDerivesByRestriction(
+        _ derived: String,
+        _ base: String,
+        _ derivation: [String: PureXML.Schema.TypeDerivation],
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> Bool {
+        if isUrTypeName(base, types) { return true }
+        var current = derived
+        var visited: Set<String> = []
+        while visited.insert(current).inserted {
+            if current == base { return true }
+            guard let step = derivation[current], step.method == .restriction else { break }
             current = step.base
         }
         if let derivedBuiltin = PureXML.Schema.BuiltinType(rawValue: current), let baseBuiltin = PureXML.Schema.BuiltinType(rawValue: base) {
