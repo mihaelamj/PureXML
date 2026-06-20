@@ -28,6 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An attribute declaration may no longer land in the XSI namespace (XSD 1.0 Schema
+  Component Constraint "xsi: Not Allowed", §3.2.6). A schema may target the XSI
+  namespace and declare unqualified attributes (they land in no namespace), but a
+  top-level attribute, or a local one made qualified by `form="qualified"` or
+  `attributeFormDefault="qualified"`, lands in XSI and is now rejected (corpus
+  attKb018a, attKa015) while unqualified ones stay valid (attKb018, attKc018). XSTS
+  invalid-schemas-accepted 39 -> 37, valid-schemas-rejected held at 0, no other
+  bucket moved.
+
 - A prefixed reference (`type`/`base`/`itemType`/`ref`/`substitutionGroup`/`memberTypes`)
   whose namespace is never imported is now rejected on the cross-document skip path
   (XSD `src-resolve`). When a schema declares imports but loads no external document,

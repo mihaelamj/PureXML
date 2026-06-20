@@ -245,7 +245,7 @@ extension PureXML.Validation {
                 nonReference: [
                     AnyValidation(idAttributesValid), AnyValidation(schemaStructureValid),
                     AnyValidation(componentNamesUnique), AnyValidation(simpleTypeFinalControlsValid),
-                    AnyValidation(contentModelsDeterministic),
+                    AnyValidation(contentModelsDeterministic), AnyValidation(attributeDeclarationsNotInXSI),
                     AnyValidation(referencedSchemasResolveToSchemas), AnyValidation(redefinitionsDeriveFromThemselves),
                     AnyValidation(redefineSelfReferencesAreWellFormed), AnyValidation(redefinedAttributeGroupsKeepRequired),
                 ],
@@ -341,6 +341,16 @@ extension PureXML.Validation {
 }
 
 extension PureXML.Validation.SchemaCompile {
+    /// xsi: Not Allowed (XSD 1.0 SCC §3.2.6): no attribute declaration lands in the
+    /// XSI namespace. See ``PureXML/Schema/XSDParser/xsiNamespaceAttributeErrors``.
+    static var attributeDeclarationsNotInXSI: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+        compileRule("Attribute declarations are not in the XSI namespace") { document in
+            PureXML.Schema.SchemaLocatedFinding.unlocated(
+                PureXML.Schema.XSDParser.xsiNamespaceAttributeErrors(document.schema, document.context),
+            )
+        }
+    }
+
     /// au-props-correct: an attribute's type is a simple type, never complex.
     static var attributeTypesSimple: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("An attribute's type is a simple type") { document in
