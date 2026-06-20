@@ -90,6 +90,7 @@ struct ValidationConfigurationTests {
             "Global schema component names are unique within their symbol spaces",
             "Simple-type final controls are declared consistently",
             "Schema content models are deterministic (UPA)",
+            "Attribute declarations are not in the XSI namespace",
             "A resolved schemaLocation reference is a valid schema",
             "A redefined type restricts or extends itself",
             "A redefined group or attribute group has a well-formed self-reference",
