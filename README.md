@@ -100,7 +100,7 @@ flowchart TB
   EncodingMismatch["#137 encoding-declaration mismatches: complete"]:::done
   BaseURI["#138 per-entity base URIs: complete"]:::done
   Epic122["#122 conformance suite maintenance: complete (#130 survivor)"]:::epic
-  XSTS["#129 XSTS runner shipped; gates #145-#148 at 0/43/0/31"]:::review
+  XSTS["#129 XSTS runner shipped; gates #145-#148 at 0/39/0/26"]:::review
   XSLTTS["#130 XSLT 1.0 suite (xalan-test): ~126 baseline failures"]:::review
   Parity100["Behavioral parity closed: #141 top-level params, #142 public streaming, #143 XPath budget, #144 WASI runtime proof, pl/ru sort collation"]:::done
   Epic139["#139 faster than libxml2, measured + streaming (benchmarks in docs/benchmarks.md; quadratics killed; unsafe authorized)"]:::epic
@@ -114,6 +114,7 @@ flowchart TB
   CrossDoc161["#161 cross-document composition"]:::todo
   Gates145["#145-#148 XSTS gates: burn-down to 0"]:::review
   Loc169["#169 located schema diagnostics"]:::todo
+  Epic195["#195 xsi:type and substitution-group derivation correctness"]:::epic
   Epic105 --> Epic121
   Epic105 --> Epic122
   Epic121 --> Oasis
@@ -135,11 +136,12 @@ flowchart TB
   Epic167 --> CrossDoc161
   Epic167 --> Gates145
   Epic167 --> Loc169
+  Epic167 --> Epic195
 ```
 
 ## Status
 
-**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (valid schemas rejected / invalid schemas accepted / valid instances rejected / invalid instances accepted), enforced in `Tests/XSTSSuiteTests.swift`: **0 / 43 / 0 / 31**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
+**Current focus:** production readiness for IDE use ([#167](https://github.com/mihaelamj/PureXML/issues/167)). XSTS settled baselines (valid schemas rejected / invalid schemas accepted / valid instances rejected / invalid instances accepted), enforced in `Tests/XSTSSuiteTests.swift`: **0 / 39 / 0 / 26**. See [`docs/roadmap.md`](docs/roadmap.md) for milestones and open tasks.
 
 PureXML is a working, dependency-free XML library today: parse, emit, validate,
 query, and stream documents on macOS, Linux, Windows, and WASM. The test suite
@@ -219,7 +221,7 @@ parity-frontier epic (**#105**) are closed.
 
 The remaining distance is **production readiness for IDE use**, tracked under epic
 **#167**: driving the XSTS conformance buckets toward zero (currently
-**0 / 43 / 0 / 31**), located schema diagnostics (#169), the schema differential
+**0 / 39 / 0 / 26**), located schema diagnostics (#169), the schema differential
 oracle (#171), and cross-document composition (#161). The one active runner
 burn-down is **#130** (the XSLT 1.0 xalan suite). See
 [`docs/roadmap.md`](docs/roadmap.md).
