@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A prefixed reference (`type`/`base`/`itemType`/`ref`/`substitutionGroup`/`memberTypes`)
+  whose namespace is never imported is now rejected on the cross-document skip path
+  (XSD `src-resolve`). When a schema declares imports but loads no external document,
+  the pool-based check stands down; a reference into a namespace that is neither the
+  target, the XSD or XML namespace, nor named by any `xs:import` can resolve to no
+  component and is flagged. To stay sound when the import closure is unknown, the
+  check stands down whenever any external carries a `schemaLocation` (an unloaded
+  located document may transitively import the referenced namespace), applying only
+  when every external is location-less. XSTS invalid-schemas-accepted 43 -> 39
+  (schZ011_a-d), valid-schemas-rejected held at 0, no other bucket moved.
+
 - A non-nillable element may now carry no `xsi:nil` attribute at all, whatever its
   value (cvc-elt.3.1). Previously only `xsi:nil="true"` on a non-nillable element
   was rejected; `xsi:nil="false"` slipped through. `ComplexValidator.nilErrors` now
