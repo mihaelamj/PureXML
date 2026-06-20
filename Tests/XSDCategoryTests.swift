@@ -90,6 +90,18 @@ struct XSDCategoryTests {
         #expect(validate(element("a", [xsi]), type, validator: nillable).isEmpty)
     }
 
+    @Test("Nillable: xsi:nil='false' is also forbidden on a non-nillable element (cvc-elt.3.1)")
+    func test_notNillableNilFalse() {
+        let nilFalse = ("xsi:nil", "false")
+        let type = Schema.ComplexType(content: .empty)
+        // cvc-elt.3.1: a non-nillable element must carry no xsi:nil attribute at all,
+        // so even xsi:nil="false" is rejected (not only "true").
+        #expect(validate(element("a", [nilFalse]), type).contains { $0.reason.contains("not nillable") })
+        // A nillable element may carry xsi:nil="false" (explicitly not nilled): accepted.
+        let nillable = Schema.ComplexValidator(nillableElements: ["a"])
+        #expect(validate(element("a", [nilFalse]), type, validator: nillable).isEmpty)
+    }
+
     @Test("Fixed: an element fixed value must match")
     func test_fixedElement() {
         let validator = Schema.ComplexValidator(elementConstraints: ["a": .fixed("yes")])
