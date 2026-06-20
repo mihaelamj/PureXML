@@ -11,7 +11,11 @@ private typealias SimpleType = PureXML.Schema.SimpleType
 extension PureXML.Schema.XSDParser {
     // MARK: Element and type references
 
-    static func elementType(_ node: PureXML.Model.TreeNode, _ context: PureXML.Schema.XSDContext) -> PureXML.Schema.ElementType {
+    static func elementType(
+        _ node: PureXML.Model.TreeNode,
+        _ context: PureXML.Schema.XSDContext,
+        resolvingHeads: Set<String> = [],
+    ) -> PureXML.Schema.ElementType {
         if let typeName = XSDNode.attribute(node, "type") {
             return typeReference(typeName, context, at: node)
         }
@@ -20,6 +24,16 @@ extension PureXML.Schema.XSDParser {
         }
         if let inline = XSDNode.firstChild(node, named: "complexType") {
             return .complex(complexType(inline, context))
+        }
+        // XSD 1.0 3.3.2: an element with neither `type` nor an inline type, but a
+        // `substitutionGroup`, takes the {type definition} of its head. Resolve the
+        // head declaration and use its type, guarding against a substitutionGroup cycle.
+        if let headReference = XSDNode.attribute(node, "substitutionGroup") {
+            let bindings = PureXML.Schema.XSDParser.namespaceBindingsInScope(of: node, defaultBindings: context.namespaceBindings)
+            let headKey = derivationKey(XSDNode.stripPrefix(headReference), in: XSDNode.referenceNamespace(headReference, bindings))
+            if !resolvingHeads.contains(headKey), let headNode = context.globalElements[headKey] {
+                return elementType(headNode, context, resolvingHeads: resolvingHeads.union([headKey]))
+            }
         }
         return .complex(anyType)
     }

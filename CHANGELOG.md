@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An element with neither a `type` attribute nor an inline type, but a
+  `substitutionGroup`, now takes the type definition of its head (XSD 1.0 3.3.2)
+  instead of defaulting to `anyType`. `XSDParser.elementType` resolves the head
+  declaration (transitively, guarding a `substitutionGroup` cycle) and uses its
+  type, so an instance of such a member is validated against the head's type. XSTS
+  invalid-instances-accepted 29 -> 28 (`typeDef00204m`), no other bucket moved
+  (valid-rejected held at 0 across all 14383 groups).
+
 - `xsi:type` naming `anyType` is now rejected on an element whose declared type is
   `anySimpleType` (cvc-elt.4.3.2.1). `anyType` is the ur-supertype of every type,
   so it is never validly *derived* from `anySimpleType` (its own subtype). The

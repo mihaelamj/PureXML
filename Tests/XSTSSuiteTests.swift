@@ -150,13 +150,13 @@ struct XSTSSuiteTests {
     private let knownSchemaValidRejected = 0
     private let knownSchemaInvalidAccepted = 43
     private let knownInstanceValidRejected = 0
-    /// Instance bucket (133 -> 29), per-step deltas in CHANGELOG.md: xsi:type must derive from the
-    /// declared type (complex/atomic/list/union via the element-ref chain), and anyType cannot stand
-    /// in for an anySimpleType element (its supertype); block/blockDefault bar substitutions on the
-    /// namespace-keyed backbone; ur-type anyType wildcards are `lax`; identity fields compare in
-    /// decimal value space and take a declared default/fixed when absent/empty; an attribute wildcard
-    /// is the INTERSECTION of its sources; dateTime/date/gYear* reject year 0000.
-    private let knownInstanceInvalidAccepted = 29
+    /// Instance bucket (133 -> 28), per-step deltas in CHANGELOG.md: xsi:type must derive from the
+    /// declared type (complex/atomic/list/union via the element-ref chain); anyType cannot stand in
+    /// for an anySimpleType element; an untyped substitutionGroup member inherits its head's type;
+    /// block/blockDefault bar substitutions on the namespace-keyed backbone; ur-type anyType wildcards
+    /// are `lax`; identity fields compare in decimal value space, taking a declared default/fixed when
+    /// absent/empty; an attribute wildcard is the INTERSECTION of its sources; year 0000 is invalid.
+    private let knownInstanceInvalidAccepted = 28
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {

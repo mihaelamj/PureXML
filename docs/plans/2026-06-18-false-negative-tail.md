@@ -92,7 +92,7 @@ classification is wrong.
 | Target namespace / form matching | `targetns00101m/targetNS00101m1_n` | `ComplexValidator*`, reference resolution |
 | Disallowed substitution | `disallowedsubst00105m/disallowedSubst00105m1_n`, `disallowedsubst00106m2/Negative` | `XSDSubstitutionMembers`, `ComplexValidatorXSIType` |
 | Nillability | `nillable00201m/nillable00201m2_n` | `XSDParserHelpers`, instance validator |
-| Type derivation | `typedef00204m/typeDef00204m1_n` | `ComplexValidatorXSIType`, derivation tables |
+| Type derivation | ~~`typedef00204m/typeDef00204m1_n`~~ closed: an untyped `substitutionGroup` member inherits its head's type (XSD 1.0 3.3.2) | `XSDParser.elementType` |
 | Additional-suite instance triage | `addB065/addB065.i` | to classify from fixture |
 | Datatype value-space edges | `anyURI_a004_1339/anyURI_a004_1339.i` (open); ~~`dateTime011_2008/dateTime011_2008.i`~~ closed: XSD 1.0 has no year zero, `0000` now rejected | `SimpleType`, `DateTimeParser` |
 | Element constraints | `elemO011/elemO011.i`, `elemT074/elemT074.i` | instance validator, element declarations |
