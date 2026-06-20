@@ -168,7 +168,10 @@ public extension PureXML.Schema.ComplexValidator {
             validateAttributes(element, complex, at: path, into: &errors)
             if let nilErrors = nilErrors(element, at: path) { return errors + nilErrors }
             shallowContent(element, complex.content, at: path, into: &errors)
-            errors += elementFixedErrors(element, at: path)
+            // A simpleContent fixed value is compared in its simple type's value space
+            // (cvc-elt.5.2.2.1), matching the tree path's validate(_:against:).
+            let simpleContentType: PureXML.Schema.SimpleType? = if case let .simpleContent(simple) = complex.content { simple } else { nil }
+            errors += elementFixedErrors(element, valueType: simpleContentType, at: path)
         case .typeReference:
             // The shared resolver also guards a circular chain, which would
             // otherwise recurse here without terminating.
