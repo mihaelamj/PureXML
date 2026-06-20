@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The streaming XSD validator now agrees with the tree validator on `xsi:type` and
+  type resolution (#186). Type resolution is keyed by namespaced identity
+  (`{ns}local`) through in-scope prefix bindings accumulated down the element stack:
+  the `xsi:type` override type, the undeclared-type check, and root/child element
+  declarations (so two globals or types sharing a local name in different namespaces
+  no longer collide; root resolution mirrors the tree path, with the bare local-name
+  map used only for a no-namespace root). The streaming path now runs the full
+  cvc-elt.4 gate the tree path runs (a blocked, abstract, not-validly-derived,
+  list/union, or anyType-for-anySimpleType override, and an abstract declared type
+  carrying no `xsi:type`, are rejected identically). And it resolves a type from an
+  element's own `xsi:type` where there is no governing declaration: an undeclared
+  root (the W3C Sun target-namespace fallback) and a strict-wildcard child, which the
+  streaming path previously rejected as undeclared.
+
 - An attribute declaration may no longer land in the XSI namespace (XSD 1.0 Schema
   Component Constraint "xsi: Not Allowed", §3.2.6). A schema may target the XSI
   namespace and declare unqualified attributes (they land in no namespace), but a

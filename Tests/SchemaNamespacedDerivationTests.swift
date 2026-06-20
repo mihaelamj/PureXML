@@ -58,4 +58,22 @@ struct SchemaNamespacedDerivationTests {
         """
         #expect(try !document.validate(instance, schemaLoader: loader).isEmpty)
     }
+
+    /// The streaming driver resolves `xsi:type` through its in-scope prefix bindings,
+    /// not the bare local name (#186). With the namespaced type table keyed by
+    /// `{ns}local`, a bare `"TD"` lookup misses, so the old streaming path reported a
+    /// false "unknown xsi:type"; the prefixed `b:TD` must resolve to urn:b's type and
+    /// agree with the tree path.
+    @Test("streaming xsi:type resolves by namespace and agrees with the tree path (#186)")
+    func test_streamingNamespacedXsiType() throws {
+        let document = try PureXML.Schema.Document(schemaA, schemaLoader: loader)
+        let valid = """
+        <b:e xmlns:b="urn:b" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:type="b:TD"><x>a</x><y>b</y></b:e>
+        """
+        let tree = try document.validate(valid, schemaLoader: loader).map(\.reason).sorted()
+        let streamed = try document.validate(streaming: valid).map(\.reason).sorted()
+        #expect(tree.isEmpty, "tree rejected a valid namespaced xsi:type: \(tree)")
+        #expect(streamed == tree, "streaming disagreed with tree: \(streamed)")
+    }
 }

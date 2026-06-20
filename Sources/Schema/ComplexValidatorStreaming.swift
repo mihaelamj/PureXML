@@ -29,10 +29,16 @@ public extension PureXML.Schema.ComplexValidator {
 
     /// The effective element type after an `xsi:type` override and following any
     /// `typeReference` chain, so the streaming driver resolves a type once per
-    /// element rather than re-entering the tree walk.
-    func effectiveType(_ declared: PureXML.Schema.ElementType, of element: PureXML.Model.Element) -> PureXML.Schema.ElementType {
+    /// element rather than re-entering the tree walk. The `xsi:type` is resolved
+    /// through its in-scope prefix bindings to a namespaced type key (as the tree
+    /// path does), so two imported types sharing a local name do not collide.
+    func effectiveType(
+        _ declared: PureXML.Schema.ElementType,
+        of element: PureXML.Model.Element,
+        namespaceBindings: [String: String] = [:],
+    ) -> PureXML.Schema.ElementType {
         var type = declared
-        if let overriding = Self.xsiTypeName(element), let resolved = types[overriding] {
+        if let resolved = resolvedXsiType(element, namespaceBindings: namespaceBindings) {
             type = resolved
         }
         // An unknown or circular chain stays a typeReference, which
@@ -41,6 +47,16 @@ public extension PureXML.Schema.ComplexValidator {
             type = resolved
         }
         return type
+    }
+
+    /// The type an element's `xsi:type` resolves to through its in-scope prefix
+    /// bindings, or nil when the named type is undeclared. Used by the streaming
+    /// driver to report an unknown `xsi:type` the way the tree path does.
+    func resolvedXsiType(_ element: PureXML.Model.Element, namespaceBindings: [String: String]) -> PureXML.Schema.ElementType? {
+        guard let reference = Self.xsiTypeReference(element, namespaceBindings: namespaceBindings) ?? Self.xsiTypeName(element) else {
+            return nil
+        }
+        return Self.resolveNamedType(reference, in: types)
     }
 
     /// The declared element type of a child `name` in `parent`'s content model: a
