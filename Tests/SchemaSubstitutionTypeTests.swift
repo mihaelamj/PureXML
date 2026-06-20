@@ -264,4 +264,18 @@ struct SchemaSubstitutionTypeTests {
                 + "</xs:element>",
         ))
     }
+
+    @Test("an untyped substitutionGroup member inherits its head's type for instance validation")
+    func test_untypedMemberInheritsHeadType() throws {
+        let schema = try PureXML.Schema.Document("""
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="Head" type="xs:boolean"/>
+          <xs:element name="root" substitutionGroup="Head"/>
+        </xs:schema>
+        """)
+        // `root` has no type of its own but substitutes `Head` (boolean), so it
+        // inherits boolean: a valid boolean is accepted, a non-boolean rejected.
+        #expect(try schema.validate("<root>true</root>").isEmpty)
+        #expect(try !schema.validate("<root>Yes</root>").isEmpty)
+    }
 }
