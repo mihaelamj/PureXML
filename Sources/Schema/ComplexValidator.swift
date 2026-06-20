@@ -86,11 +86,14 @@ public extension PureXML.Schema {
         /// element is not nillable, or when it carries content. Returns nil when
         /// the element is not nilled.
         func nilErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure]? {
-            guard Self.isNil(element) else { return nil }
             let name = element.name.localName
-            if !nillableElements.contains(name) {
+            // cvc-elt.3.1: a non-nillable element must carry no `xsi:nil` attribute at
+            // all, whatever its value (so `xsi:nil="false"` is equally forbidden, not
+            // only `xsi:nil="true"`).
+            if Self.nilAttributeValue(element) != nil, !nillableElements.contains(name) {
                 return [XSDFailure(reason: "element '\(name)' is not nillable but has xsi:nil", at: path)]
             }
+            guard Self.isNil(element) else { return nil }
             if Self.hasContent(element) {
                 return [XSDFailure(reason: "nil element '\(name)' must be empty", at: path)]
             }

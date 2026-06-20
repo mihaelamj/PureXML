@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A non-nillable element may now carry no `xsi:nil` attribute at all, whatever its
+  value (cvc-elt.3.1). Previously only `xsi:nil="true"` on a non-nillable element
+  was rejected; `xsi:nil="false"` slipped through. `ComplexValidator.nilErrors` now
+  flags the presence of any `xsi:nil` on a non-nillable element, while a nillable
+  element still accepts `xsi:nil="false"` (explicitly not nilled). XSTS
+  invalid-instances-accepted 28 -> 26, no other bucket moved (valid-rejected held
+  at 0 across all 14383 groups).
+
 - An element with neither a `type` attribute nor an inline type, but a
   `substitutionGroup`, now takes the type definition of its head (XSD 1.0 3.3.2)
   instead of defaulting to `anyType`. `XSDParser.elementType` resolves the head

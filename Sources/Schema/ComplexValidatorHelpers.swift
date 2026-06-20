@@ -185,11 +185,17 @@ extension PureXML.Schema.ComplexValidator {
 extension PureXML.Schema.ComplexValidator {
     /// Whether the element carries `xsi:nil="true"`.
     static func isNil(_ element: PureXML.Model.Element) -> Bool {
-        element.attributes.contains { attribute in
+        nilAttributeValue(element) == "true"
+    }
+
+    /// The value of the `xsi:nil` attribute if present (any value), or nil if the
+    /// element carries no `xsi:nil`. Used for the cvc-elt.3.1 rule that a
+    /// non-nillable element must carry no `xsi:nil` attribute at all.
+    static func nilAttributeValue(_ element: PureXML.Model.Element) -> String? {
+        element.attributes.first { attribute in
             attribute.name.localName == "nil"
                 && (attribute.name.namespaceURI == "http://www.w3.org/2001/XMLSchema-instance" || attribute.name.prefix == "xsi")
-                && attribute.value == "true"
-        }
+        }?.value
     }
 
     /// Whether the element has any child element or non-whitespace text.

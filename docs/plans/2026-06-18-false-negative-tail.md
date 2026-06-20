@@ -91,7 +91,7 @@ classification is wrong.
 |---|---|---|
 | Target namespace / form matching | `targetns00101m/targetNS00101m1_n` | `ComplexValidator*`, reference resolution |
 | Disallowed substitution | `disallowedsubst00105m/disallowedSubst00105m1_n`, `disallowedsubst00106m2/Negative` | `XSDSubstitutionMembers`, `ComplexValidatorXSIType` |
-| Nillability | `nillable00201m/nillable00201m2_n` | `XSDParserHelpers`, instance validator |
+| Nillability | ~~`nillable00201m/nillable00201m2_n`~~ closed: a non-nillable element carries no `xsi:nil` at all, even `"false"` (cvc-elt.3.1) | `ComplexValidator.nilErrors` |
 | Type derivation | ~~`typedef00204m/typeDef00204m1_n`~~ closed: an untyped `substitutionGroup` member inherits its head's type (XSD 1.0 3.3.2) | `XSDParser.elementType` |
 | Additional-suite instance triage | `addB065/addB065.i` | to classify from fixture |
 | Datatype value-space edges | `anyURI_a004_1339/anyURI_a004_1339.i` (open); ~~`dateTime011_2008/dateTime011_2008.i`~~ closed: XSD 1.0 has no year zero, `0000` now rejected | `SimpleType`, `DateTimeParser` |
