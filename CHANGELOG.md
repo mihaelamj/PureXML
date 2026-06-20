@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A complexContent restriction that narrows an element to a type derived from the
+  base element's type by **extension** is now rejected (XSD 1.0 cos-particle-restrict
+  NameAndTypeOK.2.2, #158): the element-type-derivation check follows the derivation
+  chain across `restriction` steps only, so an extension-derived type is not a valid
+  restriction (corpus particlesIj008). Built-in lattice and union-base derivation are
+  unchanged. XSTS invalid-schemas-accepted 37 -> 36, valid-schemas-rejected held at 0.
+
 - A `fixed` value on an element whose type is a complex type with `simpleContent` is
   now compared in the simple type's value space (cvc-elt.5.2.2.1), not as a raw string
   (#202), so `05` satisfies an `xs:int` `fixed="5"`. The complex-element fixed check on
