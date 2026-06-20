@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A `fixed` value on an element whose type is a complex type with `simpleContent` is
+  now compared in the simple type's value space (cvc-elt.5.2.2.1), not as a raw string
+  (#202), so `05` satisfies an `xs:int` `fixed="5"`. The complex-element fixed check on
+  both the tree and streaming paths now passes the `simpleContent` type as the value
+  type, in lockstep, as the simple-typed-element path already does.
+
 - The streaming XSD validator now applies an element's `default`/`fixed` value
   constraint to its simple content (#200): an empty element takes its constraint
   value, and that value (not the empty string) is validated against the type

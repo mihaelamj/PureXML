@@ -82,7 +82,10 @@ public extension PureXML.Schema {
                 return errors + nilErrors
             }
             validateContent(element, type.content, at: path, namespaceBindings: namespaceBindings, into: &errors)
-            errors += elementFixedErrors(element, at: path)
+            // A simpleContent fixed value is compared in its simple type's value space
+            // (cvc-elt.5.2.2.1), e.g. "05" equals an xs:int fixed "5".
+            let simpleContentType: SimpleType? = if case let .simpleContent(simple) = type.content { simple } else { nil }
+            errors += elementFixedErrors(element, valueType: simpleContentType, at: path)
             return errors
         }
 
