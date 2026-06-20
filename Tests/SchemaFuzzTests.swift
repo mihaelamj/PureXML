@@ -143,9 +143,11 @@ struct SchemaFuzzTests {
     #if os(WASI)
         private static let schemaIterations: UInt64 = 15
         private static let parserIterations: UInt64 = 40
+        private static let differentialIterations: UInt64 = 15
     #else
         private static let schemaIterations: UInt64 = 250
         private static let parserIterations: UInt64 = 600
+        private static let differentialIterations: UInt64 = 2000
     #endif
 
     // The `.timeLimit` trait (native hang detection) is not supported by the
@@ -167,6 +169,37 @@ struct SchemaFuzzTests {
             let errors = (try? document.validate(xml)) ?? []
             _ = errors.isEmpty
             _ = try? document.validate(streaming: xml)
+        }
+    }
+
+    // Standing differential gate: the streaming validator is a separate
+    // implementation of the same semantics as the tree validator (the conformance
+    // oracle), so it must AGREE with it on every input. This enforces what manual
+    // hunting only sampled: the streaming path never rejects a document the tree
+    // accepts (no false positive) and never accepts one the tree rejects. Streaming
+    // may emit additional errors on an already-invalid document (issue #206), so the
+    // tree's errors must be a subset of streaming's; it may never miss one, and the
+    // two must agree on whether the document is valid. A failure prints the seed,
+    // schema, instance, and both error sets, so it reproduces exactly.
+    #if os(WASI)
+        @Test("Streaming validation agrees with the tree validator on every fuzzed document")
+    #else
+        @Test("Streaming validation agrees with the tree validator on every fuzzed document", .timeLimit(.minutes(1)))
+    #endif
+    func test_streamingMatchesTreeDifferential() {
+        for seed in UInt64(1) ... Self.differentialIterations {
+            var generator = SchemaGenerator(rng: SeededRNG(seed: seed))
+            let xsd = generator.schema()
+            guard let document = try? PureXML.Schema.Document(xsd) else { continue }
+            let xml = generator.instance()
+            guard let tree = try? document.validate(xml),
+                  let streamed = try? document.validate(streaming: xml)
+            else { continue }
+            let treeReasons = Set(tree.map(\.reason))
+            let streamedReasons = Set(streamed.map(\.reason))
+            let detail = "seed \(seed)\n  tree:   \(treeReasons.sorted())\n  stream: \(streamedReasons.sorted())\n  xsd: \(xsd)\n  xml: \(xml)"
+            #expect(tree.isEmpty == streamed.isEmpty, "streaming/tree verdict disagreement (\(detail))")
+            #expect(treeReasons.isSubset(of: streamedReasons), "streaming missed a tree error (\(detail))")
         }
     }
 

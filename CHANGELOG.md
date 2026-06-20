@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a standing streaming-vs-tree differential gate (`SchemaFuzzTests.test_streamingMatchesTreeDifferential`,
+  related to #194). The streaming XSD validator is a separate implementation of the same semantics as the
+  tree validator (the conformance oracle), so it must agree with it on every input. The gate fuzzes 2000
+  deterministic schema/instance pairs and asserts that streaming and the tree validator agree on whether
+  each document is valid, and that every tree error appears in streaming's errors (streaming may add errors
+  on an already-invalid document, issue #206, but may never reject a valid document or miss a real error).
+  This runs in the standard test suite on all platforms, so a future change that reintroduces a streaming
+  false positive (three were found and fixed this cycle: #186, #200, #202) fails CI with a reproducible seed,
+  turning streaming-oracle agreement from a manually-hunted snapshot into an enforced invariant.
+
 - Added an opt-in differential schema-validity harness against libxml2 (`XSTSDifferentialTests`, production-readiness stopper #3: characterise correctness against an independent reference, not just the labelled suite). Over 9618 corpus schemas PureXML and libxml2 agree on 4912 (3161 valid, 1751 invalid); the 87 where PureXML is stricter were triaged as PureXML being more correct (libxml2 omits facet consistency, Element Declarations Consistent, whiteSpace restriction, au-props-correct, and notation rules), independently corroborating that PureXML does not over-reject. The 117 where libxml2 is stricter are a false-negative triage queue (stopper #2), written with the rest to /tmp/xsts-differential.txt. xmllint and the corpus are used only in the test harness, never the shipped package.
 
 - Added the counted-content-automaton design for the interactive resource-bound
