@@ -65,6 +65,29 @@ struct ContentModelDeterminismTests {
         #expect(!rejects(complexType("<xs:choice><xs:any namespace='##other'/><xs:any namespace='##local'/></xs:choice>")))
     }
 
+    @Test("an extension is checked against its base's effective content model")
+    func test_extensionEffectiveModelAmbiguous() {
+        // The base's trailing `a*` is followed by the extension's `a`, so an `a`
+        // matches either across the extension boundary (XSTS particlesZ022). The
+        // check must see the base content prepended, not the extension's own only.
+        let body = """
+        <xs:complexType name="base"><xs:sequence><xs:element name="a" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+        <xs:complexType name="d"><xs:complexContent><xs:extension base="base"><xs:sequence><xs:element name="a"/></xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+        """
+        #expect(rejects(body))
+    }
+
+    @Test("an extension adding distinct content is deterministic and compiles")
+    func test_extensionEffectiveModelDeterministic() {
+        // base `a` followed by the extension's `b` is `a, b`: deterministic, so
+        // prepending the base content must not reject a valid extension.
+        let body = """
+        <xs:complexType name="base"><xs:sequence><xs:element name="a"/></xs:sequence></xs:complexType>
+        <xs:complexType name="d"><xs:complexContent><xs:extension base="base"><xs:sequence><xs:element name="b"/></xs:sequence></xs:extension></xs:complexContent></xs:complexType>
+        """
+        #expect(!rejects(body))
+    }
+
     @Test("two same-name members of an all group are ambiguous")
     func test_allWithSameName() {
         #expect(rejects(complexType(#"<xs:all><xs:element name="a"/><xs:element name="a"/></xs:all>"#)))
