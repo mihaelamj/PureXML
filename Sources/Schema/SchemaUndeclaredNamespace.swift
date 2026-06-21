@@ -12,7 +12,7 @@ extension PureXML.Schema.XSDParser {
     /// unknown (that document might import the very namespace a reference names, as in
     /// corpus schZ004, where the main doc imports only `a` but `a`'s document imports
     /// `b`, making `b:b` resolvable), so the whole check stands down to stay lenient.
-    static func undeclaredNamespaceReferenceErrors(_ schema: XSDTree, containers: [XSDTree]) -> [String] {
+    static func undeclaredNamespaceReferenceFindings(_ schema: XSDTree, containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
         let sources = containers.isEmpty ? [schema] : containers
         if hasLocatedExternal(sources) { return [] }
         var declared: Set<String> = [xsdNamespace]
@@ -27,23 +27,23 @@ extension PureXML.Schema.XSDParser {
                 }
             }
         }
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in sources where PureXML.Schema.XSDNode.localName(container) == "schema" {
             collectUndeclaredNamespaceReferences(
                 container,
                 inheritedBindings: PureXML.Schema.XSDNode.namespaceBindings(of: container),
                 declared: declared,
-                into: &errors,
+                into: &findings,
             )
         }
-        return errors
+        return findings
     }
 
     private static func collectUndeclaredNamespaceReferences(
         _ node: XSDTree,
         inheritedBindings: [String: String],
         declared: Set<String>,
-        into errors: inout [String],
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
     ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
@@ -54,11 +54,14 @@ extension PureXML.Schema.XSDParser {
                       let uri = referenceURI(for: qname, bindings: bindings), !uri.isEmpty,
                       !declared.contains(uri)
                 else { continue }
-                errors.append("reference to '\(qname)' names namespace '\(uri)', which is not the target namespace and is not imported")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "reference to '\(qname)' names namespace '\(uri)', which is not the target namespace and is not imported",
+                    node: node,
+                ))
             }
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectUndeclaredNamespaceReferences(child, inheritedBindings: bindings, declared: declared, into: &errors)
+            collectUndeclaredNamespaceReferences(child, inheritedBindings: bindings, declared: declared, into: &findings)
         }
     }
 

@@ -313,10 +313,6 @@ extension PureXML.Validation {
                 }
             }
         }
-
-        static func locatedFindings(_ reasons: [String], at node: PureXML.Model.TreeNode?) -> [PureXML.Schema.SchemaLocatedFinding] {
-            reasons.map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: node) }
-        }
     }
 }
 
