@@ -71,6 +71,27 @@ struct SchemaReferenceTests {
         _ = try PureXML.Schema.Document(qualified)
     }
 
+    @Test("an unprefixed type reference to a target-namespace type is undeclared")
+    func test_unprefixedTypeRefToTargetNamespace() throws {
+        // No default xmlns, so `type="t"` resolves to {}t, not {urn:x}t where the
+        // type is declared: undeclared (XSTS addB009 / test66059).
+        let unprefixed = """
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:x">
+          <xsd:complexType name="t"><xsd:sequence/></xsd:complexType>
+          <xsd:element name="e" type="t"/>
+        </xsd:schema>
+        """
+        #expect(throws: (any Error).self) { _ = try PureXML.Schema.Document(unprefixed) }
+        // Guard: qualifying the reference to the target namespace resolves.
+        let qualified = """
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:x="urn:x" targetNamespace="urn:x">
+          <xsd:complexType name="t"><xsd:sequence/></xsd:complexType>
+          <xsd:element name="e" type="x:t"/>
+        </xsd:schema>
+        """
+        _ = try PureXML.Schema.Document(qualified)
+    }
+
     @Test("references are not checked when an import may supply them")
     func test_importSkipsCheck() throws {
         // A dangling reference into an imported namespace is tolerated: the default

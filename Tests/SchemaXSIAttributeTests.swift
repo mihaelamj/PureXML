@@ -80,13 +80,16 @@ struct SchemaXSIAttributeTests {
 
     @Test("the same qualified attribute targeting a non-XSI namespace is valid")
     func test_qualifiedAttributeOutsideXSIValid() {
+        // The type reference is qualified to the target namespace (`tns:attRef`); an
+        // unprefixed `attRef` with no default xmlns would resolve to {}attRef, not
+        // {urn:ok}attRef, and is itself invalid (see SchemaReferenceTests).
         let schema = """
-        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        <xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="urn:ok"
                     targetNamespace="urn:ok" attributeFormDefault="qualified">
           <xsd:complexType name="attRef">
             <xsd:attribute name="ca1"/>
           </xsd:complexType>
-          <xsd:element name="doc" type="attRef"/>
+          <xsd:element name="doc" type="tns:attRef"/>
         </xsd:schema>
         """
         #expect(compiles(schema), "qualifying into a non-XSI namespace is fine")
