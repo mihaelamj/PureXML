@@ -283,8 +283,8 @@ extension PureXML.Schema.XSDParser {
     /// type it redefines (same local name, in the redefining schema's own target
     /// namespace). Returns one finding per offending type, for a validation to
     /// report; it does not throw, so the finding flows through the validator.
-    static func redefineDerivationErrors(_ containers: [XSDTree]) -> [String] {
-        var errors: [String] = []
+    static func redefineDerivationFindings(_ containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers where XSDDerivNode.localName(container) == "redefine" {
             for type in XSDDerivNode.children(container, named: "complexType") {
                 guard let name = XSDDerivNode.attribute(type, "name") else { continue }
@@ -294,7 +294,7 @@ extension PureXML.Schema.XSDParser {
                     .flatMap { XSDDerivNode.firstChild($0, named: "extension") ?? XSDDerivNode.firstChild($0, named: "restriction") }
                     .flatMap { XSDDerivNode.attribute($0, "base") }
                 if derivationInfo(type)?.base != name || redefineBaseIsForeign(type, rawBase) {
-                    errors.append("redefined type '\(name)' must restrict or extend itself")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: "redefined type '\(name)' must restrict or extend itself", node: type))
                 }
             }
             for type in XSDDerivNode.children(container, named: "simpleType") {
@@ -302,11 +302,11 @@ extension PureXML.Schema.XSDParser {
                 let rawBase = XSDDerivNode.firstChild(type, named: "restriction")
                     .flatMap { XSDDerivNode.attribute($0, "base") }
                 if rawBase.map(XSDDerivNode.stripPrefix) != name || redefineBaseIsForeign(type, rawBase) {
-                    errors.append("redefined type '\(name)' must restrict or extend itself")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: "redefined type '\(name)' must restrict or extend itself", node: type))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// Drops from each substitution group the members a head's `block` forbids: a

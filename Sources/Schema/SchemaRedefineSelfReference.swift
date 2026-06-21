@@ -14,8 +14,8 @@ extension PureXML.Schema.XSDParser {
     /// BOUNDED: it stops at `element`/`complexType` scopes, so a recursive reference
     /// inside a nested element's content (a data-structure recursion) is not
     /// miscounted as a redefinition self-reference.
-    static func redefineSelfReferenceErrors(_ containers: [XSDTree]) -> [String] {
-        var errors: [String] = []
+    static func redefineSelfReferenceFindings(_ containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers where RedefineNode.localName(container) == "redefine" {
             let schema = RedefineNode.schemaOwner(container)
             let target = RedefineNode.attribute(schema, "targetNamespace")
@@ -34,17 +34,23 @@ extension PureXML.Schema.XSDParser {
                             let minOccurs = RedefineNode.attribute(ref, "minOccurs") ?? "1"
                             let maxOccurs = RedefineNode.attribute(ref, "maxOccurs") ?? "1"
                             if maxOccurs == "unbounded" || canonicalMagnitude(minOccurs) != "1" || canonicalMagnitude(maxOccurs) != "1" {
-                                errors.append("a redefined group's self-reference must have minOccurs and maxOccurs of 1")
+                                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                                    reason: "a redefined group's self-reference must have minOccurs and maxOccurs of 1",
+                                    node: ref,
+                                ))
                             }
                         }
                     }
                     if selfReferences > 1 {
-                        errors.append("a redefined \(kind) may contain at most one self-reference")
+                        findings.append(PureXML.Schema.SchemaLocatedFinding(
+                            reason: "a redefined \(kind) may contain at most one self-reference",
+                            node: definition,
+                        ))
                     }
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// A redefinition of an `attributeGroup` is a RESTRICTION of the original
@@ -55,18 +61,21 @@ extension PureXML.Schema.XSDParser {
     /// reference, which could re-introduce the attribute); the re-introduced-
     /// prohibited check fires only when the original has no attribute wildcard (which
     /// could otherwise admit the attribute).
-    static func redefineAttributeGroupRestrictionErrors(_ containers: [XSDTree]) -> [String] {
+    static func redefineAttributeGroupRestrictionFindings(_ containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
         let base = baseComponents(in: containers, named: "attributeGroup")
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers where RedefineNode.localName(container) == "redefine" {
             for redefinition in RedefineNode.children(container, named: "attributeGroup") {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
                       let baseGroup = resolveBaseComponent(base, name: name, owner: redefinition)
                 else { continue }
-                errors += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
+                // Each restriction violation is a property of this redefinition's
+                // attribute group, so it locates on the redefinition declaration.
+                findings += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
+                    .map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: redefinition) }
             }
         }
-        return errors
+        return findings
     }
 
     /// The `{target-namespace}name` identity of a named component, keyed by its
@@ -81,7 +90,7 @@ extension PureXML.Schema.XSDParser {
     /// keyed by namespaced identity: an attribute group or model group is identified by
     /// {name, target namespace}, so a same-local-name component imported from a
     /// different namespace is not mistaken for the redefinition's base (the namespace
-    /// guard `redefineSelfReferenceErrors` already uses). This is the pool a
+    /// guard `redefineSelfReferenceFindings` already uses). This is the pool a
     /// redefinition's base is drawn from.
     private static func baseComponents(in containers: [XSDTree], named kind: String) -> [String: XSDTree] {
         var base: [String: XSDTree] = [:]
@@ -171,14 +180,14 @@ extension PureXML.Schema.XSDParser {
     /// well-formedness rule instead, and cannot be re-parsed reliably here). An
     /// order-independent `all` reordering accepts the same language, so the oracle
     /// correctly does not flag it; only a genuine content widening is reported.
-    static func redefineGroupRestrictionErrors(
+    static func redefineGroupRestrictionFindings(
         _ containers: [XSDTree],
         context: PureXML.Schema.XSDContext,
         types: [String: PureXML.Schema.ElementType],
         derivation: [String: PureXML.Schema.TypeDerivation],
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         let base = baseComponents(in: containers, named: "group")
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers where RedefineNode.localName(container) == "redefine" {
             for redefinition in RedefineNode.children(container, named: "group") {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
@@ -197,11 +206,14 @@ extension PureXML.Schema.XSDParser {
                 if let reason = PureXML.Schema.ParticleRestriction.violation(
                     restricted: .elementOnly(redefined), base: .elementOnly(baseline), types: types, derivation: derivation,
                 ) {
-                    errors.append("a redefined model group '\(name)' must restrict the group it redefines: \(reason)")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "a redefined model group '\(name)' must restrict the group it redefines: \(reason)",
+                        node: redefinition,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// Whether `particle` or any of its descendants can never occur (`maxOccurs=0`), a
