@@ -77,12 +77,10 @@ extension PureXML.Validation {
 
         static var simpleTypeFinalControlsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple-type final controls are declared consistently") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.simpleTypeFinalErrors(
-                        document.schema,
-                        compositionLoaded: document.context.compositionLoaded,
-                        containers: document.containers,
-                    ),
+                PureXML.Schema.XSDParser.simpleTypeFinalFindings(
+                    document.schema,
+                    compositionLoaded: document.context.compositionLoaded,
+                    containers: document.containers,
                 )
             }
         }
@@ -213,17 +211,13 @@ extension PureXML.Validation {
 
         static var simpleTypeBasesAreSimple: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple types do not derive from complex types") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.simpleTypeBaseNotComplexErrors(document.schema, in: document.context),
-                )
+                PureXML.Schema.XSDParser.simpleTypeBaseNotComplexFindings(document.schema, in: document.context)
             }
         }
 
         static var simpleTypeVarietiesValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Simple-type varieties are declared consistently") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.simpleTypeVarietyErrors(document.schema, document.context),
-                )
+                PureXML.Schema.XSDParser.simpleTypeVarietyFindings(document.schema, document.context)
             }
         }
 
@@ -351,9 +345,7 @@ extension PureXML.Validation.SchemaCompile {
     static var attributeTypesSimple: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("An attribute's type is a simple type") { document in
             guard let namedTypes = document.namedTypes else { return [] }
-            return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.attributeTypeMustBeSimpleErrors(document.schema, document.context, namedTypes),
-            )
+            return PureXML.Schema.XSDParser.attributeTypeMustBeSimpleFindings(document.schema, document.context, namedTypes)
         }
     }
 

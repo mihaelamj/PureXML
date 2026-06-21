@@ -14,7 +14,7 @@ extension PureXML.Schema.XSDParser {
     /// where the single target namespace makes the names resolved by local name
     /// unambiguous; with external definitions the check stands down (a disclosed
     /// under-rejection).
-    static func simpleTypeFinalErrors(_ schema: XSDTree, compositionLoaded: Bool, containers: [XSDTree]) -> [String] {
+    static func simpleTypeFinalFindings(_ schema: XSDTree, compositionLoaded: Bool, containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: compositionLoaded) else { return [] }
         let finalOf = compositionLoaded ? mergedSimpleTypeFinalMap(containers) : simpleTypeFinalMap(schema)
         guard finalOf.values.contains(where: { !$0.isEmpty }) else { return [] }
@@ -24,8 +24,8 @@ extension PureXML.Schema.XSDParser {
         // confused with a user type of the same local name.
         let bindings = FinalNode.namespaceBindings(of: schema)
         let target = FinalNode.attribute(schema, "targetNamespace")
-        return listItemFinalErrors(schema, finalOf, bindings, target)
-            + unionMemberFinalErrors(schema, finalOf, bindings, target)
+        return listItemFinalFindings(schema, finalOf, bindings, target)
+            + unionMemberFinalFindings(schema, finalOf, bindings, target)
     }
 
     private static func mergedSimpleTypeFinalMap(_ containers: [XSDTree]) -> [String: Set<String>] {
@@ -57,33 +57,49 @@ extension PureXML.Schema.XSDParser {
         return finalOf
     }
 
-    private static func listItemFinalErrors(_ schema: XSDTree, _ finalOf: [String: Set<String>], _ bindings: [String: String], _ target: String?) -> [String] {
-        var errors: [String] = []
+    private static func listItemFinalFindings(
+        _ schema: XSDTree,
+        _ finalOf: [String: Set<String>],
+        _ bindings: [String: String],
+        _ target: String?,
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for list in descendants(schema, named: "list") {
             guard let item = FinalNode.attribute(list, "itemType"),
                   FinalNode.referenceNamespace(item, bindings) == target
             else { continue }
             let name = FinalNode.stripPrefix(item)
             if finalOf[name]?.contains("list") == true {
-                errors.append("simple type '\(name)' is final for 'list' and may not be a list item type")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "simple type '\(name)' is final for 'list' and may not be a list item type",
+                    node: list,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
-    private static func unionMemberFinalErrors(_ schema: XSDTree, _ finalOf: [String: Set<String>], _ bindings: [String: String], _ target: String?) -> [String] {
-        var errors: [String] = []
+    private static func unionMemberFinalFindings(
+        _ schema: XSDTree,
+        _ finalOf: [String: Set<String>],
+        _ bindings: [String: String],
+        _ target: String?,
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for union in descendants(schema, named: "union") {
             guard let members = FinalNode.attribute(union, "memberTypes") else { continue }
             for token in members.split(whereSeparator: \.isWhitespace) {
                 guard FinalNode.referenceNamespace(String(token), bindings) == target else { continue }
                 let name = FinalNode.stripPrefix(String(token))
                 if finalOf[name]?.contains("union") == true {
-                    errors.append("simple type '\(name)' is final for 'union' and may not be a union member type")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "simple type '\(name)' is final for 'union' and may not be a union member type",
+                        node: union,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// The derivation tokens a `final` value forbids; `#all` forbids every simple-type
