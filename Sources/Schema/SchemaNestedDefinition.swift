@@ -11,23 +11,26 @@ extension PureXML.Schema.XSDParser {
     ///
     /// "Top-level" means a direct child of `schema` or of a `redefine`; everything
     /// deeper is nested.
-    static func nestedNamedDefinitionErrors(_ schema: XSDTree) -> [String] {
-        var errors: [String] = []
-        collectNestedNamed(schema, parentIsTopLevel: false, into: &errors)
-        return errors
+    static func nestedNamedDefinitionFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        collectNestedNamed(schema, parentIsTopLevel: false, into: &findings)
+        return findings
     }
 
-    private static func collectNestedNamed(_ node: XSDTree, parentIsTopLevel: Bool, into errors: inout [String]) {
+    private static func collectNestedNamed(_ node: XSDTree, parentIsTopLevel: Bool, into findings: inout [PureXML.Schema.SchemaLocatedFinding]) {
         let kind = NestedNode.localName(node)
         // Foreign content inside an annotation is not the schema's own and is not
         // structurally checked.
         if kind == "appinfo" || kind == "documentation" { return }
         if isNestedNamedDefinition(node, kind, parentIsTopLevel: parentIsTopLevel) {
-            errors.append("a nested '\(kind ?? "")' definition may not have a 'name'; only a top-level definition is named")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "a nested '\(kind ?? "")' definition may not have a 'name'; only a top-level definition is named",
+                node: node,
+            ))
         }
         let childrenAreTopLevel = kind == "schema" || kind == "redefine"
         for child in NestedNode.elementChildren(node) {
-            collectNestedNamed(child, parentIsTopLevel: childrenAreTopLevel, into: &errors)
+            collectNestedNamed(child, parentIsTopLevel: childrenAreTopLevel, into: &findings)
         }
     }
 

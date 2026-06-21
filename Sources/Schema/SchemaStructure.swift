@@ -61,12 +61,12 @@ extension PureXML.Schema.XSDParser {
         var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
         collectStructure(schema, bindings: bindings, into: &findings)
-        append(simpleTypeVarietyFacetErrors(schema), at: schema, into: &findings)
+        findings += simpleTypeVarietyFacetFindings(schema)
         findings += valueConstraintFindings(schema)
-        append(topLevelDeclarationErrors(schema), at: schema, into: &findings)
-        append(nestedNamedDefinitionErrors(schema), at: schema, into: &findings)
-        append(anySimpleTypeRestrictionErrors(schema) + anySimpleTypeFacetErrors(schema), at: schema, into: &findings)
-        append(emptyNamespaceErrors(schema) + allGroupReferenceMaxOccursErrors(schema), at: schema, into: &findings)
+        findings += topLevelDeclarationFindings(schema)
+        findings += nestedNamedDefinitionFindings(schema)
+        findings += anySimpleTypeRestrictionFindings(schema) + anySimpleTypeFacetFindings(schema)
+        findings += emptyNamespaceFindings(schema) + allGroupReferenceMaxOccursFindings(schema)
         return findings
     }
 

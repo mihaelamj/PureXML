@@ -121,14 +121,14 @@ extension PureXML.Schema.XSDParser {
     /// reference). The per-component applicability table is the permissive
     /// global/local union and cannot make this distinction; this scan supplies the
     /// global-only constraint.
-    static func topLevelDeclarationErrors(_ schema: XSDTree) -> [String] {
-        var errors: [String] = []
-        collectTopLevelDeclarationErrors(in: schema, into: &errors)
+    static func topLevelDeclarationFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        collectTopLevelDeclarationFindings(in: schema, into: &findings)
         for redefine in PureXML.Schema.XSDNode.elementChildren(schema) {
             guard PureXML.Schema.XSDNode.localName(redefine) == "redefine" else { continue }
-            collectTopLevelDeclarationErrors(in: redefine, into: &errors)
+            collectTopLevelDeclarationFindings(in: redefine, into: &findings)
         }
-        return errors
+        return findings
     }
 
     private static let topLevelForbidden: [String: [String]] = [
@@ -142,17 +142,23 @@ extension PureXML.Schema.XSDParser {
         "simpleType", "complexType", "group", "attributeGroup", "element", "attribute", "notation",
     ]
 
-    private static func collectTopLevelDeclarationErrors(in container: XSDTree, into errors: inout [String]) {
+    private static func collectTopLevelDeclarationFindings(in container: XSDTree, into findings: inout [PureXML.Schema.SchemaLocatedFinding]) {
         for child in PureXML.Schema.XSDNode.elementChildren(container) {
             guard child.name?.namespaceURI == xsdNamespace,
                   let kind = PureXML.Schema.XSDNode.localName(child)
             else { continue }
             if namedTopLevelKinds.contains(kind), !hasUnprefixed(child, "name") {
-                errors.append("a top-level '\(kind)' definition must have a 'name' attribute")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "a top-level '\(kind)' definition must have a 'name' attribute",
+                    node: child,
+                ))
             }
             if let forbidden = topLevelForbidden[kind] {
                 for attribute in forbidden where hasUnprefixed(child, attribute) {
-                    errors.append("a top-level '\(kind)' declaration may not specify '\(attribute)'")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "a top-level '\(kind)' declaration may not specify '\(attribute)'",
+                        node: child,
+                    ))
                 }
             }
         }
