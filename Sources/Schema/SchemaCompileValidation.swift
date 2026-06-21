@@ -69,9 +69,7 @@ extension PureXML.Validation {
 
         static var componentNamesUnique: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Global schema component names are unique within their symbol spaces") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.componentNameErrors(document.schema, document.containers, document.context),
-                )
+                PureXML.Schema.XSDParser.componentNameFindings(document.schema, document.containers, document.context)
             }
         }
 
@@ -87,9 +85,7 @@ extension PureXML.Validation {
 
         static var contentModelsDeterministic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema content models are deterministic (UPA)") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.ContentModelDeterminism.violations(in: document.schema, context: document.context),
-                )
+                PureXML.Schema.ContentModelDeterminism.violationFindings(in: document.schema, context: document.context)
             }
         }
 
@@ -209,9 +205,7 @@ extension PureXML.Validation {
 
         static var notationsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Notation declarations are valid") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.notationValidityErrors(document.containers, document.context),
-                )
+                PureXML.Schema.XSDParser.notationValidityFindings(document.containers, document.context)
             }
         }
 

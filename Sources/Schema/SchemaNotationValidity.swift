@@ -1,10 +1,10 @@
 extension PureXML.Schema.XSDParser {
-    static func notationValidityErrors(
+    static func notationValidityFindings(
         _ containers: [XSDTree],
         _ context: PureXML.Schema.XSDContext,
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: context.targetNamespace)
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         var declaredNotations: Set<PureXML.Model.QualifiedName> = []
 
         // 1. Collect all declared notations and validate notation declarations
@@ -19,10 +19,16 @@ extension PureXML.Schema.XSDParser {
                 }
                 let name = PureXML.Schema.XSDNode.attribute(child, "name") ?? ""
                 if PureXML.Schema.XSDNode.attribute(child, "public") == nil, PureXML.Schema.XSDNode.attribute(child, "system") == nil {
-                    errors.append("notation '\(name)' must specify at least one of public or system attributes")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "notation '\(name)' must specify at least one of public or system attributes",
+                        node: child,
+                    ))
                 }
                 if notationHasForbiddenContent(child) {
-                    errors.append("notation '\(name)' may contain only an optional annotation, no other element or character content")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "notation '\(name)' may contain only an optional annotation, no other element or character content",
+                        node: child,
+                    ))
                 }
                 let qName = PureXML.Model.QualifiedName(localName: name, namespaceURI: containerNamespace)
                 declaredNotations.insert(qName)
@@ -32,10 +38,10 @@ extension PureXML.Schema.XSDParser {
         // 2. Validate notation enumeration constraints on simpleTypes
         for index in containers.indices {
             let container = containers[index]
-            walkSimpleTypes(container, context: context, declaredNotations: declaredNotations, into: &errors)
+            walkSimpleTypes(container, context: context, declaredNotations: declaredNotations, into: &findings)
         }
 
-        return errors
+        return findings
     }
 
     /// Whether a `notation` declaration carries content its `(annotation?)` model
@@ -56,17 +62,17 @@ extension PureXML.Schema.XSDParser {
         _ node: XSDTree,
         context: PureXML.Schema.XSDContext,
         declaredNotations: Set<PureXML.Model.QualifiedName>,
-        into errors: inout [String],
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
     ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
 
         if node.name?.namespaceURI == xsdNamespace, local == "restriction" {
-            validateNotationRestriction(node, context: context, declaredNotations: declaredNotations, into: &errors)
+            validateNotationRestriction(node, context: context, declaredNotations: declaredNotations, into: &findings)
         }
 
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            walkSimpleTypes(child, context: context, declaredNotations: declaredNotations, into: &errors)
+            walkSimpleTypes(child, context: context, declaredNotations: declaredNotations, into: &findings)
         }
     }
 
@@ -74,7 +80,7 @@ extension PureXML.Schema.XSDParser {
         _ node: XSDTree,
         context: PureXML.Schema.XSDContext,
         declaredNotations: Set<PureXML.Model.QualifiedName>,
-        into errors: inout [String],
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
     ) {
         guard let parent = node.parent,
               parent.name?.namespaceURI == xsdNamespace,
@@ -99,7 +105,10 @@ extension PureXML.Schema.XSDParser {
                 return dec.localName == valQName.localName && decNS == valNS
             }
             if !isDeclared {
-                errors.append("notation enumeration value '\(value)' does not name a declared notation")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "notation enumeration value '\(value)' does not name a declared notation",
+                    node: child,
+                ))
             }
         }
     }
