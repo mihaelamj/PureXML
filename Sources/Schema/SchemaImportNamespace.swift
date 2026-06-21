@@ -8,13 +8,13 @@ extension PureXML.Schema.XSDParser {
     /// container (an unresolved import is the processor's choice and not an error),
     /// which is the false-positive boundary. Imports keep their own target namespace
     /// (no chameleon), so the imported document's literal `targetNamespace` is used.
-    static func importNamespaceErrors(_ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
+    static func importNamespaceFindings(_ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [PureXML.Schema.SchemaLocatedFinding] {
         var locationTargetNS: [String: String?] = [:]
         for container in containers where ImportNode.localName(container) == "schema" {
             guard let location = context.containerLocations[ObjectIdentifier(container)] ?? nil else { continue }
             locationTargetNS[location] = ImportNode.attribute(container, "targetNamespace")
         }
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers {
             for node in descendants(container, named: "import") where node.name?.namespaceURI == xsdNamespace {
                 guard let location = ImportNode.attribute(node, "schemaLocation"),
@@ -23,11 +23,14 @@ extension PureXML.Schema.XSDParser {
                 let imported = locationTargetNS[location] ?? nil
                 let declared = ImportNode.attribute(node, "namespace")
                 if declared != imported {
-                    errors.append("import of '\(location)' declares namespace '\(declared ?? "(none)")', not the imported target namespace '\(imported ?? "(none)")'")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "import of '\(location)' declares namespace '\(declared ?? "(none)")', not the imported target namespace '\(imported ?? "(none)")'",
+                        node: node,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// src-redefine.5: a type inside `xs:redefine` must restrict or extend the type it
