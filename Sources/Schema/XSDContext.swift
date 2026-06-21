@@ -148,8 +148,9 @@ extension PureXML.Schema {
             _ schema: XSDTree,
             _ loader: (String) -> String?,
             _ visited: inout Set<String>,
-        ) -> [String] {
-            var failures: [String] = []
+            topLevel: Bool = true,
+        ) -> [(location: String, node: XSDTree?)] {
+            var failures: [(location: String, node: XSDTree?)] = []
             for child in elementChildren(schema) {
                 let kind = localName(child)
                 guard kind == "include" || kind == "import" || kind == "redefine",
@@ -160,10 +161,14 @@ extension PureXML.Schema {
                 guard let root = try? PureXML.parseTree(content),
                       let sub = elementChildren(root).first(where: { localName($0) == "schema" })
                 else {
-                    failures.append(location)
+                    // Only a top-level reference's node belongs to the main schema tree
+                    // the diagnostic resolves against. A failure nested in a loaded
+                    // sub-document is captured from a throwaway parse, so it stays
+                    // unlocated (the prior schema-root behavior) rather than mis-resolve.
+                    failures.append((location: location, node: topLevel ? child : nil))
                     continue
                 }
-                failures += failedSchemaReferences(sub, loader, &visited)
+                failures += failedSchemaReferences(sub, loader, &visited, topLevel: false)
             }
             return failures
         }
@@ -346,7 +351,7 @@ extension PureXML.Schema {
         /// resolved to content which is not a well-formed schema document. Recorded
         /// during composition so a validation can report each (`src-resolve`); an
         /// unresolved location (the loader returned nothing) is not recorded.
-        var failedSchemaReferences: [String] = []
+        var failedSchemaReferences: [(location: String, node: XSDTree?)] = []
         /// Target namespace imposed on an included schema with no `targetNamespace`
         /// (chameleon include), keyed by that included schema container.
         var chameleonTargetNamespaces: [ObjectIdentifier: String] = [:]

@@ -40,10 +40,6 @@ extension PureXML.Schema {
     struct SchemaLocatedFinding {
         let reason: String
         let node: PureXML.Model.TreeNode?
-
-        static func unlocated(_ reasons: [String]) -> [SchemaLocatedFinding] {
-            reasons.map { SchemaLocatedFinding(reason: $0, node: nil) }
-        }
     }
 }
 

@@ -6,11 +6,12 @@ extension PureXML.Validation.SchemaCompile {
     /// the processor's choice.
     static var referencedSchemasResolveToSchemas: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A resolved schemaLocation reference is a valid schema") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                document.context.failedSchemaReferences.map {
-                    "the referenced schema document '\($0)' is not a valid schema"
-                },
-            )
+            document.context.failedSchemaReferences.map {
+                PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the referenced schema document '\($0.location)' is not a valid schema",
+                    node: $0.node,
+                )
+            }
         }
     }
 
@@ -19,9 +20,7 @@ extension PureXML.Validation.SchemaCompile {
     /// namespace).
     static var redefinitionsDeriveFromThemselves: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A redefined type restricts or extends itself") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.redefineDerivationErrors(document.containers),
-            )
+            PureXML.Schema.XSDParser.redefineDerivationFindings(document.containers)
         }
     }
 
@@ -29,9 +28,7 @@ extension PureXML.Validation.SchemaCompile {
     /// self-reference, and a group self-reference occurs exactly once.
     static var redefineSelfReferencesAreWellFormed: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A redefined group or attribute group has a well-formed self-reference") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.redefineSelfReferenceErrors(document.containers),
-            )
+            PureXML.Schema.XSDParser.redefineSelfReferenceFindings(document.containers)
         }
     }
 
@@ -39,9 +36,7 @@ extension PureXML.Validation.SchemaCompile {
     /// it may not eliminate a required attribute use the original declares.
     static var redefinedAttributeGroupsKeepRequired: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A redefined attribute group keeps the original's required attributes") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.redefineAttributeGroupRestrictionErrors(document.containers),
-            )
+            PureXML.Schema.XSDParser.redefineAttributeGroupRestrictionFindings(document.containers)
         }
     }
 
@@ -52,13 +47,11 @@ extension PureXML.Validation.SchemaCompile {
     static var redefinedGroupsRestrictBase: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A redefined model group restricts the group it redefines") { document in
             guard let namedTypes = document.namedTypes, let derivation = document.derivation else { return [] }
-            return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.redefineGroupRestrictionErrors(
-                    document.containers,
-                    context: document.context,
-                    types: namedTypes,
-                    derivation: derivation.typeDerivation,
-                ),
+            return PureXML.Schema.XSDParser.redefineGroupRestrictionFindings(
+                document.containers,
+                context: document.context,
+                types: namedTypes,
+                derivation: derivation.typeDerivation,
             )
         }
     }
