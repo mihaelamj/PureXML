@@ -54,6 +54,14 @@ extension PureXML.Schema.XSDParser {
             return !foreignTypes.contains(localPart)
         }
         if uri == nil || uri == "" {
+            // A no-namespace (unprefixed, no default `xmlns`) reference resolves to
+            // the absent namespace. It matches a chameleon-included global adopting
+            // the includer's namespace; otherwise, when the schema has a non-empty
+            // target namespace, it cannot name a type that lives there, so it is
+            // undeclared (XSTS addB009 / test66059). This mirrors the same branch in
+            // `isUndeclaredReferenceRef`.
+            if context.chameleonNamespace, context.types.contains(localPart) { return false }
+            if !(context.targetNamespace == nil || context.targetNamespace == "") { return true }
             return !context.types.contains(localPart)
         }
         return false
