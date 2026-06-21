@@ -55,6 +55,23 @@ struct SchemaLocatedDiagnosticsTests {
         #expect(range?.start.column == 3)
     }
 
+    @Test("An ID-typed default/fixed value constraint is located on its declaring component")
+    func test_idValueConstraintLocated() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="a" type="xs:ID" default="x"/>
+        </xs:schema>
+        """
+        let findings = try inconsistentFindings(in: xsd)
+        let located = try #require(findings.first { $0.reason.contains("must not have a default or fixed value") })
+        #expect(located.codingPath.map(\.stringValue) == ["xs:schema", "xs:element"])
+
+        let (tree, _) = PureXML.readTree(xsd)
+        let range = tree.sourceRange(at: located.codingPath)
+        #expect(range?.start.line == 2)
+        #expect(range?.start.column == 3)
+    }
+
     @Test("An xs:include targetNamespace mismatch is located on the include directive")
     func test_includeMismatchLocated() throws {
         let included = """
