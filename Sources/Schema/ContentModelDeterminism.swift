@@ -28,11 +28,13 @@ public extension PureXML.Schema {
             var findings: [PureXML.Schema.SchemaLocatedFinding] = []
             var seen: Set<String> = []
             forEachComplexType(schema) { complexType in
-                guard let model = contentModelNode(complexType),
-                      let conflict = violation(model, bindings, context)
-                else { return }
+                let models = effectiveModelNodes(complexType, bindings, context, [])
+                guard !models.isEmpty, let conflict = violation(models, bindings, context) else { return }
+                // The conflicting particle the author can act on is in this type's own
+                // content, so locate on its own content-model node.
+                let node = contentModelNode(complexType) ?? complexType
                 if seen.insert(conflict).inserted {
-                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: conflict, node: model))
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: conflict, node: node))
                 }
             }
             return findings
@@ -63,28 +65,17 @@ public extension PureXML.Schema {
             }
         }
 
-        /// The model-group node (`sequence`/`choice`/`all`/`group`) that holds a
-        /// complex type's content model, reached through `complexContent` and its
-        /// `restriction`/`extension`, or nil for simple or empty content.
-        private static func contentModelNode(_ complexType: XSDTree) -> XSDTree? {
-            if let direct = modelGroupChild(complexType) { return direct }
-            guard let complexContent = PureXML.Schema.XSDNode.firstChild(complexType, named: "complexContent") else { return nil }
-            for derivation in PureXML.Schema.XSDNode.elementChildren(complexContent) {
-                if let model = modelGroupChild(derivation) { return model }
-            }
-            return nil
-        }
-
-        private static func modelGroupChild(_ node: XSDTree) -> XSDTree? {
-            PureXML.Schema.XSDNode.elementChildren(node).first {
-                ["sequence", "choice", "all", "group"].contains(PureXML.Schema.XSDNode.localName($0) ?? "")
-            }
-        }
-
-        /// A UPA-violation message for the content model rooted at `model`, or nil.
-        private static func violation(_ model: XSDTree, _ bindings: [String: String], _ context: XSDContext) -> String? {
+        /// A UPA-violation message for the content model formed by `models` in
+        /// sequence, or nil. The effective content of a `complexContent` extension is
+        /// its base's content followed by its own, so the models are built as one
+        /// sequence: a base particle that can recur or end optionally then competes
+        /// with the extension's leading particles, the cross-boundary
+        /// non-determinism a single-node check misses (XSTS particlesZ022). For a
+        /// non-extension the list is a single node, so `sequence([x])` reproduces the
+        /// prior single-model automaton exactly.
+        private static func violation(_ models: [XSDTree], _ bindings: [String: String], _ context: XSDContext) -> String? {
             var automaton = PureXML.Schema.PositionAutomaton()
-            let root = build(model, &automaton, bindings, context, [])
+            let root = sequence(models.map { build($0, &automaton, bindings, context, []) }, &automaton)
             // A model that hit the position cap was only partially built; skip it
             // rather than risk a result from an incomplete automaton.
             if automaton.labels.count > positionCap { return nil }
