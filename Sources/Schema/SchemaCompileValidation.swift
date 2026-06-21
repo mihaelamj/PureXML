@@ -358,15 +358,13 @@ extension PureXML.Validation.SchemaCompile {
     static var complexExtensionBaseValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("A content-model derivation is consistent with its base type") { document in
             guard let namedTypes = document.namedTypes else { return [] }
-            return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.simpleContentExtensionBaseErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.extensionMixedAgreementErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.simpleContentRestrictionBaseErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.simpleContentRestrictionTypeErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.complexContentBaseKindErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.simpleContentExtensionBaseKindErrors(document.schema, document.context, namedTypes)
-                    + PureXML.Schema.XSDParser.elementValueConstraintContentErrors(document.schema, document.context, namedTypes),
-            )
+            return PureXML.Schema.XSDParser.simpleContentExtensionBaseFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.extensionMixedAgreementFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.simpleContentRestrictionBaseFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.simpleContentRestrictionTypeFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.complexContentBaseKindFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.simpleContentExtensionBaseKindFindings(document.schema, document.context, namedTypes)
+                + PureXML.Schema.XSDParser.elementValueConstraintContentFindings(document.schema, document.context, namedTypes)
         }
     }
 }
