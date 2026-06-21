@@ -156,9 +156,7 @@ extension PureXML.Validation {
 
         static var attributeUsesValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Attribute uses are unique and declare at most one ID attribute") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.attributeUseErrors(document.containers, document.context),
-                )
+                PureXML.Schema.XSDParser.attributeUseFindings(document.containers, document.context)
             }
         }
 
@@ -203,9 +201,7 @@ extension PureXML.Validation {
         static var attributeRestrictionsFaithful: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Attribute restrictions are faithful to their bases") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.attributeRestrictionErrors(document.schema, document.context, namedTypes),
-                )
+                return PureXML.Schema.XSDParser.attributeRestrictionFindings(document.schema, document.context, namedTypes)
             }
         }
 
@@ -332,12 +328,10 @@ extension PureXML.Validation {
 
 extension PureXML.Validation.SchemaCompile {
     /// xsi: Not Allowed (XSD 1.0 SCC §3.2.6): no attribute declaration lands in the
-    /// XSI namespace. See ``PureXML/Schema/XSDParser/xsiNamespaceAttributeErrors``.
+    /// XSI namespace. See ``PureXML/Schema/XSDParser/xsiNamespaceAttributeFindings``.
     static var attributeDeclarationsNotInXSI: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("Attribute declarations are not in the XSI namespace") { document in
-            PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.xsiNamespaceAttributeErrors(document.schema, document.context),
-            )
+            PureXML.Schema.XSDParser.xsiNamespaceAttributeFindings(document.schema, document.context)
         }
     }
 

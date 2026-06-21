@@ -59,20 +59,24 @@ extension PureXML.Schema.XSDParser {
     /// carry their resolved namespace, so a qualified and an unqualified attribute
     /// of the same local name do not collide. The own-declared set is checked, not
     /// the set inherited through extension (a disclosed under-rejection).
-    static func attributeUseErrors(_ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String] {
-        var errors: [String] = []
+    static func attributeUseFindings(_ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers {
             for group in descendants(container, named: "attributeGroup") {
                 guard let name = AttrNode.attribute(group, "name") else { continue }
-                errors += attributeSetErrors(attributeDeclarations(under: group, context), "attribute group '\(name)'")
+                // A uniqueness/single-ID clash is a property of the whole declared
+                // attribute set, so it locates on the declaring group.
+                findings += attributeSetErrors(attributeDeclarations(under: group, context), "attribute group '\(name)'")
+                    .map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: group) }
             }
             for type in descendants(container, named: "complexType") {
                 let label = AttrNode.attribute(type, "name").map { "complex type '\($0)'" } ?? "an anonymous complex type"
-                errors += attributeSetErrors(attributeDeclarations(under: attributeContainer(of: type), context), label)
+                findings += attributeSetErrors(attributeDeclarations(under: attributeContainer(of: type), context), label)
+                    .map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: type) }
             }
-            errors += attributeRefValueConstraintErrors(container, context)
+            findings += attributeRefValueConstraintFindings(container, context)
         }
-        return errors
+        return findings
     }
 
     /// XSD 1.0 `au-props-correct.2`: when an attribute use references a global
@@ -88,8 +92,8 @@ extension PureXML.Schema.XSDParser {
     /// rejects a same-local-name collision across namespaces (an imported `imp:a`
     /// versus a local `a`), where the local-name pool could otherwise surface the
     /// wrong global and contradict a valid reference.
-    private static func attributeRefValueConstraintErrors(_ container: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
-        var errors: [String] = []
+    private static func attributeRefValueConstraintFindings(_ container: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for use in descendants(container, named: "attribute") {
             guard let ref = AttrNode.attribute(use, "ref"),
                   let declaration = context.globalAttributes[AttrNode.stripPrefix(ref)],
@@ -100,13 +104,19 @@ extension PureXML.Schema.XSDParser {
             if let useFixed = AttrNode.attribute(use, "fixed") {
                 let equal = resolved.type.valueMatches(useFixed, literal: globalFixed) || useFixed == globalFixed
                 if !equal {
-                    errors.append("attribute reference to '\(AttrNode.stripPrefix(ref))' must use its fixed value '\(globalFixed)', not '\(useFixed)'")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "attribute reference to '\(AttrNode.stripPrefix(ref))' must use its fixed value '\(globalFixed)', not '\(useFixed)'",
+                        node: use,
+                    ))
                 }
             } else if AttrNode.attribute(use, "default") != nil {
-                errors.append("attribute reference to '\(AttrNode.stripPrefix(ref))' has a fixed value and may not specify a default")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "attribute reference to '\(AttrNode.stripPrefix(ref))' has a fixed value and may not specify a default",
+                    node: use,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     /// The node whose direct children declare a complex type's attributes: the
