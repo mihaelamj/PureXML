@@ -7,20 +7,26 @@ extension PureXML.Schema.XSDParser {
     /// named user type derived from `xs:ID` is recognized, not only the built-in and
     /// inline forms. Only XSD-namespace declarations are checked; foreign content is
     /// skipped.
-    static func idValueConstraintErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
-        var errors: [String] = []
-        collectIDValueConstraintErrors(schema, context, into: &errors)
-        return errors
+    /// Located findings (#169): each error is attached to the declaring `element`/
+    /// `attribute` node, so an editor can underline it by line/column.
+    static func idValueConstraintFindings(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        collectIDValueConstraintFindings(schema, context, into: &findings)
+        return findings
     }
 
-    private static func collectIDValueConstraintErrors(_ node: XSDTree, _ context: PureXML.Schema.XSDContext, into errors: inout [String]) {
+    private static func collectIDValueConstraintFindings(
+        _ node: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
+    ) {
         let local = IDVNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
         if let error = idValueConstraintError(node, context) {
-            errors.append(error)
+            findings.append(PureXML.Schema.SchemaLocatedFinding(reason: error, node: node))
         }
         for child in IDVNode.elementChildren(node) {
-            collectIDValueConstraintErrors(child, context, into: &errors)
+            collectIDValueConstraintFindings(child, context, into: &findings)
         }
     }
 

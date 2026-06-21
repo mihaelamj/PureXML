@@ -166,9 +166,7 @@ extension PureXML.Validation {
 
         static var idValueConstraintsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("ID-typed value constraints are valid") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.idValueConstraintErrors(document.schema, document.context),
-                )
+                PureXML.Schema.XSDParser.idValueConstraintFindings(document.schema, document.context)
             }
         }
 
