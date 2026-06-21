@@ -8,7 +8,7 @@ import Testing
 /// depend on: a bidirectional "derived mixed must equal base mixed" rule would
 /// wrongly reject the legal narrowing direction (it regressed four valid schemas
 /// when tried). The targets ctZ010d (extension) and ctZ010e (restriction) are
-/// already rejected by `extensionMixedAgreementErrors` and `ParticleRestriction`
+/// already rejected by `extensionMixedAgreementFindings` and `ParticleRestriction`
 /// respectively; this guards the restriction half from regressing.
 @Suite("XSD restriction mixed-content asymmetry (#184)")
 struct SchemaRestrictionMixedTests {
