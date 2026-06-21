@@ -37,19 +37,25 @@ extension PureXML.Schema.XSDParser {
     /// `fixed="abc"` on an `xs:integer` was wrongly accepted. A named or inline user
     /// type, or a type in another namespace, is left alone, so no valid value
     /// constraint is rejected.
-    static func valueConstraintErrors(_ schema: XSDTree) -> [String] {
+    static func valueConstraintFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         let bindings = namespaceBindings(schema)
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachValueConstrained(schema) { node in
             // The value constraint attributes are the unprefixed, no-namespace
             // `default`/`fixed` on an XSD-namespace declaration; a foreign same-local
             // attribute is not the value constraint and is not structurally checked.
             if hasBothValueConstraints(node) {
-                errors.append("a '\(PureXML.Schema.XSDNode.localName(node) ?? "")' declaration may not have both a 'default' and a 'fixed' value constraint")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "a '\(PureXML.Schema.XSDNode.localName(node) ?? "")' declaration may not have both a 'default' and a 'fixed' value constraint",
+                    node: node,
+                ))
                 return
             }
             if hasDefaultWithNonOptionalUse(node) {
-                errors.append("an 'attribute' with a 'default' value constraint must have use='optional'")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "an 'attribute' with a 'default' value constraint must have use='optional'",
+                    node: node,
+                ))
                 return
             }
             guard let typeName = PureXML.Schema.XSDNode.attribute(node, "type") else { return }
@@ -60,9 +66,12 @@ extension PureXML.Schema.XSDParser {
             guard uri == xsdNamespace, let builtin = PureXML.Schema.BuiltinType(rawValue: local),
                   !PureXML.Schema.SimpleType(base: builtin).isValid(value)
             else { return }
-            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'",
+                node: node,
+            ))
         }
-        return errors
+        return findings
     }
 
     /// A `default`/`fixed` value on an `element` or `attribute` whose `type` names a
@@ -79,9 +88,13 @@ extension PureXML.Schema.XSDParser {
     /// inline anonymous type is left alone, so no valid value constraint is rejected.
     /// The compiled `SimpleType` validator is the same one instance validation uses,
     /// so its whitespace and facet handling match.
-    static func userTypeValueConstraintErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+    static func userTypeValueConstraintFindings(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         let bindings = context.namespaceBindings
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachValueConstrained(schema) { node in
             guard node.name?.namespaceURI == xsdNamespace,
                   let typeName = unprefixedValue(node, "type")
@@ -93,9 +106,12 @@ extension PureXML.Schema.XSDParser {
             guard uri == context.targetNamespace, let resolved = types[local],
                   let simple = simpleContentType(of: resolved), !simple.isValid(value)
             else { return }
-            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for type '\(typeName)'",
+                node: node,
+            ))
         }
-        return errors
+        return findings
     }
 
     /// Like ``userTypeValueConstraintErrors`` but for an element or attribute whose
@@ -104,8 +120,8 @@ extension PureXML.Schema.XSDParser {
     /// against that type's value space. Validated against the simpleContent base's
     /// value space (not the local restriction facets), so only a clear value-space
     /// mismatch (a non-numeric `default` on a decimal-based type) is flagged.
-    static func inlineTypeValueConstraintErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
-        var errors: [String] = []
+    static func inlineTypeValueConstraintFindings(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachValueConstrained(schema) { node in
             guard node.name?.namespaceURI == xsdNamespace,
                   unprefixedValue(node, "type") == nil
@@ -114,9 +130,12 @@ extension PureXML.Schema.XSDParser {
             guard let value = fixed ?? unprefixedValue(node, "default"),
                   let simple = inlineSimpleType(of: node, context), !simple.isValid(value)
             else { return }
-            errors.append("the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for the declared inline type")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "the \(fixed != nil ? "fixed" : "default") value '\(value)' is not valid for the declared inline type",
+                node: node,
+            ))
         }
-        return errors
+        return findings
     }
 
     /// The simple value space of an element/attribute's INLINE type: an inline

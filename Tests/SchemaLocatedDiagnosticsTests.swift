@@ -72,6 +72,60 @@ struct SchemaLocatedDiagnosticsTests {
         #expect(range?.start.column == 3)
     }
 
+    @Test("A bad value constraint against a named user type is located on its declaring element")
+    func test_userTypeValueConstraintLocated() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:t" xmlns:t="urn:t">
+          <xs:simpleType name="count"><xs:restriction base="xs:integer"/></xs:simpleType>
+          <xs:element name="a" type="t:count" default="notanumber"/>
+        </xs:schema>
+        """
+        let findings = try inconsistentFindings(in: xsd)
+        let located = try #require(findings.first { $0.reason.contains("is not valid for type 't:count'") })
+        #expect(located.codingPath.map(\.stringValue) == ["xs:schema", "xs:element"])
+
+        let (tree, _) = PureXML.readTree(xsd)
+        let range = tree.sourceRange(at: located.codingPath)
+        #expect(range?.start.line == 3)
+        #expect(range?.start.column == 3)
+    }
+
+    @Test("A bad value constraint against an inline type is located on its declaring element")
+    func test_inlineTypeValueConstraintLocated() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="a" default="x">
+            <xs:simpleType><xs:restriction base="xs:integer"/></xs:simpleType>
+          </xs:element>
+        </xs:schema>
+        """
+        let findings = try inconsistentFindings(in: xsd)
+        let located = try #require(findings.first { $0.reason.contains("is not valid for the declared inline type") })
+        #expect(located.codingPath.map(\.stringValue) == ["xs:schema", "xs:element"])
+
+        let (tree, _) = PureXML.readTree(xsd)
+        let range = tree.sourceRange(at: located.codingPath)
+        #expect(range?.start.line == 2)
+        #expect(range?.start.column == 3)
+    }
+
+    @Test("A bad value constraint against a built-in type is located on its declaring element")
+    func test_builtinValueConstraintLocated() throws {
+        let xsd = """
+        <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+          <xs:element name="a" type="xs:integer" default="notanumber"/>
+        </xs:schema>
+        """
+        let findings = try inconsistentFindings(in: xsd)
+        let located = try #require(findings.first { $0.reason.contains("is not valid for type 'xs:integer'") })
+        #expect(located.codingPath.map(\.stringValue) == ["xs:schema", "xs:element"])
+
+        let (tree, _) = PureXML.readTree(xsd)
+        let range = tree.sourceRange(at: located.codingPath)
+        #expect(range?.start.line == 2)
+        #expect(range?.start.column == 3)
+    }
+
     @Test("An xs:include targetNamespace mismatch is located on the include directive")
     func test_includeMismatchLocated() throws {
         let included = """
