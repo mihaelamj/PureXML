@@ -10,7 +10,7 @@ extension PureXML.Schema.XSDParser {
     /// Only the document's own globals are examined (`xs:redefine` children and
     /// included documents are not direct globals here), so a redefinition is not
     /// mistaken for a clash.
-    static func componentNameErrors(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String] {
+    static func componentNameFindings(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
         let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: context.targetNamespace)
         let uniqueIndices = findUniqueIndices(
             in: containers,
@@ -19,20 +19,20 @@ extension PureXML.Schema.XSDParser {
             mainTargetNamespace: context.targetNamespace,
         )
 
-        var errors = checkDuplicateGlobals(
+        var findings = checkDuplicateGlobalFindings(
             in: containers,
             indices: uniqueIndices,
             namespaceMap: namespaceMap,
             mainTargetNamespace: context.targetNamespace,
         )
-        errors += identityConstraintNameErrors(
+        findings += identityConstraintNameFindings(
             containers,
             uniqueIndices,
             namespaceMap: namespaceMap,
             mainTargetNamespace: context.targetNamespace,
         )
-        errors += keyrefReferErrors(schema, containers, context)
-        return errors
+        findings += keyrefReferFindings(schema, containers, context)
+        return findings
     }
 
     private static func findUniqueIndices(
@@ -73,13 +73,13 @@ extension PureXML.Schema.XSDParser {
         let name: String
     }
 
-    private static func checkDuplicateGlobals(
+    private static func checkDuplicateGlobalFindings(
         in containers: [XSDTree],
         indices: [Int],
         namespaceMap: [Int: String?],
         mainTargetNamespace: String?,
-    ) -> [String] {
-        var errors: [String] = []
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         var seenComponents: Set<ComponentKey> = []
         for index in indices {
             let container = containers[index]
@@ -99,11 +99,14 @@ extension PureXML.Schema.XSDParser {
                 if !seenComponents.insert(key).inserted {
                     let nsStr = namespaceURI.map { " in namespace '\($0)'" } ?? " in no namespace"
                     let kindLabel = kind == "group" ? "model group" : (kind == "attributeGroup" ? "attribute group" : kind)
-                    errors.append("duplicate \(kindLabel) name '\(name)'\(nsStr)")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "duplicate \(kindLabel) name '\(name)'\(nsStr)",
+                        node: global,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     private static func componentKind(for localName: String) -> String? {
@@ -122,6 +125,7 @@ extension PureXML.Schema.XSDParser {
         let name: String
         let refer: String
         let arity: Int
+        let node: XSDTree
     }
 
     /// Findings for a `keyref` whose `refer` does not name a `key` or `unique` in
@@ -129,7 +133,7 @@ extension PureXML.Schema.XSDParser {
     /// Skipped when the document pulls in external definitions
     /// (`import`/`include`/`redefine`), which the default compile does not load,
     /// so a `refer` into them is never flagged.
-    private static func keyrefReferErrors(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [String] {
+    private static func keyrefReferFindings(_ schema: XSDTree, _ containers: [XSDTree], _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
         if skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) { return [] }
         var keyArities: [String: Int] = [:]
         var keyrefs: [KeyrefInfo] = []
@@ -138,17 +142,23 @@ extension PureXML.Schema.XSDParser {
             collectKeysAndRefers(source, keyArities: &keyArities, keyrefs: &keyrefs)
         }
 
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for keyref in keyrefs {
             if let keyArity = keyArities[keyref.refer] {
                 if keyArity != keyref.arity {
-                    errors.append("keyref '\(keyref.name)' and its referenced key/unique '\(keyref.refer)' must have the same number of fields")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "keyref '\(keyref.name)' and its referenced key/unique '\(keyref.refer)' must have the same number of fields",
+                        node: keyref.node,
+                    ))
                 }
             } else {
-                errors.append("keyref refers to undeclared key or unique '\(keyref.refer)'")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "keyref refers to undeclared key or unique '\(keyref.refer)'",
+                    node: keyref.node,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     private static func collectKeysAndRefers(
@@ -170,7 +180,7 @@ extension PureXML.Schema.XSDParser {
                 if let name, let refer {
                     let arity = PureXML.Schema.XSDNode.elementChildren(node)
                         .count(where: { $0.name?.namespaceURI == xsdNamespace && PureXML.Schema.XSDNode.localName($0) == "field" })
-                    keyrefs.append(KeyrefInfo(name: name, refer: PureXML.Schema.XSDNode.stripPrefix(refer), arity: arity))
+                    keyrefs.append(KeyrefInfo(name: name, refer: PureXML.Schema.XSDNode.stripPrefix(refer), arity: arity, node: node))
                 }
             }
         }
@@ -179,18 +189,18 @@ extension PureXML.Schema.XSDParser {
         }
     }
 
-    private static func identityConstraintNameErrors(
+    private static func identityConstraintNameFindings(
         _ containers: [XSDTree],
         _ uniqueIndices: [Int],
         namespaceMap: [Int: String?],
         mainTargetNamespace: String?,
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         struct KeyrefNameKey: Hashable {
             let targetNamespace: String?
             let name: String
         }
         var seen: Set<KeyrefNameKey> = []
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         func walk(_ node: XSDTree, namespaceURI: String?) {
             let local = PureXML.Schema.XSDNode.localName(node)
             if local == "appinfo" || local == "documentation" { return }
@@ -198,7 +208,10 @@ extension PureXML.Schema.XSDParser {
                 let key = KeyrefNameKey(targetNamespace: namespaceURI, name: name)
                 if !seen.insert(key).inserted {
                     let nsStr = namespaceURI.map { " in namespace '\($0)'" } ?? " in no namespace"
-                    errors.append("duplicate identity constraint name '\(name)'\(nsStr)")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "duplicate identity constraint name '\(name)'\(nsStr)",
+                        node: node,
+                    ))
                 }
             }
             for child in PureXML.Schema.XSDNode.elementChildren(node) {
@@ -211,7 +224,7 @@ extension PureXML.Schema.XSDParser {
             let namespaceURI = namespaceMap[index] ?? mainTargetNamespace
             walk(container, namespaceURI: namespaceURI)
         }
-        return errors
+        return findings
     }
 
     /// The `name` of `node` when it is an identity constraint (`unique`/`key`/

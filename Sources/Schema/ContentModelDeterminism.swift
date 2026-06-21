@@ -18,19 +18,24 @@ public extension PureXML.Schema {
         private static let modelGroupNames: Set<String> = ["sequence", "choice", "all"]
         private static let particleNames: Set<String> = ["element", "sequence", "choice", "all", "group", "any"]
 
-        /// Every UPA-violation message across the schema's complex-type content
-        /// models, deduplicated in first-seen order.
-        static func violations(in schema: XSDTree, context: XSDContext) -> [String] {
+        /// Every UPA-violation finding across the schema's complex-type content
+        /// models, deduplicated by message in first-seen order. Each finding is
+        /// located on the content-model node (`sequence`/`choice`/`all`/`group`)
+        /// whose particles are ambiguous; a message shared by two models locates on
+        /// the first, preserving the deduplicated count.
+        static func violationFindings(in schema: XSDTree, context: XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
             let bindings = namespaceBindings(schema)
-            var messages: [String] = []
+            var findings: [PureXML.Schema.SchemaLocatedFinding] = []
             var seen: Set<String> = []
             forEachComplexType(schema) { complexType in
                 guard let model = contentModelNode(complexType),
                       let conflict = violation(model, bindings, context)
                 else { return }
-                if seen.insert(conflict).inserted { messages.append(conflict) }
+                if seen.insert(conflict).inserted {
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: conflict, node: model))
+                }
             }
-            return messages
+            return findings
         }
 
         /// The prefix-to-namespace bindings declared on the schema element (its
