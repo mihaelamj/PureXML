@@ -143,12 +143,12 @@ struct XSTSSuiteTests {
     /// full effective-total-range Particle-Valid-Restriction (tracked).
     /// Further rules, each with valid-schemas-rejected held at 0 (see CHANGELOG and
     /// docs/xsts-deviations.md), drove invalid-schemas-accepted 130 -> 45 across
-    /// model-group occurrence, identity-constraint content, derivation base kind,
-    /// attribute/simple-type rules, composition, simpleContent inline-type checks,
-    /// complexContent mixedness, and substitution-group anySimpleType checks.
+    /// model-group occurrence, identity-constraint content, derivation base kind, attribute/simple-type,
+    /// composition, simpleContent inline-type, complexContent mixedness, and substitution-group anySimpleType checks.
     /// src-resolve (#185) 43->39; xsi:Not-Allowed (#183) 39->37; NameAndTypeOK restriction-only + cos-all-limited group-ref (#158) 37->35.
+    /// UPA wildcard-overlap (`##other` was treated as overlapping nothing) 35->31 (wildI009/I013/I014 + one more), no other bucket moved.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 35
+    private let knownSchemaInvalidAccepted = 31
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 26), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex/atomic/list/union via the element-ref chain); anyType cannot stand in

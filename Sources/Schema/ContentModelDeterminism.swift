@@ -290,12 +290,28 @@ public extension PureXML.Schema {
         private static func wildcardsOverlap(_ lhs: Wildcard, _ rhs: Wildcard) -> Bool {
             switch (lhs.namespace, rhs.namespace) {
             case (.any, _), (_, .any):
+                // `##any` admits every name, so it shares names with any other constraint.
+                true
+            case (.other, .other):
+                // Two `##other` constraints each admit every namespace but their own
+                // target (and the absent namespace); those infinite sets always
+                // intersect, so they overlap (XSTS wildI* non-deterministic choices).
                 true
             case let (.enumerated(lhsSet), .enumerated(rhsSet)):
                 !lhsSet.isDisjoint(with: rhsSet)
-            default:
-                false
+            case let (.other, .enumerated(set)):
+                otherOverlapsEnumerated(set, target: lhs.targetNamespace)
+            case let (.enumerated(set), .other):
+                otherOverlapsEnumerated(set, target: rhs.targetNamespace)
             }
+        }
+
+        /// Whether `##other` (any namespace but the target and the absent namespace)
+        /// shares a name with an enumerated set: it does iff the set names some
+        /// namespace that is neither absent (the empty string, `##local`) nor the
+        /// target namespace `##other` excludes.
+        private static func otherOverlapsEnumerated(_ set: Set<String>, target: String?) -> Bool {
+            set.contains { !$0.isEmpty && $0 != (target ?? "") }
         }
 
         private static func describe(_ label: TermLabel) -> String {

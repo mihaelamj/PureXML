@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Unique Particle Attribution now detects overlapping `xs:any` wildcards involving `##other`. `wildcardsOverlap` returned false for any pair involving `##other`, so two competing wildcards whose namespaces actually intersect, two `##other` constraints (which always share infinitely many namespaces) or `##other` against an enumerated set naming a non-target, non-absent namespace, were not flagged as non-deterministic, and the schema was wrongly accepted. The overlap is now computed correctly: `##other`∩`##other` always overlaps, and `##other`∩enumerated overlaps iff the set names a namespace that is neither absent (`##local`) nor the target. Disjoint cases (`##other` against `##local` or against the target namespace) remain deterministic, so no valid schema is newly rejected. XSTS invalid-schemas-accepted 35 → 31 (wildI009/wildI013/wildI014 and one more), valid-schemas-rejected held at 0.
 - The content-model matcher no longer blows up on a nested model group with a huge but
   finite `maxOccurs` (#192, partial). The counted-automaton active set is bounded by the
   product of the per-counter saturation caps; a finite `maximum` the input cannot reach

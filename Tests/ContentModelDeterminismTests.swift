@@ -46,6 +46,25 @@ struct ContentModelDeterminismTests {
         #expect(rejects(complexType(#"<xs:sequence><xs:element name="a" maxOccurs="unbounded"/><xs:element name="a"/></xs:sequence>"#)))
     }
 
+    @Test("a choice of ##other and an overlapping namespace wildcard is ambiguous")
+    func test_choiceOfOtherAndOverlappingWildcard() {
+        // `##other` admits namespace A (A is neither absent nor the target), and so
+        // does `namespace="A"`, so an A-namespaced element matches both (XSTS wildI009).
+        #expect(rejects(complexType("<xs:choice><xs:any namespace='##other'/><xs:any namespace='A'/></xs:choice>")))
+    }
+
+    @Test("a choice of two ##other wildcards is ambiguous")
+    func test_choiceOfTwoOtherWildcards() {
+        #expect(rejects(complexType("<xs:choice><xs:any namespace='##other'/><xs:any namespace='##other'/></xs:choice>")))
+    }
+
+    @Test("a choice of ##other and ##local is deterministic and compiles")
+    func test_choiceOfOtherAndLocalCompiles() {
+        // `##other` never admits the absent namespace and `##local` admits only it,
+        // so they are disjoint: the model is deterministic and must not be rejected.
+        #expect(!rejects(complexType("<xs:choice><xs:any namespace='##other'/><xs:any namespace='##local'/></xs:choice>")))
+    }
+
     @Test("two same-name members of an all group are ambiguous")
     func test_allWithSameName() {
         #expect(rejects(complexType(#"<xs:all><xs:element name="a"/><xs:element name="a"/></xs:all>"#)))
