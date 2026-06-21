@@ -19,19 +19,26 @@ extension PureXML.Schema.XSDParser {
     /// comparing the two fixed values in the attribute type's value space, not
     /// lexically (e.g. a list type's `"1   2  3"` and `"1 2 3"` are the same value),
     /// which a string comparison gets wrong; that clause is left for a later change.
-    static func attributeRestrictionErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+    static func attributeRestrictionFindings(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for content in descendants(schema, named: "complexContent") {
             guard let restriction = AttrRestrictNode.firstChild(content, named: "restriction"),
                   let base = AttrRestrictNode.attribute(restriction, "base"),
                   AttrRestrictNode.referenceNamespace(base, bindings) == context.targetNamespace,
                   case let .complex(complex)? = types[AttrRestrictNode.stripPrefix(base)]
             else { continue }
+            // An attribute use resolves to a model value with no source node, so a
+            // faithful-restriction violation locates on the restriction performing
+            // the illegal narrowing, the node a developer would correct.
             for derived in attributeUses(under: restriction, context) {
                 if let message = attributeRestrictionViolation(derived, complex.attributes, complex.attributeWildcard, restriction, context) {
-                    errors.append(message)
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(reason: message, node: restriction))
                 }
             }
             // cos-ct-restricts.4: a restriction's own attribute wildcard must be a
@@ -41,14 +48,20 @@ extension PureXML.Schema.XSDParser {
             if let derivedWildcard = attributeWildcard(under: restriction, context) {
                 if let baseWildcard = complex.attributeWildcard {
                     if !PureXML.Schema.ParticleRestriction.narrows(derivedWildcard, baseWildcard) {
-                        errors.append("the restriction's attribute wildcard is not a subset of the base type's attribute wildcard")
+                        findings.append(PureXML.Schema.SchemaLocatedFinding(
+                            reason: "the restriction's attribute wildcard is not a subset of the base type's attribute wildcard",
+                            node: restriction,
+                        ))
                     }
                 } else {
-                    errors.append("a restriction may not introduce an attribute wildcard that the base type does not have")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "a restriction may not introduce an attribute wildcard that the base type does not have",
+                        node: restriction,
+                    ))
                 }
             }
         }
-        return errors
+        return findings
     }
 
     /// The way `derived` (an attribute the restriction redeclares) illegally relaxes

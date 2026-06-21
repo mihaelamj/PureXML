@@ -10,19 +10,19 @@ extension PureXML.Schema.XSDParser {
     /// XSI it is forbidden (corpus attKb018a: `attributeFormDefault="qualified"` puts
     /// its attribute-group attributes into XSI). The check is scoped to schemas whose
     /// target namespace is XSI, the only documents that can place an attribute there.
-    static func xsiNamespaceAttributeErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
+    static func xsiNamespaceAttributeFindings(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard context.targetNamespace == xsiInstanceNamespace else { return [] }
         let attributeFormDefault = PureXML.Schema.XSDNode.attribute(schema, "attributeFormDefault")
-        var errors: [String] = []
-        collectXSIAttributeErrors(schema, parentIsSchema: false, attributeFormDefault: attributeFormDefault, into: &errors)
-        return errors
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
+        collectXSIAttributeFindings(schema, parentIsSchema: false, attributeFormDefault: attributeFormDefault, into: &findings)
+        return findings
     }
 
-    private static func collectXSIAttributeErrors(
+    private static func collectXSIAttributeFindings(
         _ node: XSDTree,
         parentIsSchema: Bool,
         attributeFormDefault: String?,
-        into errors: inout [String],
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
     ) {
         let local = PureXML.Schema.XSDNode.localName(node)
         if local == "appinfo" || local == "documentation" { return }
@@ -32,11 +32,14 @@ extension PureXML.Schema.XSDParser {
             let form = PureXML.Schema.XSDNode.attribute(node, "form")
             let qualified = parentIsSchema || form == "qualified" || (form == nil && attributeFormDefault == "qualified")
             if qualified {
-                errors.append("attribute declaration '\(name)' is in the XSI namespace, which is not allowed (xsi: Not Allowed)")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "attribute declaration '\(name)' is in the XSI namespace, which is not allowed (xsi: Not Allowed)",
+                    node: node,
+                ))
             }
         }
         for child in PureXML.Schema.XSDNode.elementChildren(node) {
-            collectXSIAttributeErrors(child, parentIsSchema: isSchema, attributeFormDefault: attributeFormDefault, into: &errors)
+            collectXSIAttributeFindings(child, parentIsSchema: isSchema, attributeFormDefault: attributeFormDefault, into: &findings)
         }
     }
 }
