@@ -44,6 +44,33 @@ struct SchemaReferenceTests {
         try compile("<xs:simpleType name=\"t\"><xs:restriction base=\"  xs:string \"/></xs:simpleType>")
     }
 
+    @Test("a ref resolving to the XSD namespace is undeclared")
+    func test_refResolvingToXSDNamespaceIsUndeclared() throws {
+        // The default xmlns is the XSD namespace, so an unprefixed `ref="root"`
+        // resolves to {XSD}root, not {foo}root, and the XSD namespace declares no
+        // referenceable user element: undeclared (XSTS xsd013/xsd014).
+        let refRoot = """
+        <schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:foo="foo" targetNamespace="foo">
+          <element name="root"><complexType><sequence><element ref="root"/></sequence></complexType></element>
+        </schema>
+        """
+        #expect(throws: (any Error).self) { _ = try PureXML.Schema.Document(refRoot) }
+        let refUndef = """
+        <schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:foo="foo" targetNamespace="foo">
+          <element name="root"><complexType><sequence><element ref="undef"/></sequence></complexType></element>
+        </schema>
+        """
+        #expect(throws: (any Error).self) { _ = try PureXML.Schema.Document(refUndef) }
+        // Guard: the same shape with the ref qualified to the target resolves, so the
+        // XSD-namespace rule does not reject a correctly-namespaced reference.
+        let qualified = """
+        <schema xmlns="http://www.w3.org/2001/XMLSchema" xmlns:foo="foo" targetNamespace="foo">
+          <element name="root"><complexType><sequence><element ref="foo:root"/></sequence></complexType></element>
+        </schema>
+        """
+        _ = try PureXML.Schema.Document(qualified)
+    }
+
     @Test("references are not checked when an import may supply them")
     func test_importSkipsCheck() throws {
         // A dangling reference into an imported namespace is tolerated: the default
