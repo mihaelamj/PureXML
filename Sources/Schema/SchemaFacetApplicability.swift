@@ -9,10 +9,10 @@ extension PureXML.Schema.XSDParser {
     /// The base's variety is resolved from the raw tree, since this runs before the
     /// types are compiled; an atomic, unresolvable, or external base is skipped, so
     /// no valid restriction is rejected.
-    static func simpleTypeVarietyFacetErrors(_ schema: XSDTree) -> [String] {
+    static func simpleTypeVarietyFacetFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         let bindings = namespaceBindings(schema)
         let target = PureXML.Schema.XSDNode.attribute(schema, "targetNamespace")
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachSimpleType(schema) { simpleType in
             guard let restriction = PureXML.Schema.XSDNode.firstChild(simpleType, named: "restriction"),
                   let variety = restrictionBaseVariety(restriction, schema, bindings, target, [])
@@ -22,10 +22,13 @@ extension PureXML.Schema.XSDParser {
                 .compactMap(PureXML.Schema.XSDNode.localName)
                 .filter { facetNames.contains($0) }
             for facet in used where !allowed.contains(facet) {
-                errors.append("the facet '\(facet)' does not apply to a \(variety) type")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the facet '\(facet)' does not apply to a \(variety) type",
+                    node: simpleType,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     /// A `default`/`fixed` value on an `element` or `attribute` must be a valid value
@@ -289,22 +292,25 @@ extension PureXML.Schema.XSDParser {
 
     /// Reject any restriction (in the XSD namespace) whose `base`
     /// attribute resolves to `xs:anySimpleType` in the XSD namespace when defined directly under a simpleType.
-    static func anySimpleTypeRestrictionErrors(_ schema: XSDTree) -> [String] {
+    static func anySimpleTypeRestrictionFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         let targetNamespace = schema.attributes.first { $0.name.prefix == nil && $0.name.localName == "targetNamespace" }?.value ?? ""
         if targetNamespace == xsdNamespace {
             return []
         }
         let bindings = namespaceBindings(schema)
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachRestrictionInSimpleType(schema) { node in
             guard let base = PureXML.Schema.XSDNode.attribute(node, "base") else { return }
             let (prefix, local) = splitQName(base)
             let uri = prefix.map { bindings[$0] } ?? bindings[""]
             if uri == xsdNamespace, local == "anySimpleType" {
-                errors.append("derivation by restriction of 'xs:anySimpleType' is not allowed")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "derivation by restriction of 'xs:anySimpleType' is not allowed",
+                    node: node,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     private static func forEachRestrictionInSimpleType(_ node: XSDTree, _ visit: (XSDTree) -> Void) {
@@ -330,19 +336,22 @@ extension PureXML.Schema.XSDParser {
     /// built-in other than anySimpleType, a simple-type, or external/unresolved is left
     /// alone, so no valid facet is rejected. A restriction supplying its own nested
     /// `simpleType` base is also skipped (the facet applies to that, not anySimpleType).
-    static func anySimpleTypeFacetErrors(_ schema: XSDTree) -> [String] {
+    static func anySimpleTypeFacetFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         let bindings = namespaceBindings(schema)
         let target = PureXML.Schema.XSDNode.attribute(schema, "targetNamespace")
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         forEachSimpleContentRestriction(schema) { restriction in
             guard PureXML.Schema.XSDNode.firstChild(restriction, named: "simpleType") == nil,
                   let base = PureXML.Schema.XSDNode.attribute(restriction, "base"),
                   hasConstrainingFacet(restriction),
                   simpleContentBaseIsAnySimpleType(base, schema, bindings, target, [])
             else { return }
-            errors.append("a constraining facet may not be applied to anySimpleType-based simpleContent")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "a constraining facet may not be applied to anySimpleType-based simpleContent",
+                node: restriction,
+            ))
         }
-        return errors
+        return findings
     }
 
     private static func hasConstrainingFacet(_ restriction: XSDTree) -> Bool {

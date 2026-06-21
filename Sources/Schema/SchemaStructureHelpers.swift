@@ -80,7 +80,7 @@ extension PureXML.Schema.XSDParser {
     /// is itself an all-group particle, so its `maxOccurs` must be 1 and its
     /// `minOccurs` 0 or 1. ``allGroupLimitedErrors`` covers the direct `<all>` element;
     /// this covers a `<group ref>` resolving to an all group (corpus particlesEa025).
-    static func allGroupReferenceMaxOccursErrors(_ schema: XSDTree) -> [String] {
+    static func allGroupReferenceMaxOccursFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         let xsd = PureXML.Schema.XSDParser.xsdNamespace
         var allGroupNames: Set<String> = []
         for group in descendants(schema, named: "group") where group.name?.namespaceURI == xsd {
@@ -91,21 +91,27 @@ extension PureXML.Schema.XSDParser {
             if isAll { allGroupNames.insert(name) }
         }
         guard !allGroupNames.isEmpty else { return [] }
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for group in descendants(schema, named: "group") where group.name?.namespaceURI == xsd {
             guard let ref = PureXML.Schema.XSDNode.attribute(group, "ref"),
                   allGroupNames.contains(PureXML.Schema.XSDNode.stripPrefix(ref))
             else { continue }
             let maxOccurs = PureXML.Schema.XSDNode.attribute(group, "maxOccurs")?.trimmingXMLWhitespace()
             if let maxOccurs, maxOccurs == "unbounded" || (isNonNegativeInteger(maxOccurs) && canonicalMagnitude(maxOccurs) != "1") {
-                errors.append("the maxOccurs of a reference to an all group must be 1")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the maxOccurs of a reference to an all group must be 1",
+                    node: group,
+                ))
             }
             let minOccurs = PureXML.Schema.XSDNode.attribute(group, "minOccurs")?.trimmingXMLWhitespace()
             if let minOccurs, isNonNegativeInteger(minOccurs), !["0", "1"].contains(canonicalMagnitude(minOccurs)) {
-                errors.append("the minOccurs of a reference to an all group must be 0 or 1")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the minOccurs of a reference to an all group must be 0 or 1",
+                    node: group,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     static func exceeds(_ lhs: String, _ rhs: String) -> Bool {
@@ -315,14 +321,20 @@ extension PureXML.Schema.XSDParser {
     /// is not a legal namespace name. So `<schema targetNamespace="">` and
     /// `<import namespace="">` are invalid, while omitting the attribute (no target
     /// namespace, a no-namespace import) stays valid.
-    static func emptyNamespaceErrors(_ schema: XSDTree) -> [String] {
-        var errors: [String] = []
+    static func emptyNamespaceFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         if PureXML.Schema.XSDNode.attribute(schema, "targetNamespace") == "" {
-            errors.append("the 'targetNamespace' attribute may not be the empty string")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "the 'targetNamespace' attribute may not be the empty string",
+                node: schema,
+            ))
         }
         for importNode in descendants(schema, named: "import") where PureXML.Schema.XSDNode.attribute(importNode, "namespace") == "" {
-            errors.append("an 'import' namespace may not be the empty string")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "an 'import' namespace may not be the empty string",
+                node: importNode,
+            ))
         }
-        return errors
+        return findings
     }
 }
