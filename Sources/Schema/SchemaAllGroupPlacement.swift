@@ -8,7 +8,7 @@ extension PureXML.Schema.XSDParser {
     /// where that reference appears inside a compositor (so the `all` is not the
     /// whole content). The reference is followed only when it resolves to this
     /// schema's own target namespace.
-    static func allGroupReferencePlacementErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+    static func allGroupReferencePlacementFindings(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [PureXML.Schema.SchemaLocatedFinding] {
         // A redefined group's effective content is the redefinition's, not the
         // original loaded definition, so a redefined group name is exempt: its
         // original `all` content is overridden (and the suite treats a reference to
@@ -41,21 +41,30 @@ extension PureXML.Schema.XSDParser {
             }
         }
         guard !allGroups.isEmpty else { return [] }
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for container in containers {
-            collectAllGroupRefPlacement(container, allGroups, bindings, target, into: &errors)
+            collectAllGroupRefPlacement(container, allGroups, bindings, target, into: &findings)
         }
-        return errors
+        return findings
     }
 
-    private static func collectAllGroupRefPlacement(_ node: XSDTree, _ allGroups: Set<String>, _ bindings: [String: String], _ target: String?, into errors: inout [String]) {
+    private static func collectAllGroupRefPlacement(
+        _ node: XSDTree,
+        _ allGroups: Set<String>,
+        _ bindings: [String: String],
+        _ target: String?,
+        into findings: inout [PureXML.Schema.SchemaLocatedFinding],
+    ) {
         let kind = AllNode.localName(node)
         let insideCompositor = kind == "sequence" || kind == "choice" || kind == "all"
         for child in AllNode.elementChildren(node) {
             if insideCompositor, let referenced = allGroupReference(child, allGroups, bindings, target) {
-                errors.append("the all-group '\(referenced)' may not be referenced inside a '\(kind ?? "")'; an all group must be the whole content model")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the all-group '\(referenced)' may not be referenced inside a '\(kind ?? "")'; an all group must be the whole content model",
+                    node: child,
+                ))
             }
-            collectAllGroupRefPlacement(child, allGroups, bindings, target, into: &errors)
+            collectAllGroupRefPlacement(child, allGroups, bindings, target, into: &findings)
         }
     }
 
