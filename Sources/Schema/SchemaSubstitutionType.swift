@@ -21,13 +21,13 @@ extension PureXML.Schema.XSDParser {
     ///   2.3 and 2.4: a type derives from a union if it derives from one of the
     ///   union's member types). When either type is a list or union the check stands
     ///   down rather than reject a valid member, a disclosed under-rejection.
-    static func substitutionTypeErrors(
+    static func substitutionTypeFindings(
         _ schema: XSDTree,
         _ containers: [XSDTree],
         _ tables: DerivationTables,
         _ types: [String: PureXML.Schema.ElementType],
         _ context: PureXML.Schema.XSDContext,
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let sources = context.compositionLoaded ? containers : [schema]
         let namespaceMap = resolveContainerNamespaces(containers, mainTargetNamespace: context.targetNamespace)
@@ -46,7 +46,7 @@ extension PureXML.Schema.XSDParser {
                 }
             }
         }
-        return sources.indices.flatMap { index -> [String] in
+        return sources.indices.flatMap { index -> [PureXML.Schema.SchemaLocatedFinding] in
             let source = sources[index]
             guard SubTypeNode.localName(source) != "redefine" else { return [] }
             let bindings = SubTypeNode.namespaceBindings(of: source)
@@ -69,7 +69,7 @@ extension PureXML.Schema.XSDParser {
         _ globalElementType: [GlobalElementKey: String],
         _ tables: DerivationTables,
         _ types: [String: PureXML.Schema.ElementType],
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard let member = SubTypeNode.attribute(element, "name"),
               let headReference = SubTypeNode.attribute(element, "substitutionGroup")
         else { return [] }
@@ -100,11 +100,21 @@ extension PureXML.Schema.XSDParser {
         // as a recorded restriction of the head's type, both of which `isDerived`
         // covers). Affiliating it to any other head type is not a valid derivation.
         if isListOrUnion(memberType, types), !isDerived, headType != "anySimpleType", headType != "anyType" {
-            return ["element '\(member)' may not be in the substitution group of '\(head)': its list or union type is not derived from '\(headType)'"]
+            return [
+                PureXML.Schema.SchemaLocatedFinding(
+                    reason: "element '\(member)' may not be in the substitution group of '\(head)': its list or union type is not derived from '\(headType)'",
+                    node: element,
+                ),
+            ]
         }
         guard !isListOrUnion(memberType, types), !isListOrUnion(headType, types) else { return [] }
         if !isDerived {
-            return ["element '\(member)' may not be in the substitution group of '\(head)': its type is not derived from '\(headType)'"]
+            return [
+                PureXML.Schema.SchemaLocatedFinding(
+                    reason: "element '\(member)' may not be in the substitution group of '\(head)': its type is not derived from '\(headType)'",
+                    node: element,
+                ),
+            ]
         }
         return checkExclusions(
             member: member,
@@ -112,7 +122,7 @@ extension PureXML.Schema.XSDParser {
             inlineDeriv: inlineDeriv,
             headInfo: (head, headType),
             tables: tables,
-        )
+        ).map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: element) }
     }
 
     private static func checkExclusions(
