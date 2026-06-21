@@ -69,9 +69,10 @@ extension PureXML.Schema.XSDParser {
                 guard let name = RedefineNode.attribute(redefinition, "name"),
                       let baseGroup = resolveBaseComponent(base, name: name, owner: redefinition)
                 else { continue }
+                let referenced = referencedAttributeNames(of: redefinition, ownName: name, base: base)
                 // Each restriction violation is a property of this redefinition's
                 // attribute group, so it locates on the redefinition declaration.
-                findings += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition)
+                findings += attributeGroupRestrictionErrors(name: name, base: baseGroup, redefinition: redefinition, referenced: referenced)
                     .map { PureXML.Schema.SchemaLocatedFinding(reason: $0, node: redefinition) }
             }
         }
@@ -111,7 +112,53 @@ extension PureXML.Schema.XSDParser {
         base[namespacedKey(name, owner: owner)] ?? base["{}\(name)"]
     }
 
-    private static func attributeGroupRestrictionErrors(name: String, base: XSDTree, redefinition: XSDTree) -> [String] {
+    /// The non-prohibited attribute names a redefinition pulls in through its
+    /// `attributeGroup` references, with whether any of them is a SELF-reference
+    /// (resolving by NAMESPACE and local name to the redefinition's own name+target).
+    /// A self-reference re-imports the original and is reported via `hasSelfReference`
+    /// rather than counted. Returns nil (decline, stay lenient) when a referenced
+    /// group does not resolve from the base pool, carries an attribute wildcard, nests
+    /// a further `attributeGroup` reference, or names an attribute by `ref` (not
+    /// `name`): in each case the contributed set is not fully known, so the add-check
+    /// must not fire. A redefinition with no `attributeGroup` reference yields an empty
+    /// set and no self-reference, preserving the direct-declaration-only behavior.
+    private static func referencedAttributeNames(
+        of redefinition: XSDTree, ownName: String, base: [String: XSDTree],
+    ) -> (names: Set<String>, hasSelfReference: Bool)? {
+        let schema = RedefineNode.schemaOwner(redefinition)
+        let target = RedefineNode.attribute(schema, "targetNamespace") ?? ""
+        let bindings = RedefineNode.namespaceBindings(of: schema)
+        var names: Set<String> = []
+        var hasSelfReference = false
+        for child in RedefineNode.elementChildren(redefinition) where RedefineNode.localName(child) == "attributeGroup" {
+            guard let ref = RedefineNode.attribute(child, "ref") else { return nil }
+            let refNamespace = RedefineNode.referenceNamespace(ref, bindings) ?? ""
+            if RedefineNode.stripPrefix(ref) == ownName, refNamespace == target {
+                hasSelfReference = true
+                continue
+            }
+            guard let group = base["{\(refNamespace)}\(RedefineNode.stripPrefix(ref))"] else { return nil }
+            for member in RedefineNode.elementChildren(group) {
+                switch RedefineNode.localName(member) {
+                case "attribute":
+                    guard let attrName = RedefineNode.attribute(member, "name") else { return nil }
+                    if RedefineNode.attribute(member, "use") != "prohibited" { names.insert(attrName) }
+                case "anyAttribute", "attributeGroup":
+                    return nil
+                default:
+                    break
+                }
+            }
+        }
+        return (names, hasSelfReference)
+    }
+
+    private static func attributeGroupRestrictionErrors(
+        name: String,
+        base: XSDTree,
+        redefinition: XSDTree,
+        referenced: (names: Set<String>, hasSelfReference: Bool)?,
+    ) -> [String] {
         var errors: [String] = []
         let children = RedefineNode.elementChildren(redefinition)
         // The redefinition's attributes by name, so a check can read the `use` (a
@@ -124,23 +171,20 @@ extension PureXML.Schema.XSDParser {
         let use: (String) -> String? = { redefined[$0].map { RedefineNode.attribute($0, "use") ?? "optional" } }
         let hasReference = children.contains { RedefineNode.localName($0) == "attributeGroup" }
         let baseHasWildcard = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "anyAttribute" }
-        // A restriction may not ADD an attribute the original does not have (a superset).
-        // Checked only when the original's attribute set is fully known from its direct
-        // declarations (no nested attributeGroup reference could supply the name), and
-        // only when the redefinition itself carries no attributeGroup reference: a
-        // self-reference brings in the original's attributes, so declaring further ones
-        // alongside it is a valid redefine (W3C attgC007/attgC038/groupB018), not an
-        // addition. Both guards keep the check from mistaking an inherited attribute for
-        // a newly added one.
+        // A restriction may not ADD an attribute the original lacks (and the original
+        // has no wildcard to admit it). The redefinition's full attribute set is its
+        // direct declarations PLUS those pulled in by a NON-self attributeGroup
+        // reference (`referenced.names`); a self-reference re-imports the original's own
+        // attributes, so declaring further ones alongside it is a valid redefine (W3C
+        // attgC007/attgC038/groupB018), not an addition. The check runs only when that
+        // set is fully known (`referenced` resolved, no self-reference) and the
+        // original's set is fully known (no nested reference, no wildcard), so an
+        // inherited attribute is never mistaken for an added one (catches attgC028,
+        // whose `ref="car"` injects foreign attributes with no self-reference).
         let baseNames = Set(RedefineNode.children(base, named: "attribute").compactMap { RedefineNode.attribute($0, "name") })
         let baseHasReference = RedefineNode.elementChildren(base).contains { RedefineNode.localName($0) == "attributeGroup" }
-        if !baseHasReference, !hasReference {
-            // A `use="prohibited"` attribute forbids the name rather than permitting it,
-            // so declaring one the base lacks does not widen the usable set; like the
-            // re-introduce and fixed-value checks, it is left alone.
-            for attrName in redefined.keys.sorted() where !baseNames.contains(attrName) && use(attrName) != "prohibited" {
-                errors.append("a redefined attribute group '\(name)' may not add the attribute '\(attrName)'")
-            }
+        if !baseHasReference, !baseHasWildcard {
+            errors += addedAttributeErrors(name: name, redefined: redefined, baseNames: baseNames, referenced: referenced, use: use)
         }
         for attribute in RedefineNode.children(base, named: "attribute") {
             guard let attrName = RedefineNode.attribute(attribute, "name") else { continue }
@@ -160,6 +204,30 @@ extension PureXML.Schema.XSDParser {
             }
         }
         return errors
+    }
+
+    /// The "may not ADD an attribute the original lacks" errors. The redefinition's
+    /// full attribute set is its direct (non-prohibited) declarations plus the names a
+    /// non-self reference contributes (`referenced.names`, already non-prohibited). A
+    /// `use="prohibited"` direct attribute forbids rather than widens, so it is left
+    /// alone. The check fires only when both sets are fully known and admit no wildcard:
+    /// the original has no nested reference and no wildcard, and the redefinition has a
+    /// resolved reference set with no self-reference (a self-reference re-imports the
+    /// original and is governed by the restriction rules, not counted as an addition).
+    private static func addedAttributeErrors(
+        name: String,
+        redefined: [String: XSDTree],
+        baseNames: Set<String>,
+        referenced: (names: Set<String>, hasSelfReference: Bool)?,
+        use: (String) -> String?,
+    ) -> [String] {
+        guard let referenced, !referenced.hasSelfReference else { return [] }
+        var effective = referenced.names
+        for attrName in redefined.keys where use(attrName) != "prohibited" {
+            effective.insert(attrName)
+        }
+        return effective.sorted().filter { !baseNames.contains($0) }
+            .map { "a redefined attribute group '\(name)' may not add the attribute '\($0)'" }
     }
 
     /// A base attribute with a `fixed` value is relaxed when the redefinition declares

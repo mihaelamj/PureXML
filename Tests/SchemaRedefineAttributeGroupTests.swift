@@ -88,6 +88,45 @@ struct SchemaRedefineAttributeGroupTests {
         )
     }
 
+    @Test("a non-self reference injecting a foreign attribute is rejected (attgC028)")
+    func test_nonSelfReferenceAddRejected() throws {
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>"
+            + "<xs:attributeGroup ref='car'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:attributeGroup name='car'><xs:attribute name='foo1' type='xs:int'/>"
+            + "<xs:attribute name='foo2' type='xs:string'/></xs:attributeGroup>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='g'><xs:attribute name='att' type='xs:int'/></xs:attributeGroup></xs:schema>"
+        #expect(throws: (any Error).self) { try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc }) }
+    }
+
+    @Test("a non-self reference whose attributes are all in the original is valid")
+    func test_nonSelfReferenceSubsetAccepted() throws {
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>"
+            + "<xs:attributeGroup ref='sub'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:attributeGroup name='sub'><xs:attribute name='att' type='xs:int'/></xs:attributeGroup>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='g'><xs:attribute name='att' type='xs:int'/>"
+            + "<xs:attribute name='att2' type='xs:string'/></xs:attributeGroup></xs:schema>"
+        _ = try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
+
+    @Test("a referenced group with an attribute wildcard is not judged (lenient, no false positive)")
+    func test_nonSelfReferenceWildcardLenient() throws {
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>"
+            + "<xs:attributeGroup ref='car'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:attributeGroup name='car'><xs:attribute name='foo1' type='xs:int'/>"
+            + "<xs:anyAttribute/></xs:attributeGroup>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='g'><xs:attribute name='att' type='xs:int'/></xs:attributeGroup></xs:schema>"
+        _ = try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
+
     @Test("re-declaring an attribute the base inherits via a reference is valid")
     func test_redeclareInheritedAccepted() throws {
         let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"

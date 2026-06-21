@@ -146,9 +146,9 @@ struct XSTSSuiteTests {
     /// model-group occurrence, identity-constraint content, derivation base kind, attribute/simple-type,
     /// composition, simpleContent inline-type, complexContent mixedness, and substitution-group anySimpleType checks.
     /// src-resolve (#185) 43->39; xsi:Not-Allowed (#183) 39->37; NameAndTypeOK restriction-only + cos-all-limited group-ref (#158) 37->35.
-    /// UPA `##other` 35->31; UPA effective-extension model 31->29; ref to XSD ns undeclared 29->27; unprefixed type-ref to target ns undeclared 27->25; valid-rejected 0.
+    /// UPA `##other` 35->31; UPA ext-model 31->29; ref-to-XSD-ns 29->27; unprefixed type-ref 27->25; redefine attrGroup non-self-ref add (attgC028) 25->24; valid-rejected 0.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 25
+    private let knownSchemaInvalidAccepted = 24
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 26), per-step deltas in CHANGELOG.md: xsi:type must derive from the
     /// declared type (complex/atomic/list/union via the element-ref chain); anyType cannot stand in
