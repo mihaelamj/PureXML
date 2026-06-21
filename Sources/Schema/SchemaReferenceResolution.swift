@@ -73,6 +73,16 @@ extension PureXML.Schema.XSDParser {
         if let foreign = context.foreignPools[uri]?[poolName] {
             return !foreign.contains(localPart)
         }
+        if uri == xsdNamespace {
+            // The XSD namespace declares no referenceable user component (element,
+            // group, attribute, attribute group), so a reference resolving to it is
+            // undeclared. This is reached when an unprefixed reference picks up a
+            // default `xmlns` of the XSD namespace, so it is NOT in the target
+            // namespace (XSTS xsd013/xsd014); the schema that itself targets the XSD
+            // namespace is the `inTargetNamespace` case above, and a genuinely loaded
+            // XSD-namespace document is the `foreignPools` case just before.
+            return true
+        }
         if uri == nil || uri == "" {
             if context.chameleonNamespace, context.pools[poolName]?.contains(localPart) == true { return false }
             if !(context.targetNamespace == nil || context.targetNamespace == "") { return true }
