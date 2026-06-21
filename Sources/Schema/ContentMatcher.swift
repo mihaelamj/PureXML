@@ -245,19 +245,32 @@ extension PureXML.Schema {
 
         /// The per-counter saturation point for the active-set representation.
         ///
-        /// An occurrence counter only needs distinct values up to what its own
-        /// bound and the available input make observable. A bounded counter
-        /// saturates at `min(maximum, inputLength + 1)`. An unbounded counter
-        /// saturates at its `minimum`: once the minimum is reached every higher
-        /// count is matching-equivalent (`canExit` stays satisfied and
-        /// `belowMaximum` is vacuous), so collapsing them is exact. Clamping each
-        /// counter independently bounds the active-configuration set by the content
-        /// model instead of by `inputLength` raised to the counter count, so a long
-        /// run of one repeated element no longer makes the closure blow up.
+        /// An occurrence counter only needs distinct values up to what its own bound
+        /// and the available input make observable. An unbounded counter saturates at
+        /// its `minimum`: once the minimum is reached every higher count is
+        /// matching-equivalent (`canExit` stays satisfied and `belowMaximum` is
+        /// vacuous), so collapsing them is exact.
+        ///
+        /// A finite `maximum` the input cannot reach is matching-equivalent to
+        /// unbounded and saturates the same way. The active set increments a counter
+        /// at most to its cap, and the cap is at most `inputLength + 1`; so when
+        /// `maximum > inputLength + 1` the value can never reach `maximum` under any
+        /// continuation, `belowMaximum` is always satisfied, and every value `>= min`
+        /// is indistinguishable. Saturating such a counter at its minimum (rather than
+        /// at `min(maximum, inputLength + 1)`) is therefore exact, and it keeps a huge
+        /// but finite `maxOccurs` on a nested counter from multiplying the
+        /// active-configuration set by an `inputLength` factor per nesting level (the
+        /// Z035 worst case). Only a `maximum` the input can actually reach
+        /// (`<= inputLength + 1`) still needs its values tracked up to that maximum.
         private func counterCaps(for inputLength: Int) -> [Int] {
             let reachable = inputLength == Int.max ? Int.max : inputLength + 1
             return counters.map { scope in
-                scope.range.maximum.clamped(to: reachable) ?? scope.range.minimum.clamped(to: reachable)
+                guard let maximumCap = scope.range.maximum.clamped(to: reachable),
+                      !scope.range.maximum.isGreaterThan(reachable)
+                else {
+                    return scope.range.minimum.clamped(to: reachable)
+                }
+                return maximumCap
             }
         }
     }

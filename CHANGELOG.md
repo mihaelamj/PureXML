@@ -38,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The content-model matcher no longer blows up on a nested model group with a huge but
+  finite `maxOccurs` (#192, partial). The counted-automaton active set is bounded by the
+  product of the per-counter saturation caps; a finite `maximum` the input cannot reach
+  (`maximum > inputLength + 1`) is now saturated at its minimum, exactly as an unbounded
+  counter is, because the value can never reach that maximum under any continuation (the
+  cap is at most `inputLength + 1`), so `belowMaximum` always holds and every value at or
+  above the minimum is matching-equivalent. A document that did not terminate within a
+  minute against such a model (the Z035 worst case) now validates in linear time, with no
+  change to any accept/reject decision (full XSTS suite still 0/35/0/26; an adversarial
+  no-caps reference-matcher differential confirms no verdict changed, including nullable
+  bodies and the occurrence boundary). Guarded by `ContentMatcherWorstCaseTests`. A model
+  with several *moderate* (input-reachable) `maxOccurs` nested deeply still enumerates a
+  large active set and is tracked under #192.
+
 - A reference to a model group whose content is an `all` group must have `maxOccurs`
   of 1 and `minOccurs` of 0 or 1 (XSD 1.0 cos-all-limited, #158). A `<group ref>` that
   resolves to an `<xs:all>` group with `maxOccurs="2"` is now rejected (corpus
