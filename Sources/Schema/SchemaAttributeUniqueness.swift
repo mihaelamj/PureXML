@@ -19,21 +19,31 @@ extension PureXML.Schema.XSDParser {
     /// `types` first. Self-contained schema; a foreign or unresolved type is left
     /// alone. Strictly zero false positive: an attribute can never carry a complex
     /// type, so no valid schema is affected.
-    static func attributeTypeMustBeSimpleErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+    static func attributeTypeMustBeSimpleFindings(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for attribute in descendants(schema, named: "attribute") where attribute.name?.namespaceURI == xsdNamespace {
             guard let typeName = AttrNode.attribute(attribute, "type") else { continue }
             let namespace = AttrNode.referenceNamespace(typeName, bindings)
             let local = AttrNode.stripPrefix(typeName)
             if namespace == context.targetNamespace, case .complex? = types[local] {
-                errors.append("an attribute's type must be a simple type, not the complex type '\(local)'")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "an attribute's type must be a simple type, not the complex type '\(local)'",
+                    node: attribute,
+                ))
             } else if namespace == xsdNamespace, types[local] == nil, local == "anyType" {
-                errors.append("an attribute's type must be a simple type, not 'anyType'")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "an attribute's type must be a simple type, not 'anyType'",
+                    node: attribute,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     /// Schema-validity findings for attribute-use uniqueness (XSD 1.0

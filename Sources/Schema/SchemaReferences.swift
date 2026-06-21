@@ -232,8 +232,8 @@ extension PureXML.Schema.XSDParser {
         return errors
     }
 
-    static func simpleTypeBaseNotComplexErrors(_ schema: XSDTree, in context: PureXML.Schema.XSDContext) -> [String] {
-        var errors: [String] = []
+    static func simpleTypeBaseNotComplexFindings(_ schema: XSDTree, in context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)
         let targetNamespace = context.targetNamespace
 
@@ -262,11 +262,11 @@ extension PureXML.Schema.XSDParser {
             if node.name?.namespaceURI == xsdNamespace {
                 switch local {
                 case "restriction":
-                    Self.checkRestrictionUnderSimpleType(node, isComplex: isComplex, errors: &errors)
+                    Self.checkRestrictionUnderSimpleType(node, isComplex: isComplex, findings: &findings)
                 case "list":
-                    Self.checkList(node, isComplex: isComplex, errors: &errors)
+                    Self.checkList(node, isComplex: isComplex, findings: &findings)
                 case "union":
-                    Self.checkUnion(node, isComplex: isComplex, errors: &errors)
+                    Self.checkUnion(node, isComplex: isComplex, findings: &findings)
                 default:
                     break
                 }
@@ -277,26 +277,35 @@ extension PureXML.Schema.XSDParser {
             }
         }
         check(schema)
-        return errors
+        return findings
     }
 
-    private static func checkRestrictionUnderSimpleType(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+    private static func checkRestrictionUnderSimpleType(_ node: XSDTree, isComplex: (String) -> Bool, findings: inout [PureXML.Schema.SchemaLocatedFinding]) {
         guard let parent = node.parent, parent.name?.namespaceURI == xsdNamespace, PureXML.Schema.XSDNode.localName(parent) == "simpleType" else { return }
         if let base = PureXML.Schema.XSDNode.attribute(node, "base"), isComplex(base) {
-            errors.append("base type '\(base)' of simpleType restriction must be a simple type, not a complex type")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "base type '\(base)' of simpleType restriction must be a simple type, not a complex type",
+                node: node,
+            ))
         }
     }
 
-    private static func checkList(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+    private static func checkList(_ node: XSDTree, isComplex: (String) -> Bool, findings: inout [PureXML.Schema.SchemaLocatedFinding]) {
         if let itemType = PureXML.Schema.XSDNode.attribute(node, "itemType"), isComplex(itemType) {
-            errors.append("itemType '\(itemType)' of list must be a simple type, not a complex type")
+            findings.append(PureXML.Schema.SchemaLocatedFinding(
+                reason: "itemType '\(itemType)' of list must be a simple type, not a complex type",
+                node: node,
+            ))
         }
     }
 
-    private static func checkUnion(_ node: XSDTree, isComplex: (String) -> Bool, errors: inout [String]) {
+    private static func checkUnion(_ node: XSDTree, isComplex: (String) -> Bool, findings: inout [PureXML.Schema.SchemaLocatedFinding]) {
         if let members = PureXML.Schema.XSDNode.attribute(node, "memberTypes") {
             for token in members.split(whereSeparator: \.isWhitespace) where isComplex(String(token)) {
-                errors.append("memberType '\(token)' of union must be a simple type, not a complex type")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "memberType '\(token)' of union must be a simple type, not a complex type",
+                    node: node,
+                ))
             }
         }
     }

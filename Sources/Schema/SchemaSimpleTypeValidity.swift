@@ -3,9 +3,9 @@ extension PureXML.Schema.XSDParser {
     /// the itemType of a list must be atomic or union (where all member types are atomic).
     /// That is, a list's itemType cannot be a list or a union containing a list, and
     /// cannot resolve to the simple ur-type 'anySimpleType'.
-    static func simpleTypeVarietyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [String] {
+    static func simpleTypeVarietyFindings(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext) -> [PureXML.Schema.SchemaLocatedFinding] {
         let targetNamespace = context.targetNamespace
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
 
         func check(_ node: XSDTree) {
             let local = PureXML.Schema.XSDNode.localName(node)
@@ -31,13 +31,19 @@ extension PureXML.Schema.XSDParser {
                 }
 
                 if !isForeign, isListOrUnionContainingList(item) {
-                    errors.append("the item type of a list must be atomic or union of atomic, not a list or union containing list")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "the item type of a list must be atomic or union of atomic, not a list or union containing list",
+                        node: node,
+                    ))
                 }
                 // src-simple-type.2: a list has its item type from EITHER the
                 // itemType attribute OR an inline simpleType child, never both and
                 // never neither.
                 if hasItemTypeAttribute(node) == hasSimpleTypeChild(node) {
-                    errors.append("a list must have either an 'itemType' attribute or an inline simpleType child, but not both")
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "a list must have either an 'itemType' attribute or an inline simpleType child, but not both",
+                        node: node,
+                    ))
                 }
             }
 
@@ -45,7 +51,10 @@ extension PureXML.Schema.XSDParser {
             // attribute, inline simpleType children, or both, so it must declare at
             // least one of them (an empty union has no member type definitions).
             if isEmptyUnion(node, local) {
-                errors.append("a union must declare at least one member type, through 'memberTypes' or an inline simpleType child")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "a union must declare at least one member type, through 'memberTypes' or an inline simpleType child",
+                    node: node,
+                ))
             }
 
             for child in PureXML.Schema.XSDNode.elementChildren(node) {
@@ -54,7 +63,7 @@ extension PureXML.Schema.XSDParser {
         }
 
         check(schema)
-        return errors
+        return findings
     }
 
     /// A `union` element in the schema namespace that declares no member types at
