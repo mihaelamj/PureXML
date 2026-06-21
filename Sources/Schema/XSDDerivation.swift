@@ -107,9 +107,10 @@ extension PureXML.Schema.XSDParser {
     /// redefinition derives from its former self), so redefined types are treated as
     /// chain ends rather than self-cycles, matching the suite's "circular ref is
     /// allowed if parent is redefine".
-    static func derivationCycleErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+    static func derivationCycleFindings(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [PureXML.Schema.SchemaLocatedFinding] {
         let redefined = redefinedTypeNames(containers)
         var graph: [String: String] = [:]
+        var nodeOf: [String: XSDTree] = [:]
         for container in containers {
             for kind in ["complexType", "simpleType"] {
                 for type in descendants(container, named: kind) {
@@ -120,12 +121,13 @@ extension PureXML.Schema.XSDParser {
                     // local names collide (a `local:X` extending an imported `other:X`).
                     guard XSDDerivNode.referenceNamespace(base, bindings) == target else { continue }
                     graph[name] = XSDDerivNode.stripPrefix(base)
+                    nodeOf[name] = type
                 }
             }
         }
         return graph.keys.sorted().compactMap { name in
             guard !redefined.contains(name), derivesFromItself(name, graph, redefined) else { return nil }
-            return "type '\(name)' must not be derived from itself"
+            return PureXML.Schema.SchemaLocatedFinding(reason: "type '\(name)' must not be derived from itself", node: nodeOf[name])
         }
     }
 
@@ -189,36 +191,47 @@ extension PureXML.Schema.XSDParser {
     /// chain may not loop. A reference is followed only when it resolves to this
     /// schema's own target namespace, and a redefined group/attribute group is a
     /// chain end (its single self-reference is the legal redefinition).
-    static func circularReferenceErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
-        substitutionCycleErrors(containers, bindings, target)
-            + referenceCycleErrors(containers, "group", "model group", bindings, target)
-            + referenceCycleErrors(containers, "attributeGroup", "attribute group", bindings, target)
+    static func circularReferenceFindings(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [PureXML.Schema.SchemaLocatedFinding] {
+        substitutionCycleFindings(containers, bindings, target)
+            + referenceCycleFindings(containers, "group", "model group", bindings, target)
+            + referenceCycleFindings(containers, "attributeGroup", "attribute group", bindings, target)
     }
 
-    private static func substitutionCycleErrors(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [String] {
+    private static func substitutionCycleFindings(_ containers: [XSDTree], _ bindings: [String: String], _ target: String?) -> [PureXML.Schema.SchemaLocatedFinding] {
         var graph: [String: String] = [:]
+        var nodeOf: [String: XSDTree] = [:]
         for container in containers {
             for element in descendants(container, named: "element") {
                 guard let name = XSDDerivNode.attribute(element, "name"),
                       let head = XSDDerivNode.attribute(element, "substitutionGroup"),
                       XSDDerivNode.referenceNamespace(head, bindings) == target else { continue }
                 graph[name] = XSDDerivNode.stripPrefix(head)
+                nodeOf[name] = element
             }
         }
         return graph.keys.sorted().compactMap { name in
-            derivesFromItself(name, graph, []) ? "element '\(name)' must not be a member of its own substitution group" : nil
+            guard derivesFromItself(name, graph, []) else { return nil }
+            return PureXML.Schema.SchemaLocatedFinding(reason: "element '\(name)' must not be a member of its own substitution group", node: nodeOf[name])
         }
     }
 
     /// A named-definition reference cycle: a `kind` definition (`group` /
     /// `attributeGroup`) whose `kind`-references reach itself. Multi-edge, since a
     /// definition may reference several others.
-    private static func referenceCycleErrors(_ containers: [XSDTree], _ kind: String, _ label: String, _ bindings: [String: String], _ target: String?) -> [String] {
+    private static func referenceCycleFindings(
+        _ containers: [XSDTree],
+        _ kind: String,
+        _ label: String,
+        _ bindings: [String: String],
+        _ target: String?,
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         let redefined = redefinedNames(containers, kind)
         var adjacency: [String: [String]] = [:]
+        var nodeOf: [String: XSDTree] = [:]
         for container in containers {
             for definition in descendants(container, named: kind) {
                 guard let name = XSDDerivNode.attribute(definition, "name") else { continue }
+                if nodeOf[name] == nil { nodeOf[name] = definition }
                 for ref in boundedReferences(definition, kind) where XSDDerivNode.referenceNamespace(ref, bindings) == target {
                     adjacency[name, default: []].append(XSDDerivNode.stripPrefix(ref))
                 }
@@ -226,7 +239,7 @@ extension PureXML.Schema.XSDParser {
         }
         return adjacency.keys.sorted().compactMap { name in
             guard !redefined.contains(name), reachesItself(name, adjacency, redefined) else { return nil }
-            return "\(label) '\(name)' must not reference itself"
+            return PureXML.Schema.SchemaLocatedFinding(reason: "\(label) '\(name)' must not reference itself", node: nodeOf[name])
         }
     }
 

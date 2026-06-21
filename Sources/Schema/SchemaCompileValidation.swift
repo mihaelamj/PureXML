@@ -95,36 +95,30 @@ extension PureXML.Validation {
 
         static var typeDerivationAcyclic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Type derivation chains contain no cycles") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.derivationCycleErrors(
-                        document.containers,
-                        document.context.namespaceBindings,
-                        document.context.targetNamespace,
-                    ),
+                PureXML.Schema.XSDParser.derivationCycleFindings(
+                    document.containers,
+                    document.context.namespaceBindings,
+                    document.context.targetNamespace,
                 )
             }
         }
 
         static var typeReferencesAcyclic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema type references contain no cycles") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.circularReferenceErrors(
-                        document.containers,
-                        document.context.namespaceBindings,
-                        document.context.targetNamespace,
-                    ),
+                PureXML.Schema.XSDParser.circularReferenceFindings(
+                    document.containers,
+                    document.context.namespaceBindings,
+                    document.context.targetNamespace,
                 )
             }
         }
 
         static var allGroupReferencesPlaced: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("xs:all group references appear only where permitted") { document in
-                PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.allGroupReferencePlacementErrors(
-                        document.containers,
-                        document.context.namespaceBindings,
-                        document.context.targetNamespace,
-                    ),
+                PureXML.Schema.XSDParser.allGroupReferencePlacementFindings(
+                    document.containers,
+                    document.context.namespaceBindings,
+                    document.context.targetNamespace,
                 )
             }
         }
