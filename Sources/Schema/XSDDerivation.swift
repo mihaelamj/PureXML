@@ -16,7 +16,7 @@ extension PureXML.Schema.XSDParser {
     ///
     /// The original fields (`typeDerivation`, `typeBlock`, etc.) are keyed by BARE
     /// local name and feed the schema-validity machinery (``ParticleRestriction``,
-    /// ``CompiledSchemaFacts``, ``substitutionTypeErrors(_:_:_:_:_:)``), which
+    /// ``CompiledSchemaFacts``, ``substitutionTypeFindings(_:_:_:_:_:)``), which
     /// resolves component references to local names and is the single-namespace
     /// consistent identity those rules compare by.
     ///

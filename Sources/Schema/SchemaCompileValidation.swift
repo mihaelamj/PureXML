@@ -163,14 +163,12 @@ extension PureXML.Validation {
         static var substitutionMembersDeriveCorrectly: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Substitution-group members derive correctly from their head") { document in
                 guard let derivation = document.derivation, let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.substitutionTypeErrors(
-                        document.schema,
-                        document.containers,
-                        derivation,
-                        namedTypes,
-                        document.context,
-                    ),
+                return PureXML.Schema.XSDParser.substitutionTypeFindings(
+                    document.schema,
+                    document.containers,
+                    derivation,
+                    namedTypes,
+                    document.context,
                 )
             }
         }
@@ -186,9 +184,7 @@ extension PureXML.Validation {
         static var extensionAllGroupsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Complex types extending xs:all groups satisfy XSD placement rules") { document in
                 guard let namedTypes = document.namedTypes else { return [] }
-                return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                    PureXML.Schema.XSDParser.extensionAllGroupErrors(document.schema, document.context, namedTypes),
-                )
+                return PureXML.Schema.XSDParser.extensionAllGroupFindings(document.schema, document.context, namedTypes)
             }
         }
 
@@ -338,13 +334,11 @@ extension PureXML.Validation.SchemaCompile {
     static var anonymousRestrictionsValid: PureXML.Validation.Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
         compileRule("Anonymous complex-type restrictions accept a subset of their base's") { document in
             guard let namedTypes = document.namedTypes else { return [] }
-            return PureXML.Schema.SchemaLocatedFinding.unlocated(
-                PureXML.Schema.XSDParser.anonymousRestrictionErrors(
-                    document.schema,
-                    document.context,
-                    namedTypes,
-                    document.derivation?.typeDerivation ?? [:],
-                ),
+            return PureXML.Schema.XSDParser.anonymousRestrictionFindings(
+                document.schema,
+                document.context,
+                namedTypes,
+                document.derivation?.typeDerivation ?? [:],
             )
         }
     }

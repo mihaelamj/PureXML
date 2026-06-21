@@ -12,10 +12,14 @@ extension PureXML.Schema.XSDParser {
     /// content is element-only or mixed. An empty base (extending it with an `all`
     /// makes the `all` the whole content, which is valid), a simple-content base, or
     /// an unresolved/foreign base is left alone. Checked for a self-contained schema.
-    static func extensionAllGroupErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ types: [String: PureXML.Schema.ElementType]) -> [String] {
+    static func extensionAllGroupFindings(
+        _ schema: XSDTree,
+        _ context: PureXML.Schema.XSDContext,
+        _ types: [String: PureXML.Schema.ElementType],
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for content in descendants(schema, named: "complexContent") {
             guard let ext = ExtAllNode.firstChild(content, named: "extension"),
                   let base = ExtAllNode.attribute(ext, "base"),
@@ -26,17 +30,23 @@ extension PureXML.Schema.XSDParser {
             // The extension itself adds an `all` group over a base that already has
             // element content: the all would be nested in the extension sequence.
             if extensionHasAllGroup(ext), baseHasElementContent(complex.content) {
-                errors.append("an 'all' group may not extend the type '\(baseName)', which has its own content; an all group must be the whole content model")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "an 'all' group may not extend the type '\(baseName)', which has its own content; an all group must be the whole content model",
+                    node: ext,
+                ))
                 continue
             }
             // The base's own content IS an `all` group and the extension adds
             // element content: the base's all is then nested in the sequence that
             // joins base and extension content, which is forbidden (cos-all-limited).
             if contentIsAllGroup(complex.content), extensionAddsElementContent(ext) {
-                errors.append("the type '\(baseName)' has an 'all' group as its whole content and may not be extended with element content")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "the type '\(baseName)' has an 'all' group as its whole content and may not be extended with element content",
+                    node: ext,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     /// Particle Valid (Restriction) for ANONYMOUS complex types: the named-type
@@ -47,15 +57,15 @@ extension PureXML.Schema.XSDParser {
     /// in this schema's own target namespace, and runs the same subset check. Only a
     /// self-contained schema is examined; the same `ParticleRestriction.violation`
     /// used for named types keeps the false-positive profile identical.
-    static func anonymousRestrictionErrors(
+    static func anonymousRestrictionFindings(
         _ schema: XSDTree,
         _ context: PureXML.Schema.XSDContext,
         _ types: [String: PureXML.Schema.ElementType],
         _ derivation: [String: PureXML.Schema.TypeDerivation],
-    ) -> [String] {
+    ) -> [PureXML.Schema.SchemaLocatedFinding] {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
-        var errors: [String] = []
+        var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for complexType in descendants(schema, named: "complexType") where ExtAllNode.attribute(complexType, "name") == nil {
             guard let content = ExtAllNode.firstChild(complexType, named: "complexContent"),
                   let restriction = ExtAllNode.firstChild(content, named: "restriction"),
@@ -70,10 +80,13 @@ extension PureXML.Schema.XSDParser {
                 types: types,
                 derivation: derivation,
             ) {
-                errors.append("an anonymous complex type is not a valid restriction of '\(ExtAllNode.stripPrefix(baseRef))': \(reason)")
+                findings.append(PureXML.Schema.SchemaLocatedFinding(
+                    reason: "an anonymous complex type is not a valid restriction of '\(ExtAllNode.stripPrefix(baseRef))': \(reason)",
+                    node: restriction,
+                ))
             }
         }
-        return errors
+        return findings
     }
 
     /// Whether a content type's whole content model is a NON-EMPTY `all` group. An
