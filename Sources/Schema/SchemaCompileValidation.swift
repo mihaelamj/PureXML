@@ -63,6 +63,23 @@ extension PureXML.Validation {
             }
         }
 
+        /// The top-level declaration constraints (a global definition needs a `name`;
+        /// the local-only `form`/`use`/`ref`/`minOccurs`/`maxOccurs` are forbidden on
+        /// a global element or attribute) apply to every schema document, not only the
+        /// one the validation is rooted at. `schemaStructureValid` walks just
+        /// `document.schema`, so a violation that lives in an included or imported
+        /// document was missed; this runs the same global-component check over the
+        /// other document roots in the composition. The main schema is excluded (it is
+        /// already covered) and `redefine` container entries are skipped (each schema
+        /// root already walks its own `redefine` children).
+        static var containerTopLevelDeclarationsValid: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+            compileRule("Top-level declarations in included or imported documents follow the global-component constraints") { document in
+                document.containers
+                    .filter { $0 !== document.schema && PureXML.Schema.XSDNode.localName($0) == "schema" }
+                    .flatMap { PureXML.Schema.XSDParser.topLevelDeclarationFindings($0) }
+            }
+        }
+
         static var componentNamesUnique: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Global schema component names are unique within their symbol spaces") { document in
                 PureXML.Schema.XSDParser.componentNameFindings(document.schema, document.containers, document.context)
@@ -210,6 +227,7 @@ extension PureXML.Validation {
             Validator<PureXML.Schema.SchemaCompileContext>.defaults(
                 nonReference: [
                     AnyValidation(idAttributesValid), AnyValidation(schemaStructureValid),
+                    AnyValidation(containerTopLevelDeclarationsValid),
                     AnyValidation(componentNamesUnique), AnyValidation(simpleTypeFinalControlsValid),
                     AnyValidation(contentModelsDeterministic), AnyValidation(attributeDeclarationsNotInXSI),
                     AnyValidation(referencedSchemasResolveToSchemas), AnyValidation(redefinitionsDeriveFromThemselves),
