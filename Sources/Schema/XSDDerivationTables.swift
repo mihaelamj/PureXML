@@ -102,7 +102,25 @@ extension PureXML.Schema.XSDParser {
         if let type = XSDDerivNode.attribute(element, "type") {
             tables.elementTypeNames[name] = XSDDerivNode.stripPrefix(type)
             tables.nsElementTypeNames[key] = resolvedKey(of: type, on: element, default: namespace)
+        } else {
+            recordInlineElementDerivation(element, key: key, in: namespace, into: &tables)
         }
+    }
+
+    /// Records the derivation of an element's INLINE complex type, which carries no
+    /// `type` name and so is absent from the named backbone. The entry is keyed by a
+    /// synthetic key (the element key plus a `#` marker no QName can contain, so it
+    /// cannot collide with a real type and is unreachable as anyone else's derivation
+    /// base) so a substitution-group `block` on the head can drop a member whose inline
+    /// type reaches the head's type by a blocked method (cos-equiv-derived-ok-rec; XSTS
+    /// disallowedSubst00105m). A plain inline type with no derivation records nothing.
+    private static func recordInlineElementDerivation(_ element: XSDTree, key: String, in namespace: String?, into tables: inout DerivationTables) {
+        guard let inlineType = XSDDerivNode.firstChild(element, named: "complexType"),
+              let derivation = namespacedDerivationInfo(inlineType, in: namespace)
+        else { return }
+        let inlineKey = key + "#inline"
+        tables.nsElementTypeNames[key] = inlineKey
+        tables.nsTypeDerivation[inlineKey] = derivation
     }
 
     /// The namespace a local element's name takes at instance level: the target

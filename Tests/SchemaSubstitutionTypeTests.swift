@@ -9,6 +9,23 @@ struct SchemaSubstitutionTypeTests {
         (try? PureXML.Schema.Document("<xs:schema \(xsd)>\(body)</xs:schema>")) != nil
     }
 
+    @Test("a head's block=extension forbids substituting an extension-derived member, even an inline type (disallowedSubst00105m)")
+    func test_blockExtensionForbidsSubstitution() throws {
+        let schema = "<xs:schema \(xsd)>"
+            + "<xs:element name=\"root\"><xs:complexType><xs:sequence>"
+            + "<xs:element ref=\"Head\" maxOccurs=\"unbounded\"/></xs:sequence></xs:complexType></xs:element>"
+            + "<xs:element name=\"Head\" type=\"HeadType\" block=\"extension\"/>"
+            + "<xs:complexType name=\"HeadType\"><xs:sequence><xs:element name=\"Ear\"/></xs:sequence></xs:complexType>"
+            + "<xs:element name=\"Member3\" substitutionGroup=\"Head\"><xs:complexType><xs:complexContent>"
+            + "<xs:extension base=\"HeadType\"><xs:sequence><xs:element name=\"Nose\"/></xs:sequence></xs:extension>"
+            + "</xs:complexContent></xs:complexType></xs:element></xs:schema>"
+        let doc = try PureXML.Schema.Document(schema)
+        // Member3 derives by extension, which Head blocks: the substitution is forbidden.
+        #expect(try !doc.validate("<root><Member3><Ear>e</Ear><Nose>n</Nose></Member3></root>").isEmpty)
+        // The head itself, and a restriction-derived member, remain valid substitutes.
+        #expect(try doc.validate("<root><Head><Ear>e</Ear></Head></root>").isEmpty)
+    }
+
     @Test("A member whose type is unrelated to the head's type is rejected")
     func test_unrelatedMemberType() {
         #expect(!compiles(
