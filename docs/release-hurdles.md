@@ -116,7 +116,7 @@ remaining release proof has two parts:
 
 When both are done, Part 2 closes stopper 4 (proven bounds) and the remaining
 stopper-3 silent gap. Until then, the instance-time star-degradation is closed,
-but `positionCap` remains a named release blocker.
+`positionCap` has since been DELETED (2026-06-22): the compositional `CompositionalDeterminism` engine replaces the inlining position automaton, so determinism is checked in `O(nodes * particles^2)` with no cap and no silent skip, proven verdict-equivalent over the whole XSTS corpus.
 
 ## If turned into work
 

@@ -63,7 +63,7 @@ Every claim below is labeled per proof discipline.
 | Counted matcher build size is independent of numeric occurrence magnitudes. | theorem, implemented | `ContentNFABuilder` allocates one counter scope per particle occurrence and a constant number of states/edges per particle; high-bound tests assert state count stays structural. |
 | Counted matcher runtime is bounded for interactive validation. | theorem target | For `N` child elements, `S` program states, and `D` counter scopes, validation is bounded by `O(N * S * D)` time and `O(S * D)` live matcher memory. The constants are schema-structural, not occurrence-magnitude structural. |
 | `all` groups remain exact. | theorem already implemented, out of scope for NFA replacement | `all` is validated by direct member counts in `ComplexValidator.matchesAll` and `allStructureErrors`; the counted automaton does not need to encode it initially. |
-| Counted UPA/determinism replaces `positionCap`. | blocked design frontier | The instance matcher can be replaced first. Deleting `positionCap` requires a separate counted determinism pass or a proof that the existing clamp is exact for XSD's admitted content models. |
+| Counted UPA/determinism replaces `positionCap`. | DONE (2026-06-22) | `CompositionalDeterminism` computes `first`/`followlast` over particle identities, summarizing each group once; `ContentModelDeterminism` delegates to it and `positionCap` is deleted. Proven verdict-equivalent to the inlining automaton by a differential over the whole XSTS corpus (zero divergences). |
 
 ## Bound representation
 
@@ -433,3 +433,17 @@ O(nodes × particles²), polynomial in schema text: a PROVEN bound, no cap.
 - A perf test compiles a `2^K`-nested-group schema (K ≥ 20) within a tight time bound.
 - XSTS `valid-schemas-rejected` stays 0 and `invalid-schemas-accepted` does not rise
   (it may fall, as previously-skipped pathological models now get checked).
+
+### Status: DONE (2026-06-22)
+
+Implemented as `CompositionalDeterminism` (`Sources/Schema/ContentModelDeterminismCompositional.swift`);
+`ContentModelDeterminism` delegates to it and the inlining position automaton and
+`positionCap` are deleted. The followlast detail (a repeating end-item's loop-back
+combined with the suffix-first as ONE decision set, and an `all` member's cross to
+the other members combined likewise) was essential: a first attempt that emitted the
+loop and the suffix as SEPARATE decision sets under-detected 13 XSTS content models;
+the differential caught every one. Acceptance met: no `positionCap` and no silent
+skip; verdict-equivalent on the XSTS corpus (zero divergences);
+`SchemaDeterminismGroupBlowupTests` compiles a 2^20-position model without hanging and
+rejects an ambiguous one; XSTS `valid-schemas-rejected` 0 and `invalid-schemas-accepted`
+unchanged at 15.
