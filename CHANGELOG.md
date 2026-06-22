@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added an opt-in DEEP fuzz campaign (`SchemaFuzzTests.test_deepFuzzCampaign`, production-readiness stopper #3: correctness bounded, not sampled). The standing fuzz gate samples a fast, hang-guarded 2000/250/600 iterations every CI run; this runs the same streaming-vs-tree differential over `PUREXML_FUZZ_ITERATIONS` seeds when that variable is set (skipped otherwise), so a long campaign is reproducible without editing the bounds and a divergence reproduces from its seed. It carries no `.timeLimit` (a 60k-seed run legitimately exceeds a minute); termination stays guaranteed by the engine's own occurrence/state caps. A campaign over 60,000 seeds (plus 20,000 schema/instance and 80,000 parser-byte iterations) found zero streaming-vs-tree divergences, crashes, or hangs.
+
 - Added a standing streaming-vs-tree differential gate (`SchemaFuzzTests.test_streamingMatchesTreeDifferential`,
   related to #194). The streaming XSD validator is a separate implementation of the same semantics as the
   tree validator (the conformance oracle), so it must agree with it on every input. The gate fuzzes 2000
