@@ -194,6 +194,9 @@ extension PureXML.Schema.XSDParser {
             if relaxesFixedValue(base: attribute, redefined: redefined[attrName], use: use(attrName)) {
                 errors.append("a redefined attribute group '\(name)' may not relax the fixed value of '\(attrName)'")
             }
+            if use(attrName) != "prohibited", widensBuiltinType(base: attribute, redefined: redefined[attrName]) {
+                errors.append("a redefined attribute group '\(name)' may not widen the type of '\(attrName)'")
+            }
             switch RedefineNode.attribute(attribute, "use") {
             case "required" where !hasReference && redefined[attrName] == nil:
                 errors.append("a redefined attribute group '\(name)' may not eliminate the required attribute '\(attrName)'")
@@ -228,6 +231,37 @@ extension PureXML.Schema.XSDParser {
         }
         return effective.sorted().filter { !baseNames.contains($0) }
             .map { "a redefined attribute group '\(name)' may not add the attribute '\($0)'" }
+    }
+
+    /// Whether a redefined attribute WIDENS the original's type. A redefinition is a
+    /// restriction, so a re-declared attribute's type must derive by restriction from
+    /// the original's. The check is BUILT-IN-only and therefore certain: it fires only
+    /// when both the original and the re-declared attribute name a built-in type and the
+    /// re-declared built-in does not derive from the original's in the XSD derivation
+    /// lattice (e.g. `int` does not derive from `boolean`, XSTS schM4). A user, inline,
+    /// or absent type on either side is not compared (returns false, staying lenient):
+    /// an absent original type is `anySimpleType`, which any type validly restricts, and
+    /// a user/inline type's derivation is not resolvable here, so no valid restriction
+    /// is rejected.
+    private static func widensBuiltinType(base: XSDTree, redefined: XSDTree?) -> Bool {
+        guard let redefined,
+              let baseBuiltin = builtinType(of: base),
+              let redefinedBuiltin = builtinType(of: redefined)
+        else { return false }
+        return !redefinedBuiltin.derives(from: baseBuiltin)
+    }
+
+    /// The built-in type an attribute names, ONLY when its `type` QName resolves to the
+    /// XSD namespace. A user type whose local name coincides with a built-in (a
+    /// `{urn:x}int`) resolves to a different namespace and returns nil, so it is not
+    /// mistaken for the built-in and `widensBuiltinType` declines rather than reject a
+    /// valid restriction. The QName is resolved against the owning schema's bindings,
+    /// the same context `redefineSelfReferenceFindings` uses for redefine references.
+    private static func builtinType(of attribute: XSDTree) -> PureXML.Schema.BuiltinType? {
+        guard let type = RedefineNode.attribute(attribute, "type") else { return nil }
+        let bindings = RedefineNode.namespaceBindings(of: RedefineNode.schemaOwner(attribute))
+        guard RedefineNode.referenceNamespace(type, bindings) == xsdNamespace else { return nil }
+        return PureXML.Schema.BuiltinType(rawValue: RedefineNode.stripPrefix(type))
     }
 
     /// A base attribute with a `fixed` value is relaxed when the redefinition declares
