@@ -31,10 +31,12 @@ struct XSTSSuiteTests {
     /// history of how each bucket reached its current value (every rule and its exact
     /// delta) lives in CHANGELOG.md and docs/xsts-deviations.md, not inline here.
     private let knownSchemaValidRejected = 0
-    /// Schema bucket, per-step deltas in CHANGELOG.md. Latest (15 -> 13): an
+    /// Schema bucket, per-step deltas in CHANGELOG.md. Recent: 15 -> 13, an
     /// unescaped `[` inside a pattern-facet character class is a syntax error per
-    /// XSD Appendix F, so the schema is invalid (RegexTest_993, RegexTest_1477).
-    private let knownSchemaInvalidAccepted = 13
+    /// XSD Appendix F (RegexTest_993, RegexTest_1477); 13 -> 12, an unknown
+    /// `\p{...}` category or block name is rejected now the block set is complete
+    /// (reK88, `\p{IsaA0-a9}`).
+    private let knownSchemaInvalidAccepted = 12
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's

@@ -66,9 +66,10 @@ extension PureXML.Schema {
                 } catch let error as PureXML.Regex.RegexError where rejectsPattern(error) {
                     errors.append("pattern '\(value)' is not a valid regular expression: \(error)")
                 } catch {
-                    // A construct the engine does not support (`.empty`, `.unsupported`
-                    // for an untabulated `\p{Is...}` block, `.badQuantifier` for the
-                    // lenient `{,m}` form) is a valid XSD pattern, not a schema error.
+                    // A construct the engine merely under-supports on an otherwise-
+                    // valid pattern (`.badQuantifier` for the lenient `{,m}` form,
+                    // `.badEscape`/`.badClass`) is a valid XSD pattern, not a schema
+                    // error. The empty pattern is valid and never throws.
                 }
             }
             return errors
@@ -82,7 +83,7 @@ extension PureXML.Schema {
             case .unbalanced, .danglingQuantifier, .reversedRange, .emptyClass, .reversedQuantifier,
                  .incompleteEscape, .unterminatedClass, .unescapedClassBracket, .invalidProperty:
                 true
-            case .unsupported, .badQuantifier, .badEscape, .badClass:
+            case .badQuantifier, .badEscape, .badClass:
                 false
             }
         }

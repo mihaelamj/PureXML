@@ -178,7 +178,8 @@ struct RegexTests {
         #expect(try matches(#"\p{IsTamil}+"#, "\u{0B85}"))
         #expect(try matches(#"\p{IsHangulJamo}+"#, "\u{1100}"))
         #expect(try !matches(#"\p{IsTamil}+"#, "\u{0531}")) // Armenian is not Tamil
-        // An unknown block name is still a compile error.
-        #expect(throws: PureXML.Regex.RegexError.self) { _ = try PureXML.Regex.Pattern(#"\p{IsNotARealBlock}"#) }
+        // An unknown block name is a compile error (the block set is complete, so
+        // an unrecognised name is a genuine syntax error, not an engine limitation).
+        #expect(throws: PureXML.Regex.RegexError.invalidProperty) { _ = try PureXML.Regex.Pattern(#"\p{IsNotARealBlock}"#) }
     }
 }

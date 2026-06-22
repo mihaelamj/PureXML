@@ -5,8 +5,8 @@ import Testing
 /// was only compiled lazily at instance time (`try?`), so an unparseable one was
 /// silently ignored and the schema accepted. Compile-time validation rejects the
 /// unambiguous structural errors (unbalanced parentheses, a quantifier with
-/// nothing to repeat) while tolerating constructs the engine merely does not
-/// support on an otherwise-valid pattern (an untabulated `\p{Is...}` block, the
+/// nothing to repeat, an unknown `\p{...}` category or block name) while tolerating
+/// constructs the engine merely under-supports on an otherwise-valid pattern (the
 /// empty pattern, the lenient `{,m}` quantifier), so no valid schema is rejected.
 @Suite("Pattern facet regex validity")
 struct SchemaPatternFacetTests {
@@ -57,10 +57,30 @@ struct SchemaPatternFacetTests {
 
     @Test("a construct the engine does not support is not treated as a schema error")
     func test_engineGapTolerated() throws {
-        // Empty pattern (valid: matches the empty string), an untabulated Unicode
-        // block escape, and the lenient `{,m}` quantifier are all accepted.
+        // The empty pattern (valid: matches the empty string) and the lenient
+        // `{,m}` quantifier are accepted.
         try compile("")
-        try compile(#"\p{IsHighSurrogates}"#)
         try compile("[0-9]{,5}")
+    }
+
+    @Test("an unknown \\p{...} category or block name is rejected (XSTS reK88)")
+    func test_unknownPropertyRejected() {
+        // `\p{IsaA0-a9}` (XSTS reK88) names no Unicode block; the recognised set is
+        // the complete XSD 1.0 charProp list, so an unknown name is a syntax error.
+        #expect(rejects(#"\p{IsaA0-a9}"#))
+        #expect(rejects(#"\p{IsNotARealBlock}"#))
+        #expect(rejects(#"\p{Zz}"#))
+    }
+
+    @Test("the complete XSD 1.0 block set compiles, including supplementary and surrogate blocks")
+    func test_fullBlockSetCompiles() throws {
+        // Supplementary-plane blocks (Unicode 3.1) are valid XSD block names.
+        try compile(#"\p{IsMusicalSymbols}"#)
+        try compile(#"\p{IsOldItalic}"#)
+        try compile(#"\p{IsCJKUnifiedIdeographsExtensionB}"#)
+        try compile(#"\p{IsTags}"#)
+        // Surrogate blocks are valid names whose ranges hold no scalar (match nothing).
+        try compile(#"\p{IsHighSurrogates}"#)
+        try compile(#"\p{IsLowSurrogates}"#)
     }
 }

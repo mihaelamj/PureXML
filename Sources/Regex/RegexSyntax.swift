@@ -6,7 +6,6 @@ extension PureXML.Regex {
         case badEscape(String)
         case badClass
         case badQuantifier
-        case unsupported(String)
         /// A character-class range whose first endpoint exceeds its second
         /// (`[b-a]`): unambiguously invalid, never an engine limitation.
         case reversedRange
@@ -39,7 +38,6 @@ extension PureXML.Regex {
             case let .badEscape(detail): "invalid escape '\\\(detail)'"
             case .badClass: "malformed character class"
             case .badQuantifier: "malformed quantifier"
-            case let .unsupported(detail): "unsupported construct: \(detail)"
             case .reversedRange: "character-class range is reversed"
             case .emptyClass: "empty character class"
             case .reversedQuantifier: "quantifier minimum exceeds maximum"
