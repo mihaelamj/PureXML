@@ -132,7 +132,7 @@ extension PureXML.Schema {
             var seen: [[FieldValue?]] = []
             for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
-                if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
+                if let error = fieldError(constraint, at: target, path: targetPath) {
                     issues.append(error)
                     continue
                 }
@@ -169,7 +169,7 @@ extension PureXML.Schema {
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
             for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
-                if let error = fieldCardinalityError(constraint, at: target, path: targetPath) {
+                if let error = fieldError(constraint, at: target, path: targetPath) {
                     issues.append(error)
                     continue
                 }
@@ -188,16 +188,33 @@ extension PureXML.Schema {
         /// `target`. A field must evaluate to a node-set with at most one member
         /// (Identity-constraint Definition; cvc-identity-constraint.3); selecting
         /// several is a violation, not a multi-valued key.
-        private func fieldCardinalityError(
+        private func fieldError(
             _ constraint: IdentityConstraint,
             at target: PureXML.Model.TreeNode,
             path targetPath: [PureXML.Validation.PathKey],
         ) -> PureXML.Validation.ValidationError? {
-            for field in constraint.fields where select(field, at: target, namespaces: constraint.namespaceBindings).count > 1 {
-                return .init(
-                    reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must select at most one node",
-                    at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
-                )
+            let step = fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings)
+            for field in constraint.fields {
+                let selected = select(field, at: target, namespaces: constraint.namespaceBindings)
+                // cvc-identity-constraint.3: each field must evaluate to at most one node.
+                if selected.count > 1 {
+                    return .init(
+                        reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must select at most one node",
+                        at: targetPath + step,
+                    )
+                }
+                // cvc-identity-constraint.3 / c-fields-xpaths: a field must identify a node
+                // with a simple type (or simple content). An element with element children
+                // has complex content and can never be simple-typed, so it is not a valid
+                // field target. Checked structurally: a simple-typed or simple-content
+                // element carries only text, never element children, so no valid field is
+                // rejected; an empty or text-only node, or an attribute, is left alone.
+                if let node = selected.first, node.kind == .element, node.children.contains(where: { $0.kind == .element }) {
+                    return .init(
+                        reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must identify a node with simple content",
+                        at: targetPath + step,
+                    )
+                }
             }
             return nil
         }
