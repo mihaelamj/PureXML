@@ -113,15 +113,12 @@ extension PureXML.Schema.XSDParser {
     }
 
     /// The non-prohibited attribute names a redefinition pulls in through its
-    /// `attributeGroup` references, with whether any of them is a SELF-reference
-    /// (resolving by NAMESPACE and local name to the redefinition's own name+target).
-    /// A self-reference re-imports the original and is reported via `hasSelfReference`
-    /// rather than counted. Returns nil (decline, stay lenient) when a referenced
-    /// group does not resolve from the base pool, carries an attribute wildcard, nests
-    /// a further `attributeGroup` reference, or names an attribute by `ref` (not
-    /// `name`): in each case the contributed set is not fully known, so the add-check
-    /// must not fire. A redefinition with no `attributeGroup` reference yields an empty
-    /// set and no self-reference, preserving the direct-declaration-only behavior.
+    /// `attributeGroup` references, with whether any is a SELF-reference (resolving by
+    /// NAMESPACE and local name to the redefinition's own name+target; reported via
+    /// `hasSelfReference` rather than counted, since it re-imports the original). Returns
+    /// nil (decline, stay lenient) when the contributed set is not fully known: a
+    /// referenced group that does not resolve, carries an attribute wildcard, nests a
+    /// further `attributeGroup` reference, or names an attribute by `ref` (not `name`).
     private static func referencedAttributeNames(
         of redefinition: XSDTree, ownName: String, base: [String: XSDTree],
     ) -> (names: Set<String>, hasSelfReference: Bool)? {
@@ -197,13 +194,16 @@ extension PureXML.Schema.XSDParser {
             if use(attrName) != "prohibited", widensBuiltinType(base: attribute, redefined: redefined[attrName]) {
                 errors.append("a redefined attribute group '\(name)' may not widen the type of '\(attrName)'")
             }
-            switch RedefineNode.attribute(attribute, "use") {
-            case "required" where !hasReference && redefined[attrName] == nil:
-                errors.append("a redefined attribute group '\(name)' may not eliminate the required attribute '\(attrName)'")
-            case "prohibited" where !baseHasWildcard && use(attrName) != nil && use(attrName) != "prohibited":
-                errors.append("a redefined attribute group '\(name)' may not re-introduce the prohibited attribute '\(attrName)'")
-            default:
-                break
+            if redeclaresSelfSuppliedAttribute(
+                attribute,
+                redeclaration: redefined[attrName],
+                hasSelfReference: referenced?.hasSelfReference == true,
+                prohibited: use(attrName) == "prohibited",
+            ) {
+                errors.append("a redefined attribute group '\(name)' redeclares '\(attrName)', which its self-reference already supplies")
+            }
+            if let transition = useTransitionError(base: attribute, redefined: redefined[attrName], name: name, hasReference: hasReference, baseHasWildcard: baseHasWildcard) {
+                errors.append(transition)
             }
         }
         return errors
@@ -231,6 +231,49 @@ extension PureXML.Schema.XSDParser {
         }
         return effective.sorted().filter { !baseNames.contains($0) }
             .map { "a redefined attribute group '\(name)' may not add the attribute '\($0)'" }
+    }
+
+    /// The `use`-transition restriction errors for one base attribute: a redefinition
+    /// may not eliminate a REQUIRED attribute (unless a reference could re-supply it),
+    /// nor re-introduce a PROHIBITED attribute as usable (unless the original has an
+    /// attribute wildcard that could admit it).
+    private static func useTransitionError(
+        base: XSDTree, redefined: XSDTree?, name: String, hasReference: Bool, baseHasWildcard: Bool,
+    ) -> String? {
+        guard let attrName = RedefineNode.attribute(base, "name") else { return nil }
+        let use = redefined.map { RedefineNode.attribute($0, "use") ?? "optional" }
+        switch RedefineNode.attribute(base, "use") {
+        case "required" where !hasReference && redefined == nil:
+            return "a redefined attribute group '\(name)' may not eliminate the required attribute '\(attrName)'"
+        case "prohibited" where !baseHasWildcard && use != nil && use != "prohibited":
+            return "a redefined attribute group '\(name)' may not re-introduce the prohibited attribute '\(attrName)'"
+        default:
+            return nil
+        }
+    }
+
+    /// schM8 / ag-props-correct.2: when a redefinition SELF-references the original it
+    /// re-imports all of the original's attributes, so directly re-declaring one of them
+    /// produces two attribute uses of the same name (a duplicate), which is invalid. The
+    /// check fires only for a re-declared, NON-prohibited attribute the original directly
+    /// declares, and only when BOTH the original and the re-declaration land in NO
+    /// namespace (a qualified attribute's target namespace depends on cross-document
+    /// `form`/chameleon resolution, so it is not compared, staying lenient).
+    private static func redeclaresSelfSuppliedAttribute(
+        _ attribute: XSDTree, redeclaration: XSDTree?, hasSelfReference: Bool, prohibited: Bool,
+    ) -> Bool {
+        guard hasSelfReference, let redeclaration, !prohibited else { return false }
+        return isNoNamespaceAttribute(attribute) && isNoNamespaceAttribute(redeclaration)
+    }
+
+    /// Whether an attribute use lands in NO namespace: it is not `form="qualified"` and
+    /// its owning schema does not set `attributeFormDefault="qualified"`. A qualified
+    /// attribute's target namespace depends on cross-document `form`/chameleon
+    /// resolution, so the self-reference duplicate check (which compares by local name)
+    /// is sound only for no-namespace attributes; a qualified one is not compared.
+    private static func isNoNamespaceAttribute(_ attribute: XSDTree) -> Bool {
+        if RedefineNode.attribute(attribute, "form") == "qualified" { return false }
+        return RedefineNode.attribute(RedefineNode.schemaOwner(attribute), "attributeFormDefault") != "qualified"
     }
 
     /// Whether a redefined attribute WIDENS the original's type. A redefinition is a
