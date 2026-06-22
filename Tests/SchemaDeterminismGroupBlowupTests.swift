@@ -11,10 +11,14 @@ import Testing
 /// both depths still exceed the old 4096-position cap, so the point holds.
 @Suite("UPA on 2^K nested-group content models")
 struct SchemaDeterminismGroupBlowupTests {
+    // The compiled content model also memoizes group expansion
+    // (GroupParticleMemo), so even these depths build in O(depth), not 2^depth: a
+    // depth past ~25 is infeasible to inline at all, so it doubles as a regression
+    // guard on that memo. WASI uses a smaller depth (~30x slower runtime).
     #if os(WASI)
-        private static let depth = 13 // 2^13 = 8192 positions, past the old 4096 cap
+        private static let depth = 16 // 2^16 = 65536 inlined positions, past the old 4096 cap
     #else
-        private static let depth = 20 // 2^20 = ~1,048,576 inlined positions
+        private static let depth = 40 // 2^40 inlined positions: infeasible without memoization
     #endif
 
     /// `g0=(g1,g1) … g{depth-1}=(g{depth},g{depth})`, leaf `g{depth}` = the given model.

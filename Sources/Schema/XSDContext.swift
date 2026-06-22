@@ -284,6 +284,7 @@ extension PureXML.Schema {
     /// refs can be expanded), and a guard against cyclic group references.
     struct XSDContext {
         var simpleTypes: [String: SimpleType]
+        let groupMemo = GroupParticleMemo()
         var attributeGroups: [String: XSDTree]
         /// Attribute-group definitions from included schemas before a `redefine`
         /// overlay replaces them; used when a redefinition self-references its
