@@ -98,10 +98,19 @@ extension PureXML.Schema.XSDParser {
         guard let definition = context.groups[name] else {
             return nil
         }
+        // Memoize the expansion: it is fixed by the definition and the visiting set
+        // (scope is fixed per definition), so sibling references share it and a
+        // multiply-referenced nested group compiles in O(groups), not 2^K. The
+        // reference site's own occurrence still wraps the shared content term.
+        let key = PureXML.Schema.GroupParticleMemoKey(definition: ObjectIdentifier(definition), visiting: context.visitingGroups)
+        if let cached = context.groupMemo.store[key] {
+            return Particle(occurrenceRange: occurrence, term: cached.term)
+        }
         let scoped = context.scoped(for: XSDNode.schemaOwner(definition))
         guard let inner = modelGroup(in: definition, scoped.visiting(name)) else {
             return nil
         }
+        context.groupMemo.store[key] = inner
         return Particle(occurrenceRange: occurrence, term: inner.term)
     }
 
