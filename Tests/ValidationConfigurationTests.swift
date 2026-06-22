@@ -87,6 +87,7 @@ struct ValidationConfigurationTests {
         #expect(PureXML.Validation.SchemaCompile.preCompileValidator().validationDescriptions == [
             "Schema component id attributes are valid NCNames and unique",
             "Schema vocabulary elements follow the schema-for-schemas structure",
+            "Top-level declarations in included or imported documents follow the global-component constraints",
             "Global schema component names are unique within their symbol spaces",
             "Simple-type final controls are declared consistently",
             "Schema content models are deterministic (UPA)",
