@@ -26,7 +26,7 @@ extension PureXML.Schema.ComplexValidator {
 
     /// Locates `all`-group violations: each child that is not an in-bounds member,
     /// recovering past it, then each required member that never appeared.
-    func allStructureErrors(_ group: PureXML.Schema.Group, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
+    func allStructureErrors(_ group: PureXML.Schema.Group, children: [PureXML.Model.Element], groupOptional: Bool = false, at path: XSDPath, into errors: inout [XSDFailure]) {
         var counts = [Int](repeating: 0, count: group.particles.count)
         let steps = Self.childSteps(children)
         for (index, child) in children.enumerated() {
@@ -40,6 +40,11 @@ extension PureXML.Schema.ComplexValidator {
             }
             counts[position] += 1
         }
+        // An optional `all` group (`minOccurs="0"`) that contributes no children is
+        // absent (zero occurrences), so its required members are not expected; but
+        // once any child appears the group is present once and every member's own
+        // `minOccurs` applies. A required group (`minOccurs="1"`) always enforces.
+        if groupOptional, children.isEmpty { return }
         for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
             if case let .element(name, _, _, _, _, _) = member.term {
                 errors.append(XSDFailure(reason: "element '\(name.localName)' is required but missing", at: path))

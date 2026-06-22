@@ -31,7 +31,7 @@ struct XSTSSuiteTests {
     /// history of how each bucket reached its current value (every rule and its exact
     /// delta) lives in CHANGELOG.md and docs/xsts-deviations.md, not inline here.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 18
+    private let knownSchemaInvalidAccepted = 17
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's
@@ -39,8 +39,9 @@ struct XSTSSuiteTests {
     /// typed member reached by a blocked method, disallowedSubst00105m); ur-type anyType wildcards are `lax`;
     /// identity fields compare in decimal value space (default/fixed when absent) and must be simple-content,
     /// element-children (idK012) or empty-complex (idG006); an attr wildcard is the INTERSECTION; year 0000 invalid;
-    /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065).
-    private let knownInstanceInvalidAccepted = 21
+    /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065);
+    /// an optional xs:all group present in the instance still requires its members (mgZ001).
+    private let knownInstanceInvalidAccepted = 20
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
