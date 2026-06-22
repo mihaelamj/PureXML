@@ -243,7 +243,13 @@ extension PureXML.Regex {
         private mutating func nextClassMember() throws -> ClassMember {
             guard let character = peek() else { throw RegexError.unterminatedClass }
             advance()
-            guard character == "\\" else { return .scalar(scalar(of: character)) }
+            guard character == "\\" else {
+                // A nested `[` is legal only as a `-[...]` subtraction, routed by
+                // parseClass/parseClassMember before reaching here; any other `[`
+                // is an unescaped class bracket, invalid per Appendix F.
+                if character == "[" { throw RegexError.unescapedClassBracket }
+                return .scalar(scalar(of: character))
+            }
             guard let escaped = peek() else { throw RegexError.incompleteEscape }
             advance()
             if let single = Self.singleEscape(escaped) { return .scalar(single) }

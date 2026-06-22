@@ -125,11 +125,28 @@ struct RegexTests {
     func test_unterminatedClass() throws {
         // A `[` the expression ends before closing with `]` is invalid.
         #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("a[") }
-        #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("[a[:xyz:") }
         #expect(throws: PureXML.Regex.RegexError.unterminatedClass) { _ = try PureXML.Regex.Pattern("[a-") }
         // A closed class, and a class whose only `]` is escaped, stay valid.
         #expect(try matches("[abc]", "b"))
         #expect(try matches("[a\\]]", "]"))
+    }
+
+    @Test("An unescaped '[' inside a character class is rejected")
+    func test_unescapedClassBracket() throws {
+        // Per XSD Appendix F a literal `[` inside a class must be escaped (`\[`);
+        // a nested class is legal only as a `-[...]` subtraction. The XSTS cases
+        // RegexTest_993 / RegexTest_1477 declare the pattern `[a[:xyz:]`, an
+        // unescaped inner `[`, so the schema declaring them is invalid.
+        #expect(throws: PureXML.Regex.RegexError.unescapedClassBracket) { _ = try PureXML.Regex.Pattern("[a[:xyz:]") }
+        #expect(throws: PureXML.Regex.RegexError.unescapedClassBracket) { _ = try PureXML.Regex.Pattern("[a[bc]") }
+        #expect(throws: PureXML.Regex.RegexError.unescapedClassBracket) { _ = try PureXML.Regex.Pattern("[[abc]") }
+        // With no closing `]`, the inner `[` still faults first (more precise than
+        // the unterminated-class diagnosis the swallowed `[` used to produce).
+        #expect(throws: PureXML.Regex.RegexError.unescapedClassBracket) { _ = try PureXML.Regex.Pattern("[a[:xyz:") }
+        // An escaped `[` and a `-[...]` subtraction stay valid.
+        #expect(try matches("[a\\[c]", "["))
+        #expect(try matches("[a-z-[aeiou]]", "b"))
+        #expect(try !matches("[a-z-[aeiou]]", "e"))
     }
 
     @Test("The empty pattern is valid and matches only the empty string")

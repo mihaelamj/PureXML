@@ -44,6 +44,17 @@ struct SchemaPatternFacetTests {
         try compile("(ab)*c?")
     }
 
+    @Test("an unescaped '[' inside a character class is rejected (XSTS RegexTest_993/1477)")
+    func test_unescapedClassBracket() {
+        // `[a[:xyz:]` (XSTS RegexTest_993 and RegexTest_1477) has an unescaped
+        // inner `[`, invalid per XSD Appendix F, so the schema is invalid.
+        #expect(rejects("[a[:xyz:]"))
+        #expect(rejects("[a[bc]"))
+        // The escaped form and a `-[...]` subtraction stay valid patterns.
+        #expect(!rejects("[a\\[c]"))
+        #expect(!rejects("[a-z-[aeiou]]"))
+    }
+
     @Test("a construct the engine does not support is not treated as a schema error")
     func test_engineGapTolerated() throws {
         // Empty pattern (valid: matches the empty string), an untabulated Unicode
