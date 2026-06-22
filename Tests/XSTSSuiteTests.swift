@@ -27,126 +27,9 @@ struct XSTSSuiteTests {
     /// count rising is a regression. The suite is opt-in, so CI and plain
     /// `swift test` are unaffected; run it with `swift test -c release --filter
     /// XSTS` (debug is far slower and the corpus is large). Per-case deviations
-    /// are written to /tmp/xsts-failures.txt for the burn-down.
-    ///
-    /// Re-measured 2026-06-16 after the harness was corrected to compile and merge
-    /// ALL of a schemaTest's schemaDocuments (it previously loaded only the first,
-    /// under-loading any multi-document schema). That removed a spurious valid-
-    /// instance rejection (wildZ003, whose root element is declared in the second
-    /// document) and exposed one previously-masked invalid-instance acceptance
-    /// (schA5, a schema-collection test the engine wrongly accepts once the full
-    /// collection is loaded): instances rejected 8 → 7, invalid accepted 146 → 147.
-    ///
-    /// Pinning the regex repertoire to Unicode 3.2 (the version the corpus is
-    /// consistent at) then cleared reZ003v, whose `\w` instance is all code points
-    /// assigned by 3.2: instances rejected 7 → 6, no other bucket moved.
-    ///
-    /// Driving per-child assessment from the matched content-model particle rather
-    /// than a by-name lookup (#180) then cleared isDefault079 (two same-named
-    /// particles with different `fixed` values) and QFE1700c2 (an element matching
-    /// a `skip` wildcard must not be validated against its global declaration):
-    /// instances rejected 6 → 4, no other bucket moved.
-    ///
-    /// Compiling an import chain of schema documents as a union rather than merging
-    /// separately compiled documents (#161) then cleared ctZ007, a cross-document
-    /// substitution group: instances rejected 4 → 3, no other bucket moved. The
-    /// remaining three are the Ethiopic-digit `\d` cases (reS17, reS38, reZ004v),
-    /// which contradict `\d` = `\p{Nd}` and are tracked as suspect tests.
-    ///
-    /// Enforcing identity-constraint field cardinality (a field must select at most
-    /// one node; cvc-identity-constraint.3) then caught four invalid instances that
-    /// were accepted (idF005, idG005, and kin): invalid accepted 147 → 143, no
-    /// other bucket moved.
-    ///
-    /// Resolving identity-constraint selector/field XPath prefixes against the
-    /// schema's namespace context (where the constraint is declared) rather than
-    /// the instance document then caught ten more (the idc004/5/6 cluster and
-    /// namespace-resolution cases): invalid accepted 143 → 133, no other bucket
-    /// moved.
-    ///
-    /// Resolving an identity-constraint attribute field's type through the
-    /// selector's target global element (not just the host's descendants) lets a
-    /// `unique`/`key` compare values in their value space (3.0 and 3 are the same
-    /// xsd:decimal key): invalid accepted 133 → 132, no other bucket moved.
-    /// The invalid-schemas-accepted bucket has since been driven 262 → 181 across
-    /// many schema-validity rules (regex `pattern` validity, schema-for-schemas
-    /// structure, derivation/`final`/`finalDefault`, notation, attribute and
-    /// attributeGroup constraints, value constraints, and `redefine` resolution);
-    /// each rule and its exact bucket delta is recorded per-entry in CHANGELOG.md.
-    /// The remaining residue is the cos-particle-restrict, redefine/composition, and
-    /// wildcard-restriction tail (see schema-validity-burndown notes). Recent steps:
-    /// Requiring each component a `redefine` names to exist (same kind, same name) in
-    /// the redefined schema once that schema is loaded (src-redefine.6/7.2.1) then
-    /// caught one more invalid schema: invalid-schemas accepted 183 → 182, no other
-    /// bucket moved.
-    /// Rejecting a `redefine` that redefines the same component twice (src-redefine.7.2.2)
-    /// then caught one more invalid schema: invalid-schemas accepted 182 → 181, no
-    /// other bucket moved.
-    /// Checking the RecurseAsIfGroup occurrence in Particle-Valid-Restriction (an
-    /// element restricting a base group is a synthetic {1,1} group, so a base group
-    /// that must occur 2+ times cannot be restricted to one element; §3.9.6) then
-    /// caught two more invalid schemas: invalid-schemas accepted 181 → 179, no other
-    /// bucket moved.
-    /// Enforcing the NameAndTypeOK block-superset clause (a restricting element's
-    /// `{disallowed substitutions}` must be a superset of the base element's, with
-    /// `block`/`blockDefault` carried on the particle) then caught sixteen more
-    /// invalid schemas: invalid-schemas accepted 179 → 163, no other bucket moved.
-    /// Subset-checking ANONYMOUS complex-type restrictions (inline `<complexType>`
-    /// declarations, which the named-type rule never saw) with the same
-    /// Particle-Valid-Restriction algorithm then caught fifteen more invalid schemas:
-    /// invalid-schemas accepted 163 → 148, no other bucket moved.
-    /// Enforcing the NameAndTypeOK fixed-value clause (a restriction of a `fixed`
-    /// base element must be fixed to the same value, compared in the base type's
-    /// value space) then caught four more invalid schemas: invalid-schemas accepted
-    /// 148 → 144, no other bucket moved.
-    /// Enforcing the NameAndTypeOK nillable clause (a restriction may not be nillable
-    /// unless the base element is) then caught two more invalid schemas:
-    /// invalid-schemas accepted 144 → 142, no other bucket moved.
-    /// Requiring a `simpleContent` restriction's base to be a complex type, not a
-    /// built-in or user simple type (src-ct.2), then caught five more invalid
-    /// schemas: invalid-schemas accepted 142 → 137, no other bucket moved.
-    /// Requiring a restricting wildcard's `processContents` to be at least as strong
-    /// as the base's (strict > lax > skip; Wildcard Subset §3.10.6) then caught three
-    /// more invalid schemas: invalid-schemas accepted 137 → 134, no other bucket moved.
-    /// Rejecting an empty-string namespace value (`targetNamespace=""`, `import
-    /// namespace=""`) then caught two more invalid schemas: invalid-schemas accepted
-    /// 134 → 132, no other bucket moved.
-    /// Requiring an attribute a restriction adds (with no matching base attribute use)
-    /// to be admitted by the base's attribute wildcard (cos-ct-restricts.3) then
-    /// caught one more invalid schema: invalid-schemas accepted 132 → 131, no other
-    /// bucket moved.
-    /// Requiring a restriction's own attribute wildcard to be a subset of the base's
-    /// (cos-ct-restricts.4: a base without one admits none; `##any` over `##other` is
-    /// not a subset) then caught three more invalid schemas: invalid-schemas accepted
-    /// 131 → 128, no other bucket moved.
-    /// Instance tests whose expected validity contradicts the normative XSD
-    /// definition of `\d`, excluded as a named, bounded spec divergence (not a
-    /// validator defect). XSD 1.0 Datatypes Appendix F defines `\d` as `\p{Nd}`.
-    /// reS17 (U+1369), reS38 (U+1371), and reZ004v use Ethiopic digits, which are
-    /// general category `No` (Other Number), not `Nd`, so `\d` does not match them
-    /// and the instance is invalid; the corpus marks these `valid`. Verified that
-    /// our `\d` matches `Nd` (incl. Khmer U+17E0) and rejects Ethiopic `No`, which is
-    /// what every conformant processor (e.g. Xerces) does. Faking `\d` to match `No`
-    /// would corrupt the definition and is refused; the tests are the outliers.
-    private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
-
-    /// FALSE POSITIVES ARE 0 (production stopper #1). The last over-rejection,
-    /// particlesZ001 (`element{0,∞}` restricting `choice{0,∞}` over that element;
-    /// the test's own doc calls the RecurseAsIfGroup rule "ambiguous"), is fixed by
-    /// reading element-vs-choice restriction via effective total range. That reading
-    /// is a bounded, NAMED under-rejection: element-vs-choice no longer models exact
-    /// in-branch sequencing, so invalid-schemas-accepted rose 128 → 130 (two
-    /// element-vs-choice restriction cases) and, with particlesZ001 now correctly
-    /// compiling, its instance particlesZ001.i (a previously-masked invalid-instance
-    /// gap) is accepted, 132 → 133. Per the production standard over-rejection is the
-    /// non-starter and under-rejection is recoverable; this debt is recovered by the
-    /// full effective-total-range Particle-Valid-Restriction (tracked).
-    /// Further rules, each with valid-schemas-rejected held at 0 (see CHANGELOG and
-    /// docs/xsts-deviations.md), drove invalid-schemas-accepted 130 -> 45 across
-    /// model-group occurrence, identity-constraint content, derivation base kind, attribute/simple-type,
-    /// composition, simpleContent inline-type, complexContent mixedness, and substitution-group anySimpleType checks.
-    /// src-resolve (#185) 43->39; xsi:Not-Allowed (#183) 39->37; NameAndTypeOK restriction-only + cos-all-limited group-ref (#158) 37->35.
-    /// UPA 31; ext-model 29; XSD-ns 27; unpref-type-ref 25; redefine-attrGroup attgC028/schM4/schM8 25->22, attQ011/017 ref-dup 22->20; valid-rejected 0.
+    /// are written to /tmp/xsts-failures.txt for the burn-down. The full per-step
+    /// history of how each bucket reached its current value (every rule and its exact
+    /// delta) lives in CHANGELOG.md and docs/xsts-deviations.md, not inline here.
     private let knownSchemaValidRejected = 0
     private let knownSchemaInvalidAccepted = 20
     private let knownInstanceValidRejected = 0
@@ -157,6 +40,9 @@ struct XSTSSuiteTests {
     /// identity fields compare in decimal value space (default/fixed when absent) and must be simple-content,
     /// element-children (idK012) or empty-complex (idG006); an attr wildcard is the INTERSECTION; year 0000 invalid.
     private let knownInstanceInvalidAccepted = 22
+    /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
+    /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
+    private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
 
     @Test("Every XSTS case behaves: compile, reject, validate, invalidate")
     func test_suite() throws {
