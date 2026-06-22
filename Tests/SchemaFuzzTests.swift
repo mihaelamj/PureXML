@@ -63,9 +63,40 @@ private struct SchemaGenerator {
         case 0: "<xs:element name=\"\(pick(Self.names))\" type=\"\(pick(Self.leafTypes))\"\(occurrence())/>"
         case 1: "<xs:any\(occurrence()) processContents=\"\(pick(["strict", "lax", "skip"]))\"/>"
         case 2: "<xs:element ref=\"\(pick(Self.names))\"\(occurrence())/>"
-        case 3: "<xs:group ref=\"\(pick(["g0", "g1"]))\"\(occurrence())/>"
+        // `c0` enters the deep linear chain (deep call/return), `g0`/`g1` the
+        // shallow mutual cycle (the visiting-group guard and sibling calls).
+        case 3: "<xs:group ref=\"\(pick(["g0", "g1", "c0"]))\"\(occurrence())/>"
         default: "<xs:element name=\"\(pick(Self.names))\"\(occurrence())/>"
         }
+    }
+
+    // A deep LINEAR group-reference chain (c0 -> c1 -> … -> c{chainDepth}): each
+    // level references the next exactly once, so its inlined size is O(depth), not
+    // 2^depth. It exercises deep group call/return nesting (the correctness a
+    // future pushdown content-model matcher hinges on) and keeps the streaming and
+    // tree validators differentially compared over it, WITHOUT the exponential
+    // inlined blowup a doubling chain would trigger in the per-instance NFA build
+    // (that doubling case is pinned separately by SchemaDeterminismGroupBlowupTests).
+    #if os(WASI)
+        private static let chainDepth = 3
+    #else
+        private static let chainDepth = 6
+    #endif
+
+    private mutating func chainGroups() -> [String] {
+        var groups: [String] = []
+        for level in 0 ..< Self.chainDepth {
+            let compositor = pick(Self.compositors)
+            let element = "<xs:element name=\"\(pick(Self.names))\"\(occurrence())/>"
+            let next = "<xs:group ref=\"c\(level + 1)\"\(occurrence())/>"
+            // Vary which side the recursive reference sits on so the chain exercises
+            // a group call as both a sequence head and a tail (distinct follow sets).
+            let body = toss() ? element + next : next + element
+            groups.append("<xs:group name=\"c\(level)\"><xs:\(compositor)>\(body)</xs:\(compositor)></xs:group>")
+        }
+        groups.append("<xs:group name=\"c\(Self.chainDepth)\"><xs:sequence>"
+            + "<xs:element name=\"\(pick(Self.names))\"\(occurrence())/></xs:sequence></xs:group>")
+        return groups
     }
 
     private mutating func particle(_ depth: Int) -> String {
@@ -93,6 +124,9 @@ private struct SchemaGenerator {
         // visiting-group guard).
         parts.append("<xs:group name=\"g0\">\(modelGroup(2))</xs:group>")
         parts.append("<xs:group name=\"g1\">\(modelGroup(2))</xs:group>")
+        // The deep linear chain c0 -> … -> c{chainDepth}, reachable from any leaf
+        // via `<xs:group ref="c0">`.
+        parts.append(contentsOf: chainGroups())
         // Global elements with a substitution chain (m2 -> m1 -> head).
         parts.append("<xs:element name=\"head\" type=\"\(pick(Self.leafTypes))\"/>")
         parts.append("<xs:element name=\"m1\" substitutionGroup=\"head\"/>")

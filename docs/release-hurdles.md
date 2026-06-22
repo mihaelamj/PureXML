@@ -86,12 +86,14 @@ not code.
 
 Two engines, two postures.
 
-**Compile-time UPA (`ContentModelDeterminism`)** is fairly safe: it clamps `{n,n}`
-to 2 copies and uses a self-loop for repetition (ContentModelDeterminism.swift:117–132),
-so positions ≈ schema *text* size. `positionCap = 4096` is a backstop for
-pathological nested group references; when hit it **silently skips the UPA check**
-(`return nil`, ContentModelDeterminism.swift:85): a hidden false negative and a
-stopper-3 silent gap, but rare.
+**Compile-time UPA (`ContentModelDeterminism`)** is now bounded with no silent gap.
+The former inlining position automaton (with its `positionCap = 4096` skip) was
+replaced on 2026-06-22 by `CompositionalDeterminism`, which summarizes each
+`<xs:group>` once and computes `first`/`followlast` over particle identities in
+`O(nodes * particles^2)` without inlining, so a multiply-referenced nested group
+can no longer blow up to `2^K` positions and is never skipped. The schema-side
+expansion is likewise memoized (`GroupParticleMemo`), so the compiled content model
+also builds in `O(groups)`, not `2^K`.
 
 **Instance-time matcher (`ContentMatcher`)**, the one that runs on keystrokes, no
 longer unrolls occurrences into states. The 2026-06-19 counted matcher stores XSD
@@ -107,16 +109,42 @@ encodes an O(log n)-byte numeric bound as n states. No ceiling fixes that withou
 changing semantics at the ceiling.
 
 **What the remaining proof requires.** The instance matcher now uses a **counting
-automaton**: `{m,n}` is represented with a counter/register, not m copies. The
-remaining release proof has two parts:
+automaton**: `{m,n}` is represented with a counter/register, not m copies. That
+closes the *occurrence*-unrolling blowup. One structural residual remains, distinct
+from occurrences:
 
-- keep the implementation proof aligned with `docs/design/counted-content-automaton.md`
-  for the counted matcher (`ContentMatcher.swift`);
-- replace the compile-time UPA `positionCap` skip with counted determinism.
+**Per-instance group-inlining in the NFA build.** `ContentNFABuilder.build`
+(ComplexValidator.swift:215, run per validated element) still walks the *inlined*
+particle tree, expanding every `<xs:group ref>` in place. A pathological schema
+whose nested group references inline to `2^K` positions (e.g. `g{i}=(g{i+1},g{i+1})`)
+therefore makes the per-instance **automaton construction** exponential, even though
+the *match* over a valid instance keeps a small active set and the compile-time UPA
+of the same schema is now polynomial. The trigger is a developer-authored schema,
+not external instance data (instance validation against any fixed real schema is
+bounded), so the severity is low; but it is where a `2^K`-inlining schema can still
+hang on first instance validation. The tree path's NFA build is the cited site; the
+streaming path's equivalent term walks (`elementTypes`/`sequenceStructureErrors`,
+listed below) share the property. It is recorded here rather than left silent.
 
-When both are done, Part 2 closes stopper 4 (proven bounds) and the remaining
-stopper-3 silent gap. Until then, the instance-time star-degradation is closed,
-`positionCap` has since been DELETED (2026-06-22): the compositional `CompositionalDeterminism` engine replaces the inlining position automaton, so determinism is checked in `O(nodes * particles^2)` with no cap and no silent skip, proven verdict-equivalent over the whole XSTS corpus.
+The fully general fix is a **pushdown / recursive-transition-network matcher**:
+keep group references first-class (`call`/`return` against a stack) so a shared
+sub-model is built once (`O(groups)`) with context-pure returns, instead of inlined.
+This is pervasive (every `Term` consumer: the NFA builder, the streaming
+`elementTypes`/`sequenceStructureErrors`, `wildcardMatch`, `ParticleRestriction`,
+completions) and touches the keystroke-critical instance validator, so it is
+FP-critical: naive sub-model *sharing* without a stack merges follow sets and is
+unsound. It must therefore be gated by a differential that actually exercises deep
+group call/return before it can switch. That gate now exists and is hardened: the
+streaming-vs-tree differential (`SchemaFuzzTests`) generates a deep **linear**
+group-reference chain (`c0 -> … -> c{chainDepth}`, `O(depth)` not `2^depth`, so it
+stresses call/return depth without the exponential build) and was run divergence-free
+over a 60 000-seed campaign. Until the matcher lands, the residual stands as a
+characterized, low-severity, disclosed limitation.
+
+When the pushdown matcher lands behind that gate, Part 2 closes stopper 4 (proven
+bounds). The compile-time UPA gap is already closed: `positionCap` was DELETED
+(2026-06-22), determinism checked in `O(nodes * particles^2)` with no cap and no
+silent skip, proven verdict-equivalent over the whole XSTS corpus.
 
 ## If turned into work
 
@@ -124,8 +152,11 @@ stopper-3 silent gap. Until then, the instance-time star-degradation is closed,
   paired with the FP-guard test matrix (valid restrictions that must still pass)
   before tightening. Drive `invalid-schemas-accepted` / `invalid-instances-accepted`
   to 0 (M2, M3), FP gate sacred.
-- **Part 2:** the `ContentMatcher` counter automaton has landed; the remaining
-  acceptance criteria are deleting `ContentModelDeterminism.positionCap`, keeping
-  the stated worst-case bound/proof current, and preserving no silent
-  star-degradation (M4 "proven bounds"). Aligns with the performance epic (#139,
-  #175–178). The design is pinned in `docs/design/counted-content-automaton.md`.
+- **Part 2:** the `ContentMatcher` counter automaton has landed and
+  `ContentModelDeterminism.positionCap` is deleted (compile-time UPA now
+  polynomial). The remaining acceptance criterion for M4 "proven bounds" is the
+  **pushdown / RTN instance matcher** that keeps group references first-class so
+  the per-instance NFA build is `O(groups)` not `2^K`, switched only behind the
+  hardened deep-group streaming-vs-tree differential (FP gate sacred). Aligns with
+  the performance epic (#139, #175–178). The design is pinned in
+  `docs/design/counted-content-automaton.md`.
