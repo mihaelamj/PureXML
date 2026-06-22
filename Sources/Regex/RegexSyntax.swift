@@ -18,8 +18,13 @@ extension PureXML.Regex {
         /// expression ended. Unambiguously invalid, never an engine limitation.
         case incompleteEscape
         /// A character class opened with `[` that the expression ends before
-        /// closing with `]` (`a[`, `[a[:xyz:`). Unambiguously invalid.
+        /// closing with `]` (`a[`). Unambiguously invalid.
         case unterminatedClass
+        /// An unescaped `[` inside a character class (`[a[bc]`, `[a[:xyz:]`): XSD
+        /// Appendix F `SingleCharNoEsc` excludes `[`, and a nested class is legal
+        /// only as a `-[...]` subtraction, so a `[` not introduced by `-` is a
+        /// syntax error. Unambiguously invalid, never an engine limitation.
+        case unescapedClassBracket
         /// The `{...}` of a `\p`/`\P` escape whose content can be no XSD charProp:
         /// empty, the bare prefix `Is`, a non-block name carrying a character that
         /// is not a letter, or `Is` followed by a non-block-name character
@@ -40,6 +45,7 @@ extension PureXML.Regex {
             case .reversedQuantifier: "quantifier minimum exceeds maximum"
             case .incompleteEscape: "an escape '\\' has no following character"
             case .unterminatedClass: "a character class is not closed with ']'"
+            case .unescapedClassBracket: "an unescaped '[' inside a character class"
             case .invalidProperty: "a \\p{...} property name is malformed"
             }
         }
