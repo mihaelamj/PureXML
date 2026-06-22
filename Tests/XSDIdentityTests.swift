@@ -9,39 +9,6 @@ struct XSDIdentityTests {
 
     private let head = "<xs:schema xmlns:xs=\"http://www.w3.org/2001/XMLSchema\">"
 
-    @Test("a field selecting a complex-content element is rejected (cvc-identity-constraint.3)")
-    func test_fieldMustBeSimpleContent() throws {
-        // The field `pid` selects an element with element children (`gid`), which has
-        // complex content and can never be simple-typed: invalid (idK012/idG006).
-        let complexField = """
-        \(head)
-          <xs:element name="root">
-            <xs:complexType><xs:sequence>
-              <xs:element name="uid" maxOccurs="unbounded"><xs:complexType><xs:sequence>
-                <xs:element name="pid"><xs:complexType><xs:sequence><xs:element name="gid"/></xs:sequence></xs:complexType></xs:element>
-              </xs:sequence></xs:complexType></xs:element>
-            </xs:sequence></xs:complexType>
-            <xs:key name="k"><xs:selector xpath=".//uid"/><xs:field xpath="pid"/></xs:key>
-          </xs:element>
-        </xs:schema>
-        """
-        #expect(try !validate(complexField, "<root><uid><pid><gid>x</gid></pid></uid></root>").isEmpty)
-        // Guard: a simple-content field target stays valid (no false positive).
-        let simpleField = """
-        \(head)
-          <xs:element name="root">
-            <xs:complexType><xs:sequence>
-              <xs:element name="uid" maxOccurs="unbounded"><xs:complexType><xs:sequence>
-                <xs:element name="pid" type="xs:string"/>
-              </xs:sequence></xs:complexType></xs:element>
-            </xs:sequence></xs:complexType>
-            <xs:key name="k"><xs:selector xpath=".//uid"/><xs:field xpath="pid"/></xs:key>
-          </xs:element>
-        </xs:schema>
-        """
-        #expect(try validate(simpleField, "<root><uid><pid>a</pid></uid><uid><pid>b</pid></uid></root>").isEmpty)
-    }
-
     @Test("xs:unique rejects a duplicated field value")
     func test_unique() throws {
         let xsd = """
