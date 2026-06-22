@@ -342,3 +342,94 @@ This arc is complete only when all are true:
   "theorem" with code references.
 - `docs/release-hurdles.md` no longer lists content-model occurrence unrolling as
   an interactive-safety blocker.
+
+## Counted UPA / deleting `positionCap`: the compositional determinism algorithm
+
+This section specifies the algorithm that deletes `ContentModelDeterminism.positionCap`,
+turning the "blocked design frontier" (table row above) into a ready-to-implement,
+FP-safe plan. Derived 2026-06-22 from a first-principles analysis of the current engine.
+
+### Why `positionCap` exists (root cause, confirmed in code)
+
+`ContentModelDeterminism` builds a Glushkov position automaton; `groupReference`
+(`ContentModelDeterminism.swift`) *inlines* every `<xs:group ref>` via `build(model,…)`,
+with the `visiting` set guarding only CYCLES, not repeated references. So
+`g0=seq(ref g1, ref g1)`, `g1=seq(ref g2, ref g2)`, … expands to `2^K` positions:
+position count is EXPONENTIAL in schema text via multiply-referenced nested groups.
+`positionCap = 4096` caps that blowup and, when hit, `return nil` (silently skips the
+UPA check = an under-rejection = the remaining stopper-3/4 debt). It is NOT primarily
+an overlap-cost issue (`overlap` is O(set²) but within the cap that is ~16M cheap ops,
+sub-second at compile time, not a bottleneck): the blocker is the exponential position
+COUNT.
+
+### Why naive fixes are unsound
+
+Deduplicating positions by `(label, particle)` so a group's elements get ONE position
+regardless of reference count is UNSOUND: a group referenced in context A (followed by
+X) and context B (followed by Y) would merge `followpos = X ∪ Y`, manufacturing a
+decision set `{X,Y}` that occurs in no single context: a spurious conflict = a FALSE
+POSITIVE (violates stopper #1). Inlining is sound precisely because each reference site
+gets fresh positions with context-pure `followpos`.
+
+### The sound compositional algorithm (no inlining, bounded O(particles²))
+
+Compute determinism over PARTICLE identities (`ObjectIdentifier` of the element/wildcard
+node), of which there are O(schema text size), never over inlined positions. For each
+sub-model node compute a summary that is CONTEXT-INDEPENDENT:
+
+- `nullable: Bool`
+- `firstParticles: Set<(particle, label)>`: distinct particles that can start it
+- `lastParticles: Set<(particle, label)>`: distinct particles that can end it
+- `followlast: Set<{particle pair}>`: particle pairs that share a decision set INTERNALLY
+  (its own `followpos`-induced co-occurrences), plus the node's internal verdict
+- `internalConflict: TermLabel?`: a conflicting label if the sub-model is itself ambiguous
+
+Composition rules (a conflict = two DISTINCT particles whose labels `labelsOverlap`
+sharing a decision set):
+- leaf (element/`any`): first = last = {(particle,label)}; no internal conflict.
+- `choice(c…)`: decision set = ∪ firstParticles(cᵢ); conflict if that set holds a
+  distinct-particle overlapping-label pair, or any child conflicts. first/last = unions.
+- `sequence(c…)`: walk the nullable runs; at each gap the decision set is the
+  firstParticles of the maximal nullable run starting there (joined to the preceding
+  run's lastParticles via followpos): check each such set; first = firstParticles of the
+  leading nullable prefix; last = lastParticles of the trailing nullable suffix.
+- `all(c…)`: every member may follow every other and all share one decision set
+  (mirrors the current `all`): the decision set is ∪ firstParticles(cᵢ) AND each member
+  pair contributes cross-`followpos`; check the union for conflicts.
+- repetition `R{m,n}` with n>1 or unbounded: the Brüggemann-Klein star condition.
+  `followlast(R) ∪ firstParticles(R)` must be conflict-free (the last->first repetition
+  edge). `{n,n}` clamps to two copies exactly as today (determinism-equivalent); `{0,1}`
+  adds no edge.
+- `group ref`: use the group's MEMOIZED summary (computed once: context-independent).
+  Cross-boundary conflicts (the group's lastParticles followed by the next context's
+  firstParticles, and the previous context's lastParticles followed by the group's
+  firstParticles) are computed by the PARENT at each reference site, so two distinct
+  reference sites never merge their continuations. This is the soundness key: each group
+  is summarized once (no `2^K` blowup) while cross-boundary decision sets stay
+  context-pure.
+
+Bound: each group summarized once; each composition checks O(particles²) pairs; total
+O(nodes × particles²), polynomial in schema text: a PROVEN bound, no cap.
+
+### FP-safe rollout (cardinal rule sacred)
+
+1. Implement the compositional checker ALONGSIDE the existing inlining `violation`; do
+   NOT make it authoritative.
+2. Add a differential: for every fuzzed schema where `positionCap` is not hit (so the
+   inlining oracle is exact) AND for the whole XSTS corpus, assert the compositional
+   verdict EQUALS the inlining verdict. Extend `SchemaGenerator` to emphasize
+   multiply-referenced nested groups.
+3. Iterate the compositional checker until it agrees everywhere (the inlining check is
+   the trusted oracle; any divergence is a bug in the new checker, fixed toward
+   agreement). This makes the change FP-safe by construction: nothing ships until proven
+   equivalent on the oracle.
+4. Only then switch `violation` to the compositional checker and DELETE `positionCap`.
+   Add a perf test on the `2^K`-group pattern proving polynomial (not exponential) time.
+
+### Acceptance criteria (supersedes the `positionCap` row in the table above)
+
+- `ContentModelDeterminism.swift` contains no `positionCap` and no silent UPA skip.
+- The compositional/inlining differential passes on XSTS + a deep group-ref fuzz.
+- A perf test compiles a `2^K`-nested-group schema (K ≥ 20) within a tight time bound.
+- XSTS `valid-schemas-rejected` stays 0 and `invalid-schemas-accepted` does not rise
+  (it may fall, as previously-skipped pathological models now get checked).
