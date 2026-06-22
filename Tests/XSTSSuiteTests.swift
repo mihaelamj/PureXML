@@ -38,8 +38,9 @@ struct XSTSSuiteTests {
     /// type; a non-nillable element carries no xsi:nil; block/blockDefault bar substitutions (incl. an inline-
     /// typed member reached by a blocked method, disallowedSubst00105m); ur-type anyType wildcards are `lax`;
     /// identity fields compare in decimal value space (default/fixed when absent) and must be simple-content,
-    /// element-children (idK012) or empty-complex (idG006); an attr wildcard is the INTERSECTION; year 0000 invalid.
-    private let knownInstanceInvalidAccepted = 22
+    /// element-children (idK012) or empty-complex (idG006); an attr wildcard is the INTERSECTION; year 0000 invalid;
+    /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065).
+    private let knownInstanceInvalidAccepted = 21
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]

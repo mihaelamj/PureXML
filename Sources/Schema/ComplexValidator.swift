@@ -92,7 +92,7 @@ public extension PureXML.Schema {
         /// The errors from an `xsi:nil="true"` element: rejecting it when the
         /// element is not nillable, or when it carries content. Returns nil when
         /// the element is not nilled.
-        func nilErrors(_ element: PureXML.Model.Element, at path: XSDPath) -> [XSDFailure]? {
+        func nilErrors(_ element: PureXML.Model.Element, fixedValue: String? = nil, at path: XSDPath) -> [XSDFailure]? {
             let name = element.name.localName
             // cvc-elt.3.1: a non-nillable element must carry no `xsi:nil` attribute at
             // all, whatever its value (so `xsi:nil="false"` is equally forbidden, not
@@ -103,6 +103,12 @@ public extension PureXML.Schema {
             guard Self.isNil(element) else { return nil }
             if Self.hasContent(element) {
                 return [XSDFailure(reason: "nil element '\(name)' must be empty", at: path)]
+            }
+            // cvc-elt.3.2.2: a nilled element may not have a fixed {value constraint}.
+            // The matched particle's constraint is authoritative; the by-local-name map
+            // is a fallback for paths without a particle (e.g. the resolved-type entry).
+            if (fixedValue ?? elementConstraints[name]?.fixedValue) != nil {
+                return [XSDFailure(reason: "nil element '\(name)' must not have a fixed value constraint", at: path)]
             }
             return []
         }
@@ -318,7 +324,7 @@ public extension PureXML.Schema {
                 for attribute in child.attributes where !Self.isNamespaceDeclaration(attribute) && !Self.isSchemaInstanceAttribute(attribute) {
                     errors.append(XSDFailure(reason: "'\(child.name.localName)' has a simple type and must not carry attribute '\(attribute.name.localName)'", at: path))
                 }
-                if let nilErrors = nilErrors(child, at: path) {
+                if let nilErrors = nilErrors(child, fixedValue: particleConstraint?.fixedValue, at: path) {
                     errors += nilErrors
                     return
                 }
