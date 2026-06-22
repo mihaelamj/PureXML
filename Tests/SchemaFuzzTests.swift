@@ -221,4 +221,36 @@ struct SchemaFuzzTests {
             _ = try? PureXML.parse(bytes: bytes)
         }
     }
+
+    /// Opt-in DEEP fuzz campaign (production-readiness stopper #3: correctness
+    /// bounded, not sampled). The standing tests above keep a fast, hang-guarded
+    /// 2000/250/600-iteration sample for every CI run; this runs the same
+    /// streaming-vs-tree differential over `PUREXML_FUZZ_ITERATIONS` seeds when
+    /// that variable is set, so a long campaign is reproducible without editing the
+    /// bounds. It carries no `.timeLimit` (a 60k-seed run legitimately exceeds a
+    /// minute); termination is still guaranteed by the engine's own occurrence and
+    /// state caps. A divergence prints the seed, schema, and instance, exactly like
+    /// the standing gate, so it reproduces. Run:
+    /// `PUREXML_FUZZ_ITERATIONS=60000 swift test --filter test_deepFuzzCampaign`.
+    @Test("Deep fuzz campaign (opt-in via PUREXML_FUZZ_ITERATIONS)")
+    func test_deepFuzzCampaign() {
+        guard let raw = ProcessInfo.processInfo.environment["PUREXML_FUZZ_ITERATIONS"],
+              let iterations = UInt64(raw), iterations > 0
+        else { return }
+        for seed in UInt64(1) ... iterations {
+            var generator = SchemaGenerator(rng: SeededRNG(seed: seed))
+            let xsd = generator.schema()
+            _ = try? PureXML.parse(xsd)
+            guard let document = try? PureXML.Schema.Document(xsd) else { continue }
+            let xml = generator.instance()
+            guard let tree = try? document.validate(xml),
+                  let streamed = try? document.validate(streaming: xml)
+            else { continue }
+            let treeReasons = Set(tree.map(\.reason))
+            let streamedReasons = Set(streamed.map(\.reason))
+            let detail = "seed \(seed)\n  tree:   \(treeReasons.sorted())\n  stream: \(streamedReasons.sorted())\n  xsd: \(xsd)\n  xml: \(xml)"
+            #expect(tree.isEmpty == streamed.isEmpty, "streaming/tree verdict disagreement (\(detail))")
+            #expect(treeReasons.isSubset(of: streamedReasons), "streaming missed a tree error (\(detail))")
+        }
+    }
 }
