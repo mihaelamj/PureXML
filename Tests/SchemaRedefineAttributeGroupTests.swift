@@ -80,6 +80,28 @@ struct SchemaRedefineAttributeGroupTests {
         )
     }
 
+    @Test("re-declaring an attribute the self-reference already supplies is rejected (schM8)")
+    func test_selfRefRedeclareDuplicateRejected() throws {
+        // The self-reference re-imports the original's `a`, so directly re-declaring `a`
+        // produces two attribute uses of the same name: a duplicate (ag-props-correct.2).
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attributeGroup ref='g'/><xs:attribute name='a' type='xs:string'/>",
+                base: "<xs:attribute name='a' type='xs:string'/>",
+            )
+        }
+    }
+
+    @Test("a self-reference re-declaring a prohibited attribute is not flagged as duplicate (lenient)")
+    func test_selfRefRedeclareProhibitedLenient() throws {
+        // A `use="prohibited"` re-declaration removes rather than duplicates, so the
+        // duplicate check declines; the base attribute is optional, so this compiles.
+        _ = try redefine(
+            group: "<xs:attributeGroup ref='g'/><xs:attribute name='a' use='prohibited' type='xs:string'/>",
+            base: "<xs:attribute name='a' type='xs:string'/>",
+        )
+    }
+
     @Test("adding an attribute alongside a self-reference is valid")
     func test_addWithSelfReferenceAccepted() throws {
         _ = try redefine(
