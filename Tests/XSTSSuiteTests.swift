@@ -40,8 +40,9 @@ struct XSTSSuiteTests {
     /// identity fields compare in decimal value space (default/fixed when absent) and must be simple-content,
     /// element-children (idK012) or empty-complex (idG006); an attr wildcard is the INTERSECTION; year 0000 invalid;
     /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065);
-    /// an optional xs:all group present in the instance still requires its members (mgZ001).
-    private let knownInstanceInvalidAccepted = 20
+    /// an optional xs:all group present in the instance still requires its members (mgZ001);
+    /// a defaulted/fixed IDREF/IDREFS must resolve to a matching ID, cvc-id (idZ012).
+    private let knownInstanceInvalidAccepted = 19
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
