@@ -31,7 +31,7 @@ struct XSTSSuiteTests {
     /// history of how each bucket reached its current value (every rule and its exact
     /// delta) lives in CHANGELOG.md and docs/xsts-deviations.md, not inline here.
     private let knownSchemaValidRejected = 0
-    private let knownSchemaInvalidAccepted = 17
+    private let knownSchemaInvalidAccepted = 16
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's

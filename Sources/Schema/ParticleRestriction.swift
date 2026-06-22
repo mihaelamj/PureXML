@@ -84,23 +84,19 @@ extension PureXML.Schema {
                 return rangeSubsumed(restricted, base) && narrows(restrictedWildcard, baseWildcard)
             case let (.element, .group(baseGroup)):
                 return elementRestrictsGroup(restricted, base, baseGroup, types, derivation)
-            case let (.group, .element(baseName, _, baseTypeName, _, _, _)):
-                // The mirror of RecurseAsIfGroup, by the same cardinality argument as
-                // group/wildcard: a base element accepts only its own name, its own
-                // occurrence count of times. The derived group is a valid restriction
-                // iff every leaf it can contain is that element (same name, and a type
-                // that derives from the base's) AND the group's effective total
-                // occurrence range is within the base element's. Comparing the derived
-                // group's *own* occurrence to the element's would be wrong (a derived
-                // `sequence(a,a)` emits two a's at occurrence {1,1}); the effective
-                // range is the count that must be bounded.
-                return leavesRestrict(restricted, toElement: baseName, baseTypeName, types, derivation)
-                    && rangeWithinWildcard(
-                        derivedMin: restricted.effectiveOccurrenceMin(),
-                        derivedMax: restricted.effectiveOccurrenceMax(),
-                        wildcardMin: base.minOccurs,
-                        wildcardMax: base.maxOccurs,
-                    )
+            case (.group, .element):
+                // XSD 1.0 §3.9.6 "Particle Valid (Restriction)" defines NO case for a
+                // derived group against a base element: the only element/group pairing
+                // is the reverse (an element restricting a base group, via
+                // RecurseAsIfGroup). A derived group that can contribute content
+                // therefore never validly restricts a single base element, regardless
+                // of how its leaves are named or counted. (A CONTENT-FREE derived group
+                // was already accepted above as a valid restriction of any emptiable
+                // base; only a content-bearing one reaches here.) This is the spec rule
+                // the corpus enforces -- e.g. a `choice(seq(e1), e2, e3)` restricting a
+                // `choice(e1, e2, e3)` is invalid because the derived `seq(e1)` branch
+                // has no base element it can validly restrict (particlesHb011).
+                return false
             case let (.group(restrictedGroup), .group(baseGroup)) where restrictedGroup.compositor == .sequence && baseGroup.compositor == .choice:
                 // MapAndSum (Sequence:Choice, XSD 1.0 §3.9.6): each derived particle is
                 // a valid restriction of some base branch, AND the derived sequence's
@@ -341,27 +337,6 @@ extension PureXML.Schema {
             case let .element(name, _, _, _, _, _): wildcard.admits(name)
             case let .wildcard(inner): narrows(inner, wildcard)
             case let .group(group): group.particles.allSatisfy { leavesAdmitted($0, by: wildcard) }
-            }
-        }
-
-        /// Whether every leaf a particle can contain is the named base element (same
-        /// name, and a type that derives from the base element's). A wildcard leaf is
-        /// rejected: it can match names other than the base element's, so it is not a
-        /// subset. Used when the base content model is a single element.
-        private static func leavesRestrict(
-            _ particle: Particle,
-            toElement baseName: PureXML.Model.QualifiedName,
-            _ baseTypeName: String?,
-            _ types: [String: ElementType],
-            _ derivation: [String: TypeDerivation],
-        ) -> Bool {
-            switch particle.term {
-            case let .element(name, _, typeName, _, _, _):
-                sameName(name, baseName) && elementTypeRestrictionOK(typeName, baseTypeName, types, derivation)
-            case .wildcard:
-                false
-            case let .group(group):
-                group.particles.allSatisfy { leavesRestrict($0, toElement: baseName, baseTypeName, types, derivation) }
             }
         }
 
