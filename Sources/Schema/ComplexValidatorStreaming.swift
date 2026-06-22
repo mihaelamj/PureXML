@@ -194,7 +194,7 @@ public extension PureXML.Schema.ComplexValidator {
         at path: XSDPath,
         into errors: inout [XSDFailure],
     ) {
-        if let nilErrors = nilErrors(element, at: path) {
+        if let nilErrors = nilErrors(element, fixedValue: valueConstraint?.fixedValue, at: path) {
             errors += nilErrors
             return
         }
