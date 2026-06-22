@@ -125,6 +125,7 @@ extension PureXML.Schema.XSDParser {
         let bindings = context.namespaceBindings
         var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         for content in descendants(schema, named: "complexContent") {
+            let isRestriction = ContentDerivNode.firstChild(content, named: "restriction") != nil
             guard let derivation = ContentDerivNode.firstChild(content, named: "extension")
                 ?? ContentDerivNode.firstChild(content, named: "restriction"),
                 let base = ContentDerivNode.attribute(derivation, "base")
@@ -135,6 +136,18 @@ extension PureXML.Schema.XSDParser {
                 if case .simple = local {
                     findings.append(PureXML.Schema.SchemaLocatedFinding(
                         reason: "a complexContent base must be a complex type, not the simple type '\(baseName)'",
+                        node: derivation,
+                    ))
+                } else if isRestriction, case let .complex(complex) = local, case .simpleContent = complex.content {
+                    // cos-ct-restricts 5.2: a complexContent restriction's {content type}
+                    // is element-only/mixed/empty (from its model group), which can never
+                    // validly restrict a SIMPLE content type. So a complexContent
+                    // restriction of a complex type that has simple content is invalid.
+                    // (The extension direction has a valid attribute-only idiom and is
+                    // handled by simpleContentExtensionBaseFindings, so it is not flagged
+                    // here.) Catches particlesZ039.
+                    findings.append(PureXML.Schema.SchemaLocatedFinding(
+                        reason: "a complexContent restriction's base '\(baseName)' has simple content, which a complexContent restriction cannot restrict",
                         node: derivation,
                     ))
                 }
