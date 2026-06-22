@@ -88,6 +88,52 @@ struct SchemaRedefineAttributeGroupTests {
         )
     }
 
+    @Test("widening a re-declared attribute's built-in type is rejected (schM4)")
+    func test_widenBuiltinTypeRejected() throws {
+        // int does not derive by restriction from boolean, so re-typing the attribute
+        // from boolean to int widens it: a redefinition must restrict, not widen.
+        #expect(throws: (any Error).self) {
+            try redefine(
+                group: "<xs:attribute name='a' type='xs:int'/>",
+                base: "<xs:attribute name='a' type='xs:boolean'/>",
+            )
+        }
+    }
+
+    @Test("narrowing a re-declared attribute's built-in type within the lattice is valid")
+    func test_narrowBuiltinTypeAccepted() throws {
+        // int derives from integer, so re-typing integer -> int is a valid restriction.
+        _ = try redefine(
+            group: "<xs:attribute name='a' type='xs:int'/>",
+            base: "<xs:attribute name='a' type='xs:integer'/>",
+        )
+    }
+
+    @Test("re-typing an originally untyped attribute is valid (anySimpleType base)")
+    func test_retypeUntypedBaseAccepted() throws {
+        // An absent base type is anySimpleType, which any type validly restricts.
+        _ = try redefine(
+            group: "<xs:attribute name='a' type='xs:int'/>",
+            base: "<xs:attribute name='a'/>",
+        )
+    }
+
+    @Test("a user type whose local name coincides with a built-in is not mistaken for it (no false positive)")
+    func test_userTypeNamedLikeBuiltinNotWidened() throws {
+        // The redefinition re-types `a` to `tns:int`, a USER simpleType that restricts
+        // xs:string. Its local name is the built-in keyword `int`, but it resolves to
+        // the target namespace, not the XSD namespace, so the type-widening check must
+        // not treat it as xsd:int (which would not derive from xsd:string) and reject.
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' xmlns:tns='urn:t' targetNamespace='urn:t'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='g'>"
+            + "<xs:attribute name='a' type='tns:int'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:simpleType name='int'><xs:restriction base='xs:string'/></xs:simpleType>"
+            + "<xs:element name='e'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema' targetNamespace='urn:t'>"
+            + "<xs:attributeGroup name='g'><xs:attribute name='a' type='xs:string'/></xs:attributeGroup></xs:schema>"
+        _ = try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
+
     @Test("a non-self reference injecting a foreign attribute is rejected (attgC028)")
     func test_nonSelfReferenceAddRejected() throws {
         let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
