@@ -7,6 +7,11 @@ private struct ReachedAttribute {
     let id: ObjectIdentifier
     let name: PureXML.Model.QualifiedName
     let isID: Bool
+    /// A `use="prohibited"` attribute is a removal marker, not a member of the
+    /// component's {attribute uses} (XSD §3.4.2 / §3.6.2), so it neither clashes by
+    /// name nor counts toward the single-ID limit. Excluding it keeps a self-reference
+    /// that re-imports an attribute and then prohibits it from reading as a duplicate.
+    let isProhibited: Bool
 }
 
 extension PureXML.Schema.XSDParser {
@@ -151,15 +156,16 @@ extension PureXML.Schema.XSDParser {
                         id: ObjectIdentifier(declaration),
                         name: PureXML.Model.QualifiedName(localName: refName, namespaceURI: namespace),
                         isID: use.type.base == .id,
+                        isProhibited: AttrNode.attribute(child, "use") == "prohibited",
                     ))
                 } else if let use = attributeUse(child, context) {
-                    result.append(ReachedAttribute(id: ObjectIdentifier(child), name: use.name, isID: use.type.base == .id))
+                    result.append(ReachedAttribute(
+                        id: ObjectIdentifier(child), name: use.name, isID: use.type.base == .id,
+                        isProhibited: AttrNode.attribute(child, "use") == "prohibited",
+                    ))
                 }
             case "attributeGroup":
-                guard let ref = AttrNode.attribute(child, "ref") else { break }
-                let name = AttrNode.stripPrefix(ref)
-                guard !visited.contains(name), let group = context.attributeGroups[name] else { break }
-                result += attributeDeclarations(under: group, context, visited: visited.union([name]))
+                result += referencedGroupDeclarations(child, context, visited: visited)
             default:
                 break
             }
@@ -167,11 +173,31 @@ extension PureXML.Schema.XSDParser {
         return result
     }
 
+    /// Attribute declarations reached through an `<attributeGroup ref="X">`. A first
+    /// visit recurses into X's active definition. A re-visit is a redefinition's
+    /// self-reference, which expands to X's pre-redefine base definition so the
+    /// original's attributes join the redefined set (ag-props-correct.2, XSTS attQ011);
+    /// a genuine non-redefine cycle has no base definition and contributes nothing.
+    private static func referencedGroupDeclarations(
+        _ child: XSDTree, _ context: PureXML.Schema.XSDContext, visited: Set<String>,
+    ) -> [ReachedAttribute] {
+        guard let ref = AttrNode.attribute(child, "ref") else { return [] }
+        let name = AttrNode.stripPrefix(ref)
+        if visited.contains(name) {
+            if context.redefinedAttributeGroups.contains(name), let base = context.baseAttributeGroups[name] {
+                return attributeDeclarations(under: base, context, visited: visited)
+            }
+            return []
+        }
+        guard let group = context.attributeGroups[name] else { return [] }
+        return attributeDeclarations(under: group, context, visited: visited.union([name]))
+    }
+
     private static func attributeSetErrors(_ declarations: [ReachedAttribute], _ label: String) -> [String] {
         var seenIDs: Set<ObjectIdentifier> = []
         var counts: [PureXML.Model.QualifiedName: Int] = [:]
         var idCount = 0
-        for declaration in declarations where seenIDs.insert(declaration.id).inserted {
+        for declaration in declarations where !declaration.isProhibited && seenIDs.insert(declaration.id).inserted {
             counts[declaration.name, default: 0] += 1
             if declaration.isID { idCount += 1 }
         }
