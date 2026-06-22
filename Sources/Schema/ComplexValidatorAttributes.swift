@@ -18,6 +18,12 @@ extension PureXML.Schema.ComplexValidator {
                 recordIDs(use.type, value: match.value, at: path)
             } else if use.required {
                 errors.append(PureXML.Validation.ValidationError(reason: "missing required attribute '\(use.name.localName)'", at: path))
+            } else if let constraint = use.valueConstraint {
+                // An absent attribute takes its `default`/`fixed` value, so a
+                // defaulted or fixed IDREF/IDREFS must still resolve to a matching
+                // ID (cvc-id): the supplied value participates in document-scoped
+                // ID/IDREF checking exactly as a present value would.
+                recordIDs(use.type, value: constraint.value, at: path)
             }
         }
         validateWildcardAttributes(present, element: element, type: type, at: path, into: &errors)
