@@ -178,28 +178,30 @@ struct XSDParticleRestrictionTests {
         )?.contains("not a valid restriction") == true)
     }
 
-    @Test("A group restricting a base that is a single element is bounded by that element's range")
+    @Test("A content-bearing derived group never restricts a base single element")
     func test_groupRestrictsSingleElement() {
         // mgE014: base sequence(title?) normalizes to the bare element title{0,1};
-        // the derived sequence(title{0,0}) normalizes to the empty group, which
-        // accepts only the empty sequence, valid against an emptiable element.
+        // the derived sequence(title{0,0}) normalizes to the empty (content-free)
+        // group, which accepts only the empty sequence, valid against an emptiable
+        // element. This is the content-free path, not a derived-group/base-element rule.
         #expect(compiles(
             base: "<xs:sequence><xs:element name=\"title\" minOccurs=\"0\"/></xs:sequence>",
             restriction: "<xs:sequence><xs:element name=\"title\" minOccurs=\"0\" maxOccurs=\"0\"/></xs:sequence>",
         ))
-        // A derived choice repeated within the element's range is valid (the base
-        // element, normalized from a single-member sequence, is compositor-agnostic).
-        #expect(compiles(
+        // XSD 1.0 §3.9.6 defines NO restriction rule for a derived group against a base
+        // element (only the reverse, an element against a base group). A content-bearing
+        // derived group restricting a single base element is therefore invalid, even
+        // when its leaves share the element's name and its effective count fits.
+        #expect(restrictionError(
             base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
             restriction: "<xs:choice maxOccurs=\"2\"><xs:element name=\"a\"/></xs:choice>",
-        ))
-        // A derived group whose effective count exceeds the base element's maxOccurs is
-        // rejected: sequence(a){1,10} emits up to ten a's, the base allows three.
+        )?.contains("not a valid restriction") == true)
+        // The same holds when the derived group's effective count exceeds the base
+        // element's maxOccurs, and when a leaf is differently named.
         #expect(restrictionError(
             base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
             restriction: "<xs:sequence maxOccurs=\"10\"><xs:element name=\"a\"/></xs:sequence>",
         )?.contains("not a valid restriction") == true)
-        // A derived leaf with a different name than the base element is rejected.
         #expect(restrictionError(
             base: "<xs:sequence><xs:element name=\"a\" maxOccurs=\"3\"/></xs:sequence>",
             restriction: "<xs:choice maxOccurs=\"2\"><xs:element name=\"b\"/></xs:choice>",
