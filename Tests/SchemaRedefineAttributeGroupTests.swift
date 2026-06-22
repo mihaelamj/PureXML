@@ -110,6 +110,39 @@ struct SchemaRedefineAttributeGroupTests {
         )
     }
 
+    @Test("a duplicate attribute via a redefined self-referencing group is rejected (attQ011)")
+    func test_redefineSelfRefDuplicateAcrossReferences() throws {
+        // attG references the global `foo` AND the redefined `red`; `red` self-references,
+        // so its original (which declares `foo`) is re-imported. attG then holds two
+        // attribute uses named `foo`: a duplicate (ag-props-correct.2).
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='red'>"
+            + "<xs:attributeGroup ref='red'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:attribute name='foo' type='xs:string'/>"
+            + "<xs:attributeGroup name='attG'><xs:attribute ref='foo'/><xs:attributeGroup ref='red'/></xs:attributeGroup>"
+            + "<xs:complexType name='ct'><xs:attributeGroup ref='attG'/></xs:complexType>"
+            + "<xs:element name='e' type='ct'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='red'><xs:attribute name='foo' type='xs:string'/></xs:attributeGroup></xs:schema>"
+        #expect(throws: (any Error).self) { try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc }) }
+    }
+
+    @Test("a redefined self-referencing group supplying a distinct attribute is valid (no false duplicate)")
+    func test_redefineSelfRefDistinctAttributeAccepted() throws {
+        // Same shape, but `red`'s original declares `bar`, not `foo`: attG holds `foo`
+        // and `bar`, no duplicate, so the self-reference expansion must not over-flag.
+        let main = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:redefine schemaLocation='b.xsd'><xs:attributeGroup name='red'>"
+            + "<xs:attributeGroup ref='red'/></xs:attributeGroup></xs:redefine>"
+            + "<xs:attribute name='foo' type='xs:string'/>"
+            + "<xs:attributeGroup name='attG'><xs:attribute ref='foo'/><xs:attributeGroup ref='red'/></xs:attributeGroup>"
+            + "<xs:complexType name='ct'><xs:attributeGroup ref='attG'/></xs:complexType>"
+            + "<xs:element name='e' type='ct'/></xs:schema>"
+        let baseDoc = "<xs:schema xmlns:xs='http://www.w3.org/2001/XMLSchema'>"
+            + "<xs:attributeGroup name='red'><xs:attribute name='bar' type='xs:string'/></xs:attributeGroup></xs:schema>"
+        _ = try PureXML.Schema.Document(main, schemaLoader: { _ in baseDoc })
+    }
+
     @Test("widening a re-declared attribute's built-in type is rejected (schM4)")
     func test_widenBuiltinTypeRejected() throws {
         // int does not derive by restriction from boolean, so re-typing the attribute
