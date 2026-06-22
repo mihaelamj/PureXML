@@ -205,11 +205,14 @@ extension PureXML.Schema {
                 }
                 // cvc-identity-constraint.3 / c-fields-xpaths: a field must identify a node
                 // with a simple type (or simple content). An element with element children
-                // has complex content and can never be simple-typed, so it is not a valid
-                // field target. Checked structurally: a simple-typed or simple-content
-                // element carries only text, never element children, so no valid field is
-                // rejected; an empty or text-only node, or an attribute, is left alone.
-                if let node = selected.first, node.kind == .element, node.children.contains(where: { $0.kind == .element }) {
+                // has complex content (checked structurally), and an element whose DECLARED
+                // type is a complex type with non-simple content (empty or element-only, so
+                // an attributes-only element with no children, XSTS idG006) is equally
+                // invalid (checked through the schema type model). A simple-typed or
+                // simple-content element, a text-only node, and an attribute are left alone.
+                let element = selected.first.flatMap { $0.kind == .element ? $0 : nil }
+                let hasElementChildren = element?.children.contains { $0.kind == .element } ?? false
+                if element != nil, hasElementChildren || fieldTargetIsComplexNonSimple(field, at: target) {
                     return .init(
                         reason: "\(label(constraint)) '\(constraint.name)': field '\(field)' must identify a node with simple content",
                         at: targetPath + step,
