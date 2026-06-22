@@ -30,14 +30,12 @@ extension PureXML.Schema.XSDParser {
             if let member = particle(child, context) { particles.append(member) }
         }
         let occurrence = XSDNode.occurrenceRange(node)
-        if compositor == .all, occurrence.minimum.isZero {
-            particles = particles.map {
-                Particle(
-                    occurrenceRange: .init(minimum: .init(0), maximum: $0.occurrenceRange.maximum),
-                    term: $0.term,
-                )
-            }
-        }
+        // An `all` group's own `minOccurs="0"` makes the GROUP optional (it occurs
+        // zero or one times), not its members optional: when the group is present
+        // (any child appears) every member keeps its own `minOccurs`. The members
+        // therefore retain their declared occurrence here; the absent-group case is
+        // handled at validation time (see allStructureErrors) by skipping the
+        // required-member check only when the group has no children at all.
         return Particle(
             occurrenceRange: occurrence,
             term: .group(Group(compositor: compositor, particles: particles)),

@@ -208,7 +208,7 @@ public extension PureXML.Schema {
             // particle, actually matched.
             let matched: [PureXML.Schema.MatchedParticle?]
             if case let .group(group) = particle.term, group.compositor == .all {
-                allStructureErrors(group, children: children, at: path, into: &errors)
+                allStructureErrors(group, children: children, groupOptional: particle.occurrenceRange.minimum.isZero, at: path, into: &errors)
                 matched = allMatchedParticles(group, children: children)
             } else {
                 sequenceStructureErrors(particle, children: children, at: path, into: &errors)

@@ -238,7 +238,7 @@ public extension PureXML.Schema.ComplexValidator {
 
     private func shallowStructure(_ particle: PureXML.Schema.Particle, children: [PureXML.Model.Element], at path: XSDPath, into errors: inout [XSDFailure]) {
         if case let .group(group) = particle.term, group.compositor == .all {
-            allStructureErrors(group, children: children, at: path, into: &errors)
+            allStructureErrors(group, children: children, groupOptional: particle.occurrenceRange.minimum.isZero, at: path, into: &errors)
         } else {
             sequenceStructureErrors(particle, children: children, at: path, into: &errors)
         }
