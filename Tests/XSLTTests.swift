@@ -81,6 +81,24 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("A match pattern predicate sees top-level variables")
+    func test_patternReferencesGlobalVariable() throws {
+        // foo[. > $screen] matches only foo elements over the global threshold
+        // (XSLT 1.0 5.2: a pattern predicate sees the global variables; Xalan
+        // match14). Without them the predicate fails and nothing matches.
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:variable name="screen" select="7"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/doc"><out><xsl:apply-templates/></out></xsl:template>
+          <xsl:template match="foo[. &gt; $screen]"><xsl:value-of select="@n"/>:over,</xsl:template>
+          <xsl:template match="*"><xsl:value-of select="@n"/>:under,</xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<doc><foo n=\"a\">8</foo><foo n=\"b\">5</foo><foo n=\"c\">9</foo></doc>"
+        #expect(try transform(stylesheet, source) == "<out>a:over,b:under,c:over,</out>")
+    }
+
     @Test("The identity transform reproduces the input")
     func test_identity() throws {
         let stylesheet = """

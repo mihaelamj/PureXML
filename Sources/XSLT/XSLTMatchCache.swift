@@ -18,6 +18,11 @@ extension PureXML.XSLT {
     final class MatchCache {
         private var matched: [String: PatternMatches] = [:]
 
+        /// The top-level (global) variable bindings, in scope when a pattern
+        /// predicate is evaluated (XSLT 1.0 5.2). Constant per transform, so it
+        /// does not enter the cache key; the transformer sets it before matching.
+        var globalVariables: [String: PureXML.XPath.Value] = [:]
+
         /// The identities of the tree nodes `pattern` selects over `root`.
         func nodes(
             matching pattern: String,
@@ -51,7 +56,7 @@ extension PureXML.XSLT {
                 let trimmed = branch.trimmingXMLWhitespace()
                 let path = trimmed.hasPrefix("/") || trimmed.hasPrefix("key(") || trimmed.hasPrefix("id(") ? trimmed : "//" + trimmed
                 guard let query = try? PureXML.XPath.Query(path),
-                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: [:], functions: functions, namespaces: namespaces),
+                      let value = try? query.value(atNode: .tree(root), position: 1, size: 1, variables: globalVariables, functions: functions, namespaces: namespaces),
                       let selected = value.nodes
                 else { continue }
                 for node in selected {

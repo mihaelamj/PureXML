@@ -49,9 +49,8 @@ extension PureXML.XSLT {
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
-            // One table for all pattern matching: matches() runs per
-            // (template, node) during template selection, so a fresh table
-            // per call would be allocated millions of times on large inputs.
+            // One table for all pattern matching: matches() runs per (template,
+            // node), so a fresh table per call would allocate millions of times.
             let caches = keyIndexes
             patternTable = PureXML.XSLT.Library.table(
                 current: .tree(root),
@@ -81,7 +80,9 @@ extension PureXML.XSLT {
         }
 
         func run() -> PureXML.Model.Node {
-            let context = XSLTContext(node: root, position: 1, size: 1, variables: evaluatedGlobals())
+            let globals = evaluatedGlobals()
+            matchCache.globalVariables = globals // pattern predicates see globals (5.2)
+            let context = XSLTContext(node: root, position: 1, size: 1, variables: globals)
             return .document(applyTemplates(to: [.tree(root)], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
@@ -100,8 +101,7 @@ extension PureXML.XSLT {
         }
 
         func matches(_ node: PureXML.Model.TreeNode, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
-            // Patterns evaluate over the node's own document, so templates
-            // match nodes loaded through document() too.
+            // Patterns evaluate over the node's own document (so document()-loaded nodes match too).
             let documentRoot = Self.documentRoot(of: node)
             return matchCache.nodes(matching: pattern, over: documentRoot, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
         }

@@ -19,7 +19,6 @@ extend/extend01
 extend/extend02
 extend/extend04
 idkey/idkey31
-idkey/idkey43
 idkey/idkey45
 idkey/idkey46
 idkey/idkey47
@@ -27,7 +26,6 @@ idkey/idkey48
 idkey/idkey53
 impincl/impincl08
 impincl/impincl27
-match/match14
 mdocs/mdocs07
 mdocs/mdocs09
 mdocs/mdocs12
