@@ -1,4 +1,14 @@
 extension PureXML.XSLT.Library {
+    /// A QName-valued function argument (a key or decimal-format name) resolved
+    /// to expanded form `{uri}local`, matching the expansion applied to the
+    /// corresponding declaration's name. The prefix resolves against the
+    /// expression's in-scope namespaces; an unprefixed or unbound name is left
+    /// as is.
+    static func expandedName(_ raw: String, _ namespaces: [String: String]) -> String {
+        guard let colon = raw.firstIndex(of: ":"), let uri = namespaces[String(raw[..<colon])] else { return raw }
+        return "{\(uri)}\(raw[raw.index(after: colon)...])"
+    }
+
     /// The XPath `id()` definition exactly: only attributes the DTD
     /// declares as type ID identify elements; a document without ID
     /// declarations yields the empty set.
@@ -66,7 +76,9 @@ extension PureXML.XSLT.Library {
         _ context: PureXML.XPath.EvaluationContext,
         _ keys: (PureXML.Model.TreeNode) -> PureXML.XSLT.KeyIndex,
     ) -> PureXML.XPath.Value {
-        let name = arguments.first?.string ?? ""
+        // The key name is matched by expanded QName (XSLT 1.0 12.2), matching
+        // the expansion applied to the xsl:key declaration name.
+        let name = expandedName(arguments.first?.string ?? "", context.namespaces)
         guard arguments.count > 1 else { return .nodeSet([]) }
         let values: [String] = if let nodes = arguments[1].nodes {
             nodes.map(\.stringValue)

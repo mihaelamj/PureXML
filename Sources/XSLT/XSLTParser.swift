@@ -122,7 +122,7 @@ extension PureXML.XSLT {
             case "strip-space": parts.stripSpace.formUnion(elementNames(child))
             case "preserve-space": parts.preserveSpace.formUnion(elementNames(child))
             case "attribute-set": addAttributeSet(child, into: &parts)
-            case "decimal-format": parts.decimalFormats[XSLTNode.attribute(child, "name") ?? ""] = decimalFormat(child)
+            case "decimal-format": parts.decimalFormats[expandedDeclaredName(child)] = decimalFormat(child)
             case "namespace-alias": addNamespaceAlias(child, into: &parts)
             default: return false
             }
@@ -174,7 +174,9 @@ extension PureXML.XSLT {
 
         private static func key(_ node: XSLTTree) -> Key {
             Key(
-                name: XSLTNode.attribute(node, "name") ?? "",
+                // Keyed by expanded QName; the key() function expands its name
+                // argument the same way before looking the index up.
+                name: expandedDeclaredName(node),
                 match: XSLTNode.attribute(node, "match") ?? "",
                 use: XSLTNode.attribute(node, "use") ?? ".",
             )
@@ -192,7 +194,7 @@ extension PureXML.XSLT {
                 .compactMap(instruction)
             return Template(
                 match: match,
-                name: XSLTNode.attribute(node, "name"),
+                name: XSLTNode.attribute(node, "name").map { expandedQName($0, at: node) },
                 mode: expandedMode(node),
                 priority: priority,
                 importPrecedence: precedence,
@@ -282,7 +284,7 @@ extension PureXML.XSLT {
                 )
             case "copy-of": .copyOf(select: XSLTNode.attribute(node, "select") ?? "")
             case "call-template": .callTemplate(
-                    name: XSLTNode.attribute(node, "name") ?? "",
+                    name: expandedDeclaredName(node),
                     parameters: withParameters(node),
                 )
             case "text": .literalText(
@@ -328,7 +330,11 @@ extension PureXML.XSLT {
 
         /// The whitespace-separated names of `[xsl:]use-attribute-sets` on `node`.
         static func useAttributeSets(_ node: XSLTTree) -> [String] {
-            (XSLTNode.attribute(node, "use-attribute-sets") ?? "").split(whereSeparator: \.isWhitespace).map(String.init)
+            // Each referenced set is keyed by expanded QName, matching the
+            // expansion applied to the attribute-set declaration's name.
+            (XSLTNode.attribute(node, "use-attribute-sets") ?? "")
+                .split(whereSeparator: \.isWhitespace)
+                .map { expandedQName(String($0), at: node) }
         }
 
         private static func caseOrder(_ node: XSLTTree) -> PureXML.XSLT.CaseOrder? {

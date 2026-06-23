@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Named templates, `xsl:key` names, `xsl:attribute-set` names, and `xsl:decimal-format` names are now matched by expanded QName, like mode and variable names already were. XSLT 1.0 compares all of these by expanded name, so two prefixes bound to the same namespace name the same thing, but they were keyed and compared as raw prefix strings. A declaration name now resolves to `{uri}local` at parse time, and the runtime references (`call-template`/`use-attribute-sets` at parse, `key()` and `format-number`'s format name at evaluation) resolve their prefix against the in-scope namespaces the same way. Closes Apache Xalan conformance cases `namedtemplate16`, `attribset48`, and `idkey53`.
+
 - `xsl:copy` of the root node now honors `use-attribute-sets`. Copying the root produces no element of its own, so the attribute-set attributes have nowhere to attach on the copy and instead join the enclosing result element (XSLT 1.0 7.5); they were silently dropped. Closes Apache Xalan conformance cases `attribset27` and `attribset29`.
 
 - `xsl:element` with an unusable name now passes its content through instead of creating a bad element. XSLT 1.0 7.1.2 makes a name that is not a QName an error; the recovery (pinned `element-name-not-QName` "pass-through") emits the element's content without the wrapper. The check rejected only an empty or multi-colon name, so an undeclared prefix (`none:foo`) or a name that is not an NCName (`this is a string`) still produced a malformed element. Closes Apache Xalan conformance cases `namespace40`, `namespace42`, `namespace43`, `namespace60`, `namespace73`, and `namespace79`.
