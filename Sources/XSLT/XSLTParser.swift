@@ -68,8 +68,8 @@ extension PureXML.XSLT {
             // weak parent chain to their own stylesheet element, retained only in
             // the otherwise-unread retainedRoots; pin it so ARC keeps it here.
             withExtendedLifetime(collector.retainedRoots) {
-                for (child, _) in collector.declarations {
-                    _ = absorbDeclaration(child, into: &parts, precedence: precedence, low: low)
+                for (child, base) in collector.declarations {
+                    _ = absorbDeclaration(child, into: &parts, precedence: precedence, low: low, base: base)
                 }
             }
             return parts.stylesheet
@@ -113,10 +113,10 @@ extension PureXML.XSLT {
 
         /// Absorbs a non-composition top-level declaration, returning whether it
         /// was one (so the caller can then try `include`/`import`).
-        private static func absorbDeclaration(_ child: XSLTTree, into parts: inout Parts, precedence: Int, low: Int) -> Bool {
+        private static func absorbDeclaration(_ child: XSLTTree, into parts: inout Parts, precedence: Int, low: Int, base: String) -> Bool {
             switch XSLTNode.localName(child) {
-            case "template": parts.templates.append(template(child, precedence: precedence, low: low))
-            case "variable", "param": addGlobal(child, into: &parts)
+            case "template": parts.templates.append(template(child, precedence: precedence, low: low, base: base))
+            case "variable", "param": addGlobal(child, base, into: &parts)
             case "key": parts.keys.append(key(child))
             case "output": parts.output = parts.output.merged(with: parseOutput(child))
             case "strip-space": parts.stripSpace.formUnion(elementNames(child))
@@ -131,8 +131,8 @@ extension PureXML.XSLT {
 
         /// A top-level xsl:variable or xsl:param; param names are recorded
         /// so caller-supplied values can override their defaults.
-        private static func addGlobal(_ child: XSLTTree, into parts: inout Parts) {
-            parts.globals.append(variable(child))
+        private static func addGlobal(_ child: XSLTTree, _ base: String, into parts: inout Parts) {
+            parts.globals.append(PureXML.XSLT.GlobalDeclaration(instruction: variable(child), baseURI: base))
             if XSLTNode.localName(child) == "param", let name = XSLTNode.attribute(child, "name") {
                 parts.parameterNames.insert(name)
             }
@@ -184,7 +184,7 @@ extension PureXML.XSLT {
 
         // MARK: Templates
 
-        private static func template(_ node: XSLTTree, precedence: Int, low: Int) -> Template {
+        private static func template(_ node: XSLTTree, precedence: Int, low: Int, base: String) -> Template {
             let match = XSLTNode.attribute(node, "match")
             let priority = XSLTNode.attribute(node, "priority").flatMap(Double.init)
                 ?? match.map(defaultPriority) ?? 0
@@ -202,6 +202,7 @@ extension PureXML.XSLT {
                 parameters: parameters,
                 body: body,
                 namespaces: inScopeNamespaces(node).filter { !$0.key.isEmpty },
+                baseURI: base,
             )
         }
 

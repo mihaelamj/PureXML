@@ -198,6 +198,7 @@ extension PureXML.XSLT {
             documents: PureXML.XSLT.DocumentCache,
             selfDocument: PureXML.Model.Node? = nil,
             unparsedEntities: [String: String] = [:],
+            baseURI stylesheetBase: String = "",
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([current]) }
@@ -228,7 +229,9 @@ extension PureXML.XSLT {
                     if let nodes = arguments.first?.nodes {
                         return .nodeSet(nodes.flatMap { load($0.stringValue, secondBase ?? baseURI(of: $0, documents)) })
                     }
-                    return .nodeSet(load(arguments.first?.string ?? "", secondBase ?? ""))
+                    // A string-form reference resolves against the base URI of the
+                    // stylesheet element holding the expression (XSLT 1.0 12.1).
+                    return .nodeSet(load(arguments.first?.string ?? "", secondBase ?? stylesheetBase))
                 }
                 .adding("id") { arguments, context in
                     idLookup(arguments, context, documents)

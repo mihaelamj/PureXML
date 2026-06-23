@@ -52,4 +52,35 @@ struct XSLTDocumentBaseURITests {
         let out = try run("document('target.xml', document('dir/sub/inner.xml#xpointer(/inner)'))/hit")
         #expect(out == "<out>TWO_ARG</out>")
     }
+
+    /// A string-form `document()` reference resolves against the base URI of the
+    /// stylesheet element holding it, which for a declaration in an included or
+    /// imported file is that file's URI, not the top stylesheet's (XSLT 1.0 12.1;
+    /// the semantics behind Apache Xalan impincl08).
+    @Test("a global document() in an included file resolves against the included file's base")
+    func test_includedGlobalBase() throws {
+        let files = [
+            "lib/inc.xsl": """
+            <xsl:stylesheet version="1.0" \(xsl)>
+              <xsl:variable name="d" select="document('data.xml')"/>
+              <xsl:template name="emit"><xsl:value-of select="$d/d/v"/></xsl:template>
+            </xsl:stylesheet>
+            """,
+            "lib/data.xml": "<d><v>INCLUDED</v></d>",
+        ]
+        let out = try PureXML.XSLT.transform(
+            stylesheet: """
+            <xsl:stylesheet version="1.0" \(xsl)>
+              <xsl:output omit-xml-declaration="yes"/>
+              <xsl:include href="lib/inc.xsl"/>
+              <xsl:template match="/"><out><xsl:call-template name="emit"/></out></xsl:template>
+            </xsl:stylesheet>
+            """,
+            source: "<doc/>",
+            documentLoader: { files[$0] },
+        )
+        // `data.xml` resolves against lib/inc.xsl, reaching lib/data.xml; without
+        // base provenance it would resolve against the top stylesheet and miss.
+        #expect(out == "<out>INCLUDED</out>")
+    }
 }

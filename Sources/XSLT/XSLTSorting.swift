@@ -156,6 +156,7 @@ extension PureXML.XSLT.Transformer {
         context.importPrecedence = template.importPrecedence
         context.importRangeLow = template.importRangeLow
         context.namespaces = template.namespaces
+        context.baseURI = template.baseURI
         for parameter in template.parameters {
             if let passed = parameters.first(where: { $0.name == parameter.name }) {
                 context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)

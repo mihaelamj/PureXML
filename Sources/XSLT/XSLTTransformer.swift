@@ -172,9 +172,8 @@ extension PureXML.XSLT {
 
         func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
             if let select { return value(select, context) ?? .string("") }
-            // XSLT 1.0 11.2: a variable with no select and EMPTY content is the
-            // empty string (equivalent to select=""), not a result tree fragment,
-            // so boolean() of it is false. Only non-empty content is an RTF.
+            // XSLT 1.0 11.2: a variable with no select and empty content is the
+            // empty string, not an RTF (so boolean() is false); only content is.
             if body.isEmpty { return .string("") }
             // A body variable is a result-tree fragment: a queryable document node.
             let children = instantiate(body, context).compactMap(Self.nodeOf).map(PureXML.Model.TreeNode.init)
@@ -196,6 +195,7 @@ extension PureXML.XSLT {
                     documents: documentCache,
                     selfDocument: stylesheetDocument,
                     unparsedEntities: unparsedEntityURIs,
+                    baseURI: context.baseURI,
                 ),
                 namespaces: context.namespaces,
             )

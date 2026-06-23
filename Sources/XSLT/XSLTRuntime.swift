@@ -33,6 +33,10 @@ extension PureXML.XSLT {
         /// The stylesheet xmlns bindings of the template being instantiated,
         /// so prefixed names in its expressions resolve by URI.
         var namespaces: [String: String] = [:]
+        /// The base URI of the stylesheet element currently being instantiated
+        /// (its template's or global variable's source file), against which a
+        /// relative string-form `document()` reference resolves (XSLT 1.0 12.1).
+        var baseURI: String = ""
 
         init(
             node: PureXML.Model.TreeNode,
@@ -42,6 +46,7 @@ extension PureXML.XSLT {
             variables: [String: PureXML.XPath.Value],
             mode: String? = nil,
             importPrecedence: Int = .max,
+            baseURI: String = "",
         ) {
             self.node = node
             self.current = current
@@ -50,6 +55,7 @@ extension PureXML.XSLT {
             self.variables = variables
             self.mode = mode
             self.importPrecedence = importPrecedence
+            self.baseURI = baseURI
         }
     }
 
