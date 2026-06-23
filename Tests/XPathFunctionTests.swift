@@ -40,6 +40,12 @@ struct XPathFunctionTests {
     func test_substringAround() throws {
         #expect(try string("substring-before('1999/04', '/')") == "1999")
         #expect(try string("substring-after('1999/04', '/')") == "04")
+        // XPath errata: an empty second argument matches at the start, so
+        // substring-after returns the whole string and substring-before is empty.
+        #expect(try string("substring-after('ABCDE', '')") == "ABCDE")
+        #expect(try string("substring-before('ABCDE', '')") == "")
+        // An absent non-empty separator yields the empty string for both.
+        #expect(try string("substring-after('ABCDE', 'x')") == "")
     }
 
     @Test("substring honors one-based positions and length")

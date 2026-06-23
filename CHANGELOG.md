@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `substring-after(s, '')` now returns `s` instead of the empty string. Per the XPath 1.0 errata, an empty second argument matches at the start of the string, so everything after it is the whole string; the function bailed to empty on an empty separator. `substring-before(s, '')` stays empty, as the spec requires. Closes Apache Xalan conformance case `string143`.
+
 - `unparsed-entity-uri` now returns the URI of a DTD-declared unparsed (`NDATA`) entity instead of always the empty string. The function was a stub; it now reads the source document type's unparsed entities, threaded to the function table alongside the document loader. An unknown name still returns empty. Closes Apache Xalan conformance case `expression02`.
 
 - `document('')` now returns the stylesheet's own document. XSLT 1.0 section 12.1 makes an empty URI reference the document that contains the expression, so a stylesheet can read its own `xsl:*` nodes (a common idiom for embedded lookup tables and self-inspection), but the reference was passed straight to the document loader, which has no entry for it, so the call returned an empty node-set. The transformer now keeps its parsed stylesheet tree and the `document` function returns it for an empty reference (caching it like any loaded document; a `#fragment` still applies). Closes Apache Xalan conformance cases `select67`, `select68`, `idkey50`, `mdocs17`, and `namespace20`.
