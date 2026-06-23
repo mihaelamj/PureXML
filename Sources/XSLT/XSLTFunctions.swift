@@ -282,15 +282,31 @@ extension PureXML.XSLT {
                 // The loaded document's base URI is the (already base-resolved)
                 // reference it came from, so a relative reference taken from one
                 // of its nodes resolves against it (XSLT 1.0 12.1).
-                if let tree = cache.trees[path] { cache.baseURIs[ObjectIdentifier(tree)] = path }
+                if let tree = cache.trees[path] { recordBaseURI(tree, path, cache) }
             }
             guard let tree = cache.trees[path], let parsed = cache.sources[path] else { return [] }
             guard let fragment, !fragment.isEmpty else { return [.tree(tree)] }
             let selections = (try? PureXML.XPointer.evaluate(fragment, over: parsed)) ?? []
             return selections.compactMap { selection in
                 guard case let .node(node) = selection else { return nil }
-                return .tree(PureXML.Model.TreeNode(node))
+                // A fragment selection is a detached subtree, so its own root,
+                // not the cached whole-document tree, must carry the base URI for
+                // a later relative reference taken from one of its nodes.
+                let subtree = PureXML.Model.TreeNode(node)
+                recordBaseURI(subtree, path, cache)
+                return .tree(subtree)
             }
+        }
+
+        /// Records `path` as the base URI of the document root containing `node`,
+        /// so a relative `document()` reference later taken from `node` resolves
+        /// against it (XSLT 1.0 12.1).
+        private static func recordBaseURI(_ node: PureXML.Model.TreeNode, _ path: String, _ cache: PureXML.XSLT.DocumentCache) {
+            var root = node
+            while let parent = root.parent {
+                root = parent
+            }
+            cache.baseURIs[ObjectIdentifier(root)] = path
         }
 
         private static func localPart(_ name: String) -> String {

@@ -44,4 +44,12 @@ struct XSLTDocumentBaseURITests {
         let out = try run("document(document('dir/sub/inner.xml')/inner/ref)/sib")
         #expect(out == "<out>NODE_SET</out>")
     }
+
+    @Test("a fragment-selected node still carries its document's base URI")
+    func test_fragmentBase() throws {
+        // The fragment selection is a detached subtree, yet it must still resolve
+        // `target.xml` against dir/sub/inner.xml's directory.
+        let out = try run("document('target.xml', document('dir/sub/inner.xml#xpointer(/inner)'))/hit")
+        #expect(out == "<out>TWO_ARG</out>")
+    }
 }
