@@ -35,6 +35,23 @@ struct TreeNodeTests {
         #expect(tree.firstChild?.stringValue == "abc")
     }
 
+    @Test("A comment or PI node's stringValue is its own data, but it adds nothing to an ancestor's")
+    func test_stringValueOfCommentAndPI() throws {
+        // XPath 1.0 5.6/5.7: the string-value of a comment or processing-
+        // instruction node is its own character data (so value-of select=
+        // "comment()" returns it). But such a node contributes nothing to the
+        // string-value of an enclosing element (5.1), which is text+CDATA only.
+        let tree = try PureXML.parseTree("<r>a<!-- hi --><?pi go?>b</r>")
+        let root = try #require(tree.firstChild)
+        let comment = try #require(root.children.first { $0.kind == .comment })
+        let instruction = try #require(root.children.first { $0.kind == .processingInstruction })
+        #expect(comment.stringValue == " hi ")
+        #expect(instruction.stringValue == "go")
+        // The element excludes both: only the "a" and "b" text remain.
+        #expect(root.stringValue == "ab")
+        #expect(root.textContent == "ab")
+    }
+
     @Test("elementChildren skips non-element nodes")
     func test_elementChildren() throws {
         let tree = try PureXML.parseTree("<r>text<a/><!--c--><b/></r>")

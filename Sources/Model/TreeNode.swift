@@ -149,7 +149,7 @@ public extension PureXML.Model {
         /// replacement content. `value` mirrors the children's text for quick use.
         public static func entityReference(_ name: String, children: [TreeNode] = []) -> TreeNode {
             let node = TreeNode(kind: .entityReference, name: PureXML.Model.QualifiedName(name), children: children)
-            node.value = children.reduce(into: "") { $0 += $1.stringValue }
+            node.value = children.reduce(into: "") { $0 += $1.textContent }
             return node
         }
 
