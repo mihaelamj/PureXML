@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- An XPath location step now accepts whitespace around the `::` axis separator. XPath 1.0 allows whitespace between tokens, so `child :: sub` is the child axis with node test `sub`, but the parser only matched `::` immediately after the axis name, so a spaced separator silently fell back to the child axis with the axis name read as an element test and selected nothing. Closes Apache Xalan conformance cases `select16`, `select27`, and `select28`.
+
 - A variable or parameter with empty content and no `select` is now the empty string, not a result tree fragment. XSLT 1.0 section 11.2 makes `<xsl:variable name="x"/>` equivalent to `select=""`, so `boolean()` of it is false, but it was always built as a (non-empty) result-tree-fragment document node, which `boolean()` reports as true. Only non-empty content is still an RTF. Closes Apache Xalan conformance cases `boolean43` and `boolean87`.
 
 - Top-level (global) variables and parameters now resolve references to one another regardless of declaration order. XSLT 1.0 section 11.4 lets a global reference any other global, but they were evaluated once top-to-bottom, so a forward reference (a variable declared before the one it uses) saw an undefined value and resolved to empty. Globals now evaluate to a fixpoint: each pass re-evaluates the unsettled ones with the latest bindings, so a dependency chain in any document order settles, while a genuine circular reference stops at the pass cap. Closes Apache Xalan conformance cases `variable33`, `variable34`, and `variable35`.

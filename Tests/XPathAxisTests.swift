@@ -99,4 +99,14 @@ struct XPathAxisTests {
         // ancestor axis is reverse, but the returned node-set is document-ordered.
         #expect(try names("//c/ancestor-or-self::node()") == ["root", "a", "b", "c"])
     }
+
+    @Test("Whitespace is allowed around the :: axis separator")
+    func test_whitespaceAroundAxisSeparator() throws {
+        // XPath 1.0 allows whitespace between tokens, so `child :: a` is the
+        // child axis with node test `a`, the same as `child::a` (Apache Xalan
+        // select16, select27, select28).
+        #expect(try names("/root/child::a") == ["a", "a"])
+        #expect(try names("/root/child :: a") == ["a", "a"])
+        #expect(try names("/root/descendant :: c") == ["c"])
+    }
 }

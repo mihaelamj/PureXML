@@ -75,9 +75,6 @@ processorinfo/processorinfo03
 reluri/reluri09
 reluri/reluri10
 reluri/reluri11
-select/select16
-select/select27
-select/select28
 select/select67
 select/select68
 sort/sort02
