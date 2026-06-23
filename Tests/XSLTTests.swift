@@ -81,6 +81,21 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("xsl:processing-instruction and xsl:comment keep only text-node content")
+    func test_piCommentIgnoreNonTextContent() throws {
+        // Content that creates a non-text node (here a copied element) is ignored
+        // with its content, not flattened to its string value (XSLT 1.0 7.4/7.6,
+        // Apache Xalan copy60), so only the leading text node survives.
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/doc"><out><xsl:processing-instruction name="pi"><xsl:copy-of select="node()"/></xsl:processing-instruction></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        // doc = text "foo" then an element; the element node is dropped.
+        #expect(try transform(stylesheet, "<doc>foo<a>bar</a></doc>") == "<out><?pi foo?></out>")
+    }
+
     @Test("Whitespace around a CDATA section in a template is preserved")
     func test_literalWhitespaceAroundCData() throws {
         // Text and CDATA coalesce into one node, so " <![CDATA[test]]> " is the

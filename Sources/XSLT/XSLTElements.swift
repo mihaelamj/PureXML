@@ -129,6 +129,21 @@ extension PureXML.XSLT.Transformer {
 }
 
 extension PureXML.XSLT.Transformer {
+    /// The concatenated value of only the text and CDATA node items, ignoring an
+    /// element (or other) node together with its content. xsl:comment and
+    /// xsl:processing-instruction may contain only text (XSLT 1.0 7.4, 7.6); the
+    /// recovery for a created non-text node is to ignore it and its content,
+    /// which is not the same as taking the string-value of everything.
+    static func textNodesOnly(of items: [PureXML.XSLT.ResultItem]) -> String {
+        items.reduce(into: "") { result, item in
+            guard case let .node(node) = item else { return }
+            switch node {
+            case let .text(value), let .cdata(value): result += value
+            default: break
+            }
+        }
+    }
+
     /// The source element's in-scope namespace declarations as literal
     /// xmlns attributes (xsl:copy copies namespace nodes, 7.5); the fixup
     /// pass drops the ones already in scope in the result.

@@ -302,9 +302,9 @@ extension PureXML.XSLT.Transformer {
         case .number:
             [.node(.text(numberInstruction(instruction, context)))]
         case let .comment(body):
-            [.node(.comment(Self.text(of: instantiate(body, context))))]
+            [.node(.comment(Self.textNodesOnly(of: instantiate(body, context))))]
         case let .processingInstruction(name, body):
-            [.node(.processingInstruction(target: avt(name, context), data: Self.text(of: instantiate(body, context))))]
+            [.node(.processingInstruction(target: avt(name, context), data: Self.textNodesOnly(of: instantiate(body, context))))]
         case let .message(terminate, body):
             message(terminate, body, context)
         case .applyImports:

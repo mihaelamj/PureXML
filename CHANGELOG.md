@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsl:processing-instruction` and `xsl:comment` now use only the text-node content they instantiate, ignoring any element (or other) node together with its content. XSLT 1.0 sections 7.4 and 7.6 make it an error for the content to create a non-text node, with the recovery being to ignore the offending node and its content; PureXML instead took the string-value of all content, so a copied element leaked its text into the PI or comment. Closes Apache Xalan conformance case `copy60`.
+
 - Whitespace adjacent to a CDATA section in a template is no longer stripped. Text and CDATA are one text node in the data model, so `<out> <![CDATA[test]]> </out>` is the node `" test "`, whose surrounding spaces must survive whitespace stripping (XSLT 1.0 3.4). The template body dropped each whitespace-only text node independently, so the spaces around the CDATA vanished. Adjacent text and CDATA children now coalesce into one run, dropped only when the whole run is whitespace; a purely whitespace run between elements is still removed. Closes Apache Xalan conformance case `whitespace13`.
 
 - A serialized comment whose text ends with `-` or contains `--` is now made well-formed by inserting a space after the offending hyphen. XML forbids `--` inside a comment and a `-` immediately before `-->`, so a comment ending in `-` was emitted as `<!--text--->` (a malformed comment); the serializer now applies the XSLT 1.0 section 16 recovery, so `text-` becomes `text- `. Closes Apache Xalan conformance cases `output89` and `output90`.
