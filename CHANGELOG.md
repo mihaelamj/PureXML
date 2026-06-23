@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A variable or parameter is now named by expanded QName, not by its literal prefix. XSLT 1.0 section 11.1 names a variable by expanded name, so two prefixes bound to the same namespace name the same variable, but the declared name and the `$prefix:local` reference were compared as raw strings, so `$new:x` did not see a variable declared `txt:x` even when `new` and `txt` share a namespace. A prefixed declared name now resolves to `{uri}local` at parse time, and a variable reference falls back to the namespace-resolved name when the raw key is unbound (so a caller-supplied raw binding still works and unprefixed names are unchanged). Closes Apache Xalan conformance case `variable55`.
+
 - A template `mode` is now matched by expanded name, not by its literal prefix. XSLT 1.0 section 5.7 compares a mode by expanded name, so two prefixes bound to the same namespace name the same mode, but the prefixed QName string was stored and compared verbatim, so `apply-templates mode="foo:m"` missed a template with `mode="moo:m"` even when `foo` and `moo` share a namespace. Mode names on `xsl:template` and `xsl:apply-templates` now resolve to `{uri}local` at parse time. Closes Apache Xalan conformance case `modes16`.
 
 - `substring-after(s, '')` now returns `s` instead of the empty string. Per the XPath 1.0 errata, an empty second argument matches at the start of the string, so everything after it is the whole string; the function bailed to empty on an empty separator. `substring-before(s, '')` stays empty, as the spec requires. Closes Apache Xalan conformance case `string143`.

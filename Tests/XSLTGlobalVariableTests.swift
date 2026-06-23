@@ -39,4 +39,18 @@ struct XSLTGlobalVariableTests {
         """
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<doc><v>GotIt</v></doc>") == "<out>GotIt</out>")
     }
+
+    @Test("A variable is named by expanded QName: prefixes sharing a namespace name the same variable")
+    func test_variableMatchedByExpandedName() throws {
+        // txt and new are both bound to urn:v, so $new:x references the variable
+        // declared as txt:x (XSLT 1.0 11.1, Apache Xalan variable55).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl) xmlns:txt="urn:v" xmlns:new="urn:v" exclude-result-prefixes="txt new">
+          <xsl:variable name="txt:x" select="'Wizard'"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:value-of select="$new:x"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<out>Wizard</out>")
+    }
 }

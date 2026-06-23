@@ -129,8 +129,7 @@ extension PureXML.XPath {
             case let .string(value):
                 return .string(value)
             case let .variable(name):
-                guard let value = context.variables[name] else { throw QueryError.undefinedVariable(name) }
-                return value
+                return try resolveVariable(name, context)
             case let .negate(inner):
                 return try .number(-eval(inner, context).number)
             case let .function(name, arguments):
@@ -145,6 +144,23 @@ extension PureXML.XPath {
             case let .filter(primary, predicates, steps):
                 return try evalFilter(primary, predicates, steps, context)
             }
+        }
+
+        /// The value bound to `$name`. A prefixed reference may be bound under its
+        /// expanded name `{uri}local` (an XSLT variable is named by expanded
+        /// QName): the raw key is tried first, so a caller's raw binding is
+        /// unaffected, then the namespace-resolved name.
+        private static func resolveVariable(_ name: String, _ context: EvaluationContext) throws -> Value {
+            if let value = context.variables[name] { return value }
+            if let expanded = expandedKey(name, context.namespaces), let value = context.variables[expanded] { return value }
+            throw QueryError.undefinedVariable(name)
+        }
+
+        /// A prefixed name as its expanded key `{uri}local`, or nil when the name
+        /// has no prefix or the prefix is unbound in `namespaces`.
+        private static func expandedKey(_ name: String, _ namespaces: [String: String]) -> String? {
+            guard let colon = name.firstIndex(of: ":"), let uri = namespaces[String(name[..<colon])] else { return nil }
+            return "{\(uri)}\(name[name.index(after: colon)...])"
         }
 
         private static func evalPath(absolute: Bool, steps: [Step], _ context: EvaluationContext) throws -> Value {

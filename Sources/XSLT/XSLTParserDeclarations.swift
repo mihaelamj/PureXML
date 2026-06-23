@@ -40,6 +40,20 @@ extension PureXML.XSLT.XSLTParser {
         return "{\(uri)}\(local)"
     }
 
+    /// A variable or parameter `name` as an expanded name `{uri}local` when it
+    /// carries a prefix, or the bare name when unprefixed. A variable is named by
+    /// expanded QName (XSLT 1.0 11.1), so two prefixes bound to one namespace name
+    /// the same variable; the XPath evaluator falls back to the same expansion on
+    /// a reference, so only a prefixed name changes and unprefixed names are kept.
+    static func expandedDeclaredName(_ node: XSLTTree) -> String {
+        let raw = XSLTNode.attribute(node, "name") ?? ""
+        guard let colon = raw.firstIndex(of: ":") else { return raw }
+        let prefix = String(raw[..<colon])
+        let local = String(raw[raw.index(after: colon)...])
+        guard let uri = resolvePrefix(prefix, at: node) else { return raw }
+        return "{\(uri)}\(local)"
+    }
+
     static func addAttributeSet(_ child: XSLTTree, into parts: inout Parts) {
         guard let name = XSLTNode.attribute(child, "name") else { return }
         // Same-name attribute sets merge (7.1.4) as ordered definitions:

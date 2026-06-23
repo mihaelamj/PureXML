@@ -205,7 +205,7 @@ extension PureXML.XSLT {
 
         private static func binding(_ node: XSLTTree) -> Binding {
             Binding(
-                name: XSLTNode.attribute(node, "name") ?? "",
+                name: expandedDeclaredName(node),
                 select: XSLTNode.attribute(node, "select"),
                 body: body(node),
             )
@@ -280,7 +280,7 @@ extension PureXML.XSLT {
         }
 
         private static func variable(_ node: XSLTTree) -> Instruction {
-            .variable(name: XSLTNode.attribute(node, "name") ?? "", select: XSLTNode.attribute(node, "select"), body: body(node))
+            .variable(name: expandedDeclaredName(node), select: XSLTNode.attribute(node, "select"), body: body(node))
         }
 
         static func choose(_ node: XSLTTree) -> Instruction {

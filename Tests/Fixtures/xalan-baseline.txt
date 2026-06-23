@@ -78,7 +78,6 @@ sort/sort32
 sort/sort33
 sort/sort34
 string/string132
-variable/variable55
 whitespace/whitespace06
 whitespace/whitespace07
 whitespace/whitespace13
