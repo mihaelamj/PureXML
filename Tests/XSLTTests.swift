@@ -110,6 +110,9 @@ struct XSLTTests {
         #expect(try out("none:foo") == "<out><yyy/></out>") // undeclared prefix
         #expect(try out("this is bad") == "<out><yyy/></out>") // not an NCName
         #expect(try out("good") == "<out><good><yyy/></good></out>") // a valid name still wraps
+        // A name using a non-ASCII NameChar (U+00B7 middle dot) is a valid XML
+        // name and must still wrap, not be dropped as unusable.
+        #expect(try out("a\u{B7}b") == "<out><a\u{B7}b><yyy/></a\u{B7}b></out>")
     }
 
     @Test("xsl:copy-of carries an element's inherited namespace nodes")

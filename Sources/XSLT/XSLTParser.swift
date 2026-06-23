@@ -233,7 +233,7 @@ extension PureXML.XSLT {
             var result: [Instruction] = []
             var run = ""
             func flush() {
-                if !run.isEmpty, !run.allSatisfy(isXMLWhitespace) { result.append(.literalText(run)) }
+                if !run.isEmpty, !run.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isWhitespace) { result.append(.literalText(run)) }
                 run = ""
             }
             for child in node.children {
@@ -246,10 +246,6 @@ extension PureXML.XSLT {
             }
             flush()
             return result
-        }
-
-        private static func isXMLWhitespace(_ character: Character) -> Bool {
-            character == " " || character == "\t" || character == "\n" || character == "\r"
         }
 
         static func instruction(_ node: XSLTTree) -> Instruction? {

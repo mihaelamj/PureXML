@@ -152,4 +152,17 @@ struct XSLTOutputMethodTests {
         )
         #expect(result == "<out>a\u{E6}b</out>")
     }
+
+    @Test("A comment ending in a hyphen is well-formed in html output too")
+    func test_htmlCommentHyphenSafety() throws {
+        // The html output method must also apply the section-16 comment recovery,
+        // so a trailing hyphen does not produce a malformed `<!--x--->`.
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="html"/>
+          <xsl:template match="/"><out><xsl:comment>x-</xsl:comment></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<out><!--x- --></out>")
+    }
 }

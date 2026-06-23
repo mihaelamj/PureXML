@@ -13,7 +13,7 @@ extension PureXML.HTML {
             case let .text(value), let .cdata(value):
                 escapeText(value)
             case let .comment(value):
-                "<!--\(value)-->"
+                "<!--\(PureXML.Emitting.Escaping.comment(value))-->"
             case let .processingInstruction(target, data):
                 data.isEmpty ? "<?\(target)>" : "<?\(target) \(data)>"
             }
