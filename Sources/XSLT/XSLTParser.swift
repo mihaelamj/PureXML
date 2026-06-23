@@ -51,14 +51,11 @@ extension PureXML.XSLT {
     /// vocabulary is recognized by namespace or the `xsl` prefix; other elements
     /// are literal result elements.
     enum XSLTParser {
-        /// Compiles a stylesheet element, folding in `xsl:include`/`xsl:import`.
-        /// Compiles one stylesheet unit. Import precedences are assigned in
-        /// post-order over the import tree (each import lower than its
-        /// importer, later sibling imports higher than earlier ones), and a
-        /// unit's templates carry the [low, precedence) range of its own
-        /// import subtree, the set apply-imports searches. An included
-        /// stylesheet's declarations join the including unit at its
-        /// precedence; its imports join the including unit's import list.
+        /// Compiles one stylesheet unit, folding in `xsl:include`/`xsl:import`.
+        /// Import precedences are assigned post-order over the import tree (each
+        /// import lower than its importer, later siblings higher); a unit's
+        /// templates carry the [low, precedence) range apply-imports searches. An
+        /// included stylesheet joins the including unit at its precedence.
         static func compile(_ top: XSLTTree, loader: (String) -> String?, counter: inout Int, base: String = "", chain: Set<String> = []) -> Stylesheet {
             var parts = Parts()
             let low = counter
@@ -67,10 +64,9 @@ extension PureXML.XSLT {
             counter = collector.counter
             let precedence = counter
             counter += 1
-            // Included declarations resolve their 7.1.1 namespace nodes by
-            // walking the weak parent chain to their own stylesheet element,
-            // which lives only in the otherwise-unread retainedRoots; pin it
-            // across this loop so optimized ARC cannot release it early.
+            // Included declarations resolve their 7.1.1 namespace nodes via the
+            // weak parent chain to their own stylesheet element, retained only in
+            // the otherwise-unread retainedRoots; pin it so ARC keeps it here.
             withExtendedLifetime(collector.retainedRoots) {
                 for (child, _) in collector.declarations {
                     _ = absorbDeclaration(child, into: &parts, precedence: precedence, low: low)
@@ -197,7 +193,7 @@ extension PureXML.XSLT {
             return Template(
                 match: match,
                 name: XSLTNode.attribute(node, "name"),
-                mode: XSLTNode.attribute(node, "mode"),
+                mode: expandedMode(node),
                 priority: priority,
                 importPrecedence: precedence,
                 importRangeLow: low,
@@ -261,7 +257,7 @@ extension PureXML.XSLT {
                 )
             case "apply-templates": .applyTemplates(
                     select: XSLTNode.attribute(node, "select"),
-                    mode: XSLTNode.attribute(node, "mode"),
+                    mode: expandedMode(node),
                     sorts: sorts(node),
                     parameters: withParameters(node),
                 )
@@ -335,65 +331,5 @@ extension PureXML.XSLT {
                 )
             }
         }
-    }
-}
-
-/// Top-level declaration helpers for ``XSLTParser``, kept in an extension so the
-/// parser enum stays within the type-body length budget.
-private extension PureXML.XSLT.XSLTParser {
-    /// Records an `xsl:namespace-alias`: the namespace bound to `stylesheet-prefix`
-    /// is rewritten to the one bound to `result-prefix` (with that prefix) on output.
-    static func addNamespaceAlias(_ child: XSLTTree, into parts: inout Parts) {
-        let stylePrefix = XSLTNode.attribute(child, "stylesheet-prefix") ?? "#default"
-        let resultPrefix = XSLTNode.attribute(child, "result-prefix") ?? "#default"
-        let key = resolvePrefix(stylePrefix, at: child) ?? ""
-        parts.namespaceAliases[key] = PureXML.XSLT.NamespaceAlias(
-            uri: resolvePrefix(resultPrefix, at: child),
-            prefix: resultPrefix == "#default" ? nil : resultPrefix,
-        )
-    }
-
-    /// Resolves a namespace prefix (or `#default`) to its URI from the `xmlns`
-    /// declarations in scope at `node`, walking up to the stylesheet element.
-    static func resolvePrefix(_ prefix: String, at node: XSLTTree) -> String? {
-        var current: XSLTTree? = node
-        while let element = current {
-            for attribute in element.attributes {
-                let isDefault = prefix == "#default" && attribute.name.prefix == nil && attribute.name.localName == "xmlns"
-                let isPrefixed = attribute.name.prefix == "xmlns" && attribute.name.localName == prefix
-                if isDefault || isPrefixed { return attribute.value }
-            }
-            current = element.parent
-        }
-        return nil
-    }
-
-    static func addAttributeSet(_ child: XSLTTree, into parts: inout Parts) {
-        guard let name = XSLTNode.attribute(child, "name") else { return }
-        // Same-name attribute sets merge (7.1.4) as ordered definitions:
-        // each expands its used sets before its own attributes, and a later
-        // definition's attributes override earlier same-named ones.
-        let addition = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
-        parts.attributeSets[name, default: []].append(addition)
-    }
-
-    /// Reads an `xsl:decimal-format`'s symbol overrides; each unset attribute
-    /// keeps the XSLT standard default.
-    static func decimalFormat(_ node: XSLTTree) -> PureXML.XSLT.DecimalFormat {
-        var format = PureXML.XSLT.DecimalFormat()
-        func char(_ name: String, _ keyPath: WritableKeyPath<PureXML.XSLT.DecimalFormat, Character>) {
-            if let value = XSLTNode.attribute(node, name)?.first { format[keyPath: keyPath] = value }
-        }
-        char("decimal-separator", \.decimalSeparator)
-        char("grouping-separator", \.groupingSeparator)
-        char("percent", \.percent)
-        char("per-mille", \.perMille)
-        char("zero-digit", \.zeroDigit)
-        char("digit", \.digit)
-        char("pattern-separator", \.patternSeparator)
-        char("minus-sign", \.minusSign)
-        if let infinity = XSLTNode.attribute(node, "infinity") { format.infinity = infinity }
-        if let notANumber = XSLTNode.attribute(node, "NaN") { format.notANumber = notANumber }
-        return format
     }
 }

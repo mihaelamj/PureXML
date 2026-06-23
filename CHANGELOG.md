@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A template `mode` is now matched by expanded name, not by its literal prefix. XSLT 1.0 section 5.7 compares a mode by expanded name, so two prefixes bound to the same namespace name the same mode, but the prefixed QName string was stored and compared verbatim, so `apply-templates mode="foo:m"` missed a template with `mode="moo:m"` even when `foo` and `moo` share a namespace. Mode names on `xsl:template` and `xsl:apply-templates` now resolve to `{uri}local` at parse time. Closes Apache Xalan conformance case `modes16`.
+
 - `substring-after(s, '')` now returns `s` instead of the empty string. Per the XPath 1.0 errata, an empty second argument matches at the start of the string, so everything after it is the whole string; the function bailed to empty on an empty separator. `substring-before(s, '')` stays empty, as the spec requires. Closes Apache Xalan conformance case `string143`.
 
 - `unparsed-entity-uri` now returns the URI of a DTD-declared unparsed (`NDATA`) entity instead of always the empty string. The function was a stub; it now reads the source document type's unparsed entities, threaded to the function table alongside the document loader. An unknown name still returns empty. Closes Apache Xalan conformance case `expression02`.

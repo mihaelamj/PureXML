@@ -34,7 +34,6 @@ mdocs/mdocs12
 mdocs/mdocs13
 mdocs/mdocs15
 mdocs/mdocs19
-modes/modes16
 namedtemplate/namedtemplate12
 namedtemplate/namedtemplate16
 namespace/namespace113

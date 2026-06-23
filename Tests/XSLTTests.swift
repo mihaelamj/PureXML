@@ -67,6 +67,20 @@ struct XSLTTests {
         #expect(try transform(stylesheet, source) == "<toc><li>A</li><li>B</li></toc><body><h1>A</h1><h1>B</h1></body>")
     }
 
+    @Test("A mode is matched by expanded name: prefixes sharing a namespace name the same mode")
+    func test_modeMatchedByExpandedName() throws {
+        // foo and moo are both bound to urn:m, so apply-templates mode="foo:m"
+        // selects the template with mode="moo:m" (XSLT 1.0 5.7, Xalan modes16).
+        let stylesheet = """
+        <xsl:stylesheet \(xsl) xmlns:foo="urn:m" xmlns:moo="urn:m" exclude-result-prefixes="foo moo">
+          <xsl:template match="/"><out><xsl:apply-templates select="doc/a" mode="foo:m"/></out></xsl:template>
+          <xsl:template match="a" mode="moo:m">matched</xsl:template>
+          <xsl:template match="a">unmatched</xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
+    }
+
     @Test("The identity transform reproduces the input")
     func test_identity() throws {
         let stylesheet = """
