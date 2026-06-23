@@ -61,8 +61,6 @@ output/output74
 output/output75
 output/output80
 output/output86
-output/output89
-output/output90
 position/position106
 processorinfo/processorinfo03
 reluri/reluri09

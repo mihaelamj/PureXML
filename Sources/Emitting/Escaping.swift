@@ -49,5 +49,20 @@ extension PureXML.Emitting {
             }
             return result
         }
+
+        /// Makes `value` safe inside a comment: a comment may not contain `--`
+        /// or end with `-`, so a space is inserted after each offending hyphen
+        /// (the XSLT 1.0 16 recovery, so `after-` becomes `after- `).
+        static func comment(_ value: String) -> String {
+            var result = ""
+            var previousHyphen = false
+            for character in value {
+                if character == "-", previousHyphen { result.append(" ") }
+                result.append(character)
+                previousHyphen = character == "-"
+            }
+            if previousHyphen { result.append(" ") }
+            return result
+        }
     }
 }

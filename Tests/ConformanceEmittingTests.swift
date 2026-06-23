@@ -53,4 +53,14 @@ struct ConformanceEmittingTests {
         let failures = try PureXML.Validation.Conformance.failures(in: corpus())
         #expect(failures.isEmpty, "\(failures.map(\.reason))")
     }
+
+    @Test("A comment ending in a hyphen or containing -- is made safe")
+    func test_commentHyphenSafety() {
+        // A comment may not end with `-` or contain `--`; a space is inserted
+        // after each offending hyphen (XSLT 1.0 16, Apache Xalan output89/90).
+        let trailing = PureXML.serialize(.element(.init("r", children: [.comment("ends-")])), options: compact)
+        #expect(trailing == "<r><!--ends- --></r>")
+        let doubled = PureXML.serialize(.element(.init("r", children: [.comment("a--b")])), options: compact)
+        #expect(doubled == "<r><!--a- -b--></r>")
+    }
 }

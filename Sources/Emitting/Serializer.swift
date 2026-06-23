@@ -85,7 +85,7 @@ public extension PureXML.Emitting {
                     ? Escaping.text(value, asciiOnly: options.asciiOnly, escapeCarriageReturn: options.textEscaping.escapesCarriageReturn)
                     : "<![CDATA[\(value)]]>"
             case let .comment(value):
-                output += "<!--\(value)-->"
+                output += "<!--\(Escaping.comment(value))-->"
             case let .processingInstruction(target, data):
                 output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(data)?>"
             }

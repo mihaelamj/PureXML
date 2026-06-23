@@ -99,7 +99,7 @@ public extension PureXML.Emitting {
             if options.prettyPrint, !open.isEmpty {
                 output += options.lineEnding + pad(open.count)
             }
-            output += "<!--\(text)-->"
+            output += "<!--\(Escaping.comment(text))-->"
             markParentHasElements()
         }
 

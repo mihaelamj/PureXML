@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A serialized comment whose text ends with `-` or contains `--` is now made well-formed by inserting a space after the offending hyphen. XML forbids `--` inside a comment and a `-` immediately before `-->`, so a comment ending in `-` was emitted as `<!--text--->` (a malformed comment); the serializer now applies the XSLT 1.0 section 16 recovery, so `text-` becomes `text- `. Closes Apache Xalan conformance cases `output89` and `output90`.
+
 - A match pattern's predicate now sees the top-level (global) variables. XSLT 1.0 section 5.2 evaluates a pattern predicate with the global variables in scope, but pattern matching ran with no variables bound, so a template like `match="foo[. > $screen]"` never matched (the predicate's `$screen` was undefined). The transformer now supplies the global bindings to the match cache, which are constant per transform and so do not affect caching. Closes Apache Xalan conformance cases `match14` and `idkey43`.
 
 - A variable or parameter is now named by expanded QName, not by its literal prefix. XSLT 1.0 section 11.1 names a variable by expanded name, so two prefixes bound to the same namespace name the same variable, but the declared name and the `$prefix:local` reference were compared as raw strings, so `$new:x` did not see a variable declared `txt:x` even when `new` and `txt` share a namespace. A prefixed declared name now resolves to `{uri}local` at parse time, and a variable reference falls back to the namespace-resolved name when the raw key is unbound (so a caller-supplied raw binding still works and unprefixed names are unchanged). Closes Apache Xalan conformance case `variable55`.
