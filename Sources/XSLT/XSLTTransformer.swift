@@ -339,7 +339,7 @@ extension PureXML.XSLT.Transformer {
         }
         return nodes.map { xnode in
             switch xnode {
-            case let .tree(tree): .node(tree.node)
+            case let .tree(tree): .node(Self.withInScopeNamespaces(tree))
             case let .attribute(_, attribute): .attribute(attribute)
             case let .namespace(_, prefix, uri):
                 .attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:\(prefix)", uri))

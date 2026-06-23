@@ -169,6 +169,23 @@ extension PureXML.XSLT.Transformer {
         }
     }
 
+    /// A copied tree node for `xsl:copy-of`. For an element it carries the
+    /// element's full set of in-scope namespace nodes (XSLT 1.0 11.3: copying a
+    /// node copies its namespace nodes), so a declaration inherited from an
+    /// ancestor of the copied element is added alongside the element's own; the
+    /// serializer's namespace fixup later drops any already in the result scope.
+    static func withInScopeNamespaces(_ tree: PureXML.Model.TreeNode) -> PureXML.Model.Node {
+        guard case let .element(element) = tree.node else { return tree.node }
+        let declared = Set(element.attributes
+            .filter { $0.name.prefix == "xmlns" || ($0.name.prefix == nil && $0.name.localName == "xmlns") }
+            .map(\.name.description))
+        let inherited = namespaceDeclarations(inScopeAt: tree).compactMap { decl -> PureXML.Model.Attribute? in
+            guard !declared.contains(decl.name.description), case let .literal(uri) = decl.value.first else { return nil }
+            return PureXML.Model.Attribute(name: decl.name, value: uri)
+        }
+        return .element(.init(name: element.name, attributes: element.attributes + inherited, children: element.children))
+    }
+
     /// The topmost ancestor of `node` (its document node).
     static func documentRoot(of node: PureXML.Model.TreeNode) -> PureXML.Model.TreeNode {
         var current = node

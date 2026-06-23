@@ -81,6 +81,21 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("xsl:copy-of carries an element's inherited namespace nodes")
+    func test_copyOfInheritedNamespaces() throws {
+        // The copied <inner> inherits xmlns:ped from the root, with no ped-prefixed
+        // name of its own, so copy-of must still carry the ped namespace node
+        // (XSLT 1.0 11.3, Apache Xalan copy09).
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:copy-of select="root/inner"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<root xmlns:ped=\"urn:ped\"><inner xmlns:bdd=\"urn:bdd\"/></root>"
+        #expect(try transform(stylesheet, source) == "<out><inner xmlns:bdd=\"urn:bdd\" xmlns:ped=\"urn:ped\"/></out>")
+    }
+
     @Test("xsl:processing-instruction and xsl:comment keep only text-node content")
     func test_piCommentIgnoreNonTextContent() throws {
         // Content that creates a non-text node (here a copied element) is ignored

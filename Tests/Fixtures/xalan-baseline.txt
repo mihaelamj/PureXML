@@ -9,9 +9,6 @@ attribvaltemplate/attribvaltemplate08
 axes/axes116
 conflictres/conflictres29
 conflictres/conflictres30
-copy/copy09
-copy/copy27
-copy/copy48
 extend/extend01
 extend/extend02
 extend/extend04
@@ -24,7 +21,6 @@ idkey/idkey53
 impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
-mdocs/mdocs09
 mdocs/mdocs12
 mdocs/mdocs13
 mdocs/mdocs15
