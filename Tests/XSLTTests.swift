@@ -81,6 +81,20 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("xsl:copy of the root with use-attribute-sets adds the attributes to the enclosing element")
+    func test_copyRootWithAttributeSets() throws {
+        // Copying the root makes no element of its own, so the attribute-set
+        // attributes join the enclosing <out> (XSLT 1.0 7.5, Xalan attribset29).
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:attribute-set name="s"><xsl:attribute name="a">1</xsl:attribute></xsl:attribute-set>
+          <xsl:template match="/"><out><xsl:copy use-attribute-sets="s"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<x/>") == "<out a=\"1\"/>")
+    }
+
     @Test("xsl:element with an unusable name passes its content through")
     func test_elementInvalidNamePassThrough() throws {
         func out(_ name: String) throws -> String {

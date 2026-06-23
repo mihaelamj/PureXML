@@ -138,6 +138,13 @@ extension PureXML.XSLT.Transformer {
             return [.node(.comment(context.node.value))]
         case .processingInstruction:
             return [.node(.processingInstruction(target: context.node.name?.description ?? "", data: context.node.value))]
+        case .document:
+            // Copying the root node produces no element of its own, but xsl:copy
+            // may carry use-attribute-sets (7.5); those attributes have no copied
+            // element to attach to, so they join the enclosing result element,
+            // ahead of the copied content.
+            let setAttributes = attributeSetAttributes(useAttributeSets, context, visiting: []).map(PureXML.XSLT.ResultItem.attribute)
+            return setAttributes + instantiate(body, context)
         default:
             return instantiate(body, context)
         }

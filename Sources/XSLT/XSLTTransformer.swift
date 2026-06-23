@@ -376,7 +376,7 @@ extension PureXML.XSLT.Transformer {
 
     /// The attributes contributed by `names` and the attribute sets they include,
     /// lower precedence first, with a `visiting` guard against recursive includes.
-    private func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
+    func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
         var result: [PureXML.Model.Attribute] = []
         for name in names where !visiting.contains(name) {
             for definition in stylesheet.attributeSets[name] ?? [] {
