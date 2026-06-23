@@ -197,6 +197,7 @@ extension PureXML.XSLT {
             decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
             documents: PureXML.XSLT.DocumentCache,
             selfDocument: PureXML.Model.Node? = nil,
+            unparsedEntities: [String: String] = [:],
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([current]) }
@@ -236,7 +237,9 @@ extension PureXML.XSLT {
                 .adding("system-property") { arguments, _ in systemProperty(arguments.first?.string ?? "") }
                 .adding("element-available") { arguments, _ in .boolean(instructionNames.contains(localPart(arguments.first?.string ?? ""))) }
                 .adding("function-available") { arguments, _ in .boolean(functionNames.contains(localPart(arguments.first?.string ?? ""))) }
-                .adding("unparsed-entity-uri") { _, _ in .string("") }
+                .adding("unparsed-entity-uri") { arguments, _ in
+                    .string(unparsedEntities[arguments.first?.string ?? ""] ?? "")
+                }
         }
 
         /// Loads one `document()` reference: the whole document, or, when the

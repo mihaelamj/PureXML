@@ -15,7 +15,6 @@ copy/copy48
 copy/copy56
 copy/copy58
 copy/copy60
-expression/expression02
 extend/extend01
 extend/extend02
 extend/extend04

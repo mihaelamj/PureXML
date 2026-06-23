@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `unparsed-entity-uri` now returns the URI of a DTD-declared unparsed (`NDATA`) entity instead of always the empty string. The function was a stub; it now reads the source document type's unparsed entities, threaded to the function table alongside the document loader. An unknown name still returns empty. Closes Apache Xalan conformance case `expression02`.
+
 - `document('')` now returns the stylesheet's own document. XSLT 1.0 section 12.1 makes an empty URI reference the document that contains the expression, so a stylesheet can read its own `xsl:*` nodes (a common idiom for embedded lookup tables and self-inspection), but the reference was passed straight to the document loader, which has no entry for it, so the call returned an empty node-set. The transformer now keeps its parsed stylesheet tree and the `document` function returns it for an empty reference (caching it like any loaded document; a `#fragment` still applies). Closes Apache Xalan conformance cases `select67`, `select68`, `idkey50`, `mdocs17`, and `namespace20`.
 
 - An XPath location step now accepts whitespace around the `::` axis separator. XPath 1.0 allows whitespace between tokens, so `child :: sub` is the child axis with node test `sub`, but the parser only matched `::` immediately after the axis name, so a spaced separator silently fell back to the child axis with the axis name read as an element test and selected nothing. Closes Apache Xalan conformance cases `select16`, `select27`, and `select28`.

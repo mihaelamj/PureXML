@@ -24,13 +24,12 @@ extension PureXML.XSLT {
             termination.message
         }
 
-        /// Caller-supplied top-level parameter values, overriding xsl:param
-        /// defaults by name.
+        /// Caller-supplied top-level parameter values, overriding xsl:param defaults.
         let parameters: [String: String]
-
-        /// The stylesheet's own parsed document, returned by `document('')`
-        /// (XSLT 1.0 12.1: an empty URI reference is the containing stylesheet).
+        /// The stylesheet's own parsed document, returned by `document('')` (12.1).
         let stylesheetDocument: PureXML.Model.Node?
+        /// The source DTD's unparsed entities by name to system URI, for `unparsed-entity-uri` (12.4).
+        let unparsedEntityURIs: [String: String]
 
         init(
             stylesheet: Stylesheet,
@@ -39,12 +38,14 @@ extension PureXML.XSLT {
             idAttributes: [String: Set<String>] = [:],
             parameters: [String: String] = [:],
             stylesheetDocument: PureXML.Model.Node? = nil,
+            unparsedEntityURIs: [String: String] = [:],
         ) {
             self.parameters = parameters
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
             self.stylesheetDocument = stylesheetDocument
+            self.unparsedEntityURIs = unparsedEntityURIs
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
@@ -65,6 +66,7 @@ extension PureXML.XSLT {
                 decimalFormats: stylesheet.decimalFormats,
                 documents: documentCache,
                 selfDocument: stylesheetDocument,
+                unparsedEntities: unparsedEntityURIs,
             )
         }
 
@@ -193,6 +195,7 @@ extension PureXML.XSLT {
                     decimalFormats: stylesheet.decimalFormats,
                     documents: documentCache,
                     selfDocument: stylesheetDocument,
+                    unparsedEntities: unparsedEntityURIs,
                 ),
                 namespaces: context.namespaces,
             )
