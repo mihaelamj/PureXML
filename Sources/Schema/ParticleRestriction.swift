@@ -264,15 +264,22 @@ extension PureXML.Schema {
             guard processContentsRank(restricted.processContents) >= processContentsRank(base.processContents) else {
                 return false
             }
+            // Wildcard Subset (XSD 1.0 §3.10.6 / Errata E1-10): the restriction's
+            // namespace constraint must admit only what the base does. Both `not`
+            // forms exclude absent.
             return switch (restricted.namespace, base.namespace) {
             case (_, .any):
                 true
-            case (.other, .other):
-                restricted.targetNamespace == base.targetNamespace
             case let (.enumerated(narrow), .enumerated(wide)):
                 narrow.isSubset(of: wide)
-            case let (.enumerated(narrow), .other):
-                !narrow.contains("") && !narrow.contains(base.targetNamespace ?? "")
+            case let (.enumerated(narrow), .notNamespace(excluded)):
+                !narrow.contains(excluded) && !narrow.contains("")
+            case let (.enumerated(narrow), .notAbsent):
+                !narrow.contains("")
+            case let (.notNamespace(narrow), .notNamespace(wide)):
+                narrow == wide
+            case (.notNamespace, .notAbsent), (.notAbsent, .notAbsent):
+                true
             default:
                 false
             }

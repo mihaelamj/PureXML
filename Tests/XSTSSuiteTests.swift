@@ -35,8 +35,9 @@ struct XSTSSuiteTests {
     /// unescaped `[` inside a pattern-facet character class is a syntax error per
     /// XSD Appendix F (RegexTest_993, RegexTest_1477); 13 -> 12, an unknown
     /// `\p{...}` category or block name is rejected now the block set is complete
-    /// (reK88, `\p{IsaA0-a9}`).
-    private let knownSchemaInvalidAccepted = 12
+    /// (reK88, `\p{IsaA0-a9}`); 12 -> 11, an attribute-wildcard union in a type
+    /// extension that is not expressible per Errata E1-10 is rejected (wildZ013).
+    private let knownSchemaInvalidAccepted = 11
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's
@@ -47,9 +48,12 @@ struct XSTSSuiteTests {
     /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065);
     /// an optional xs:all group present in the instance still requires its members (mgZ001);
     /// a defaulted/fixed IDREF/IDREFS must resolve to a matching ID, cvc-id (idZ012).
-    /// Latest (19 -> 17): a negated character-class subtraction excludes both the
+    /// 19 -> 17: a negated character-class subtraction excludes both the
     /// negated base and the subtrahend (`[^cde-[ag]]`), RegexTest_430 and _422.
-    private let knownInstanceInvalidAccepted = 17
+    /// Latest (17 -> 15): the attribute-wildcard union of a type extension is
+    /// computed per Errata E1-10, so the resulting wildcard admits exactly the
+    /// right attributes (wildZ013a, wildZ013d).
+    private let knownInstanceInvalidAccepted = 15
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]

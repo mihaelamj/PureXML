@@ -237,16 +237,19 @@ private struct CompWalk {
     }
 
     static func wildcardsOverlap(_ lhs: PureXML.Schema.Wildcard, _ rhs: PureXML.Schema.Wildcard) -> Bool {
+        // Two wildcards overlap when some namespace name is admitted by both. Any
+        // two `not` forms always share infinitely many named namespaces; a `not`
+        // form overlaps a set when the set holds a named namespace it admits.
         switch (lhs.namespace, rhs.namespace) {
         case (.any, _), (_, .any): true
-        case (.other, .other): true
         case let (.enumerated(lhsSet), .enumerated(rhsSet)): !lhsSet.isDisjoint(with: rhsSet)
-        case let (.other, .enumerated(set)): otherOverlapsEnumerated(set, target: lhs.targetNamespace)
-        case let (.enumerated(set), .other): otherOverlapsEnumerated(set, target: rhs.targetNamespace)
+        case let (.enumerated(set), .notNamespace(name)), let (.notNamespace(name), .enumerated(set)):
+            set.contains { !$0.isEmpty && $0 != name }
+        case let (.enumerated(set), .notAbsent), let (.notAbsent, .enumerated(set)):
+            set.contains { !$0.isEmpty }
+        case (.notNamespace, .notNamespace), (.notNamespace, .notAbsent),
+             (.notAbsent, .notNamespace), (.notAbsent, .notAbsent):
+            true
         }
-    }
-
-    static func otherOverlapsEnumerated(_ set: Set<String>, target: String?) -> Bool {
-        set.contains { !$0.isEmpty && $0 != (target ?? "") }
     }
 }

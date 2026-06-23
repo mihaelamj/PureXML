@@ -115,6 +115,7 @@ struct ValidationConfigurationTests {
             "Simple-type varieties are declared consistently",
             "Notation declarations are valid",
             "Simple-type facets are valid for their base type",
+            "Attribute wildcard unions in type extensions are expressible",
             "Every schema reference resolves to a declared component",
             "Substitution-group members derive correctly from their head",
         ])
