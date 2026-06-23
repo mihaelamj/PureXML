@@ -54,4 +54,21 @@ struct XSLTResultFragmentTests {
         """
         #expect(try transform(style, "<x/>") == "1,3,")
     }
+
+    @Test("A variable with empty content and no select is the empty string, not an RTF")
+    func test_emptyContentVariableIsEmptyString() throws {
+        // XSLT 1.0 11.2: <xsl:variable name="x"/> with empty content and no
+        // select is equivalent to select="", so its boolean() is false (an RTF,
+        // by contrast, is always true). A variable with non-empty content stays
+        // an RTF and is true (Apache Xalan boolean43, boolean87).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="text"/>
+          <xsl:variable name="empty"></xsl:variable>
+          <xsl:variable name="rtf"><n/></xsl:variable>
+          <xsl:template match="/"><xsl:value-of select="boolean($empty)"/>,<xsl:value-of select="boolean($rtf)"/></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(style, "<x/>") == "false,true")
+    }
 }

@@ -7,8 +7,6 @@ attribset/attribset44
 attribset/attribset48
 attribvaltemplate/attribvaltemplate08
 axes/axes116
-boolean/boolean43
-boolean/boolean87
 conflictres/conflictres29
 conflictres/conflictres30
 copy/copy09
