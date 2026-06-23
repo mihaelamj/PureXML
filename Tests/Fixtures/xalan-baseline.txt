@@ -32,12 +32,6 @@ namespace/namespace19
 namespace/namespace23
 namespace/namespace24
 namespace/namespace35
-namespace/namespace40
-namespace/namespace42
-namespace/namespace43
-namespace/namespace60
-namespace/namespace73
-namespace/namespace79
 numbering/numbering63
 output/output22
 output/output26

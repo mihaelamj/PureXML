@@ -67,14 +67,28 @@ extension PureXML.XSLT.Transformer {
         return name
     }
 
+    /// Whether `part` is a valid XML NCName: a letter or `_` start, then name
+    /// characters (no spaces or punctuation), so `this is a string` is rejected.
+    static func isNCName(_ part: Substring) -> Bool {
+        guard let first = part.first, first == "_" || first.isLetter else { return false }
+        return part.dropFirst().allSatisfy { $0 == "_" || $0 == "-" || $0 == "." || $0.isLetter || $0.isNumber }
+    }
+
     func elementInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
         guard case let .element(nameTemplate, namespaceTemplate, namespaces, useAttributeSets, body) = instruction else {
             return []
         }
         let raw = avt(nameTemplate, context)
         let parts = raw.split(separator: ":", omittingEmptySubsequences: false)
-        if raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2 {
-            // An unusable element name: the recovery is to emit the content
+        let hasExplicitNamespace = (namespaceTemplate.map { !avt($0, context).isEmpty }) ?? false
+        let prefix = parts.count == 2 ? String(parts[0]) : nil
+        // A prefix not bound to a namespace (and no explicit namespace attribute
+        // supplies one) makes the QName unusable, as does a non-NCName part.
+        let undeclaredPrefix = !hasExplicitNamespace && (prefix.map { $0 != "xml" && namespaces[$0] == nil } ?? false)
+        let unusableName = raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2
+            || !parts.allSatisfy(Self.isNCName) || undeclaredPrefix
+        if unusableName {
+            // The recovery (7.1.2, element-name-not-QName) emits the content
             // without the wrapper element.
             return instantiate(body, context).filter { if case .attribute = $0 { false } else { true } }
         }

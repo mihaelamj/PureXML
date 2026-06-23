@@ -81,6 +81,23 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("xsl:element with an unusable name passes its content through")
+    func test_elementInvalidNamePassThrough() throws {
+        func out(_ name: String) throws -> String {
+            try transform("""
+            <xsl:stylesheet \(xsl)>
+              <xsl:output omit-xml-declaration="yes"/>
+              <xsl:template match="/"><out><xsl:element name="\(name)"><yyy/></xsl:element></out></xsl:template>
+            </xsl:stylesheet>
+            """, "<x/>")
+        }
+        // An undeclared prefix or non-QName name is unusable; the recovery emits
+        // the content without the wrapper element (XSLT 1.0 7.1.2, Xalan namespace40/43).
+        #expect(try out("none:foo") == "<out><yyy/></out>") // undeclared prefix
+        #expect(try out("this is bad") == "<out><yyy/></out>") // not an NCName
+        #expect(try out("good") == "<out><good><yyy/></good></out>") // a valid name still wraps
+    }
+
     @Test("xsl:copy-of carries an element's inherited namespace nodes")
     func test_copyOfInheritedNamespaces() throws {
         // The copied <inner> inherits xmlns:ped from the root, with no ped-prefixed
