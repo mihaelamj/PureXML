@@ -325,7 +325,10 @@ extension PureXML.XSLT.Transformer {
     }
 
     private func callTemplate(_ name: String, _ parameters: [PureXML.XSLT.Binding], _ context: XSLTContext) -> [ResultItem] {
-        guard let template = stylesheet.templates.first(where: { $0.name == name }) else { return [] }
+        // XSLT 1.0 section 6: pick the highest import-precedence definition, not the
+        // first by position, so an included template outranks a same-name import.
+        guard let template = stylesheet.templates.filter({ $0.name == name })
+            .max(by: { $0.importPrecedence < $1.importPrecedence }) else { return [] }
         return instantiateTemplate(template, context, passing: parameters, from: context)
     }
 

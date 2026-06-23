@@ -54,11 +54,7 @@ modes/modes12
 modes/modes16
 namedtemplate/namedtemplate12
 namedtemplate/namedtemplate16
-namedtemplate/namedtemplate17
-namedtemplate/namedtemplate18
-namedtemplate/namedtemplate19
 namespace/namespace113
-namespace/namespace13
 namespace/namespace19
 namespace/namespace20
 namespace/namespace23
