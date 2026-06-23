@@ -98,7 +98,21 @@ extension PureXML.Validation {
 
         static var contentModelsDeterministic: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
             compileRule("Schema content models are deterministic (UPA)") { document in
-                PureXML.Schema.ContentModelDeterminism.violationFindings(in: document.schema, context: document.context)
+                // Run over every schema document in the composition, not just the
+                // root: a `redefine` in the root can make a complex type that lives
+                // in an INCLUDED/redefined document ambiguous (XSTS schN10: the root
+                // redefines a group so the base document's `b-ct` gains a duplicate
+                // particle). That model lives in the other root, so walking only
+                // `document.schema` missed it. The shared context carries the
+                // redefine-effective group definitions, so each root resolves them
+                // identically to instance validation. Each root uses its own
+                // namespace bindings (violationFindings reads them from the root).
+                let roots = [document.schema] + document.containers.filter {
+                    $0 !== document.schema && PureXML.Schema.XSDNode.localName($0) == "schema"
+                }
+                return roots.flatMap {
+                    PureXML.Schema.ContentModelDeterminism.violationFindings(in: $0, context: document.context)
+                }
             }
         }
 

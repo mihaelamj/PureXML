@@ -36,8 +36,11 @@ struct XSTSSuiteTests {
     /// XSD Appendix F (RegexTest_993, RegexTest_1477); 13 -> 12, an unknown
     /// `\p{...}` category or block name is rejected now the block set is complete
     /// (reK88, `\p{IsaA0-a9}`); 12 -> 11, an attribute-wildcard union in a type
-    /// extension that is not expressible per Errata E1-10 is rejected (wildZ013).
-    private let knownSchemaInvalidAccepted = 11
+    /// extension that is not expressible per Errata E1-10 is rejected (wildZ013);
+    /// 11 -> 10, a redefine self-reference's expansion is now seen by the UPA check
+    /// and that check runs over every composition root, so a redefined group that
+    /// duplicates a particle across the redefine chain is rejected (schN10).
+    private let knownSchemaInvalidAccepted = 10
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's
