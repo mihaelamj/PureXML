@@ -36,6 +36,12 @@ extension PureXML.XSLT {
         /// The id() index per document root, built on first use: ID value to
         /// its element (the first in document order wins, per ID semantics).
         var idIndexes: [ObjectIdentifier: [String: PureXML.Model.TreeNode]] = [:]
+        /// The base URI of each loaded document, keyed by its root identity: the
+        /// URI reference it was loaded from. A relative reference in `document()`
+        /// resolves against the base URI of the node supplying the base (XSLT 1.0
+        /// 12.1); a root absent here is the source document, whose base the loader
+        /// already applies, so it resolves against the empty string.
+        var baseURIs: [ObjectIdentifier: String] = [:]
     }
 
     /// The ID-typed attributes a document type declares, element name to
