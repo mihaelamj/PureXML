@@ -81,6 +81,21 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc><a/></doc>") == "<out>matched</out>")
     }
 
+    @Test("Whitespace around a CDATA section in a template is preserved")
+    func test_literalWhitespaceAroundCData() throws {
+        // Text and CDATA coalesce into one node, so " <![CDATA[test]]> " is the
+        // non-whitespace node " test " and its spaces survive stripping, while a
+        // purely whitespace run between elements is still dropped (Xalan
+        // whitespace13).
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out> <![CDATA[test]]> </out></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<x/>") == "<out> test </out>")
+    }
+
     @Test("A match pattern predicate sees top-level variables")
     func test_patternReferencesGlobalVariable() throws {
         // foo[. > $screen] matches only foo elements over the global threshold

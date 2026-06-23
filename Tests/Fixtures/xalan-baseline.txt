@@ -76,5 +76,4 @@ sort/sort34
 string/string132
 whitespace/whitespace06
 whitespace/whitespace07
-whitespace/whitespace13
 whitespace/whitespace20

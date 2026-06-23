@@ -226,7 +226,30 @@ extension PureXML.XSLT {
         // MARK: Bodies and instructions
 
         static func body(_ node: XSLTTree) -> [Instruction] {
-            node.children.compactMap(instruction)
+            // Adjacent text and CDATA children are one text node in the data
+            // model, so a whitespace-only run is dropped (XSLT 1.0 3.4) only when
+            // the WHOLE coalesced run is whitespace: " <![CDATA[x]]> " keeps its
+            // spaces because the run "x" surrounds them with non-whitespace.
+            var result: [Instruction] = []
+            var run = ""
+            func flush() {
+                if !run.isEmpty, !run.allSatisfy(isXMLWhitespace) { result.append(.literalText(run)) }
+                run = ""
+            }
+            for child in node.children {
+                if child.kind == .text || child.kind == .cdata {
+                    run += child.value
+                } else {
+                    flush()
+                    if let instruction = instruction(child) { result.append(instruction) }
+                }
+            }
+            flush()
+            return result
+        }
+
+        private static func isXMLWhitespace(_ character: Character) -> Bool {
+            character == " " || character == "\t" || character == "\n" || character == "\r"
         }
 
         static func instruction(_ node: XSLTTree) -> Instruction? {
