@@ -41,7 +41,10 @@ extension PureXML.XPath {
         private static func substringAfter(_ arguments: [Value]) -> String {
             let haystack = Array(argument(arguments, 0))
             let needle = Array(argument(arguments, 1))
-            guard !needle.isEmpty, let start = search(needle, in: haystack) else { return "" }
+            // XPath errata E22: substring-after(s, "") is s. The empty string
+            // matches at the start (search returns 0), so everything after it is
+            // the whole string; a non-empty needle that is absent still yields "".
+            guard let start = search(needle, in: haystack) else { return "" }
             return String(haystack[(start + needle.count)...])
         }
 

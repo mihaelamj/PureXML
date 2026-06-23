@@ -156,8 +156,14 @@ extension PureXML.XPath.Compiler {
         }
         let save = index
         let word = parseName()
+        // XPath 1.0 allows whitespace around the `::` axis separator (a child
+        // `::` sub is the child axis). Skip it before the test; on no match the
+        // reset to `save` (before the name) undoes the skip, so a bare name step
+        // is unaffected.
+        skipSpace()
         if !word.isEmpty, matches("::") {
             advance(by: 2)
+            skipSpace()
             return try Self.namedAxis(word)
         }
         index = save

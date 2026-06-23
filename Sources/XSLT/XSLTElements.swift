@@ -73,8 +73,15 @@ extension PureXML.XSLT.Transformer {
         }
         let raw = avt(nameTemplate, context)
         let parts = raw.split(separator: ":", omittingEmptySubsequences: false)
-        if raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2 {
-            // An unusable element name: the recovery is to emit the content
+        let hasExplicitNamespace = (namespaceTemplate.map { !avt($0, context).isEmpty }) ?? false
+        let prefix = parts.count == 2 ? String(parts[0]) : nil
+        // A prefix not bound to a namespace (and no explicit namespace attribute
+        // supplies one) makes the QName unusable, as does a non-NCName part.
+        let undeclaredPrefix = !hasExplicitNamespace && (prefix.map { $0 != "xml" && namespaces[$0] == nil } ?? false)
+        let unusableName = raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2
+            || !parts.allSatisfy { PureXML.Parsing.XMLCharacter.isValidName(String($0)) } || undeclaredPrefix
+        if unusableName {
+            // The recovery (7.1.2, element-name-not-QName) emits the content
             // without the wrapper element.
             return instantiate(body, context).filter { if case .attribute = $0 { false } else { true } }
         }
@@ -90,7 +97,9 @@ extension PureXML.XSLT.Transformer {
         _ context: XSLTContext,
     ) -> [PureXML.XSLT.ResultItem] {
         let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: true)
-        return [.attribute(.init(name: name, value: Self.text(of: instantiate(body, context))))]
+        // xsl:attribute content that creates a non-text node ignores it with its
+        // content (XSLT 1.0 errata E27), like xsl:comment/processing-instruction.
+        return [.attribute(.init(name: name, value: Self.textNodesOnly(of: instantiate(body, context))))]
     }
 
     func copyInstruction(_ useAttributeSets: [String], _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
@@ -122,6 +131,13 @@ extension PureXML.XSLT.Transformer {
             return [.node(.comment(context.node.value))]
         case .processingInstruction:
             return [.node(.processingInstruction(target: context.node.name?.description ?? "", data: context.node.value))]
+        case .document:
+            // Copying the root node produces no element of its own, but xsl:copy
+            // may carry use-attribute-sets (7.5); those attributes have no copied
+            // element to attach to, so they join the enclosing result element,
+            // ahead of the copied content.
+            let setAttributes = attributeSetAttributes(useAttributeSets, context, visiting: []).map(PureXML.XSLT.ResultItem.attribute)
+            return setAttributes + instantiate(body, context)
         default:
             return instantiate(body, context)
         }
@@ -129,6 +145,21 @@ extension PureXML.XSLT.Transformer {
 }
 
 extension PureXML.XSLT.Transformer {
+    /// The concatenated value of only the text and CDATA node items, ignoring an
+    /// element (or other) node together with its content. xsl:comment and
+    /// xsl:processing-instruction may contain only text (XSLT 1.0 7.4, 7.6); the
+    /// recovery for a created non-text node is to ignore it and its content,
+    /// which is not the same as taking the string-value of everything.
+    static func textNodesOnly(of items: [PureXML.XSLT.ResultItem]) -> String {
+        items.reduce(into: "") { result, item in
+            guard case let .node(node) = item else { return }
+            switch node {
+            case let .text(value), let .cdata(value): result += value
+            default: break
+            }
+        }
+    }
+
     /// The source element's in-scope namespace declarations as literal
     /// xmlns attributes (xsl:copy copies namespace nodes, 7.5); the fixup
     /// pass drops the ones already in scope in the result.
@@ -150,6 +181,23 @@ extension PureXML.XSLT.Transformer {
             let name = prefix.isEmpty ? "xmlns" : "xmlns:" + prefix
             return PureXML.XSLT.LiteralAttribute(name: PureXML.Model.QualifiedName(name), value: [.literal(uri)])
         }
+    }
+
+    /// A copied tree node for `xsl:copy-of`. For an element it carries the
+    /// element's full set of in-scope namespace nodes (XSLT 1.0 11.3: copying a
+    /// node copies its namespace nodes), so a declaration inherited from an
+    /// ancestor of the copied element is added alongside the element's own; the
+    /// serializer's namespace fixup later drops any already in the result scope.
+    static func withInScopeNamespaces(_ tree: PureXML.Model.TreeNode) -> PureXML.Model.Node {
+        guard case let .element(element) = tree.node else { return tree.node }
+        let declared = Set(element.attributes
+            .filter { $0.name.prefix == "xmlns" || ($0.name.prefix == nil && $0.name.localName == "xmlns") }
+            .map(\.name.description))
+        let inherited = namespaceDeclarations(inScopeAt: tree).compactMap { decl -> PureXML.Model.Attribute? in
+            guard !declared.contains(decl.name.description), case let .literal(uri) = decl.value.first else { return nil }
+            return PureXML.Model.Attribute(name: decl.name, value: uri)
+        }
+        return .element(.init(name: element.name, attributes: element.attributes + inherited, children: element.children))
     }
 
     /// The topmost ancestor of `node` (its document node).

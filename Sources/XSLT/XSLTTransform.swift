@@ -22,7 +22,19 @@ public extension PureXML.XSLT {
         let root = PureXML.Model.TreeNode(parsed.node)
         let idAttributes = PureXML.XSLT.declaredIDAttributes(parsed.documentType)
         Whitespace.strip(root, stylesheet: sheet)
-        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader, idAttributes: idAttributes, parameters: parameters)
+        // The stylesheet's own document, queried by `document('')` (XSLT 1.0 12.1).
+        let stylesheetDocument = try? PureXML.parse(stylesheet, limits: .init(allowDoctype: true))
+        // The source DTD's unparsed entities, by name to system URI (12.4).
+        let unparsedEntityURIs = parsed.documentType.unparsedEntities.mapValues(\.id.resolvedSystemID)
+        let transformer = Transformer(
+            stylesheet: sheet,
+            root: root,
+            documentLoader: documentLoader,
+            idAttributes: idAttributes,
+            parameters: parameters,
+            stylesheetDocument: stylesheetDocument,
+            unparsedEntityURIs: unparsedEntityURIs,
+        )
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         let method = sheet.output.method ?? defaultMethod(for: result)
@@ -207,7 +219,13 @@ public extension PureXML.XSLT {
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
         let root = try PureXML.parseTree(source, limits: .init(allowDoctype: true))
         Whitespace.strip(root, stylesheet: sheet)
-        let transformer = Transformer(stylesheet: sheet, root: root, documentLoader: documentLoader)
+        let stylesheetDocument = try? PureXML.parse(stylesheet, limits: .init(allowDoctype: true))
+        let transformer = Transformer(
+            stylesheet: sheet,
+            root: root,
+            documentLoader: documentLoader,
+            stylesheetDocument: stylesheetDocument,
+        )
         let result = transformer.run()
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         return result

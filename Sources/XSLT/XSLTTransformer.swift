@@ -24,9 +24,12 @@ extension PureXML.XSLT {
             termination.message
         }
 
-        /// Caller-supplied top-level parameter values, overriding xsl:param
-        /// defaults by name.
+        /// Caller-supplied top-level parameter values, overriding xsl:param defaults.
         let parameters: [String: String]
+        /// The stylesheet's own parsed document, returned by `document('')` (12.1).
+        let stylesheetDocument: PureXML.Model.Node?
+        /// The source DTD's unparsed entities by name to system URI, for `unparsed-entity-uri` (12.4).
+        let unparsedEntityURIs: [String: String]
 
         init(
             stylesheet: Stylesheet,
@@ -34,17 +37,20 @@ extension PureXML.XSLT {
             documentLoader: @escaping (String) -> String? = { _ in nil },
             idAttributes: [String: Set<String>] = [:],
             parameters: [String: String] = [:],
+            stylesheetDocument: PureXML.Model.Node? = nil,
+            unparsedEntityURIs: [String: String] = [:],
         ) {
             self.parameters = parameters
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
+            self.stylesheetDocument = stylesheetDocument
+            self.unparsedEntityURIs = unparsedEntityURIs
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
-            // One table for all pattern matching: matches() runs per
-            // (template, node) during template selection, so a fresh table
-            // per call would be allocated millions of times on large inputs.
+            // One table for all pattern matching: matches() runs per (template,
+            // node), so a fresh table per call would allocate millions of times.
             let caches = keyIndexes
             patternTable = PureXML.XSLT.Library.table(
                 current: .tree(root),
@@ -58,6 +64,8 @@ extension PureXML.XSLT {
                 loader: documentLoader,
                 decimalFormats: stylesheet.decimalFormats,
                 documents: documentCache,
+                selfDocument: stylesheetDocument,
+                unparsedEntities: unparsedEntityURIs,
             )
         }
 
@@ -72,22 +80,9 @@ extension PureXML.XSLT {
         }
 
         func run() -> PureXML.Model.Node {
-            var variables: [String: PureXML.XPath.Value] = [:]
-            for global in stylesheet.globals {
-                if case let .variable(name, select, body) = global {
-                    // A caller-supplied value overrides an xsl:param default.
-                    if stylesheet.parameterNames.contains(name), let supplied = parameters[name] {
-                        variables[name] = .string(supplied)
-                        continue
-                    }
-                    // Each global evaluates with every previously evaluated
-                    // global in scope (a top-level variable may reference an
-                    // earlier top-level param, directly or via call-template).
-                    let globalContext = XSLTContext(node: root, position: 1, size: 1, variables: variables)
-                    variables[name] = variableValue(select, body, globalContext)
-                }
-            }
-            let context = XSLTContext(node: root, position: 1, size: 1, variables: variables)
+            let globals = evaluatedGlobals()
+            matchCache.globalVariables = globals // pattern predicates see globals (5.2)
+            let context = XSLTContext(node: root, position: 1, size: 1, variables: globals)
             return .document(applyTemplates(to: [.tree(root)], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
@@ -106,8 +101,7 @@ extension PureXML.XSLT {
         }
 
         func matches(_ node: PureXML.Model.TreeNode, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
-            // Patterns evaluate over the node's own document, so templates
-            // match nodes loaded through document() too.
+            // Patterns evaluate over the node's own document (so document()-loaded nodes match too).
             let documentRoot = Self.documentRoot(of: node)
             return matchCache.nodes(matching: pattern, over: documentRoot, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
         }
@@ -178,6 +172,10 @@ extension PureXML.XSLT {
 
         func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
             if let select { return value(select, context) ?? .string("") }
+            // XSLT 1.0 11.2: a variable with no select and EMPTY content is the
+            // empty string (equivalent to select=""), not a result tree fragment,
+            // so boolean() of it is false. Only non-empty content is an RTF.
+            if body.isEmpty { return .string("") }
             // A body variable is a result-tree fragment: a queryable document node.
             let children = instantiate(body, context).compactMap(Self.nodeOf).map(PureXML.Model.TreeNode.init)
             return .nodeSet([.tree(PureXML.Model.TreeNode.document(children: children))])
@@ -196,6 +194,8 @@ extension PureXML.XSLT {
                     loader: documentLoader,
                     decimalFormats: stylesheet.decimalFormats,
                     documents: documentCache,
+                    selfDocument: stylesheetDocument,
+                    unparsedEntities: unparsedEntityURIs,
                 ),
                 namespaces: context.namespaces,
             )
@@ -302,9 +302,9 @@ extension PureXML.XSLT.Transformer {
         case .number:
             [.node(.text(numberInstruction(instruction, context)))]
         case let .comment(body):
-            [.node(.comment(Self.text(of: instantiate(body, context))))]
+            [.node(.comment(Self.textNodesOnly(of: instantiate(body, context))))]
         case let .processingInstruction(name, body):
-            [.node(.processingInstruction(target: avt(name, context), data: Self.text(of: instantiate(body, context))))]
+            [.node(.processingInstruction(target: avt(name, context), data: Self.textNodesOnly(of: instantiate(body, context))))]
         case let .message(terminate, body):
             message(terminate, body, context)
         case .applyImports:
@@ -325,7 +325,10 @@ extension PureXML.XSLT.Transformer {
     }
 
     private func callTemplate(_ name: String, _ parameters: [PureXML.XSLT.Binding], _ context: XSLTContext) -> [ResultItem] {
-        guard let template = stylesheet.templates.first(where: { $0.name == name }) else { return [] }
+        // XSLT 1.0 section 6: pick the highest import-precedence definition, not the
+        // first by position, so an included template outranks a same-name import.
+        guard let template = stylesheet.templates.filter({ $0.name == name })
+            .max(by: { $0.importPrecedence < $1.importPrecedence }) else { return [] }
         return instantiateTemplate(template, context, passing: parameters, from: context)
     }
 
@@ -336,7 +339,7 @@ extension PureXML.XSLT.Transformer {
         }
         return nodes.map { xnode in
             switch xnode {
-            case let .tree(tree): .node(tree.node)
+            case let .tree(tree): .node(Self.withInScopeNamespaces(tree))
             case let .attribute(_, attribute): .attribute(attribute)
             case let .namespace(_, prefix, uri):
                 .attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:\(prefix)", uri))
@@ -373,7 +376,7 @@ extension PureXML.XSLT.Transformer {
 
     /// The attributes contributed by `names` and the attribute sets they include,
     /// lower precedence first, with a `visiting` guard against recursive includes.
-    private func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
+    func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {
         var result: [PureXML.Model.Attribute] = []
         for name in names where !visiting.contains(name) {
             for definition in stylesheet.attributeSets[name] ?? [] {

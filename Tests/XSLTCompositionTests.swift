@@ -252,4 +252,35 @@ struct XSLTCompositionTests {
         // imported copy of shared.xsl.
         #expect(result == "<out>RS</out>")
     }
+
+    @Test("A literal result element from an xsl:include keeps its 7.1.1 namespace nodes")
+    func test_includedLiteralKeepsNamespaceNode() throws {
+        // The included sheet declares ped on its own stylesheet element, so
+        // its literal result element copies that namespace node (7.1.1). The
+        // including sheet excludes ped from its own wrapper, so the node is
+        // not inherited and must be re-declared on the included element. The
+        // included declarations are absorbed after composition walks the weak
+        // parent chain back to the included stylesheet element; that element
+        // must stay alive for the chain to resolve (Xalan conf lre05).
+        let included = """
+        <xsl:stylesheet version="1.0" \(xsl) xmlns:ped="http://tester.com">
+          <xsl:template match="item"><sub/></xsl:template>
+        </xsl:stylesheet>
+        """
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl) xmlns:ped="http://tester.com">
+          <xsl:include href="inc.xsl"/>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/">
+            <main xsl:exclude-result-prefixes="ped"><xsl:apply-templates select="//item"/></main>
+          </xsl:template>
+        </xsl:stylesheet>
+        """
+        let result = try PureXML.XSLT.transform(
+            stylesheet: style,
+            source: "<r><item/></r>",
+            documentLoader: { ["inc.xsl": included][$0] },
+        )
+        #expect(result == "<main><sub xmlns:ped=\"http://tester.com\"/></main>")
+    }
 }
