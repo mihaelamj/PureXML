@@ -157,14 +157,40 @@ derived element wrapped as a one-particle group `(1,1)`.)
   contain is admitted by the wildcard, and `[minETR(D), maxETR(D)] ⊆ [B.min,
   B.max]`. PureXML has this (`leavesAdmitted` + `rangeWithinWildcard`).
 
-## Where the current oracle approximates (the closeable gaps)
+## Empirical finding (2026-06-23): the keystone's targets are CONTESTED, not gaps
 
-| Clause | Current (`ParticleRestriction.swift`) | Exact form | XSTS |
-|---|---|---|---|
-| Substitution-group expansion | none (QName-only) | Step 2 | elemZ026, V020 |
-| MapAndSum | per-particle approximation (line 8) | Step 3 effective-total-range | V020 |
-| RecurseAsIfGroup in-branch order | bounded under-rejection (line ~298) | exact Recurse with sequencing | M034 |
-| NameAndTypeOK type derivation | value-space `isSimpleTypeRestrictionOK` | by-NAME union-member derivation | Ig004, Ik011/025/027 |
+Probing the actual XSTS cases overturned this document's first hypothesis that
+substitution-group expansion (Step 2) closes `elemZ026` / `particlesV020`. Both
+are the same pattern: a derived `ref` to a substitution-group MEMBER restricting a
+base `ref` to the HEAD (`elemZ026`: `ref restrictedBasicBit` restricts
+`ref basicBit`; `V020`: `ref bar` restricts `ref SUB`). Measured behaviour
+(`SRProbe`): PureXML ALREADY ACCEPTS these, and the substitution-group link is the
+cause -- the same schema with the member NOT in the head's substitution group is
+correctly rejected (`NameAndTypeOK` name mismatch). PureXML's content model
+expands a head `ref` to admit its members (required for instance validation), and
+the restriction oracle inherits that, giving the **Xerces-lenient** reading.
+
+So these are CONTESTED, not closeable: PureXML + Xerces accept (a member is a
+valid restriction of its head via expansion); XSTS rejects under strict
+`NameAndTypeOK` (names differ, no expansion). The keystone (ADDING expansion)
+would entrench the acceptance, the opposite of closing them. Closing them would
+require a separate NON-expanded restriction view AND reverses the deliberate
+leniency -- a false-positive risk against schemas the spec's expansion reading and
+Xerces accept. There is therefore NO clean FP-safe conformance win in the exact
+oracle: every remaining particle case is contested (`elemZ026`/`V020`/`Ig004`
+`#all`-collapse) or FP-delicate (`Ik011/025/027` union-member, which already
+regressed `addB150`), or a deliberate anti-over-rejection divergence
+(`Ha161`/`M034`, which protect `particlesZ001`). The proof-first discipline earned
+its keep: it prevented shipping the keystone against contested targets.
+
+## Where the current oracle approximates (and why each is NOT a clean win)
+
+| Clause | Current | "Exact" form | XSTS | Verdict |
+|---|---|---|---|---|
+| Substitution-group expansion | already expands (lenient) | strict non-expanded restriction view | elemZ026, V020 | CONTESTED (Xerces/PureXML accept, XSTS rejects); closing risks FP |
+| MapAndSum | per-particle approx (line 8) | Step 3 effective-total-range | V020 | V020 is contested above; MapAndSum exactness alone closes nothing |
+| RecurseAsIfGroup in-branch order | bounded under-rejection | exact Recurse with sequencing | M034 | DEFERRED: exact form over-rejects `particlesZ001` (spec dispute) |
+| NameAndTypeOK type derivation | value-space | by-NAME union-member derivation | Ig004, Ik011/025/027 | Ig004 contested (#all-collapse); Ik FP-delicate (addB150) |
 
 ## Spec limitations (genuine, not bugs -- name and bound them)
 
@@ -188,23 +214,28 @@ chosen by the WG. Consequences this oracle must respect:
   derivation-by-name; a naive value-space tightening already regressed addB150
   (recorded in CHANGELOG). FP-delicate; close only with the by-name derivation.
 
-## Implementation order (each its own PR, FP-gated)
+## Conclusion (after the empirical finding): no clean conformance win remains
 
-1. **Substitution-group expansion (Step 2)** -- highest value (elemZ026 + V020),
-   but the FP-critical proof (block/final filtering, global-head-only) must hold;
-   gate with the full XSTS `valid-schemas-rejected = 0` + adversarial
-   over-rejection critic. This is the keystone; the UPA design avoided expansion,
-   so this introduces it for restriction ONLY, where the spec requires it.
-2. **MapAndSum exact effective-total-range (Step 3)** -- closes V020's cardinality
-   half; pure arithmetic, lower risk; pairs with (1).
-3. **NameAndTypeOK union-member by-name derivation** -- Ik cluster; FP-delicate,
-   needs the addB150 control in the gate.
-4. **RecurseAsIfGroup exact** -- DEFERRED pending the Z001 spec adjudication; do not
-   attempt until the Ha161/Z001 contradiction is resolved (it is a spec dispute,
-   not a code gap).
+The derivation stands as the correct reference algorithm and the soundness
+framework, but applying it to the actual XSTS tail shows every remaining particle
+case is contested or FP-delicate (see the table and finding above). Concretely:
 
-Each step: derive the soundness argument here first, implement behind the XSTS
-`valid-*-rejected = 0` gate AND a dedicated adversarial over-rejection critic
-(the gate is corpus-bounded; the critic constructs the inputs the corpus misses,
-as it did for the attribute-wildcard rework), and disclose any residual under-
-rejection in the changelog. Proof on paper precedes the change to the oracle.
+- Substitution-group expansion: NOT a gap -- PureXML already expands (lenient,
+  Xerces-aligned). elemZ026/V020 are contested; closing them risks an FP.
+- MapAndSum exactness: closes nothing on its own (its only target, V020, is
+  contested on the subst-group axis, not the cardinality axis).
+- NameAndTypeOK union-member / Ig004: FP-delicate (addB150) / contested (#all).
+- RecurseAsIfGroup exact: deferred (Ha161/Z001 spec dispute).
+
+So the exact-oracle keystone does NOT escape the contested tail; there is no
+FP-safe particle-restriction change to ship. The remaining lever toward the full
+bar is therefore NOT conformance but the proven resource bound: the pushdown / RTN
+content matcher (stopper 4), which is provable, non-contested, and independent of
+this oracle. That is where the program continues.
+
+If a particle clause is ever attempted, the discipline holds: derive the
+soundness argument here first, implement behind the full XSTS `valid-*-rejected =
+0` gate AND a dedicated adversarial over-rejection critic (the gate is
+corpus-bounded; the critic constructs the inputs the corpus misses, as it did for
+the attribute-wildcard rework), and disclose any residual under-rejection. Proof
+on paper precedes the change to the oracle.
