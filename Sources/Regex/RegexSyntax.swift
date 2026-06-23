@@ -22,7 +22,20 @@ extension PureXML.Regex {
         /// An unescaped `[` inside a character class (`[a[bc]`, `[a[:xyz:]`): XSD
         /// Appendix F `SingleCharNoEsc` excludes `[`, and a nested class is legal
         /// only as a `-[...]` subtraction, so a `[` not introduced by `-` is a
-        /// syntax error. Unambiguously invalid, never an engine limitation.
+        /// syntax error. Unambiguously invalid per the grammar, never an engine
+        /// limitation.
+        ///
+        /// Contested-corpus note: this rejects not only the W3C-*settled* invalid
+        /// cases (XSTS RegexTest_993/1477, `[a[:xyz:]`) but also siblings the MS
+        /// suite marks *valid* (`([[:]+)`, `([[=]+)`, `([[.]+)`, RegexTest_989/990/
+        /// 991/1473-1475, and the space-bearing subtraction `[a - c - [ b ] ]+`,
+        /// 479/480). Those entries are W3C-*queried* (status="queried", Bugzilla
+        /// #4118) precisely because "valid" contradicts the Appendix F grammar; the
+        /// suite's settled position (993/1477) agrees with rejecting. PureXML
+        /// follows the grammar, which is also the W3C's settled direction. The
+        /// queried siblings are excluded from the XSTS conformance gate, so this
+        /// is not a counted false positive. A deliberate spec-strict choice, not an
+        /// oversight.
         case unescapedClassBracket
         /// The `{...}` of a `\p`/`\P` escape whose content can be no XSD charProp:
         /// empty, the bare prefix `Is`, a non-block name carrying a character that
