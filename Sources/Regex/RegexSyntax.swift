@@ -95,12 +95,18 @@ extension PureXML.Regex {
         }
 
         func matches(_ scalar: Unicode.Scalar) -> Bool {
-            var hit = ranges.contains { $0.contains(scalar) }
+            let inBase = ranges.contains { $0.contains(scalar) }
                 || named.contains { $0.contains(scalar) }
                 || negatedNamed.contains { !$0.contains(scalar) }
                 || categories.contains { $0.contains(scalar) }
+            // XSD `charClassSub ::= (posCharGroup | negCharGroup) '-' charClassExpr`
+            // is the set difference of the (possibly NEGATED) group and the
+            // subtrahend, so negation applies to the base FIRST, then subtraction
+            // removes from that result: `[^cde-[ag]]` is (not c/d/e) minus a/g,
+            // i.e. excludes {a,c,d,e,g}, not just {c,d,e} (XSTS RegexTest_430).
+            var hit = negated ? !inBase : inBase
             if hit, subtraction.contains(where: { $0.matches(scalar) }) { hit = false }
-            return negated ? !hit : hit
+            return hit
         }
 
         static func single(_ scalar: Unicode.Scalar) -> CharClass {

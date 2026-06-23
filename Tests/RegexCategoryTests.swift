@@ -88,6 +88,19 @@ struct RegexCategoryTests {
         #expect(try !matches("[a-z-[aeiou]]+", "bce"))
     }
 
+    @Test("A negated class with subtraction excludes both the base and the subtrahend")
+    func test_negatedSubtraction() throws {
+        // `[^cde-[ag]]` is (not c/d/e) minus a/g, i.e. excludes {a,c,d,e,g}
+        // (XSD charClassSub: the difference of the NEGATED group and the
+        // subtrahend). XSTS RegexTest_430: `agbfxyzga` contains a and g, so it
+        // must NOT match `[^cde-[ag]]+`.
+        #expect(try !matches("[^cde-[ag]]+", "agbfxyzga"))
+        #expect(try matches("[^cde-[ag]]+", "bfxyz")) // none of a,c,d,e,g
+        #expect(try !matches("[^cde-[ag]]+", "a")) // a is subtracted out
+        #expect(try !matches("[^cde-[ag]]+", "c")) // c is in the negated base
+        #expect(try matches("[^cde-[ag]]+", "b")) // b is admitted
+    }
+
     @Test("Subtraction nests")
     func test_nestedSubtraction() throws {
         // a-z, minus (b-d minus c): so b and d are removed, c stays.

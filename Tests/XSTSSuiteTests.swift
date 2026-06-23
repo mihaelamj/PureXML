@@ -47,7 +47,9 @@ struct XSTSSuiteTests {
     /// a nilled element may not have a fixed value constraint, cvc-elt.3.2.2 (addB065);
     /// an optional xs:all group present in the instance still requires its members (mgZ001);
     /// a defaulted/fixed IDREF/IDREFS must resolve to a matching ID, cvc-id (idZ012).
-    private let knownInstanceInvalidAccepted = 19
+    /// Latest (19 -> 17): a negated character-class subtraction excludes both the
+    /// negated base and the subtrahend (`[^cde-[ag]]`), RegexTest_430 and _422.
+    private let knownInstanceInvalidAccepted = 17
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]
