@@ -180,15 +180,42 @@ private struct CompWalk {
     private mutating func group(_ node: PureXML.Model.TreeNode, visiting: Set<String>) -> CompSummary {
         guard let ref = PureXML.Schema.XSDNode.attribute(node, "ref") else { return CompSummary(nullable: true, first: [], lastFollow: []) }
         let name = PureXML.Schema.XSDNode.stripPrefix(ref)
+        if visiting.contains(name) { return redefineSelfReference(name, visiting: visiting) }
         if let cached = groupCache[name] { return cached }
-        guard !visiting.contains(name), let definition = context.groups[name],
-              let model = PureXML.Schema.XSDNode.elementChildren(definition).first(where: { ["sequence", "choice", "all"].contains(PureXML.Schema.XSDNode.localName($0) ?? "") })
+        guard let definition = context.groups[name], let model = modelChild(definition)
         else { return CompSummary(nullable: true, first: [], lastFollow: []) }
         // Summarize the group once: its internal decision sets are context-independent
         // and emitted here; its cross-boundary follow is formed by each reference site.
         let summary = summarize(model, visiting: visiting.union([name]))
         groupCache[name] = summary
         return summary
+    }
+
+    /// A `<group ref>` to the name currently being summarized is a src-redefine
+    /// self-reference: in the compiled (instance) content model it expands to the
+    /// ORIGINAL group it redefines (XSDParserParticles.groupReferenceParticle), not
+    /// to itself. The determinism check must see that same expanded model, else the
+    /// original's particles are invisible and a real UPA ambiguity goes unreported
+    /// (the redefine chain in XSTS schN10: an inner c-g2 contributes a `c24` that
+    /// overlaps the redefinition's own direct `c24`). Expand one level to the base; a
+    /// mark stops a redefine CHAIN from re-expanding the same name, so it terminates.
+    /// Every item this surfaces is genuinely reachable in the real model, so the
+    /// decision sets stay a SUBSET of the true ones: it can catch a real ambiguity,
+    /// never invent one (no false positive). A non-redefined recursive reference has
+    /// no base, so it still contributes nothing, exactly as before.
+    private mutating func redefineSelfReference(_ name: String, visiting: Set<String>) -> CompSummary {
+        let empty = CompSummary(nullable: true, first: [], lastFollow: [])
+        let mark = "\u{1}redefined:\(name)"
+        guard !visiting.contains(mark), context.redefinedGroups.contains(name),
+              let base = context.baseGroups[name], let model = modelChild(base)
+        else { return empty }
+        return summarize(model, visiting: visiting.union([mark]))
+    }
+
+    /// The `sequence`/`choice`/`all` model child of a group definition, if any.
+    private func modelChild(_ definition: PureXML.Model.TreeNode) -> PureXML.Model.TreeNode? {
+        PureXML.Schema.XSDNode.elementChildren(definition)
+            .first { ["sequence", "choice", "all"].contains(PureXML.Schema.XSDNode.localName($0) ?? "") }
     }
 
     // MARK: Conflict
