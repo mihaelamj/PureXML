@@ -25,7 +25,6 @@ idkey/idkey45
 idkey/idkey46
 idkey/idkey47
 idkey/idkey48
-idkey/idkey50
 idkey/idkey53
 impincl/impincl08
 impincl/impincl27
@@ -35,14 +34,12 @@ mdocs/mdocs09
 mdocs/mdocs12
 mdocs/mdocs13
 mdocs/mdocs15
-mdocs/mdocs17
 mdocs/mdocs19
 modes/modes16
 namedtemplate/namedtemplate12
 namedtemplate/namedtemplate16
 namespace/namespace113
 namespace/namespace19
-namespace/namespace20
 namespace/namespace23
 namespace/namespace24
 namespace/namespace35
@@ -75,8 +72,6 @@ processorinfo/processorinfo03
 reluri/reluri09
 reluri/reluri10
 reluri/reluri11
-select/select67
-select/select68
 sort/sort02
 sort/sort10
 sort/sort14

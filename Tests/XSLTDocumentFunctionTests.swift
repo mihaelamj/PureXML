@@ -70,4 +70,20 @@ struct XSLTDocumentFunctionTests {
         }
         #expect(out == "3")
     }
+
+    @Test("document('') is the stylesheet's own document")
+    func test_emptyReferenceIsStylesheet() throws {
+        // XSLT 1.0 12.1: an empty URI reference is the document containing the
+        // expression, so a stylesheet can read its own xsl:* nodes (Apache Xalan
+        // select67, select68, idkey50, mdocs17, namespace20).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="text"/>
+          <xsl:variable name="pick" select="'go'"/>
+          <xsl:template match="/"><xsl:value-of select="document('')/*/xsl:template[@name=$pick]"/></xsl:template>
+          <xsl:template name="go">FOUND</xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(style, "<x/>", loader: { _ in nil }) == "FOUND")
+    }
 }

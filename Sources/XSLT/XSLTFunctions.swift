@@ -196,6 +196,7 @@ extension PureXML.XSLT {
             loader: @escaping (String) -> String?,
             decimalFormats: [String: PureXML.XSLT.DecimalFormat] = [:],
             documents: PureXML.XSLT.DocumentCache,
+            selfDocument: PureXML.Model.Node? = nil,
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([current]) }
@@ -218,7 +219,7 @@ extension PureXML.XSLT {
                     } else {
                         [arguments.first?.string ?? ""]
                     }
-                    return .nodeSet(references.flatMap { documentReference($0, loader, documents) })
+                    return .nodeSet(references.flatMap { documentReference($0, loader, documents, selfDocument) })
                 }
                 .adding("id") { arguments, context in
                     idLookup(arguments, context, documents)
@@ -244,6 +245,7 @@ extension PureXML.XSLT {
             _ reference: String,
             _ loader: (String) -> String?,
             _ cache: PureXML.XSLT.DocumentCache,
+            _ selfDocument: PureXML.Model.Node?,
         ) -> [PureXML.XPath.Node] {
             let path: String
             let fragment: String?
@@ -255,9 +257,17 @@ extension PureXML.XSLT {
                 fragment = nil
             }
             if cache.trees[path] == nil {
-                guard let text = loader(path), let parsed = try? PureXML.parse(text, limits: .init(allowDoctype: true)) else { return [] }
-                cache.sources[path] = parsed
-                cache.trees[path] = PureXML.Model.TreeNode(parsed)
+                // An empty URI reference is the stylesheet's own document
+                // (XSLT 1.0 12.1: `document('')`); any other path loads.
+                if path.isEmpty {
+                    guard let selfDocument else { return [] }
+                    cache.sources[path] = selfDocument
+                    cache.trees[path] = PureXML.Model.TreeNode(selfDocument)
+                } else {
+                    guard let text = loader(path), let parsed = try? PureXML.parse(text, limits: .init(allowDoctype: true)) else { return [] }
+                    cache.sources[path] = parsed
+                    cache.trees[path] = PureXML.Model.TreeNode(parsed)
+                }
             }
             guard let tree = cache.trees[path], let parsed = cache.sources[path] else { return [] }
             guard let fragment, !fragment.isEmpty else { return [.tree(tree)] }

@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `document('')` now returns the stylesheet's own document. XSLT 1.0 section 12.1 makes an empty URI reference the document that contains the expression, so a stylesheet can read its own `xsl:*` nodes (a common idiom for embedded lookup tables and self-inspection), but the reference was passed straight to the document loader, which has no entry for it, so the call returned an empty node-set. The transformer now keeps its parsed stylesheet tree and the `document` function returns it for an empty reference (caching it like any loaded document; a `#fragment` still applies). Closes Apache Xalan conformance cases `select67`, `select68`, `idkey50`, `mdocs17`, and `namespace20`.
+
 - An XPath location step now accepts whitespace around the `::` axis separator. XPath 1.0 allows whitespace between tokens, so `child :: sub` is the child axis with node test `sub`, but the parser only matched `::` immediately after the axis name, so a spaced separator silently fell back to the child axis with the axis name read as an element test and selected nothing. Closes Apache Xalan conformance cases `select16`, `select27`, and `select28`.
 
 - A variable or parameter with empty content and no `select` is now the empty string, not a result tree fragment. XSLT 1.0 section 11.2 makes `<xsl:variable name="x"/>` equivalent to `select=""`, so `boolean()` of it is false, but it was always built as a (non-empty) result-tree-fragment document node, which `boolean()` reports as true. Only non-empty content is still an RTF. Closes Apache Xalan conformance cases `boolean43` and `boolean87`.

@@ -28,17 +28,23 @@ extension PureXML.XSLT {
         /// defaults by name.
         let parameters: [String: String]
 
+        /// The stylesheet's own parsed document, returned by `document('')`
+        /// (XSLT 1.0 12.1: an empty URI reference is the containing stylesheet).
+        let stylesheetDocument: PureXML.Model.Node?
+
         init(
             stylesheet: Stylesheet,
             root: PureXML.Model.TreeNode,
             documentLoader: @escaping (String) -> String? = { _ in nil },
             idAttributes: [String: Set<String>] = [:],
             parameters: [String: String] = [:],
+            stylesheetDocument: PureXML.Model.Node? = nil,
         ) {
             self.parameters = parameters
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
+            self.stylesheetDocument = stylesheetDocument
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
@@ -58,6 +64,7 @@ extension PureXML.XSLT {
                 loader: documentLoader,
                 decimalFormats: stylesheet.decimalFormats,
                 documents: documentCache,
+                selfDocument: stylesheetDocument,
             )
         }
 
@@ -185,6 +192,7 @@ extension PureXML.XSLT {
                     loader: documentLoader,
                     decimalFormats: stylesheet.decimalFormats,
                     documents: documentCache,
+                    selfDocument: stylesheetDocument,
                 ),
                 namespaces: context.namespaces,
             )
