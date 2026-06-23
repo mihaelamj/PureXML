@@ -9,6 +9,28 @@ extension PureXML.XSLT.Library {
         return "{\(uri)}\(raw[raw.index(after: colon)...])"
     }
 
+    /// The base URI against which a relative `document()` reference taken from
+    /// this node resolves (XSLT 1.0 12.1): the URI the node's document was loaded
+    /// from. The source document is absent from the map, so its base is the empty
+    /// string, which leaves resolution to the loader's own base handling.
+    static func baseURI(of node: PureXML.XPath.Node, _ documents: PureXML.XSLT.DocumentCache) -> String {
+        let owner: PureXML.Model.TreeNode? = switch node {
+        case let .tree(tree): tree
+        case let .attribute(tree, _), let .namespace(tree, _, _): tree
+        }
+        guard var root = owner else { return "" }
+        while let parent = root.parent {
+            root = parent
+        }
+        return documents.baseURIs[ObjectIdentifier(root)] ?? ""
+    }
+
+    /// One `document()` reference resolved against its base URI; an empty base
+    /// defers to the loader, which applies the source or stylesheet base itself.
+    static func resolveDocumentReference(_ reference: String, against base: String) -> String {
+        base.isEmpty ? reference : PureXML.XInclude.URIReference.resolve(reference, against: base)
+    }
+
     /// The XPath `id()` definition exactly: only attributes the DTD
     /// declares as type ID identify elements; a document without ID
     /// declarations yields the empty set.

@@ -45,9 +45,6 @@ output/output80
 output/output86
 position/position106
 processorinfo/processorinfo03
-reluri/reluri09
-reluri/reluri10
-reluri/reluri11
 sort/sort02
 sort/sort10
 sort/sort14

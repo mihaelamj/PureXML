@@ -214,14 +214,21 @@ extension PureXML.XSLT {
                     keyLookup(arguments, context, keys)
                 }
                 .adding("document") { arguments, _ in
-                    // A string or a node-set of URI references, each optionally with
-                    // a `#fragment` selecting a subset of the loaded document.
-                    let references: [String] = if let nodes = arguments.first?.nodes {
-                        nodes.map(\.stringValue)
-                    } else {
-                        [arguments.first?.string ?? ""]
+                    // XSLT 1.0 12.1: a string or node-set of URI references, each
+                    // optionally with a `#fragment`. A relative reference resolves
+                    // against the base URI of the second argument's first node;
+                    // without a second argument, against the reference node's own
+                    // base (node-set) or the stylesheet (string).
+                    let secondBase: String? = arguments.count > 1
+                        ? (arguments[1].nodes?.min(by: PureXML.XPath.Node.precedes)).map { baseURI(of: $0, documents) }
+                        : nil
+                    func load(_ reference: String, _ base: String) -> [PureXML.XPath.Node] {
+                        documentReference(resolveDocumentReference(reference, against: base), loader, documents, selfDocument)
                     }
-                    return .nodeSet(references.flatMap { documentReference($0, loader, documents, selfDocument) })
+                    if let nodes = arguments.first?.nodes {
+                        return .nodeSet(nodes.flatMap { load($0.stringValue, secondBase ?? baseURI(of: $0, documents)) })
+                    }
+                    return .nodeSet(load(arguments.first?.string ?? "", secondBase ?? ""))
                 }
                 .adding("id") { arguments, context in
                     idLookup(arguments, context, documents)
@@ -272,6 +279,10 @@ extension PureXML.XSLT {
                     cache.sources[path] = parsed
                     cache.trees[path] = PureXML.Model.TreeNode(parsed)
                 }
+                // The loaded document's base URI is the (already base-resolved)
+                // reference it came from, so a relative reference taken from one
+                // of its nodes resolves against it (XSLT 1.0 12.1).
+                if let tree = cache.trees[path] { cache.baseURIs[ObjectIdentifier(tree)] = path }
             }
             guard let tree = cache.trees[path], let parsed = cache.sources[path] else { return [] }
             guard let fragment, !fragment.isEmpty else { return [.tree(tree)] }
