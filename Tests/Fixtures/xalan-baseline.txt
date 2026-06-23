@@ -12,8 +12,6 @@ conflictres/conflictres30
 copy/copy09
 copy/copy27
 copy/copy48
-copy/copy56
-copy/copy58
 extend/extend01
 extend/extend02
 extend/extend04

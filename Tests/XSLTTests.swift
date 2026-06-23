@@ -96,6 +96,19 @@ struct XSLTTests {
         #expect(try transform(stylesheet, "<doc>foo<a>bar</a></doc>") == "<out><?pi foo?></out>")
     }
 
+    @Test("xsl:attribute keeps only text-node content (errata E27)")
+    func test_attributeIgnoresNonTextContent() throws {
+        // a = "T1" + <b>BBBB</b> + "T2"; the <b> element node is ignored with its
+        // content, so the attribute is "T1T2", not "T1BBBBT2" (Xalan copy58).
+        let stylesheet = """
+        <xsl:stylesheet \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/docs"><out><xsl:attribute name="attr1"><xsl:copy-of select="a/node()"/></xsl:attribute></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(stylesheet, "<docs><a>T1<b>BBBB</b>T2</a></docs>") == "<out attr1=\"T1T2\"/>")
+    }
+
     @Test("Whitespace around a CDATA section in a template is preserved")
     func test_literalWhitespaceAroundCData() throws {
         // Text and CDATA coalesce into one node, so " <![CDATA[test]]> " is the

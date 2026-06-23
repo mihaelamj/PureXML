@@ -90,7 +90,9 @@ extension PureXML.XSLT.Transformer {
         _ context: XSLTContext,
     ) -> [PureXML.XSLT.ResultItem] {
         let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: true)
-        return [.attribute(.init(name: name, value: Self.text(of: instantiate(body, context))))]
+        // xsl:attribute content that creates a non-text node ignores it with its
+        // content (XSLT 1.0 errata E27), like xsl:comment/processing-instruction.
+        return [.attribute(.init(name: name, value: Self.textNodesOnly(of: instantiate(body, context))))]
     }
 
     func copyInstruction(_ useAttributeSets: [String], _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
