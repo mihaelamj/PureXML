@@ -67,8 +67,14 @@ extension PureXML.XSLT {
             counter = collector.counter
             let precedence = counter
             counter += 1
-            for (child, _) in collector.declarations {
-                _ = absorbDeclaration(child, into: &parts, precedence: precedence, low: low)
+            // Included declarations resolve their 7.1.1 namespace nodes by
+            // walking the weak parent chain to their own stylesheet element,
+            // which lives only in the otherwise-unread retainedRoots; pin it
+            // across this loop so optimized ARC cannot release it early.
+            withExtendedLifetime(collector.retainedRoots) {
+                for (child, _) in collector.declarations {
+                    _ = absorbDeclaration(child, into: &parts, precedence: precedence, low: low)
+                }
             }
             return parts.stylesheet
         }
