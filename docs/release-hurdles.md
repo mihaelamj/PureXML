@@ -6,7 +6,7 @@ evidence, what actually stands between the current engine and a 1.0 fit to put i
 front of a developer as the authority on XML/XSD correctness.
 
 Snapshot at time of writing: v0.2.0 released; full 2006-11-06 XSTS archive (14383
-groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 13`,
+groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 12`,
 `valid-instances-rejected = 0`, `invalid-instances-accepted = 19`.
 
 ## Status against the four stoppers
@@ -16,7 +16,7 @@ groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 13`,
    libxml2 differential over 9618 schemas. **Met.** This is the doc's bar to be "an
    authority"; it is cleared on the measured corpora.
 2. **Silently accepting faulty input (false negatives).** `invalid-schemas-accepted
-   = 13`, `invalid-instances-accepted = 19`. **Not at 0.** This is the bulk of named
+   = 12`, `invalid-instances-accepted = 19`. **Not at 0.** This is the bulk of named
    milestone work (M2, M3) and the subject of Part 1 below.
 3. **Uncharacterized correctness.** Differential harness vs libxml2 and a fuzz
    suite exist (M1, ~done). Gap: real-world corpora beyond XSTS, and the silent
@@ -28,7 +28,7 @@ groups) with `valid-schemas-rejected = 0`, `invalid-schemas-accepted = 13`,
 
 ## The biggest hurdle, stated plainly
 
-Driving the false-negative buckets (`invalid-schemas-accepted = 13`,
+Driving the false-negative buckets (`invalid-schemas-accepted = 12`,
 `invalid-instances-accepted = 19`) to zero is the largest remaining body of named
 work, and it is hard for a specific reason: **the ~95% already closed were the
 tractable cases; every case left fights the cardinal rule.** The remainder sits in

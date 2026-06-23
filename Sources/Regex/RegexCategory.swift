@@ -52,13 +52,21 @@ extension PureXML.Regex {
             .control: "Cc", .format: "Cf", .surrogate: "Cs", .privateUse: "Co", .unassigned: "Cn",
         ]
 
-        /// The Unicode block names XSD 1.0 admits in `\p{Is<Block>}` (the
-        /// Unicode 3.1 blocks the regular-expression appendix fixes), each mapped
-        /// to its code-point range. An `Is<Block>` name outside this set is
-        /// rejected rather than guessed, so a pattern never matches against a
-        /// fabricated range. Surrogate blocks are omitted: surrogates are not
-        /// scalar values. `Specials` uses the main `FFF0..FFFD` range (the spec's
-        /// separate `FEFF` half is the byte-order mark, not matched here).
+        /// The complete set of Unicode block names XSD 1.0 admits in
+        /// `\p{Is<Block>}` (the Unicode 3.1 blocks the regular-expression appendix
+        /// fixes), each mapped to its code-point range. The set is exhaustive: an
+        /// `Is<Block>` name outside it is no XSD block and is rejected at compile
+        /// time (`isMalformedProperty` is gone; the predicate's presence here is the
+        /// sole authority), so a pattern never matches against a fabricated range.
+        /// XSD 1.0 freezes this list at Unicode 3.1, so a block introduced later
+        /// (e.g. `CyrillicSupplement`) is by design not an XSD 1.0 block and is
+        /// rejected, even though some processors accept any `Is[A-Za-z0-9-]+`
+        /// leniently. This is a deliberate spec-strict choice, not an oversight.
+        /// The three surrogate blocks are listed so a pattern naming them still
+        /// compiles, but their ranges hold no scalar value, so they match nothing.
+        /// `Specials` uses the main `FFF0..FFFD` range (the spec's separate `FEFF`
+        /// half is the byte-order mark, not matched here). `GreekandCoptic` is the
+        /// later Unicode rename of `Greek`, kept as a lenient alias.
         private static let blocks: [String: ClosedRange<UInt32>] = [
             "BasicLatin": 0x0000 ... 0x007F,
             "Latin-1Supplement": 0x0080 ... 0x00FF,
@@ -145,6 +153,21 @@ extension PureXML.Regex {
             "ArabicPresentationForms-B": 0xFE70 ... 0xFEFF,
             "HalfwidthandFullwidthForms": 0xFF00 ... 0xFFEF,
             "Specials": 0xFFF0 ... 0xFFFD,
+            // Surrogate blocks: valid XSD block names whose ranges hold no scalar
+            // value (lone surrogates are not Unicode scalars), so they match nothing.
+            "HighSurrogates": 0xD800 ... 0xDB7F,
+            "HighPrivateUseSurrogates": 0xDB80 ... 0xDBFF,
+            "LowSurrogates": 0xDC00 ... 0xDFFF,
+            // Supplementary-plane blocks (Unicode 3.1, beyond the BMP).
+            "OldItalic": 0x10300 ... 0x1032F,
+            "Gothic": 0x10330 ... 0x1034F,
+            "Deseret": 0x10400 ... 0x1044F,
+            "ByzantineMusicalSymbols": 0x1D000 ... 0x1D0FF,
+            "MusicalSymbols": 0x1D100 ... 0x1D1FF,
+            "MathematicalAlphanumericSymbols": 0x1D400 ... 0x1D7FF,
+            "CJKUnifiedIdeographsExtensionB": 0x20000 ... 0x2A6D6,
+            "CJKCompatibilityIdeographsSupplement": 0x2F800 ... 0x2FA1F,
+            "Tags": 0xE0000 ... 0xE007F,
         ]
     }
 }

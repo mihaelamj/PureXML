@@ -56,9 +56,30 @@ struct RegexCategoryTests {
 
     @Test("An unknown category name is a compile error")
     func test_unknownCategory() {
-        #expect(throws: PureXML.Regex.RegexError.self) {
+        #expect(throws: PureXML.Regex.RegexError.invalidProperty) {
             _ = try PureXML.Regex.Pattern("\\p{Zz}")
         }
+        // An unknown Is<Block> name is rejected too (the block set is complete).
+        #expect(throws: PureXML.Regex.RegexError.invalidProperty) {
+            _ = try PureXML.Regex.Pattern("\\p{IsaA0-a9}")
+        }
+    }
+
+    @Test("Supplementary-plane Is<Block> names match beyond the BMP")
+    func test_supplementaryBlock() throws {
+        // U+1D11E (musical symbol G clef) is in MusicalSymbols (1D100..1D1FF).
+        #expect(try matches("\\p{IsMusicalSymbols}+", "\u{1D11E}"))
+        #expect(try !matches("\\p{IsMusicalSymbols}+", "a"))
+        // U+10300 (Old Italic letter A) is in OldItalic (10300..1032F).
+        #expect(try matches("\\p{IsOldItalic}", "\u{10300}"))
+    }
+
+    @Test("Surrogate Is<Block> names compile but match no scalar")
+    func test_surrogateBlockMatchesNothing() throws {
+        // Lone surrogates are not Unicode scalars, so the block matches nothing,
+        // but the name is valid XSD so the pattern still compiles (no false reject).
+        #expect(try !matches("\\p{IsHighSurrogates}", "a"))
+        #expect(try !matches("\\p{IsLowSurrogates}+", "\u{1D11E}"))
     }
 
     @Test("Character-class subtraction removes the subtrahend")
