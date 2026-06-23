@@ -51,9 +51,16 @@ extension PureXML.Schema.XSDParser {
         let derivationType = XSDContentNode.localName(derivationNode)
 
         if derivationType == "extension", let base = resolvedBase(derivationNode, context) {
+            // Best-effort wildcard for type building: a not-expressible union makes
+            // the schema invalid (flagged by SchemaWildcardExpressibility); fall back
+            // to the base's wildcard so the dead type is still well-formed.
+            let unionWildcard: PureXML.Schema.Wildcard? = switch PureXML.Schema.Wildcard.union(ownWildcard, base.attributeWildcard) {
+            case let .constraint(wildcard): wildcard
+            case .notExpressible: base.attributeWildcard
+            }
             return XSDComplexType(
                 attributes: base.attributes + ownAttributes,
-                attributeWildcard: PureXML.Schema.Wildcard.union(ownWildcard, base.attributeWildcard),
+                attributeWildcard: unionWildcard,
                 content: extendedContent(base: base.content, own: ownParticle, mixed: mixed),
             )
         } else if derivationType == "restriction" {

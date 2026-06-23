@@ -222,6 +222,13 @@ extension PureXML.Validation {
             }
         }
 
+        static var attributeWildcardUnionsExpressible: Validation<PureXML.Schema.SchemaCompileRoot, PureXML.Schema.SchemaCompileContext> {
+            compileRule("Attribute wildcard unions in type extensions are expressible") { document in
+                guard let namedTypes = document.namedTypes else { return [] }
+                return PureXML.Schema.XSDParser.wildcardUnionExpressibilityFindings(document.schema, document.context, namedTypes)
+            }
+        }
+
         /// The default validator for checks that run before named types resolve.
         static func preCompileValidator() -> Validator<PureXML.Schema.SchemaCompileContext> {
             Validator<PureXML.Schema.SchemaCompileContext>.defaults(
@@ -256,6 +263,7 @@ extension PureXML.Validation {
                     AnyValidation(simpleTypeBasesAreSimple),
                     AnyValidation(simpleTypeVarietiesValid),
                     AnyValidation(notationsValid), AnyValidation(simpleTypeFacetsAreValid),
+                    AnyValidation(attributeWildcardUnionsExpressible),
                 ],
                 reference: [
                     AnyValidation(schemaReferencesResolve),

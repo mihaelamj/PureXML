@@ -9,16 +9,25 @@ public extension PureXML.Schema {
         case all
     }
 
-    /// The namespace constraint of a wildcard (`xs:any`/`xs:anyAttribute`).
+    /// The namespace constraint of a wildcard (`xs:any`/`xs:anyAttribute`). These
+    /// are exactly the XSD 1.0 (with Errata E1-10) expressible {namespace
+    /// constraint} forms: `any`; a set of namespace names possibly including
+    /// absent; a pair of `not` and a namespace name; a pair of `not` and absent.
+    /// Both `not` forms exclude absent (E1-10 "Wildcard allows Namespace Name"), so
+    /// there is NO "everything except N but including absent" form -- a derivation
+    /// whose attribute-wildcard union/intersection would need one is `not
+    /// expressible` (`src-ct.4`/`src-ct.5`), checked in ``SchemaWildcardExpressibility``.
     enum WildcardNamespace: Sendable, Equatable {
         /// `##any`: a name in any namespace, or none.
         case any
-        /// `##other`: a name in any namespace other than the target, and not in no
-        /// namespace.
-        case other
         /// A specific set of namespace URIs; the empty string stands for no
         /// namespace (`##local`).
         case enumerated(Set<String>)
+        /// A pair of `not` and a namespace name: any namespace name other than the
+        /// given one, and NOT absent. `##other` is `notNamespace(targetNamespace)`.
+        case notNamespace(String)
+        /// A pair of `not` and absent: any (non-absent) namespace name.
+        case notAbsent
     }
 
     /// How a wildcard-matched item is validated: `skip` (no validation), `lax`
@@ -28,6 +37,16 @@ public extension PureXML.Schema {
         case skip
         case lax
         case strict
+    }
+
+    /// The outcome of combining two wildcard constraints: a constraint (possibly
+    /// `nil`, meaning no wildcard), or `notExpressible` when the XSD 1.0 (Errata
+    /// E1-10) union/intersection cannot be written as one of the four
+    /// `WildcardNamespace` forms -- a `src-ct.4` (intersection) or `src-ct.5`
+    /// (union) Complex Type Definition Representation error.
+    enum WildcardCombination: Sendable, Equatable {
+        case constraint(Wildcard?)
+        case notExpressible
     }
 
     /// An element or attribute wildcard (`xs:any`/`xs:anyAttribute`): which
@@ -54,39 +73,60 @@ public extension PureXML.Schema {
             switch namespace {
             case .any:
                 return true
-            case .other:
-                return !namespaceURI.isEmpty && namespaceURI != (targetNamespace ?? "")
             case let .enumerated(uris):
                 return uris.contains(namespaceURI)
+            case let .notNamespace(excluded):
+                return !namespaceURI.isEmpty && namespaceURI != excluded
+            case .notAbsent:
+                return !namespaceURI.isEmpty
             }
         }
 
-        /// The union of two wildcard constraints (XSD 1.0 `cos-aw-union`), used when
-        /// a complexContent extension adds its own `anyAttribute`.
-        func union(with other: Wildcard) -> Wildcard {
-            Wildcard(
-                namespace: Self.unionNamespace(namespace, other.namespace),
+        /// The union of two wildcard constraints (XSD 1.0 `cos-aw-union` + Errata
+        /// E1-10), used when a complexContent extension adds its own `anyAttribute`.
+        func union(with other: Wildcard) -> WildcardCombination {
+            guard let namespace = Self.unionNamespace(namespace, other.namespace) else { return .notExpressible }
+            return .constraint(Wildcard(
+                namespace: namespace,
                 processContents: Self.unionProcessContents(processContents, other.processContents),
                 targetNamespace: targetNamespace ?? other.targetNamespace,
-            )
+            ))
         }
 
-        /// Combines optional wildcards from a base type and a derivation.
-        static func union(_ left: Wildcard?, _ right: Wildcard?) -> Wildcard? {
+        /// Combines optional wildcards from a base type and a derivation by union.
+        static func union(_ left: Wildcard?, _ right: Wildcard?) -> WildcardCombination {
             switch (left, right) {
-            case (nil, nil): nil
-            case (let left?, nil): left
-            case (nil, let right?): right
+            case (nil, nil): .constraint(nil)
+            case (let left?, nil): .constraint(left)
+            case (nil, let right?): .constraint(right)
             case let (left?, right?): left.union(with: right)
             }
         }
 
-        private static func unionNamespace(_ left: WildcardNamespace, _ right: WildcardNamespace) -> WildcardNamespace {
+        /// The union of two namespace constraints (XSD 1.0 §3.10.6 with Errata
+        /// E1-10), or `nil` when the result is not expressible. Both `not` forms
+        /// exclude absent, so a union that would admit "everything except a name,
+        /// plus absent" (rule 5.1.3) has no expressible form.
+        static func unionNamespace(_ left: WildcardNamespace, _ right: WildcardNamespace) -> WildcardNamespace? {
             switch (left, right) {
-            case (.any, _), (_, .any): .any
-            case (.other, .other): .other
-            case let (.enumerated(lhs), .enumerated(rhs)): .enumerated(lhs.union(rhs))
-            case (.other, _), (_, .other): .any
+            case (.any, _), (_, .any):
+                return .any
+            case let (.enumerated(lhs), .enumerated(rhs)):
+                return .enumerated(lhs.union(rhs))
+            case let (.notNamespace(lhsName), .notNamespace(rhsName)):
+                // not(x) admits the other's excluded name, so different names union
+                // to "any named, no absent"; the same name is unchanged.
+                return lhsName == rhsName ? .notNamespace(lhsName) : .notAbsent
+            case (.notAbsent, .notNamespace), (.notNamespace, .notAbsent), (.notAbsent, .notAbsent):
+                return .notAbsent
+            case let (.notNamespace(name), .enumerated(set)), let (.enumerated(set), .notNamespace(name)):
+                let hasName = set.contains(name), hasAbsent = set.contains("")
+                if hasName, hasAbsent { return .any } //                E1-10 5.1.1
+                if hasName { return .notAbsent } //                      E1-10 5.1.2
+                if hasAbsent { return nil } //          NOT EXPRESSIBLE, E1-10 5.1.3
+                return .notNamespace(name) //                           E1-10 5.1.4
+            case let (.notAbsent, .enumerated(set)), let (.enumerated(set), .notAbsent):
+                return set.contains("") ? .any : .notAbsent
             }
         }
 
@@ -96,52 +136,55 @@ public extension PureXML.Schema {
             return .skip
         }
 
-        /// The intersection of two wildcard constraints (XSD 1.0 `cos-aw-intersect`),
-        /// used to combine the `anyAttribute` wildcards a complex type or attribute
-        /// group draws from its own declaration and its referenced attribute groups:
-        /// the effective wildcard admits only what every source admits.
-        func intersection(with other: Wildcard) -> Wildcard {
-            Wildcard(
-                namespace: Self.intersectNamespace(self, other),
+        /// The intersection of two wildcard constraints (XSD 1.0 `cos-aw-intersect`
+        /// + Errata E1-10), used to combine the `anyAttribute` wildcards a complex
+        /// type or attribute group draws from its own declaration and its referenced
+        /// attribute groups: the effective wildcard admits only what every source
+        /// admits.
+        func intersection(with other: Wildcard) -> WildcardCombination {
+            .constraint(Wildcard(
+                namespace: Self.intersectNamespace(namespace, other.namespace),
                 processContents: Self.intersectProcessContents(processContents, other.processContents),
                 targetNamespace: targetNamespace ?? other.targetNamespace,
-            )
+            ))
         }
 
         /// Combines optional wildcards from several sources by intersection. A nil
-        /// source contributes no constraint (the unconstrained `##any` identity), so
-        /// a single wildcard is returned unchanged: only a type drawing on two or
-        /// more `anyAttribute`s narrows.
-        static func intersection(_ left: Wildcard?, _ right: Wildcard?) -> Wildcard? {
+        /// source contributes no constraint (the unconstrained `##any` identity).
+        static func intersection(_ left: Wildcard?, _ right: Wildcard?) -> WildcardCombination {
             switch (left, right) {
-            case (nil, nil): nil
-            case (let left?, nil): left
-            case (nil, let right?): right
+            case (nil, nil): .constraint(nil)
+            case (let left?, nil): .constraint(left)
+            case (nil, let right?): .constraint(right)
             case let (left?, right?): left.intersection(with: right)
             }
         }
 
-        private static func intersectNamespace(_ left: Wildcard, _ right: Wildcard) -> WildcardNamespace {
-            switch (left.namespace, right.namespace) {
-            case (.any, _): right.namespace
-            case (_, .any): left.namespace
-            case let (.enumerated(lhs), .enumerated(rhs)): .enumerated(lhs.intersection(rhs))
-            case let (.enumerated(uris), .other): .enumerated(Self.exclude(uris, otherThan: right.targetNamespace))
-            case let (.other, .enumerated(uris)): .enumerated(Self.exclude(uris, otherThan: left.targetNamespace))
-            case (.other, .other):
-                // Two `##other`s with the same target namespace intersect to the
-                // same `##other`; with different targets the true intersection
-                // (neither target, nor absent) is not expressible in XSD 1.0, so
-                // keep the less restrictive `##other` rather than over-reject.
-                .other
+        /// The intersection of two namespace constraints (XSD 1.0 §3.10.6 with
+        /// Errata E1-10). Two `not` forms negating DIFFERENT namespace names have a
+        /// true intersection of `not({a,b})` excluding absent, which has no single
+        /// expressible form (`src-ct.4`). Detecting that as a schema error is a
+        /// deferred rule; until then this returns the less restrictive `not(lhs)` (an
+        /// over-approximation, so an attribute is never WRONGLY rejected -- the prior
+        /// behaviour), rather than dropping the wildcard and over-rejecting valid
+        /// cross-namespace attributes on an accepted schema.
+        static func intersectNamespace(_ left: WildcardNamespace, _ right: WildcardNamespace) -> WildcardNamespace {
+            switch (left, right) {
+            case (.any, _): right
+            case (_, .any): left
+            case let (.enumerated(lhs), .enumerated(rhs)):
+                .enumerated(lhs.intersection(rhs))
+            case let (.enumerated(set), .notNamespace(name)), let (.notNamespace(name), .enumerated(set)):
+                .enumerated(set.subtracting([name, ""])) // not(name) also excludes absent
+            case let (.enumerated(set), .notAbsent), let (.notAbsent, .enumerated(set)):
+                .enumerated(set.subtracting([""]))
+            case let (.notNamespace(lhsName), .notNamespace(_)):
+                .notNamespace(lhsName) // same name: unchanged; different: lenient over-approximation
+            case (.notAbsent, .notAbsent):
+                .notAbsent
+            case let (.notNamespace(name), .notAbsent), let (.notAbsent, .notNamespace(name)):
+                .notNamespace(name)
             }
-        }
-
-        /// The URIs of `uris` that `##other` (relative to `targetNamespace`) also
-        /// admits: a non-empty namespace other than the target. The empty string
-        /// (absent / `##local`) and the target namespace are dropped.
-        private static func exclude(_ uris: Set<String>, otherThan targetNamespace: String?) -> Set<String> {
-            uris.filter { !$0.isEmpty && $0 != (targetNamespace ?? "") }
         }
 
         private static func intersectProcessContents(_ left: ProcessContents, _ right: ProcessContents) -> ProcessContents {
