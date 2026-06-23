@@ -2,7 +2,6 @@
 # one category/name per line, exact in both directions: a fixed case
 # must leave this list and a regression shows up as a new failure.
 attribset/attribset44
-attribset/attribset48
 attribvaltemplate/attribvaltemplate08
 axes/axes116
 conflictres/conflictres29
@@ -15,7 +14,6 @@ idkey/idkey45
 idkey/idkey46
 idkey/idkey47
 idkey/idkey48
-idkey/idkey53
 impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
@@ -24,7 +22,6 @@ mdocs/mdocs13
 mdocs/mdocs15
 mdocs/mdocs19
 namedtemplate/namedtemplate12
-namedtemplate/namedtemplate16
 namespace/namespace113
 namespace/namespace19
 namespace/namespace23

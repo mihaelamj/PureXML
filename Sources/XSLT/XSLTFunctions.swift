@@ -201,8 +201,9 @@ extension PureXML.XSLT {
         ) -> PureXML.XPath.FunctionTable {
             PureXML.XPath.FunctionTable()
                 .adding("current") { _, _ in .nodeSet([current]) }
-                .adding("format-number") { arguments, _ in
-                    let name = arguments.count > 2 ? arguments[2].string : ""
+                .adding("format-number") { arguments, context in
+                    // The decimal-format name is matched by expanded QName.
+                    let name = expandedName(arguments.count > 2 ? arguments[2].string : "", context.namespaces)
                     return .string(FormatNumber.format(
                         arguments.first?.number ?? .nan,
                         arguments.count > 1 ? arguments[1].string : "",

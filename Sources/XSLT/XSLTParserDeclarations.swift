@@ -31,13 +31,21 @@ extension PureXML.XSLT.XSLTParser {
     /// A `mode` attribute as expanded name `{uri}local` (bare local when
     /// unprefixed): a mode is compared by expanded name (XSLT 1.0 5.7), so two
     /// prefixes bound to one namespace are the same mode. nil when absent.
-    static func expandedMode(_ node: XSLTTree) -> String? {
-        guard let mode = XSLTNode.attribute(node, "mode") else { return nil }
-        guard let colon = mode.firstIndex(of: ":") else { return mode }
-        let prefix = String(mode[..<colon])
-        let local = String(mode[mode.index(after: colon)...])
-        guard let uri = resolvePrefix(prefix, at: node) else { return mode }
+    /// A QName resolved to expanded form `{uri}local`, or the bare name when it
+    /// is unprefixed (the null namespace) or its prefix is unbound at `node`.
+    /// XSLT 1.0 compares mode, variable, template, key, attribute-set, and
+    /// decimal-format names by expanded name, so two prefixes bound to the same
+    /// namespace name the same thing.
+    static func expandedQName(_ raw: String, at node: XSLTTree) -> String {
+        guard let colon = raw.firstIndex(of: ":") else { return raw }
+        let prefix = String(raw[..<colon])
+        let local = String(raw[raw.index(after: colon)...])
+        guard let uri = resolvePrefix(prefix, at: node) else { return raw }
         return "{\(uri)}\(local)"
+    }
+
+    static func expandedMode(_ node: XSLTTree) -> String? {
+        XSLTNode.attribute(node, "mode").map { expandedQName($0, at: node) }
     }
 
     /// A variable or parameter `name` as an expanded name `{uri}local` when it
@@ -46,21 +54,17 @@ extension PureXML.XSLT.XSLTParser {
     /// the same variable; the XPath evaluator falls back to the same expansion on
     /// a reference, so only a prefixed name changes and unprefixed names are kept.
     static func expandedDeclaredName(_ node: XSLTTree) -> String {
-        let raw = XSLTNode.attribute(node, "name") ?? ""
-        guard let colon = raw.firstIndex(of: ":") else { return raw }
-        let prefix = String(raw[..<colon])
-        let local = String(raw[raw.index(after: colon)...])
-        guard let uri = resolvePrefix(prefix, at: node) else { return raw }
-        return "{\(uri)}\(local)"
+        expandedQName(XSLTNode.attribute(node, "name") ?? "", at: node)
     }
 
     static func addAttributeSet(_ child: XSLTTree, into parts: inout Parts) {
-        guard let name = XSLTNode.attribute(child, "name") else { return }
+        guard XSLTNode.attribute(child, "name") != nil else { return }
         // Same-name attribute sets merge (7.1.4) as ordered definitions:
         // each expands its used sets before its own attributes, and a later
-        // definition's attributes override earlier same-named ones.
+        // definition's attributes override earlier same-named ones. The name is
+        // keyed by expanded QName so use-attribute-sets resolves it identically.
         let addition = PureXML.XSLT.AttributeSet(attributes: body(child), use: useAttributeSets(child))
-        parts.attributeSets[name, default: []].append(addition)
+        parts.attributeSets[expandedDeclaredName(child), default: []].append(addition)
     }
 
     /// Reads an `xsl:decimal-format`'s symbol overrides; each unset attribute
