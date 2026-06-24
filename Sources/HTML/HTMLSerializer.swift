@@ -55,7 +55,37 @@ extension PureXML.HTML {
             if Elements.booleanAttributes.contains(name.lowercased()), attribute.value.lowercased() == name.lowercased() {
                 return " \(name)"
             }
-            return " \(name)=\"\(escapeAttribute(attribute.value))\""
+            let escaped = Elements.uriAttributes.contains(name.lowercased())
+                ? escapeURI(attribute.value)
+                : escapeAttribute(attribute.value)
+            return " \(name)=\"\(escaped)\""
+        }
+
+        /// Escapes a URI-valued attribute value (XSLT 1.0 16.2, HTML 4.01 B.2.1):
+        /// each non-ASCII or control character is percent-escaped as the uppercase
+        /// hex of its UTF-8 bytes, while `"` and `&` keep their entity form.
+        private static func escapeURI(_ value: String) -> String {
+            var result = ""
+            for scalar in value.unicodeScalars {
+                if scalar.value > 0x20, scalar.value < 0x7F {
+                    switch scalar {
+                    case "\"": result += "&quot;"
+                    case "&": result += "&amp;"
+                    default: result.unicodeScalars.append(scalar)
+                    }
+                } else {
+                    for byte in String(scalar).utf8 {
+                        result += "%" + hexByte(byte)
+                    }
+                }
+            }
+            return result
+        }
+
+        /// A byte as two uppercase hex digits, without Foundation formatting.
+        private static func hexByte(_ byte: UInt8) -> String {
+            let digits = Array("0123456789ABCDEF")
+            return String([digits[Int(byte >> 4)], digits[Int(byte & 0x0F)]])
         }
 
         private static func escapeText(_ value: String) -> String {

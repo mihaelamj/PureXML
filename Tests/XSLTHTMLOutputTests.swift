@@ -57,6 +57,18 @@ struct XSLTHTMLOutputTests {
         #expect(try transform(style, "<x/>") == "<a title=\"&lt;x&gt;\">t</a>")
     }
 
+    @Test("the html method percent-escapes non-ASCII and control chars in URI-valued attributes")
+    func test_uriAttributeEscaping() throws {
+        // XSLT 1.0 16.2 / HTML 4.01 B.2.1: a URI-valued attribute (cite, href,
+        // src, ...) percent-escapes non-ASCII (the UTF-8 bytes) and control/space,
+        // keeping `"` and `&` as entities; a non-URI attribute (title) keeps its
+        // ordinary html escaping. Apache Xalan output32.
+        let out = try transform(
+            htmlStyle("<q cite=\"b&#235;.xml\" title=\"b&#235;\" href=\"a b&amp;c\"/>"), "<x/>",
+        )
+        #expect(out == "<q cite=\"b%C3%AB.xml\" title=\"b&euml;\" href=\"a%20b&amp;c\"></q>")
+    }
+
     @Test("the html method serializes a namespaced element as XML, not HTML")
     func test_namespacedElementAsXML() throws {
         // XSLT 1.0 16.2: an element whose expanded-name has a non-null namespace
