@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `html` output method now percent-escapes non-ASCII and control characters in URI-valued attributes (XSLT 1.0 16.2, HTML 4.01 appendix B.2.1). For the HTML 4 attributes of type %URI (`href`, `src`, `cite`, `action`, and the rest), each non-ASCII or control/space character in the value is written as the uppercase hex of its UTF-8 bytes (so `cite="bë.xml"` becomes `cite="b%C3%AB.xml"`), while `"` and `&` keep their entity form; other attributes are unaffected. Closes Apache Xalan conformance case `output32`.
+
 - Serializing a processing instruction whose data contains `?>` now inserts a space (`? >`) so the instruction is not terminated early (XSLT 1.0 7.3: a processor recovers from a generated `?>` by inserting a space after the `?`). The serializer emitted the `?>` raw, producing a malformed instruction. Closes Apache Xalan conformance case `output72`.
 
 - The XSLT conformance harness now decodes source and stylesheet files through the library's own encoding detection (a BOM or the XML declaration) rather than assuming UTF-8, so a non-UTF-8 corpus input is fed to the transform instead of refused. This confirms the library round-trips a UTF-16 source correctly and closes Apache Xalan conformance cases `output80` (UTF-16) and `attribvaltemplate08`, which were unreadable by the harness, not library failures.

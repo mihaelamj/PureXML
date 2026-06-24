@@ -43,6 +43,14 @@ extension PureXML.HTML {
             "defer", "declare", "noresize", "nowrap", "noshade", "compact",
         ]
 
+        /// HTML 4 attributes whose value is a URI (type %URI). The html output
+        /// method percent-escapes non-ASCII and control characters in their
+        /// values (XSLT 1.0 16.2, HTML 4.01 appendix B.2.1).
+        static let uriAttributes: Set<String> = [
+            "action", "archive", "background", "cite", "classid", "codebase",
+            "data", "href", "longdesc", "profile", "src", "usemap",
+        ]
+
         /// RCDATA elements: like raw-text, but character references in their
         /// content are decoded (`title`, `textarea`). The remaining raw-text
         /// elements (`script`, `style`) take their content with no decoding.
