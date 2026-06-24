@@ -28,7 +28,7 @@ extension PureXML.XSLT.XSLTParser {
                 count: XSLTNode.attribute(node, "count"),
                 from: XSLTNode.attribute(node, "from"),
                 value: XSLTNode.attribute(node, "value"),
-                format: XSLTNode.attribute(node, "format") ?? "1",
+                format: valueTemplate(XSLTNode.attribute(node, "format") ?? "1"),
                 groupingSeparator: XSLTNode.attribute(node, "grouping-separator"),
                 groupingSize: XSLTNode.attribute(node, "grouping-size").flatMap { Int($0) },
             ))

@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `format` attribute of `xsl:number` is now evaluated as an attribute value template (XSLT 1.0 7.7), so `format="{$f}"` uses the value of `$f` rather than the literal string. It was stored and used verbatim, so a computed or passed-in format was never applied. Closes Apache Xalan conformance case `namedtemplate12`.
+
 - A large integer-valued number now converts to a string with no decimal point (XPath 1.0 4.2). The number-to-string formatter only treated a value below 1e15 as an integer, so an integer such as `1234567890123456` (still exact in a double, which represents integers exactly up to 2^53) printed as `1234567890123456.0`. The integer bound is now 2^63, the range in which the conversion is safe. Closes Apache Xalan conformance case `string132`.
 
 - A lone `/` (the root node) is now parsed correctly when it is followed by something other than the end of the expression, such as a `)`, `]`, `|`, or an operator. The XPath grammar makes the relative part after `/` optional, but the compiler only treated `/` as the root path at the very end of the expression, so `count(/)`, `generate-id(/)`, and `/ = .` tried to parse a step from the following token and yielded an empty node-set. The compiler now recognizes a `/` as the root whenever no location step follows it. Closes Apache Xalan conformance cases `position106` and `mdocs15`.

@@ -19,6 +19,23 @@ struct XSLTNumberingTests {
         return try PureXML.XSLT.transform(stylesheet: style, source: source)
     }
 
+    @Test("the format attribute is an attribute value template (7.7)")
+    func test_formatIsAVT() throws {
+        // format="{$f}" evaluates the AVT, so a passed-in format string drives the
+        // sequence; f="A. " numbers the items A. B. (Apache Xalan namedtemplate12).
+        let emit = "<xsl:call-template name=\"n\">"
+            + "<xsl:with-param name=\"f\">A. </xsl:with-param></xsl:call-template>"
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:apply-templates select="doc/i"/></out></xsl:template>
+          <xsl:template match="i">\(emit)</xsl:template>
+          <xsl:template name="n"><xsl:param name="f">1. </xsl:param><xsl:number format="{$f}"/></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<doc><i/><i/></doc>") == "<out>A. B. </out>")
+    }
+
     @Test("level=multiple numbers every matching ancestor-or-self, outermost first")
     func test_levelMultiple() throws {
         let source = """
