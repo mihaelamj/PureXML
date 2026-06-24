@@ -145,34 +145,28 @@ public extension PureXML.Parsing {
             // replacement into the reader with no text before it: the next
             // construct is then read from the spliced replacement.
             while true {
+                // Fast byte dispatch: when the next input is a raw byte (an
+                // empty lookahead buffer over owned storage), route on it
+                // without buffering a Character, so every matches()/consume()/
+                // scan call below stays on its byte fast path. The Character
+                // path is the identical fallback for a streaming source,
+                // spliced entity text, or a non-ASCII lead.
+                if let byte = reader.peekByte() {
+                    eventStart = reader.mark
+                    if byte == 0x3C { return try scanContentMarkup() } // '<'
+                    if let text = try scanText() { return text }
+                    continue
+                }
                 guard let lead = reader.peek() else {
                     throw ParseError.unexpectedEndOfInput(reader.mark)
                 }
                 eventStart = reader.mark
-                if reader.matches("</") { return try scanEndTag() }
-                if reader.matches("<!--") {
-                    recordEmptyElementContent("a comment")
-                    return try scanComment()
-                }
-                if reader.matches("<![CDATA[") { return try scanCDATA() }
-                if reader.matches("<?") {
-                    let mark = reader.mark
-                    recordEmptyElementContent("a processing instruction")
-                    let instruction = try scanProcessingInstruction()
-                    if instruction.target.lowercased() == "xml" {
-                        throw ParseError.reservedProcessingInstructionTarget(mark)
-                    }
-                    return .processingInstruction(target: instruction.target, data: instruction.data)
-                }
-                if reader.matches("<!DOCTYPE") {
-                    throw ParseError.unsupportedDoctype(reader.mark)
-                }
-                if lead == "<" { return try scanStartTag() }
+                if lead == "<" { return try scanContentMarkup() }
                 if let text = try scanText() { return text }
             }
         }
 
-        private mutating func scanStartTag() throws -> Event {
+        mutating func scanStartTag() throws -> Event {
             guard open.count < limits.maxDepth else {
                 throw ParseError.nestingTooDeep(limit: limits.maxDepth, reader.mark)
             }
@@ -207,17 +201,26 @@ public extension PureXML.Parsing {
             let mark = reader.mark
             var raw = ""
             var length = 0
+            // Whether any '&' was seen: without one the text has no references
+            // and no markup-entity boundary, so the whole decode/split/findings
+            // pass is skipped. The scanners visit every byte already, so this
+            // costs nothing beyond a compare they were doing anyway.
+            var sawAmpersand = false
             while true {
                 // Bulk byte runs first: plain ASCII content (the bulk of any
                 // document) skips the per-character machinery entirely; the
                 // run never spans '<', CR, ']', or invalid bytes, so the
                 // character path below keeps exact error marks.
-                if let run = reader.contentRunBytes() {
+                if let run = reader.contentRunBytes(sawAmpersand: &sawAmpersand) {
                     length += run.utf8.count
                     try checkContent(length, mark)
                     raw += run
                     continue
                 }
+                // Detect the closing '<' on the byte path so the buffer stays
+                // empty: a buffered '<' would force the next element's dispatch,
+                // matches(), and name scan onto the slow Character path.
+                if reader.peekByte() == 0x3C { break }
                 guard let character = reader.peek(), character != "<" else { break }
                 length += 1
                 try checkContent(length, mark)
@@ -227,10 +230,12 @@ public extension PureXML.Parsing {
                 guard character.unicodeScalars.allSatisfy(XMLCharacter.isChar) else {
                     throw ParseError.invalidCharacter(reader.mark)
                 }
+                if character == "&" { sawAmpersand = true }
                 raw.append(character)
                 reader.advance()
             }
-            let split = raw.contains("&") ? EntityDecoder.splitAtMarkupEntity(raw, entities: referencableEntities) : nil
+            guard sawAmpersand else { return .characters(raw) }
+            let split = EntityDecoder.splitAtMarkupEntity(raw, entities: referencableEntities)
             if let split {
                 let replacement = try EntityDecoder.includeForContent(
                     split.name,
@@ -247,7 +252,7 @@ public extension PureXML.Parsing {
             return .characters(decoded)
         }
 
-        private mutating func scanProcessingInstruction() throws -> (target: String, data: String) {
+        mutating func scanProcessingInstruction() throws -> (target: String, data: String) {
             let mark = reader.mark
             reader.consume("<?")
             let target = try scanName()
@@ -280,6 +285,12 @@ public extension PureXML.Parsing {
 
         mutating func scanName() throws -> PureXML.Model.QualifiedName {
             let mark = reader.mark
+            // Fast path: an all-ASCII name scanned directly from the bytes, with
+            // no per-character buffering. The Character loop below handles a
+            // non-ASCII name, the non-fast-path, and the too-long error.
+            if let fast = reader.takeASCIIName(maxLength: limits.maxNameLength) {
+                return PureXML.Model.QualifiedName(fast)
+            }
             guard let first = reader.peek(), first.isXMLNameStart else {
                 throw ParseError.expectedName(reader.mark)
             }

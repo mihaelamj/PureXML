@@ -6,8 +6,14 @@ extension PureXML.Parsing.EventReader {
         var seen: Set<String> = []
         while true {
             reader.skipSpace()
-            guard let next = reader.peek(), next != ">", next != "/" else {
-                return attributes
+            // Byte dispatch keeps the buffer empty so scanName() reaches its
+            // byte fast path; the Character peek is the off-fast-path fallback.
+            if let byte = reader.peekByte() {
+                if byte == 0x3E || byte == 0x2F { return attributes } // '>' or '/'
+            } else {
+                guard let next = reader.peek(), next != ">", next != "/" else {
+                    return attributes
+                }
             }
             let mark = reader.mark
             let name = try scanName()
@@ -27,8 +33,17 @@ extension PureXML.Parsing.EventReader {
                 throw PureXML.Parsing.ParseError.duplicateAttribute(name: name.description, mark)
             }
             attributes.append(PureXML.Model.Attribute(name: name, value: value))
-            // A following attribute needs whitespace before it.
-            if let next = reader.peek(), next != ">", next != "/", next != "?", !next.isWhitespace {
+            // A following attribute needs whitespace before it. Check the raw
+            // byte when on the fast path to avoid buffering the next name char.
+            if let byte = reader.peekByte() {
+                // '>', '/', '?', or whitespace may legally follow a value; any
+                // other byte means a missing separator before the next attribute.
+                let isSeparator = byte == 0x3E || byte == 0x2F || byte == 0x3F
+                    || byte == 0x20 || byte == 0x09 || byte == 0x0A || byte == 0x0D
+                if !isSeparator {
+                    throw PureXML.Parsing.ParseError.missingSpaceBeforeAttribute(reader.mark)
+                }
+            } else if let next = reader.peek(), next != ">", next != "/", next != "?", !next.isWhitespace {
                 throw PureXML.Parsing.ParseError.missingSpaceBeforeAttribute(reader.mark)
             }
         }
@@ -40,9 +55,20 @@ extension PureXML.Parsing.EventReader {
             throw PureXML.Parsing.ParseError.unquotedAttributeValue(reader.mark)
         }
         reader.advance()
+        let quoteByte: UInt8 = quote == "\"" ? 0x22 : 0x27
         var raw = ""
         var length = 0
-        while let character = reader.peek(), character != quote {
+        while true {
+            // Bulk byte runs first: plain ASCII value text (the common case)
+            // skips the per-character machinery; the run stops before the
+            // quote, '<', CR, or any byte the Character path must inspect.
+            if let run = reader.attributeRunBytes(quote: quoteByte) {
+                length += run.utf8.count
+                try checkContent(length, mark)
+                raw += run
+                continue
+            }
+            guard let character = reader.peek(), character != quote else { break }
             length += 1
             try checkContent(length, mark)
             if character == "<" {

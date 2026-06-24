@@ -55,6 +55,8 @@ offsets throughout; libxml2's xmlReadMemory takes an int byte count).
 | 1 | allocation-free Reader.matches() | 0.414 s (26x) | unchanged | unchanged |
 | 2 | byte-backed Reader (owned UTF-8 storage, pointer-decoded scalars, byte-level literal match/consume) | 0.375 s (23x) | unchanged | unchanged |
 | 3 | bulk content runs (plain-ASCII character data scanned and consumed at the byte level, String built once per run) | 0.335 s (20x) | unchanged | unchanged |
+| 4 | byte-level dispatch + name/attribute scanning (non-buffering `peekByte`, byte-mode `skipSpace`, all-ASCII `takeASCIIName`, `attributeRunBytes`); keeps the lookahead buffer empty so the existing byte fast paths engage | 0.217 s (13x) | unchanged | unchanged |
+| 5 | `sawAmpersand` short-circuit (ampersand-free text returns verbatim, skipping the reference-decode/split/findings pass) and detecting the text-run-closing `<` via `peekByte` instead of buffering it (the buffered `<` had cascaded the next element's whole dispatch and name scan onto the Character path) | 0.157 s (9.5x) | unchanged | unchanged |
 
 ## Profile findings (first sample, parse path)
 
