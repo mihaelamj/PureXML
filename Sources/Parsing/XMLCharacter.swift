@@ -50,6 +50,21 @@ public extension PureXML.Parsing {
             }
         }
 
+        /// The ASCII subset of `NameStartChar`, tested on a raw byte for the
+        /// parser's byte-level fast path. A non-ASCII name-start (byte >= 0x80)
+        /// is left to the scalar predicate via the Character scanner.
+        static func isASCIINameStart(_ byte: UInt8) -> Bool {
+            switch byte {
+            case 0x3A, 0x41 ... 0x5A, 0x5F, 0x61 ... 0x7A: true
+            default: false
+            }
+        }
+
+        /// The ASCII subset of `NameChar` (after the first), on a raw byte.
+        static func isASCIINameChar(_ byte: UInt8) -> Bool {
+            isASCIINameStart(byte) || (byte >= 0x30 && byte <= 0x39) || byte == 0x2D || byte == 0x2E
+        }
+
         /// `NameChar`: a name character after the first.
         public static func isNameChar(_ scalar: Unicode.Scalar) -> Bool {
             if isNameStart(scalar) { return true }

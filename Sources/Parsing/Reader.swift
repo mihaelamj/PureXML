@@ -130,6 +130,19 @@ extension PureXML.Parsing {
             return ahead < buffer.count ? buffer[ahead] : nil
         }
 
+        /// The raw byte `ahead` positions past the cursor, on the byte fast path
+        /// only (an empty lookahead buffer, no pending raw character, owned
+        /// storage). Returns nil off the fast path or at end of input. It does
+        /// not normalize line endings and does not advance: callers use it to
+        /// dispatch on fixed ASCII bytes ('<', '/', '>', quotes) while leaving
+        /// the buffer empty, so the byte scanners below stay engaged, and fall
+        /// back to the Character path for any byte it does not recognize.
+        func peekByte(_ ahead: Int = 0) -> UInt8? {
+            guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
+            let index = byteIndex + ahead
+            return index < storage.count ? storage.pointer[index] : nil
+        }
+
         var mark: Mark {
             Mark(line: line, column: column, offset: offset)
         }
@@ -182,6 +195,34 @@ extension PureXML.Parsing {
             return true
         }
 
+        /// On the byte fast path (an empty lookahead buffer over owned bytes),
+        /// consumes an all-ASCII XML name and returns it, advancing past it.
+        /// Returns nil when not on the fast path, when the first byte is not an
+        /// ASCII name-start, when the name reaches a non-ASCII byte, or when it
+        /// exceeds `maxLength`, so the caller falls back to the Character scanner
+        /// (which handles the full Unicode name grammar and the length error).
+        /// A name has no newlines, so position tracking is plain arithmetic.
+        mutating func takeASCIIName(maxLength: Int) -> String? {
+            guard buffer.isEmpty, pendingRaw == nil, let storage, byteIndex < storage.count else { return nil }
+            let pointer = storage.pointer
+            guard PureXML.Parsing.XMLCharacter.isASCIINameStart(pointer[byteIndex]) else { return nil }
+            var index = byteIndex + 1
+            let limit = byteIndex + maxLength
+            while index < storage.count {
+                let byte = pointer[index]
+                if byte >= 0x80 { return nil }
+                if !PureXML.Parsing.XMLCharacter.isASCIINameChar(byte) { break }
+                if index >= limit { return nil }
+                index += 1
+            }
+            let length = index - byteIndex
+            let run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: length), as: UTF8.self)
+            byteIndex = index
+            offset += length
+            column += length
+            return run
+        }
+
         /// If the upcoming characters equal `literal`, consume them and return true.
         @discardableResult
         mutating func consume(_ literal: String) -> Bool {
@@ -203,58 +244,35 @@ extension PureXML.Parsing {
         }
 
         mutating func skipSpace() {
+            if skipSpaceBytes() { return }
             while let character = peek(), character.isXMLWhitespace {
                 advance()
             }
         }
 
-        /// Bulk-scans character data in byte mode: consumes and returns the
-        /// longest upcoming run of plain ASCII content bytes (no '<', no
-        /// carriage return, no "]]" pair, every byte a valid XML character),
-        /// or nil when the fast path does not apply. Anything subtle, an
-        /// entity boundary aside ('&' is plain content here), is left for
-        /// the character path so error marks stay exact. Returns nil rather
-        /// than an empty run so callers can alternate with the slow loop.
-        mutating func contentRunBytes() -> String? {
-            guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
+        /// Byte-mode whitespace skip. Returns true when it stopped at a clean
+        /// non-whitespace byte (so the buffer is empty and the caller needs no
+        /// Character loop); false when off the fast path or stopped at a
+        /// carriage return that the Character path must fold per 2.11.
+        private mutating func skipSpaceBytes() -> Bool {
+            guard buffer.isEmpty, pendingRaw == nil, let storage else { return false }
             let pointer = storage.pointer
-            let count = storage.count
-            // A run never contains ']', so "]]>" can only straddle the
-            // boundary where the slow path consumed "]]" and the run would
-            // begin with '>': leave a leading '>' to the slow path and its
-            // cdataCloseInContent check (W3C ibm14n01).
-            if byteIndex < count, pointer[byteIndex] == 0x3E { return nil }
-            var index = byteIndex
-            var newlines = 0
-            var lastLineStart = -1
-            while index < count {
-                let byte = pointer[index]
-                if byte == 0x3C { break } // '<'
-                // Valid plain ASCII content only; CR, ']' and non-ASCII go
-                // to the character path.
-                guard byte < 0x80, byte != 0x0D, byte != 0x5D,
-                      byte >= 0x20 || byte == 0x09 || byte == 0x0A
-                else {
-                    if index == byteIndex { return nil }
-                    break
+            while byteIndex < storage.count {
+                switch pointer[byteIndex] {
+                case 0x20, 0x09:
+                    column += 1
+                case 0x0A:
+                    line += 1
+                    column = 1
+                case 0x0D:
+                    return false
+                default:
+                    return true
                 }
-                if byte == 0x0A {
-                    newlines += 1
-                    lastLineStart = index
-                }
-                index += 1
+                byteIndex += 1
+                offset += 1
             }
-            guard index > byteIndex else { return nil }
-            let run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: index - byteIndex), as: UTF8.self)
-            offset += index - byteIndex
-            if newlines > 0 {
-                line += newlines
-                column = index - lastLineStart
-            } else {
-                column += index - byteIndex
-            }
-            byteIndex = index
-            return run
+            return true
         }
 
         /// Prepends `text` to the unread stream: used to splice a general
@@ -267,38 +285,116 @@ extension PureXML.Parsing {
     }
 }
 
-extension StringProtocol {
-    /// Trims leading and trailing XML whitespace without Foundation.
-    func trimmingXMLWhitespace() -> String {
-        var slice = self[...]
-        while let first = slice.first, first.isXMLWhitespace {
-            slice = slice.dropFirst()
+/// The bulk byte-run scanners, in an extension so the reader's primary type
+/// body stays under the length cap. They consume plain ASCII runs of content
+/// or attribute-value text directly from the owned storage (the common case in
+/// any real document) and hand subtle bytes back to the Character path. Both
+/// stay on the byte fast path only when the lookahead buffer is empty.
+extension PureXML.Parsing.Reader {
+    /// Bulk-scans character data in byte mode: consumes and returns the
+    /// longest upcoming run of plain ASCII content bytes (no '<', no
+    /// carriage return, no "]]" pair, every byte a valid XML character),
+    /// or nil when the fast path does not apply. Anything subtle, an
+    /// entity boundary aside ('&' is plain content here), is left for
+    /// the character path so error marks stay exact. Returns nil rather
+    /// than an empty run so callers can alternate with the slow loop.
+    mutating func contentRunBytes(sawAmpersand: inout Bool) -> String? {
+        guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
+        let pointer = storage.pointer
+        let count = storage.count
+        // A run never contains ']', so "]]>" can only straddle the
+        // boundary where the slow path consumed "]]" and the run would
+        // begin with '>': leave a leading '>' to the slow path and its
+        // cdataCloseInContent check (W3C ibm14n01).
+        if byteIndex < count, pointer[byteIndex] == 0x3E { return nil }
+        var index = byteIndex
+        var newlines = 0
+        var lastLineStart = -1
+        while index < count {
+            let byte = pointer[index]
+            if byte == 0x3C { break } // '<'
+            // Valid plain ASCII content only; CR, ']' and non-ASCII go
+            // to the character path.
+            guard byte < 0x80, byte != 0x0D, byte != 0x5D,
+                  byte >= 0x20 || byte == 0x09 || byte == 0x0A
+            else {
+                if index == byteIndex { return nil }
+                break
+            }
+            if byte == 0x0A {
+                newlines += 1
+                lastLineStart = index
+            } else if byte == 0x26 {
+                sawAmpersand = true
+            }
+            index += 1
         }
-        while let last = slice.last, last.isXMLWhitespace {
-            slice = slice.dropLast()
+        guard index > byteIndex else { return nil }
+        let run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: index - byteIndex), as: UTF8.self)
+        offset += index - byteIndex
+        if newlines > 0 {
+            line += newlines
+            column = index - lastLineStart
+        } else {
+            column += index - byteIndex
         }
-        return String(slice)
-    }
-}
-
-extension Character {
-    private typealias XML = PureXML.Parsing.XMLCharacter
-
-    /// XML S production: space, tab, carriage return, line feed.
-    var isXMLWhitespace: Bool {
-        unicodeScalars.count == 1 && unicodeScalars.first.map(XML.isWhitespace) == true
+        byteIndex = index
+        return run
     }
 
-    /// Whether this character may start an XML name. A grapheme qualifies when its
-    /// first scalar is a NameStartChar and any trailing scalars (combining marks)
-    /// are NameChar.
-    var isXMLNameStart: Bool {
-        guard let first = unicodeScalars.first, XML.isNameStart(first) else { return false }
-        return unicodeScalars.dropFirst().allSatisfy(XML.isNameChar)
-    }
-
-    /// Whether this character may continue an XML name (every scalar a NameChar).
-    var isXMLNameContinuation: Bool {
-        !unicodeScalars.isEmpty && unicodeScalars.allSatisfy(XML.isNameChar)
+    /// Bulk-scans an attribute value in byte mode: consumes and returns the
+    /// longest upcoming run of plain ASCII value bytes, stopping at the
+    /// closing `quote`, a raw '<', a carriage return (2.11 folding then
+    /// 3.3.3 normalization must run on the Character path), a control
+    /// character, or a non-ASCII byte. Tab and line feed inside the run
+    /// normalize to a single space per 3.3.3; '&' stays raw for later
+    /// reference decoding. Returns nil when the fast path does not apply or
+    /// the run would be empty, so callers alternate with the slow loop.
+    mutating func attributeRunBytes(quote: UInt8) -> String? {
+        guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
+        let pointer = storage.pointer
+        let count = storage.count
+        var index = byteIndex
+        var newlines = 0
+        var lastLineStart = -1
+        var needsTransform = false
+        while index < count {
+            let byte = pointer[index]
+            if byte == quote || byte == 0x3C || byte == 0x0D || byte >= 0x80 { break }
+            if byte < 0x20 {
+                if byte == 0x09 || byte == 0x0A {
+                    needsTransform = true
+                    if byte == 0x0A {
+                        newlines += 1
+                        lastLineStart = index
+                    }
+                } else {
+                    break
+                }
+            }
+            index += 1
+        }
+        guard index > byteIndex else { return nil }
+        let length = index - byteIndex
+        let run: String
+        if needsTransform {
+            var bytes = [UInt8](repeating: 0, count: length)
+            for position in 0 ..< length {
+                let byte = pointer[byteIndex + position]
+                bytes[position] = (byte == 0x09 || byte == 0x0A) ? 0x20 : byte
+            }
+            run = String(decoding: bytes, as: UTF8.self)
+        } else {
+            run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: length), as: UTF8.self)
+        }
+        offset += length
+        if newlines > 0 {
+            line += newlines
+            column = index - lastLineStart
+        } else {
+            column += length
+        }
+        byteIndex = index
+        return run
     }
 }
