@@ -221,11 +221,18 @@ extension PureXML.XSLT {
             XSLTNode.children(node, named: "with-param").map(binding)
         }
 
-        /// The XSLT default-priority rules for a match pattern.
+        /// The XSLT default-priority rules for a match pattern. The priority of a
+        /// single-step pattern is set by its node test, regardless of an explicit
+        /// `child::` or `attribute::` axis (XSLT 1.0 5.5), so the axis is stripped
+        /// before the node test is classified (`attribute::node()` is -0.5, like
+        /// `node()`, not 0).
         static func defaultPriority(_ pattern: String) -> Double {
             if pattern.contains("/") || pattern.contains("[") { return 0.5 }
-            if ["*", "@*", "node()", "text()", "comment()"].contains(pattern) { return -0.5 }
-            if pattern.hasSuffix(":*") { return -0.25 }
+            let test = pattern.hasPrefix("attribute::") ? String(pattern.dropFirst(11))
+                : pattern.hasPrefix("child::") ? String(pattern.dropFirst(7))
+                : pattern
+            if ["*", "@*", "node()", "text()", "comment()", "processing-instruction()"].contains(test) { return -0.5 }
+            if test.hasSuffix(":*") { return -0.25 }
             return 0
         }
 
