@@ -39,6 +39,7 @@ extension PureXML.XSLT {
             parameters: [String: String] = [:],
             stylesheetDocument: PureXML.Model.Node? = nil,
             unparsedEntityURIs: [String: String] = [:],
+            baseURI: String = "",
         ) {
             self.parameters = parameters
             self.stylesheet = stylesheet
@@ -49,6 +50,7 @@ extension PureXML.XSLT {
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
+            documentCache.registerSelfDocument(stylesheetDocument, at: baseURI)
             // One table for all pattern matching: matches() runs per (template,
             // node), so a fresh table per call would allocate millions of times.
             let caches = keyIndexes
@@ -221,11 +223,9 @@ extension PureXML.XSLT {
         }
 
         func string(_ expression: String, _ context: XSLTContext) -> String {
-            // Raw-output markers do not survive string extraction (16.4:
-            // escaping is disabled only for text written directly to the
-            // result tree), so a fragment round-trip re-enables escaping.
-            // Gated so source text in a stylesheet without
-            // disable-output-escaping passes through untouched.
+            // Raw-output markers do not survive string extraction (16.4: escaping is disabled only for text written
+            // directly to the result tree), so a fragment round-trip re-enables escaping. Gated so source text in a
+            // stylesheet without disable-output-escaping passes through untouched.
             let extracted = value(expression, context)?.string ?? ""
             return stylesheet.usesRawText ? PureXML.XSLT.RawText.stripped(extracted) : extracted
         }

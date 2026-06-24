@@ -21,6 +21,7 @@ extension PureXML.XSLT.Transformer {
                 variables: context.variables,
             )
             keyContext.namespaces = context.namespaces
+            keyContext.baseURI = context.baseURI
             return SortEntry(offset: offset, node: xnode, keys: sorts.map { string($0.select, keyContext) })
         }
         // A lang attribute value template evaluates once per sort, in the
@@ -96,13 +97,14 @@ extension PureXML.XSLT.Transformer {
         var items: [ResultItem] = []
         for (offset, xnode) in nodes.enumerated() {
             guard let owner = Self.ownerNode(xnode) else { continue }
-            let itemContext = XSLTContext(
+            var itemContext = XSLTContext(
                 node: owner,
                 current: xnode.treeNode == nil ? xnode : nil,
                 position: offset + 1,
                 size: nodes.count,
                 variables: context.variables,
             )
+            itemContext.baseURI = context.baseURI
             items += instantiate(body, itemContext)
         }
         return items

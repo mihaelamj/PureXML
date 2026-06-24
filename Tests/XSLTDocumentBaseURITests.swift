@@ -83,4 +83,53 @@ struct XSLTDocumentBaseURITests {
         // base provenance it would resolve against the top stylesheet and miss.
         #expect(out == "<out>INCLUDED</out>")
     }
+
+    /// The base URI must reach a `document()` call inside an `xsl:for-each` body,
+    /// which runs in a context derived from (not equal to) the enclosing
+    /// template's, when that template comes from an included file.
+    @Test("document() inside a for-each body in an included file keeps the file's base")
+    func test_forEachBodyBase() throws {
+        let files = [
+            "lib/inc.xsl": """
+            <xsl:stylesheet version="1.0" \(xsl)>
+              <xsl:template name="emit">
+                <xsl:for-each select="/doc/item"><xsl:value-of select="document('data.xml')/d/v"/></xsl:for-each>
+              </xsl:template>
+            </xsl:stylesheet>
+            """,
+            "lib/data.xml": "<d><v>INCLUDED</v></d>",
+        ]
+        let out = try PureXML.XSLT.transform(
+            stylesheet: """
+            <xsl:stylesheet version="1.0" \(xsl)>
+              <xsl:output omit-xml-declaration="yes"/>
+              <xsl:include href="lib/inc.xsl"/>
+              <xsl:template match="/"><out><xsl:call-template name="emit"/></out></xsl:template>
+            </xsl:stylesheet>
+            """,
+            source: "<doc><item/></doc>",
+            documentLoader: { files[$0] },
+        )
+        #expect(out == "<out>INCLUDED</out>")
+    }
+
+    /// `document('')` in the top stylesheet is the stylesheet's own document and
+    /// must not start depending on the loader to serve the stylesheet's URL once
+    /// a non-empty base URI is supplied (a regression the base threading could
+    /// introduce, since the empty reference resolves to that base).
+    @Test("document('') uses the self document even with a non-empty base URI")
+    func test_emptyReferenceWithBaseURI() throws {
+        let out = try PureXML.XSLT.transform(
+            stylesheet: """
+            <xsl:stylesheet version="1.0" \(xsl)>
+              <xsl:output omit-xml-declaration="yes"/>
+              <xsl:template match="/"><out><xsl:value-of select="count(document('')/xsl:stylesheet)"/></out></xsl:template>
+            </xsl:stylesheet>
+            """,
+            source: "<doc/>",
+            documentLoader: { _ in nil },
+            baseURI: "http://example.org/style.xsl",
+        )
+        #expect(out == "<out>1</out>")
+    }
 }
