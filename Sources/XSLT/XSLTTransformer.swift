@@ -39,6 +39,7 @@ extension PureXML.XSLT {
             parameters: [String: String] = [:],
             stylesheetDocument: PureXML.Model.Node? = nil,
             unparsedEntityURIs: [String: String] = [:],
+            baseURI: String = "",
         ) {
             self.parameters = parameters
             self.stylesheet = stylesheet
@@ -49,6 +50,7 @@ extension PureXML.XSLT {
             if !idAttributes.isEmpty {
                 documentCache.idAttributes[ObjectIdentifier(root)] = idAttributes
             }
+            documentCache.registerSelfDocument(stylesheetDocument, at: baseURI)
             // One table for all pattern matching: matches() runs per (template,
             // node), so a fresh table per call would allocate millions of times.
             let caches = keyIndexes
@@ -172,9 +174,8 @@ extension PureXML.XSLT {
 
         func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
             if let select { return value(select, context) ?? .string("") }
-            // XSLT 1.0 11.2: a variable with no select and EMPTY content is the
-            // empty string (equivalent to select=""), not a result tree fragment,
-            // so boolean() of it is false. Only non-empty content is an RTF.
+            // XSLT 1.0 11.2: a variable with no select and empty content is the
+            // empty string, not an RTF (so boolean() is false); only content is.
             if body.isEmpty { return .string("") }
             // A body variable is a result-tree fragment: a queryable document node.
             let children = instantiate(body, context).compactMap(Self.nodeOf).map(PureXML.Model.TreeNode.init)
@@ -196,6 +197,7 @@ extension PureXML.XSLT {
                     documents: documentCache,
                     selfDocument: stylesheetDocument,
                     unparsedEntities: unparsedEntityURIs,
+                    baseURI: context.baseURI,
                 ),
                 namespaces: context.namespaces,
             )
@@ -221,11 +223,9 @@ extension PureXML.XSLT {
         }
 
         func string(_ expression: String, _ context: XSLTContext) -> String {
-            // Raw-output markers do not survive string extraction (16.4:
-            // escaping is disabled only for text written directly to the
-            // result tree), so a fragment round-trip re-enables escaping.
-            // Gated so source text in a stylesheet without
-            // disable-output-escaping passes through untouched.
+            // Raw-output markers do not survive string extraction (16.4: escaping is disabled only for text written
+            // directly to the result tree), so a fragment round-trip re-enables escaping. Gated so source text in a
+            // stylesheet without disable-output-escaping passes through untouched.
             let extracted = value(expression, context)?.string ?? ""
             return stylesheet.usesRawText ? PureXML.XSLT.RawText.stripped(extracted) : extracted
         }

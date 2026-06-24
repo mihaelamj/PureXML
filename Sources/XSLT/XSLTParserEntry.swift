@@ -1,7 +1,7 @@
 /// The accumulating halves of a stylesheet under compilation.
 struct Parts {
     var templates: [PureXML.XSLT.Template] = []
-    var globals: [PureXML.XSLT.Instruction] = []
+    var globals: [PureXML.XSLT.GlobalDeclaration] = []
     var keys: [PureXML.XSLT.Key] = []
     var output = PureXML.XSLT.Output()
     var stripSpace: Set<String> = []
@@ -16,8 +16,8 @@ struct Parts {
         // precedence order (earlier imports lower, the unit's own
         // declarations appended last), so the last same-name entry wins.
         var seen = Set<String>()
-        let resolvedGlobals: [PureXML.XSLT.Instruction] = globals.reversed().filter { instruction in
-            guard let name = Self.globalName(instruction) else { return true }
+        let resolvedGlobals: [PureXML.XSLT.GlobalDeclaration] = globals.reversed().filter { declaration in
+            guard let name = Self.globalName(declaration.instruction) else { return true }
             return seen.insert(name).inserted
         }.reversed()
         var sheet = PureXML.XSLT.Stylesheet(

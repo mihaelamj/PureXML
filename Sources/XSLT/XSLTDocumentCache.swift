@@ -42,6 +42,16 @@ extension PureXML.XSLT {
         /// 12.1); a root absent here is the source document, whose base the loader
         /// already applies, so it resolves against the empty string.
         var baseURIs: [ObjectIdentifier: String] = [:]
+
+        /// Registers the top stylesheet's parsed document under its base URI, so a
+        /// `document('')` from the top stylesheet (whose empty reference resolves
+        /// to that base) reaches it without the loader; `document('')` in an
+        /// included file, a different base, still loads that file (XSLT 1.0 12.1).
+        func registerSelfDocument(_ document: PureXML.Model.Node?, at baseURI: String) {
+            guard !baseURI.isEmpty, let document else { return }
+            trees[baseURI] = PureXML.Model.TreeNode(document)
+            sources[baseURI] = document
+        }
     }
 
     /// The ID-typed attributes a document type declares, element name to

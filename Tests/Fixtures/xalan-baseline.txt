@@ -17,8 +17,6 @@ idkey/idkey48
 impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
-mdocs/mdocs12
-mdocs/mdocs13
 mdocs/mdocs15
 mdocs/mdocs19
 namedtemplate/namedtemplate12

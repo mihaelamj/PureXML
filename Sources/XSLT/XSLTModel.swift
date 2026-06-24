@@ -242,6 +242,19 @@ public extension PureXML.XSLT {
         /// The stylesheet xmlns bindings in scope at the template, for
         /// resolving prefixes in its match pattern and expressions.
         public var namespaces: [String: String] = [:]
+        /// The base URI of the stylesheet element this template was parsed from
+        /// (the including/imported file's URI), against which a relative
+        /// `document()` reference in its body resolves (XSLT 1.0 12.1).
+        public var baseURI: String = ""
+    }
+
+    /// A top-level variable or parameter paired with the base URI of the
+    /// stylesheet element it was parsed from, so a relative `document()`
+    /// reference in its select expression resolves against the right file
+    /// (XSLT 1.0 12.1) even after an include or import is folded in.
+    struct GlobalDeclaration: Sendable {
+        public var instruction: Instruction
+        public var baseURI: String
     }
 
     /// A compiled stylesheet: its template rules, global variables, keys, output
@@ -249,7 +262,7 @@ public extension PureXML.XSLT {
     /// `xsl:include`/`xsl:import` already folded in).
     struct Stylesheet: Sendable {
         public var templates: [Template]
-        public var globals: [Instruction]
+        public var globals: [GlobalDeclaration]
         public var keys: [Key]
         public var output: Output
         /// Element name tests whose whitespace-only text children are stripped from
@@ -276,7 +289,7 @@ public extension PureXML.XSLT {
 
         public init(
             templates: [Template],
-            globals: [Instruction],
+            globals: [GlobalDeclaration],
             keys: [Key],
             output: Output,
             stripSpace: Set<String> = [],
