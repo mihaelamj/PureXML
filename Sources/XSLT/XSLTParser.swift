@@ -243,10 +243,12 @@ extension PureXML.XSLT {
             // model, so a whitespace-only run is dropped (XSLT 1.0 3.4) only when
             // the WHOLE coalesced run is whitespace: " <![CDATA[x]]> " keeps its
             // spaces because the run "x" surrounds them with non-whitespace.
+            // `xml:space="preserve"` in scope keeps a whitespace-only run too.
+            let preserve = preservesWhitespace(node)
             var result: [Instruction] = []
             var run = ""
             func flush() {
-                if !run.isEmpty, !run.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isWhitespace) { result.append(.literalText(run)) }
+                if !run.isEmpty, preserve || run.unicodeScalars.contains(where: { !PureXML.Parsing.XMLCharacter.isWhitespace($0) }) { result.append(.literalText(run)) }
                 run = ""
             }
             for child in node.children {

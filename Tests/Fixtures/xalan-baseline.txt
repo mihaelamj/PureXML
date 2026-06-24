@@ -34,4 +34,3 @@ sort/sort27
 sort/sort32
 sort/sort33
 sort/sort34
-whitespace/whitespace20
