@@ -118,4 +118,16 @@ struct ParserPathDifferentialTests {
         expectAgreement("whitespace-only content", "<a>   </a>")
         expectAgreement("tabs then element", "<a>\t\t<b/></a>")
     }
+
+    @Test("Attribute-value ampersand handling agrees on both paths")
+    func test_attributeAmpersands() {
+        // The byte path skips reference decoding when no '&' is seen; the runs
+        // and the Character fallback must still agree on the decoded value.
+        expectAgreement("ampersand-free attr", #"<a v="just plain value"/>"#)
+        expectAgreement("entity in attr", #"<a v="x &lt; y &amp; z"/>"#)
+        expectAgreement("char ref in attr", #"<a v="x&#10;y"/>"#)
+        expectAgreement("ampersand-free with whitespace", "<a v=\"x\ty\nz\"/>")
+        expectAgreement("entity after whitespace run", "<a v=\"a b c &amp; d\"/>")
+        expectAgreement("undefined entity in attr", #"<a v="&bogus;"/>"#)
+    }
 }

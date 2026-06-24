@@ -12,7 +12,11 @@ extension PureXML.Parsing {
     /// `String`.
     struct Reader {
         private var pull: () -> Character?
-        private var buffer: [Character] = []
+        // `private(set)`/`let` rather than `private` so the bulk byte-run
+        // scanners (the same-module extension in ReaderByteRuns.swift) can READ
+        // the cursor state; all writes stay file-private, routed through
+        // `advanceByteRun` so position mutation is encapsulated here.
+        private(set) var buffer: [Character] = []
         private var exhausted = false
         private(set) var offset = 0
         private(set) var line = 1
@@ -23,13 +27,29 @@ extension PureXML.Parsing {
         var xml11 = false
         /// A raw character read past a carriage return that was not part of the
         /// line ending, held back to be returned next.
-        private var pendingRaw: Character?
+        private(set) var pendingRaw: Character?
         /// The contiguous fast path: when the input is a String, its UTF-8
         /// bytes are copied once into owned storage and scalars decode
         /// straight off the pointer, bypassing the per-character closure
         /// chain entirely.
-        private let storage: ByteStorage?
-        private var byteIndex = 0
+        let storage: ByteStorage?
+        private(set) var byteIndex = 0
+
+        /// Commits a bulk byte run scanned by the byte-runs extension: moves the
+        /// cursor to `end` and applies the run's position deltas in one place, so
+        /// the run scanners need no write access to the position fields. A run
+        /// with `newlines` line feeds ends `end - lastLineStart` columns into its
+        /// final line; otherwise the column advances by the run length.
+        mutating func advanceByteRun(to end: Int, length: Int, newlines: Int, lastLineStart: Int) {
+            byteIndex = end
+            offset += length
+            if newlines > 0 {
+                line += newlines
+                column = end - lastLineStart
+            } else {
+                column += length
+            }
+        }
 
         init(pulling pull: @escaping () -> Character?) {
             storage = nil
@@ -282,119 +302,5 @@ extension PureXML.Parsing {
         mutating func inject(_ text: String) {
             buffer.insert(contentsOf: text.unicodeScalars.map(Character.init), at: 0)
         }
-    }
-}
-
-/// The bulk byte-run scanners, in an extension so the reader's primary type
-/// body stays under the length cap. They consume plain ASCII runs of content
-/// or attribute-value text directly from the owned storage (the common case in
-/// any real document) and hand subtle bytes back to the Character path. Both
-/// stay on the byte fast path only when the lookahead buffer is empty.
-extension PureXML.Parsing.Reader {
-    /// Bulk-scans character data in byte mode: consumes and returns the
-    /// longest upcoming run of plain ASCII content bytes (no '<', no
-    /// carriage return, no "]]" pair, every byte a valid XML character),
-    /// or nil when the fast path does not apply. Anything subtle, an
-    /// entity boundary aside ('&' is plain content here), is left for
-    /// the character path so error marks stay exact. Returns nil rather
-    /// than an empty run so callers can alternate with the slow loop.
-    mutating func contentRunBytes(sawAmpersand: inout Bool) -> String? {
-        guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
-        let pointer = storage.pointer
-        let count = storage.count
-        // A run never contains ']', so "]]>" can only straddle the
-        // boundary where the slow path consumed "]]" and the run would
-        // begin with '>': leave a leading '>' to the slow path and its
-        // cdataCloseInContent check (W3C ibm14n01).
-        if byteIndex < count, pointer[byteIndex] == 0x3E { return nil }
-        var index = byteIndex
-        var newlines = 0
-        var lastLineStart = -1
-        while index < count {
-            let byte = pointer[index]
-            if byte == 0x3C { break } // '<'
-            // Valid plain ASCII content only; CR, ']' and non-ASCII go
-            // to the character path.
-            guard byte < 0x80, byte != 0x0D, byte != 0x5D,
-                  byte >= 0x20 || byte == 0x09 || byte == 0x0A
-            else {
-                if index == byteIndex { return nil }
-                break
-            }
-            if byte == 0x0A {
-                newlines += 1
-                lastLineStart = index
-            } else if byte == 0x26 {
-                sawAmpersand = true
-            }
-            index += 1
-        }
-        guard index > byteIndex else { return nil }
-        let run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: index - byteIndex), as: UTF8.self)
-        offset += index - byteIndex
-        if newlines > 0 {
-            line += newlines
-            column = index - lastLineStart
-        } else {
-            column += index - byteIndex
-        }
-        byteIndex = index
-        return run
-    }
-
-    /// Bulk-scans an attribute value in byte mode: consumes and returns the
-    /// longest upcoming run of plain ASCII value bytes, stopping at the
-    /// closing `quote`, a raw '<', a carriage return (2.11 folding then
-    /// 3.3.3 normalization must run on the Character path), a control
-    /// character, or a non-ASCII byte. Tab and line feed inside the run
-    /// normalize to a single space per 3.3.3; '&' stays raw for later
-    /// reference decoding. Returns nil when the fast path does not apply or
-    /// the run would be empty, so callers alternate with the slow loop.
-    mutating func attributeRunBytes(quote: UInt8) -> String? {
-        guard buffer.isEmpty, pendingRaw == nil, let storage else { return nil }
-        let pointer = storage.pointer
-        let count = storage.count
-        var index = byteIndex
-        var newlines = 0
-        var lastLineStart = -1
-        var needsTransform = false
-        while index < count {
-            let byte = pointer[index]
-            if byte == quote || byte == 0x3C || byte == 0x0D || byte >= 0x80 { break }
-            if byte < 0x20 {
-                if byte == 0x09 || byte == 0x0A {
-                    needsTransform = true
-                    if byte == 0x0A {
-                        newlines += 1
-                        lastLineStart = index
-                    }
-                } else {
-                    break
-                }
-            }
-            index += 1
-        }
-        guard index > byteIndex else { return nil }
-        let length = index - byteIndex
-        let run: String
-        if needsTransform {
-            var bytes = [UInt8](repeating: 0, count: length)
-            for position in 0 ..< length {
-                let byte = pointer[byteIndex + position]
-                bytes[position] = (byte == 0x09 || byte == 0x0A) ? 0x20 : byte
-            }
-            run = String(decoding: bytes, as: UTF8.self)
-        } else {
-            run = String(decoding: UnsafeBufferPointer(start: pointer + byteIndex, count: length), as: UTF8.self)
-        }
-        offset += length
-        if newlines > 0 {
-            line += newlines
-            column = index - lastLineStart
-        } else {
-            column += length
-        }
-        byteIndex = index
-        return run
     }
 }
