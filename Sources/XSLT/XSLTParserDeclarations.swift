@@ -48,6 +48,17 @@ extension PureXML.XSLT.XSLTParser {
         XSLTNode.attribute(node, "mode").map { expandedQName($0, at: node) }
     }
 
+    /// A strip-space/preserve-space NameTest resolved to namespace form: `*` and
+    /// an unprefixed name (the null namespace) stay as is, `prefix:*` becomes
+    /// `{uri}*`, and `prefix:local` becomes `{uri}local` (XSLT 1.0 3.4).
+    static func expandedSpecifier(_ token: String, at node: XSLTTree) -> String {
+        guard let colon = token.firstIndex(of: ":") else { return token }
+        let prefix = String(token[..<colon])
+        let local = String(token[token.index(after: colon)...])
+        guard let uri = resolvePrefix(prefix, at: node) else { return token }
+        return "{\(uri)}\(local)"
+    }
+
     /// A variable or parameter `name` as an expanded name `{uri}local` when it
     /// carries a prefix, or the bare name when unprefixed. A variable is named by
     /// expanded QName (XSLT 1.0 11.1), so two prefixes bound to one namespace name

@@ -139,9 +139,12 @@ extension PureXML.XSLT {
         }
 
         /// The whitespace-separated element name tests of an `xsl:strip-space` or
-        /// `xsl:preserve-space` element's `elements` attribute.
+        /// `xsl:preserve-space` element's `elements` attribute, each resolved to
+        /// namespace form so matching is by namespace, not prefix.
         private static func elementNames(_ node: XSLTTree) -> Set<String> {
-            Set((XSLTNode.attribute(node, "elements") ?? "").split(whereSeparator: \.isWhitespace).map(String.init))
+            Set((XSLTNode.attribute(node, "elements") ?? "").split(whereSeparator: \.isWhitespace).map {
+                expandedSpecifier(String($0), at: node)
+            })
         }
 
         /// Loads an include/import target's stylesheet element: the href

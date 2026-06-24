@@ -28,14 +28,20 @@ extension PureXML.XSLT {
             }
         }
 
-        /// Whether an element with this name has its whitespace stripped: a name
-        /// test wins over `*`, and `preserve-space` beats `strip-space` on a tie.
+        /// Whether an element has its whitespace stripped. Specifiers are matched
+        /// by namespace in order of specificity (an expanded `{uri}local` name
+        /// over a namespace wildcard `{uri}*` over `*`), and `preserve-space`
+        /// beats `strip-space` on a tie (XSLT 1.0 3.4).
         private static func shouldStrip(_ node: PureXML.Model.TreeNode, _ stripSet: Set<String>, _ preserveSet: Set<String>) -> Bool {
-            let names = [node.name?.localName, node.name?.description].compactMap(\.self)
-            if names.contains(where: preserveSet.contains) { return false }
-            if names.contains(where: stripSet.contains) { return true }
-            if preserveSet.contains("*") { return false }
-            return stripSet.contains("*")
+            let uri = node.name?.namespaceURI ?? ""
+            let local = node.name?.localName ?? ""
+            let expanded = uri.isEmpty ? local : "{\(uri)}\(local)"
+            let namespaceWildcard = uri.isEmpty ? nil : "{\(uri)}*"
+            for test in [expanded, namespaceWildcard, "*"].compactMap(\.self) {
+                if preserveSet.contains(test) { return false }
+                if stripSet.contains(test) { return true }
+            }
+            return false
         }
 
         private static func xmlSpace(_ node: PureXML.Model.TreeNode) -> String? {

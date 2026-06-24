@@ -64,4 +64,21 @@ struct XSLTWhitespaceTests {
         let source = "<a xml:space=\"preserve\">\n  <b/>\n</a>"
         #expect(try transform(style, source).contains("\n  "))
     }
+
+    @Test("strip-space matches a namespace wildcard by namespace, not prefix")
+    func test_namespaceWildcard() throws {
+        // strip-space `p:*` strips elements in p's namespace. The source binds the
+        // same namespace to a different prefix (q), which must still match, while
+        // an element in another namespace is preserved (Apache Xalan whitespace06,
+        // whitespace07).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl) xmlns:p="urn:n1" xmlns:s="urn:n2" exclude-result-prefixes="p s">
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:strip-space elements="p:*"/>
+          <xsl:template match="/"><out><xsl:value-of select="string-length(doc/p:a)"/>,<xsl:value-of select="string-length(doc/s:b)"/></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<doc xmlns:q=\"urn:n1\" xmlns:r=\"urn:n2\"><q:a>  </q:a><r:b>  </r:b></doc>"
+        #expect(try transform(style, source) == "<out>0,2</out>")
+    }
 }
