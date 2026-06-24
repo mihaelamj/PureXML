@@ -186,7 +186,12 @@ public extension PureXML.XSLT {
     /// The `<!DOCTYPE …>` prologue for the result's root element when the output
     /// declares `doctype-system` (optionally with `doctype-public`), else empty.
     private static func doctype(for result: PureXML.Model.Node, _ output: Output, method: String) -> String {
-        guard let name = rootName(of: result) else { return "" }
+        // A doctype precedes the first element, so emit none without one. The
+        // html output method then names it HTML (16.2: "The name following
+        // <!DOCTYPE should be HTML or html"); the xml method uses the document
+        // element name (16.1).
+        guard let elementName = rootName(of: result) else { return "" }
+        let name = method == "html" ? "HTML" : elementName
         if let system = output.doctypeSystem {
             let external = output.doctypePublic.map { "PUBLIC \"\($0)\" \"\(system)\"" } ?? "SYSTEM \"\(system)\""
             return "<!DOCTYPE \(name) \(external)>\n"
