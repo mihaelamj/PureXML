@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `disable-output-escaping` is now ignored when an `xsl:text` or `xsl:value-of` produces the string value of an attribute, comment, or processing-instruction node (XSLT 1.0 16.4: disabling escaping for a value used as something other than a text node is an error, with the recovery being to ignore it). The attribute value built from such content kept its raw-output markers, so the serializer left `<` and `>` unescaped in the attribute; the markers are now stripped for these three node kinds (only when the stylesheet uses the feature, so a private-use character in ordinary data is untouched). Closes Apache Xalan conformance case `output75`.
+
 - The `html` output method now percent-escapes non-ASCII and control characters in URI-valued attributes (XSLT 1.0 16.2, HTML 4.01 appendix B.2.1). For the HTML 4 attributes of type %URI (`href`, `src`, `cite`, `action`, and the rest), each non-ASCII or control/space character in the value is written as the uppercase hex of its UTF-8 bytes (so `cite="bë.xml"` becomes `cite="b%C3%AB.xml"`), while `"` and `&` keep their entity form; other attributes are unaffected. Closes Apache Xalan conformance case `output32`.
 
 - Serializing a processing instruction whose data contains `?>` now inserts a space (`? >`) so the instruction is not terminated early (XSLT 1.0 7.3: a processor recovers from a generated `?>` by inserting a space after the `?`). The serializer emitted the `?>` raw, producing a malformed instruction. Closes Apache Xalan conformance case `output72`.

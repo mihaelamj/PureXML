@@ -37,6 +37,23 @@ struct XSLTOutputMethodTests {
         #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<out>a &lt;b&gt; c</out>")
     }
 
+    @Test("disable-output-escaping is ignored for an attribute value (16.4)")
+    func test_disableOutputEscapingIgnoredOffTextNode() throws {
+        // 16.4: disabling escaping for a value used as an attribute (not a text
+        // node) is an error; the recovery ignores it, so the attribute escapes
+        // `<`/`>` while a sibling text node keeps it raw (Apache Xalan output75).
+        let body = "<e><xsl:attribute name=\"a\">"
+            + "<xsl:text disable-output-escaping=\"yes\">&lt;x&gt;</xsl:text></xsl:attribute>"
+            + "<xsl:text disable-output-escaping=\"yes\">&lt;t&gt;</xsl:text></e>"
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/">\(body)</xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<x/>") == "<e a=\"&lt;x&gt;\"><t></e>")
+    }
+
     @Test("Source text holding the private-use marker characters is untouched")
     func test_markerCharactersInSource() throws {
         let style = """
