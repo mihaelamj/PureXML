@@ -3,8 +3,6 @@
 # must leave this list and a regression shows up as a new failure.
 attribset/attribset44
 axes/axes116
-conflictres/conflictres29
-conflictres/conflictres30
 extend/extend01
 extend/extend02
 extend/extend04
