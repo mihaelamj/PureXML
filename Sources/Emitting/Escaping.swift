@@ -64,5 +64,19 @@ extension PureXML.Emitting {
             if previousHyphen { result.append(" ") }
             return result
         }
+
+        /// Makes `data` safe inside a processing instruction: PI data may not
+        /// contain `?>`, so a space is inserted between an offending `?` and `>`
+        /// (the XSLT 1.0 7.3 recovery, so `a?>b` becomes `a? >b`).
+        static func processingInstruction(_ data: String) -> String {
+            var result = ""
+            var previousQuestion = false
+            for character in data {
+                if character == ">", previousQuestion { result.append(" ") }
+                result.append(character)
+                previousQuestion = character == "?"
+            }
+            return result
+        }
     }
 }

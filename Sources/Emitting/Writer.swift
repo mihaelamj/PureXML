@@ -109,7 +109,7 @@ public extension PureXML.Emitting {
             if options.prettyPrint, !open.isEmpty {
                 output += options.lineEnding + pad(open.count)
             }
-            output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(data)?>"
+            output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(Escaping.processingInstruction(data))?>"
             markParentHasElements()
         }
 
