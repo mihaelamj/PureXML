@@ -59,6 +59,7 @@ offsets throughout; libxml2's xmlReadMemory takes an int byte count).
 | 5 | `sawAmpersand` short-circuit (ampersand-free text returns verbatim, skipping the reference-decode/split/findings pass) and detecting the text-run-closing `<` via `peekByte` instead of buffering it (the buffered `<` had cascaded the next element's whole dispatch and name scan onto the Character path) | 0.157 s (9.5x) | unchanged | unchanged |
 | 6 | byte-level markup dispatch (the single byte after `<` selects end-tag/PI/declaration/start-tag, replacing up to five literal string comparisons per element with one byte peek) | 0.147 s (9.0x) | unchanged | unchanged |
 | 7 | `sawAmpersand` short-circuit for attribute values (the byte scanner notes any `&`; an ampersand-free value skips the reference-decode pass and its full re-scan); measured against same-state baseline, every run below every baseline run | 0.143 s (~4% vs baseline) | unchanged | unchanged |
+| 8 | serialize escaping fast path (text/attribute/comment/PI return the value unchanged when no character needs escaping, instead of rebuilding it character by character; byte-level scan for the escapable bytes) | unchanged | unchanged | 0.032 s (2.7x, from 5.5x) |
 
 ## Profile findings (first sample, parse path)
 
