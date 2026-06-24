@@ -58,7 +58,11 @@ public extension PureXML.XPath {
         static func format(_ value: Double) -> String {
             if value.isNaN { return "NaN" }
             if value.isInfinite { return value < 0 ? "-Infinity" : "Infinity" }
-            if value == value.rounded(), abs(value) < 1e15 {
+            // An integer-valued double prints with no decimal point. The bound is
+            // 2^63 so the Int64 conversion cannot trap; exact integers run to 2^53
+            // and the representable ones above it are still whole, and a magnitude
+            // beyond 2^63 falls to the exponent expansion below.
+            if value == value.rounded(), abs(value) < 0x1p63 {
                 return String(Int64(value))
             }
             return expandExponent(String(value))

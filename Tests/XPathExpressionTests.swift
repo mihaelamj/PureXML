@@ -58,6 +58,15 @@ struct XPathExpressionTests {
         #expect(try string("0 div 0") == "NaN")
     }
 
+    @Test("a large integer-valued number prints with no decimal point")
+    func test_largeIntegerFormatting() throws {
+        // XPath 4.2: an integer-valued number has no decimal point, including a
+        // large integer still exact in a double (Apache Xalan string132).
+        #expect(try string("1234567890123456") == "1234567890123456")
+        #expect(try string("-1234567890123456") == "-1234567890123456")
+        #expect(try string("123456789012345 * 10") == "1234567890123450")
+    }
+
     @Test("Booleans coerce to strings and numbers")
     func test_booleanCoercion() throws {
         #expect(try string("1 = 1") == "true")
