@@ -47,6 +47,19 @@ struct XSLTDoctypeOutputTests {
         #expect(try transform(style, "<x/>") == "<!DOCTYPE note SYSTEM \"note.dtd\">\n<note/>")
     }
 
+    @Test("the html method emits no doctype when the result has no element")
+    func test_htmlNoElementNoDoctype() throws {
+        // A doctype precedes the first element (16.2); a text-only result has
+        // none, so even the html method with doctype-public emits nothing.
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="html" doctype-public="-//W3C//DTD HTML 4.01//EN"/>
+          <xsl:template match="/">just text</xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(style, "<x/>") == "just text")
+    }
+
     @Test("Without doctype-system no doctype is emitted")
     func test_none() throws {
         let style = """
