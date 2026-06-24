@@ -111,10 +111,13 @@ extension PureXML.XPath.Compiler {
             if consume("/") {
                 steps.append(Self.descendantOrSelfStep())
                 try steps.append(parseStep())
-            } else if isAtEnd {
-                return (true, [])
-            } else {
+            } else if startsStep() {
                 try steps.append(parseStep())
+            } else {
+                // The relative part after `/` is optional, so a lone `/` is the
+                // root node even when a `)`, `]`, `|`, or an operator follows it
+                // rather than the end of the expression (e.g. `count(/)`).
+                return (true, [])
             }
         } else {
             try steps.append(parseStep())
@@ -133,6 +136,15 @@ extension PureXML.XPath.Compiler {
             }
             try steps.append(parseStep())
         }
+    }
+
+    /// Whether the next token begins a location step (an axis, `@`, `.`/`..`, a
+    /// `*` wildcard, or a name/node-test), as opposed to ending the path (`)`,
+    /// `]`, `|`, an operator, or the end). Used to recognize a lone `/` as root.
+    private mutating func startsStep() -> Bool {
+        skipSpace()
+        guard let character = peek() else { return false }
+        return character.isLetter || character == "_" || character == "@" || character == "." || character == "*"
     }
 
     private mutating func parseStep() throws -> Step {
