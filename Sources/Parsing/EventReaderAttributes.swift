@@ -58,11 +58,15 @@ extension PureXML.Parsing.EventReader {
         let quoteByte: UInt8 = quote == "\"" ? 0x22 : 0x27
         var raw = ""
         var length = 0
+        // Whether any '&' was seen: without one the value has no references, so
+        // the decode pass (and its full re-scan for '&') is skipped. The
+        // scanners visit every byte already, so this costs nothing extra.
+        var sawAmpersand = false
         while true {
             // Bulk byte runs first: plain ASCII value text (the common case)
             // skips the per-character machinery; the run stops before the
             // quote, '<', CR, or any byte the Character path must inspect.
-            if let run = reader.attributeRunBytes(quote: quoteByte) {
+            if let run = reader.attributeRunBytes(quote: quoteByte, sawAmpersand: &sawAmpersand) {
                 length += run.utf8.count
                 try checkContent(length, mark)
                 raw += run
@@ -77,6 +81,7 @@ extension PureXML.Parsing.EventReader {
             guard character.unicodeScalars.allSatisfy(PureXML.Parsing.XMLCharacter.isChar) else {
                 throw PureXML.Parsing.ParseError.invalidCharacter(reader.mark)
             }
+            if character == "&" { sawAmpersand = true }
             // 3.3.3: a literal whitespace character in an attribute value
             // normalizes to a space; this happens before reference decoding,
             // so whitespace that arrives via a character reference survives.
@@ -86,6 +91,8 @@ extension PureXML.Parsing.EventReader {
         guard reader.consume(String(quote)) else {
             throw PureXML.Parsing.ParseError.unexpectedEndOfInput(reader.mark)
         }
+        // No '&' means no references to decode: the normalized run is the value.
+        guard sawAmpersand else { return raw }
         return try decodeReferences(raw, at: mark)
     }
 }
