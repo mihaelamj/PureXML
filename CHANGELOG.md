@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The `html` output method now names the document type declaration `HTML` rather than the document element name (XSLT 1.0 16.2: "The name following the `<!DOCTYPE` should be HTML or html"). With `method="html"` and a `doctype-public` or `doctype-system`, the emitted declaration is `<!DOCTYPE HTML PUBLIC "...">` regardless of the result's root element; the `xml` method still uses the document element name (16.1). Closes Apache Xalan conformance cases `output40`, `output48`, and `output60`.
+
 - The `html` output method no longer escapes a `<` character in an attribute value (XSLT 1.0 16.2). The HTML output method escapes `&` and `"` in attribute values but leaves `<` and `>` literal, unlike the `xml` method; the serializer was escaping `<` to `&lt;` there. The `xml` output method is unchanged (it still escapes both). Closes Apache Xalan conformance cases `output49` and `output74`.
 
 - A string-form `document()` reference now resolves against the base URI of the stylesheet element holding it (XSLT 1.0 12.1), which for a declaration in an `xsl:include`d or `xsl:import`ed file is that file's URI rather than the top stylesheet's. The parser already tracked each top-level declaration's source-file base; that base is now carried onto the compiled templates and global variables and threaded into expression evaluation, so a relative `document('data.xml')` (or `document('')`, the self-reference) in an included file resolves against the included file, not the importing one. Closes Apache Xalan conformance cases `mdocs12` and `mdocs13`.
