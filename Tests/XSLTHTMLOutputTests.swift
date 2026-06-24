@@ -37,6 +37,26 @@ struct XSLTHTMLOutputTests {
         #expect(!out.contains("&lt;"))
     }
 
+    @Test("The html method leaves < and > literal in an attribute value")
+    func test_attributeAngleBrackets() throws {
+        // XSLT 1.0 16.2: the html output method does not escape `<` in an
+        // attribute value (nor `>`), unlike the xml method. `&` and `"` still
+        // escape (Apache Xalan output49, output74).
+        let out = try transform(htmlStyle("<a title=\"&lt;x>&amp;&quot;\">t</a>"), "<x/>")
+        #expect(out == "<a title=\"<x>&amp;&quot;\">t</a>")
+    }
+
+    @Test("The xml method still escapes < in an attribute value")
+    func test_xmlAttributeStillEscapes() throws {
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output method="xml" omit-xml-declaration="yes"/>
+          <xsl:template match="/"><a title="&lt;x>">t</a></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(style, "<x/>") == "<a title=\"&lt;x&gt;\">t</a>")
+    }
+
     @Test("The XML output method still self-closes empty elements")
     func test_xmlStillSelfCloses() throws {
         let style = """
