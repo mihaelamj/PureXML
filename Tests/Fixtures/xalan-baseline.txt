@@ -14,7 +14,6 @@ idkey/idkey48
 impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
-mdocs/mdocs15
 mdocs/mdocs19
 namedtemplate/namedtemplate12
 namespace/namespace113
@@ -29,7 +28,6 @@ output/output63
 output/output70
 output/output73
 output/output86
-position/position106
 processorinfo/processorinfo03
 sort/sort02
 sort/sort10

@@ -25,6 +25,18 @@ struct XPathExpressionTests {
         try PureXML.XPath.Query(path).boolean(over: shop())
     }
 
+    @Test("a lone / is the root node, even before a closing paren or operator")
+    func test_rootPathBeforeTerminator() throws {
+        // The relative part after `/` is optional, so `/` followed by `)`, `|`, or
+        // an operator is the root node, not a parse that swallows the terminator
+        // (Apache Xalan position106, mdocs15).
+        #expect(try number("count(/)") == 1)
+        #expect(try number("count(/ | /)") == 1)
+        #expect(try boolean("/ = /") == true)
+        // Regression: `/` followed by a `*` wildcard still parses as a step.
+        #expect(try number("count(/*)") == 1)
+    }
+
     // MARK: Arithmetic and precedence
 
     @Test("Arithmetic honors precedence")
