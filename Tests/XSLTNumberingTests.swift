@@ -19,6 +19,21 @@ struct XSLTNumberingTests {
         return try PureXML.XSLT.transform(stylesheet: style, source: source)
     }
 
+    @Test("level=single counts the from node itself when it also matches count (7.7)")
+    func test_singleFromCountOverlap() throws {
+        // count and from both match `a`; a t's nearest count ancestor is its
+        // parent a, which is also the from boundary, so it is still counted
+        // (Apache Xalan numbering63).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><out><xsl:apply-templates select="//t"/></out></xsl:template>
+          <xsl:template match="t"><xsl:number level="single" count="a|b" from="a"/>,</xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try PureXML.XSLT.transform(stylesheet: style, source: "<doc><a><t/></a><a><t/></a></doc>") == "<out>1,2,</out>")
+    }
+
     @Test("the format attribute is an attribute value template (7.7)")
     func test_formatIsAVT() throws {
         // format="{$f}" evaluates the AVT, so a passed-in format string drives the

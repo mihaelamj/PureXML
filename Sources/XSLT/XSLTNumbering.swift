@@ -42,10 +42,13 @@ enum XSLTNumbering {
             return [total]
         default: // single
             var current: Tree? = node
-            while let candidate = current, !matchesFrom(candidate) {
+            while let candidate = current {
+                // The count node may be the from node itself when it matches both
+                // patterns (7.7), so test count before stopping at the boundary.
                 if matchesCount(candidate) {
                     return [siblingPosition(of: candidate, matching: matchesCount)]
                 }
+                if matchesFrom(candidate) { break }
                 current = candidate.parent
             }
             return []

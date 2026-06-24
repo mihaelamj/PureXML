@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsl:number level="single"` now counts the element that is the `from` boundary when that element also matches the `count` pattern (XSLT 1.0 7.7). The search for the count node stopped at the nearest `from`-matching ancestor before testing it against `count`, so a pattern like `count="a|b" from="a"` produced an empty number for an element inside an `a` (the count node is that `a`, which is also the boundary). The count pattern is now tested before the boundary stops the walk. Closes Apache Xalan conformance case `numbering63`.
+
 - The `format` attribute of `xsl:number` is now evaluated as an attribute value template (XSLT 1.0 7.7), so `format="{$f}"` uses the value of `$f` rather than the literal string. It was stored and used verbatim, so a computed or passed-in format was never applied. Closes Apache Xalan conformance case `namedtemplate12`.
 
 - A large integer-valued number now converts to a string with no decimal point (XPath 1.0 4.2). The number-to-string formatter only treated a value below 1e15 as an integer, so an integer such as `1234567890123456` (still exact in a double, which represents integers exactly up to 2^53) printed as `1234567890123456.0`. The integer bound is now 2^63, the range in which the conversion is safe. Closes Apache Xalan conformance case `string132`.
