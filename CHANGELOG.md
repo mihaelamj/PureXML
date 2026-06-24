@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsl:namespace-alias` now keeps the literal (stylesheet) prefix on aliased result elements, attributes, and namespace declarations, remapping only the namespace URI (XSLT 1.0 7.1.1: the result namespace node keeps the prefix used in the stylesheet). The serializer was adopting the `result-prefix` as the output prefix, so `axsl:foo` aliased to the XSLT namespace came out as `xsl:foo`; the `result-prefix` now only selects the replacement namespace. Closes Apache Xalan conformance cases `namespace19`, `namespace23`, `namespace24`, `namespace35`, and `namespace113`.
+
 - `xsl:key` with a union `match` pattern now indexes every branch. The match was turned into a path by prepending `//`, but for a union like `match="Level1 | Level2"` the `//` applied only to the first branch (`//Level1 | Level2`), so the second branch became relative to the root and matched nothing, leaving nodes of that type out of the key. The `//` is now distributed over each top-level union branch (`//Level1 | //Level2`), with `|` inside a predicate or function call left intact. Closes Apache Xalan conformance cases `idkey45`, `idkey46`, `idkey47`, and `idkey48`.
 
 - `xml:space="preserve"` on a literal result element (or an ancestor) in the stylesheet now keeps that element's whitespace-only text instead of stripping it (XSLT 1.0 3.4). The stylesheet whitespace stripping dropped every whitespace-only run unconditionally, ignoring an in-scope `xml:space="preserve"`; the nearest ancestor-or-self `xml:space` is now consulted, so `preserve` retains the run while `default` (or none) still strips it. Closes Apache Xalan conformance case `whitespace20`.

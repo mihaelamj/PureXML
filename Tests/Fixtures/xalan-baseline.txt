@@ -11,11 +11,6 @@ impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
 mdocs/mdocs19
-namespace/namespace113
-namespace/namespace19
-namespace/namespace23
-namespace/namespace24
-namespace/namespace35
 output/output22
 output/output26
 output/output63

@@ -13,10 +13,14 @@ extension PureXML.XSLT.Transformer {
     }
 
     /// Rewrites a literal name in an `xsl:namespace-alias`ed stylesheet namespace
-    /// to its result namespace and prefix; other names pass through unchanged.
+    /// to its result namespace, keeping the literal prefix; other names pass
+    /// through unchanged.
     func aliased(_ name: PureXML.Model.QualifiedName) -> PureXML.Model.QualifiedName {
         guard let alias = stylesheet.namespaceAliases[name.namespaceURI ?? ""] else { return name }
-        return PureXML.Model.QualifiedName(prefix: alias.prefix, localName: name.localName, namespaceURI: alias.uri)
+        // The literal prefix is kept and only its namespace URI is remapped (XSLT
+        // 1.0 7.1.1: the result namespace node keeps the stylesheet prefix); the
+        // result-prefix only selects the replacement namespace, it is not adopted.
+        return PureXML.Model.QualifiedName(prefix: name.prefix, localName: name.localName, namespaceURI: alias.uri)
     }
 
     /// The attributes with duplicates by name removed, keeping the last (so a
@@ -261,7 +265,8 @@ extension PureXML.XSLT.Transformer {
         var declarations: [PureXML.XSLT.LiteralAttribute] = []
         for (prefix, uri) in namespaces.sorted(by: { $0.key < $1.key }) {
             let alias = stylesheet.namespaceAliases[uri]
-            let resolvedPrefix = alias?.prefix ?? (prefix.isEmpty ? nil : prefix)
+            // Keep the literal prefix; an alias only remaps its namespace URI.
+            let resolvedPrefix = prefix.isEmpty ? nil : prefix
             let resolvedURI = alias?.uri ?? uri
             let attributeName = resolvedPrefix.map { "xmlns:" + $0 } ?? "xmlns"
             declarations.append(PureXML.XSLT.LiteralAttribute(

@@ -150,12 +150,12 @@ public extension PureXML.XSLT {
     /// An `xsl:namespace-alias` target: the result namespace (and its prefix) that
     /// a literal result element's stylesheet namespace is rewritten to on output.
     struct NamespaceAlias: Sendable {
+        /// The result namespace URI an aliased stylesheet namespace maps to. The
+        /// literal prefix is kept on output (7.1.1), so no prefix is stored.
         public var uri: String?
-        public var prefix: String?
 
-        public init(uri: String?, prefix: String?) {
+        public init(uri: String?) {
             self.uri = uri
-            self.prefix = prefix
         }
     }
 
