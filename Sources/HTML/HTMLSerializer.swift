@@ -85,7 +85,8 @@ extension PureXML.HTML {
                 case "&":
                     previousWasAmpersand = true
                 case "\"": result += "&quot;"
-                case "<": result += "&lt;"
+                // The html output method does not escape `<` (or `>`) in an
+                // attribute value, unlike the xml method (XSLT 1.0 16.2).
                 default: result += latin1Entity(scalar) ?? String(Character(scalar))
                 }
             }
