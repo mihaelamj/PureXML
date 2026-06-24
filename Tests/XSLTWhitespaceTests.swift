@@ -81,4 +81,18 @@ struct XSLTWhitespaceTests {
         let source = "<doc xmlns:q=\"urn:n1\" xmlns:r=\"urn:n2\"><q:a>  </q:a><r:b>  </r:b></doc>"
         #expect(try transform(style, source) == "<out>0,2</out>")
     }
+
+    @Test("xml:space=preserve in the stylesheet keeps a literal element's whitespace (3.4)")
+    func test_xmlSpacePreserveInStylesheet() throws {
+        // A literal result element with xml:space="preserve" keeps its
+        // whitespace-only content; xml:space="default" strips it, as does no
+        // xml:space at all (Apache Xalan whitespace20).
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:template match="/"><r><a xml:space="preserve"> </a><b xml:space="default"> </b><c> </c></r></xsl:template>
+        </xsl:stylesheet>
+        """
+        #expect(try transform(style, "<x/>") == "<r><a xml:space=\"preserve\"> </a><b xml:space=\"default\"/><c/></r>")
+    }
 }

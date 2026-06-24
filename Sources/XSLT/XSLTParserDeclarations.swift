@@ -48,6 +48,20 @@ extension PureXML.XSLT.XSLTParser {
         XSLTNode.attribute(node, "mode").map { expandedQName($0, at: node) }
     }
 
+    /// Whether `xml:space="preserve"` is in scope at `node`: the nearest
+    /// ancestor-or-self carrying an `xml:space` attribute has value `preserve`,
+    /// so a whitespace-only text run is kept rather than stripped (XSLT 1.0 3.4).
+    static func preservesWhitespace(_ node: XSLTTree) -> Bool {
+        var current: XSLTTree? = node
+        while let element = current {
+            if let space = element.attributes.first(where: { $0.name.prefix == "xml" && $0.name.localName == "space" })?.value {
+                return space == "preserve"
+            }
+            current = element.parent
+        }
+        return false
+    }
+
     /// A strip-space/preserve-space NameTest resolved to namespace form: `*` and
     /// an unprefixed name (the null namespace) stay as is, `prefix:*` becomes
     /// `{uri}*`, and `prefix:local` becomes `{uri}local` (XSLT 1.0 3.4).
