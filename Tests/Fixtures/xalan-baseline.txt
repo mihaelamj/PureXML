@@ -30,7 +30,6 @@ output/output26
 output/output32
 output/output63
 output/output70
-output/output72
 output/output73
 output/output75
 output/output86

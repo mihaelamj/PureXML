@@ -87,7 +87,7 @@ public extension PureXML.Emitting {
             case let .comment(value):
                 output += "<!--\(Escaping.comment(value))-->"
             case let .processingInstruction(target, data):
-                output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(data)?>"
+                output += data.isEmpty ? "<?\(target)?>" : "<?\(target) \(Escaping.processingInstruction(data))?>"
             }
         }
 

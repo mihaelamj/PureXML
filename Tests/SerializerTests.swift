@@ -9,6 +9,14 @@ struct SerializerTests {
         #expect(PureXML.serialize(node, options: .compact) == "<br/>")
     }
 
+    @Test("A ?> inside processing-instruction data is split by a space")
+    func test_processingInstructionEscapesTerminator() {
+        // PI data may not contain ?>; the XSLT 1.0 7.3 recovery inserts a space
+        // (Apache Xalan output72). A trailing ? is safe and is left alone.
+        let instruction = PureXML.Model.Node.processingInstruction(target: "p", data: "a ?> b ?")
+        #expect(PureXML.serialize(instruction, options: .compact) == "<?p a ? > b ??>")
+    }
+
     @Test("Attributes and text are escaped")
     func test_escapesAttributesAndText() {
         let element = PureXML.Model.Element(
