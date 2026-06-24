@@ -54,6 +54,7 @@ public extension PureXML.Schema {
         private let typeBlock: [String: Set<DerivationMethod>]
         private let elementBlock: [String: Set<DerivationMethod>]
         private let typeDerivation: [String: TypeDerivation]
+        private let unionMembers: [String: [String]]
         private let targetNamespace: String?
         private let globalAttributes: [String: AttributeUse]
 
@@ -73,6 +74,7 @@ public extension PureXML.Schema {
             typeBlock: [String: Set<DerivationMethod>],
             elementBlock: [String: Set<DerivationMethod>],
             typeDerivation: [String: TypeDerivation],
+            unionMembers: [String: [String]],
             targetNamespace: String?,
             globalAttributes: [String: AttributeUse],
         ) {
@@ -88,6 +90,7 @@ public extension PureXML.Schema {
             self.typeBlock = typeBlock
             self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
+            self.unionMembers = unionMembers
             self.targetNamespace = targetNamespace
             self.globalAttributes = globalAttributes
         }
@@ -117,6 +120,7 @@ public extension PureXML.Schema {
                 typeBlock: mineFirst(typeBlock, other.typeBlock),
                 elementBlock: mineFirst(elementBlock, other.elementBlock),
                 typeDerivation: mineFirst(typeDerivation, other.typeDerivation),
+                unionMembers: mineFirst(unionMembers, other.unionMembers),
                 targetNamespace: targetNamespace,
                 globalAttributes: mineFirst(globalAttributes, other.globalAttributes),
             )
@@ -140,6 +144,7 @@ public extension PureXML.Schema {
             typeBlock = compiled.nsTypeBlock
             elementBlock = compiled.nsElementBlock
             typeDerivation = compiled.nsTypeDerivation
+            unionMembers = compiled.nsUnionMembers
             targetNamespace = compiled.targetNamespace
             globalAttributes = compiled.globalAttributes
             // Schema consistency through the validation framework: every named
@@ -228,6 +233,7 @@ public extension PureXML.Schema {
                 typeBlock: typeBlock,
                 elementBlock: elementBlock,
                 typeDerivation: typeDerivation,
+                unionMembers: unionMembers,
             )
             var driver = PureXML.Validation.StreamingXSDValidator(
                 validator: validator,
@@ -292,6 +298,7 @@ public extension PureXML.Schema {
                 typeBlock: typeBlock,
                 elementBlock: elementBlock,
                 typeDerivation: typeDerivation,
+                unionMembers: unionMembers,
                 globalAttributes: globalAttributes,
                 identityFieldTypes: identityFieldTypes,
                 identityFieldConstraints: identityFieldConstraints,
