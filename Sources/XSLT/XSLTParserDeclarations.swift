@@ -1,16 +1,14 @@
 /// Top-level declaration helpers for ``XSLTParser``, kept in a separate file so
 /// the parser enum stays within the type-body and file length budgets.
 extension PureXML.XSLT.XSLTParser {
-    /// Records an `xsl:namespace-alias`: the namespace bound to `stylesheet-prefix`
-    /// is rewritten to the one bound to `result-prefix` (with that prefix) on output.
+    /// Records an `xsl:namespace-alias`: on output, the namespace URI bound to
+    /// `stylesheet-prefix` is replaced by the one bound to `result-prefix`. The
+    /// literal prefix is kept (7.1.1), so only the result namespace URI is stored.
     static func addNamespaceAlias(_ child: XSLTTree, into parts: inout Parts) {
         let stylePrefix = XSLTNode.attribute(child, "stylesheet-prefix") ?? "#default"
         let resultPrefix = XSLTNode.attribute(child, "result-prefix") ?? "#default"
         let key = resolvePrefix(stylePrefix, at: child) ?? ""
-        parts.namespaceAliases[key] = PureXML.XSLT.NamespaceAlias(
-            uri: resolvePrefix(resultPrefix, at: child),
-            prefix: resultPrefix == "#default" ? nil : resultPrefix,
-        )
+        parts.namespaceAliases[key] = PureXML.XSLT.NamespaceAlias(uri: resolvePrefix(resultPrefix, at: child))
     }
 
     /// Resolves a namespace prefix (or `#default`) to its URI from the `xmlns`
