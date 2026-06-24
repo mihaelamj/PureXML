@@ -204,9 +204,14 @@ public extension PureXML.XSLT {
         }
     }
 
-    /// Serializes the result tree by output method: html for a null-namespace
-    /// document element, otherwise XML (16.2 outputs a non-null-namespace element
-    /// as XML; the html method still omits the XML declaration).
+    /// Serializes the result tree by output method. 16.2 outputs a
+    /// non-null-namespace element as XML rather than HTML; this is applied at
+    /// document-element granularity, not per element: a namespaced document
+    /// element serializes the whole tree as XML (the html method still omitting
+    /// the XML declaration), so a tree mixing null- and non-null-namespace
+    /// elements follows its document element's path. The realistic result is
+    /// all-null (HTML) or all-namespaced (XML); the html null-namespace path is
+    /// unchanged.
     private static func serializedBody(_ result: PureXML.Model.Node, sheet: Stylesheet, options: PureXML.Emitting.Options, method: String) -> String {
         if method == "html", !documentElementIsNamespaced(result) {
             return PureXML.HTML.serialize(withContentTypeMeta(result, encoding: sheet.output.encoding ?? "UTF-8"))
