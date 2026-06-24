@@ -53,4 +53,20 @@ struct XSLTKeyNodeSetTests {
         """
         #expect(try transform(style, source) == "2")
     }
+
+    @Test("xsl:key with a union match pattern indexes every branch")
+    func test_unionMatchPattern() throws {
+        // match="a | b" indexes both a and b anywhere; the // must distribute over
+        // the union (previously only the first branch was matched anywhere, so a
+        // nested b was missed). Apache Xalan idkey45-48.
+        let style = """
+        <xsl:stylesheet version="1.0" \(xsl)>
+          <xsl:output omit-xml-declaration="yes"/>
+          <xsl:key name="k" match="a | b" use="@id"/>
+          <xsl:template match="/"><out><xsl:for-each select="key('k','x')"><xsl:value-of select="name()"/>,</xsl:for-each></out></xsl:template>
+        </xsl:stylesheet>
+        """
+        let source = "<doc><a id=\"x\"/><wrap><b id=\"x\"/></wrap></doc>"
+        #expect(try transform(style, source) == "<out>a,b,</out>")
+    }
 }

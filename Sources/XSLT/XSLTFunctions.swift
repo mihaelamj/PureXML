@@ -350,7 +350,7 @@ extension PureXML.XSLT {
         static func buildKeyIndex(stylesheet: Stylesheet, root: PureXML.Model.TreeNode) -> KeyIndex {
             var index: KeyIndex = [:]
             for key in stylesheet.keys {
-                let path = key.match.hasPrefix("/") ? key.match : "//" + key.match
+                let path = keyMatchPath(key.match)
                 guard let matchQuery = try? PureXML.XPath.Query(path),
                       let useQuery = try? PureXML.XPath.Query(key.use) else { continue }
                 for node in matchQuery.nodes(over: root) {

@@ -52,6 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsl:key` with a union `match` pattern now indexes every branch. The match was turned into a path by prepending `//`, but for a union like `match="Level1 | Level2"` the `//` applied only to the first branch (`//Level1 | Level2`), so the second branch became relative to the root and matched nothing, leaving nodes of that type out of the key. The `//` is now distributed over each top-level union branch (`//Level1 | //Level2`), with `|` inside a predicate or function call left intact. Closes Apache Xalan conformance cases `idkey45`, `idkey46`, `idkey47`, and `idkey48`.
+
 - `xml:space="preserve"` on a literal result element (or an ancestor) in the stylesheet now keeps that element's whitespace-only text instead of stripping it (XSLT 1.0 3.4). The stylesheet whitespace stripping dropped every whitespace-only run unconditionally, ignoring an in-scope `xml:space="preserve"`; the nearest ancestor-or-self `xml:space` is now consulted, so `preserve` retains the run while `default` (or none) still strips it. Closes Apache Xalan conformance case `whitespace20`.
 
 - `xsl:number level="single"` now counts the element that is the `from` boundary when that element also matches the `count` pattern (XSLT 1.0 7.7). The search for the count node stopped at the nearest `from`-matching ancestor before testing it against `count`, so a pattern like `count="a|b" from="a"` produced an empty number for an element inside an `a` (the count node is that `a`, which is also the boundary). The count pattern is now tested before the boundary stops the walk. Closes Apache Xalan conformance case `numbering63`.
