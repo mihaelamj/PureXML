@@ -225,6 +225,7 @@ extension PureXML.XSLT.Transformer {
     /// node, with patterns matched through the transform's match cache.
     func numberInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> String {
         guard case let .number(spec) = instruction else { return "" }
+        let format = avt(spec.format, context)
         let grouping = spec.groupingSeparator.flatMap { separator in
             spec.groupingSize.map { (separator: separator, size: $0) }
         }
@@ -237,12 +238,12 @@ extension PureXML.XSLT.Transformer {
             guard number.isFinite, number.rounded() >= 1, number.rounded() <= Double(Int.max) else {
                 return PureXML.XPath.Value.format(number)
             }
-            return XSLTNumbering.format([Int(number.rounded())], spec.format, grouping)
+            return XSLTNumbering.format([Int(number.rounded())], format, grouping)
         }
         let numbers = XSLTNumbering.numbers(of: context.node, level: spec.level, count: spec.count, from: spec.from) { node, pattern in
             matches(node, pattern)
         }
-        return XSLTNumbering.format(numbers, spec.format, grouping)
+        return XSLTNumbering.format(numbers, format, grouping)
     }
 }
 

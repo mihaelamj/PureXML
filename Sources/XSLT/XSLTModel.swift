@@ -167,7 +167,9 @@ public extension PureXML.XSLT {
         var count: String?
         var from: String?
         var value: String?
-        var format: String
+        /// The `format` attribute is an attribute value template (XSLT 1.0 7.7),
+        /// evaluated per instantiation.
+        var format: ValueTemplate
         var groupingSeparator: String?
         var groupingSize: Int?
     }

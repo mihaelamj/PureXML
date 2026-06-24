@@ -15,7 +15,6 @@ impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07
 mdocs/mdocs19
-namedtemplate/namedtemplate12
 namespace/namespace113
 namespace/namespace19
 namespace/namespace23
