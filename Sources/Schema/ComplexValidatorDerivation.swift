@@ -198,20 +198,55 @@ extension PureXML.Schema.ComplexValidator {
         }
         let substituteKey = Self.derivationKey(fromReference: substituteRef)
         let declaredName = resolvedDeclaredTypeName(reference)
-        guard let methods = PureXML.Schema.XSDParser.derivationMethods(from: substituteKey, to: declaredName, typeDerivation) else {
-            return nil
-        }
         // The substitution is blocked when the derivation method is disallowed by
         // either the declared type's `block` or the element declaration's own
         // `block`, both keyed by namespaced identity.
         let blocked = (typeBlock[declaredName] ?? []).union(elementBlock[Self.key(child.name)] ?? [])
-        guard !methods.isDisjoint(with: blocked) else {
+        guard isSubstitutionBlocked(from: substituteKey, to: declaredName, by: blocked) else {
             return nil
         }
         return PureXML.Validation.ValidationError(
             reason: "xsi:type '\(substituteLabel)' is blocked: substitution by this derivation is disallowed",
             at: path,
         )
+    }
+
+    /// Whether the `block` set bars deriving `substitute` from `declared`. The
+    /// derivation is along the base chain, or, when `declared` is a union, through
+    /// any one of its members (cos-st-derived-OK 2.2.4). That member clause is
+    /// EXISTENTIAL: the substitution is valid as long as ONE member yields an
+    /// unblocked derivation, so a substitute that IS a member (the empty-method
+    /// self-membership path) or reaches one member by an unblocked method is never
+    /// blocked, whatever other members it also reaches by a blocked method. With no
+    /// confirmed path at all the check stays silent (under-reject) rather than risk
+    /// a false positive.
+    private func isSubstitutionBlocked(
+        from substitute: String,
+        to declared: String,
+        by blocked: Set<PureXML.Schema.DerivationMethod>,
+    ) -> Bool {
+        if let direct = PureXML.Schema.XSDParser.derivationMethods(from: substitute, to: declared, typeDerivation) {
+            return !direct.isDisjoint(with: blocked)
+        }
+        // `unionMembers` records a union's DIRECT members only, not flattened, so a
+        // path reaching `declared` through a member that is itself a union is not
+        // modeled: that member yields no base-chain derivation here, leaving the
+        // check silent. A bounded, disclosed under-rejection, never an over-rejection.
+        guard let members = unionMembers[declared] else { return false }
+        var anyConfirmedPath = false
+        for member in members {
+            // The substitute IS a member: derived with no method of its own, so
+            // this path is unblocked and the substitution is permitted outright.
+            if member == substitute { return false }
+            guard let toMember = PureXML.Schema.XSDParser.derivationMethods(from: substitute, to: member, typeDerivation) else {
+                continue
+            }
+            anyConfirmedPath = true
+            // An unblocked path to any member makes the whole substitution valid.
+            if toMember.isDisjoint(with: blocked) { return false }
+        }
+        // Every confirmed member path is blocked (and at least one exists): bar it.
+        return anyConfirmedPath
     }
 
     /// cvc-elt.4.3.2.1: an `xsi:type` must resolve to a type DERIVED from the

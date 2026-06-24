@@ -52,6 +52,18 @@ extension PureXML.Schema.XSDParser {
         guard let name = XSDDerivNode.attribute(type, "name") else { return }
         let finalSet = methodSet(XSDDerivNode.attribute(type, "final"))
         if !finalSet.isEmpty { tables.typeFinal[name] = finalSet }
+        // A union's named member types: record them so the xsi:type-block check
+        // can follow a derivation that reaches this union through a member
+        // (cos-st-derived-OK 2.2.4). Inline (anonymous) members carry no name to
+        // record and are left out, which keeps the check silent rather than risk
+        // a false positive.
+        let union = XSDDerivNode.firstChild(type, named: "union")
+        if let union, let members = XSDDerivNode.attribute(union, "memberTypes") {
+            let memberKeys = members.split(whereSeparator: \.isWhitespace).map {
+                resolvedKey(of: String($0), on: union, default: namespace)
+            }
+            if !memberKeys.isEmpty { tables.nsUnionMembers[derivationKey(name, in: namespace)] = memberKeys }
+        }
         guard let restriction = XSDDerivNode.firstChild(type, named: "restriction"),
               let base = XSDDerivNode.attribute(restriction, "base") else { return }
         tables.typeDerivation[name] = PureXML.Schema.TypeDerivation(base: XSDDerivNode.stripPrefix(base), method: .restriction)

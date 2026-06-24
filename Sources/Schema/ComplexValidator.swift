@@ -39,6 +39,10 @@ public extension PureXML.Schema {
         /// Each named complex type's base and derivation method, keyed by namespaced
         /// identity (`{ns}local`).
         let typeDerivation: [String: TypeDerivation]
+        /// Each named union type's member type keys (`{ns}local`), so the
+        /// `xsi:type`-`block` check can follow a derivation that reaches a declared
+        /// union through one of its members (cos-st-derived-OK 2.2.4).
+        let unionMembers: [String: [String]]
         /// Global attribute declarations for strict/lax `anyAttribute` validation.
         let globalAttributes: [String: AttributeUse]
         /// Document-scoped xs:ID/xs:IDREF accumulator, filled during the typed walk
@@ -55,6 +59,7 @@ public extension PureXML.Schema {
             typeBlock: [String: Set<DerivationMethod>] = [:],
             elementBlock: [String: Set<DerivationMethod>] = [:],
             typeDerivation: [String: TypeDerivation] = [:],
+            unionMembers: [String: [String]] = [:],
         ) {
             self.types = types
             self.globalAttributes = globalAttributes
@@ -64,6 +69,7 @@ public extension PureXML.Schema {
             self.typeBlock = typeBlock
             self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
+            self.unionMembers = unionMembers
         }
 
         /// Validates `element` against `type` at `path`, one error per violation.

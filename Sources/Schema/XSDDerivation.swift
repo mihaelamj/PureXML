@@ -46,6 +46,10 @@ extension PureXML.Schema.XSDParser {
         var nsElementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:]
         /// Namespaced element name (`{ns}elem`) to namespaced declared type (`{ns}type`).
         var nsElementTypeNames: [String: String] = [:]
+        /// Namespaced union type (`{ns}local`) to its member type keys (`{ns}local`),
+        /// so the `xsi:type`-`block` check can follow a derivation that reaches a
+        /// declared union through one of its members.
+        var nsUnionMembers: [String: [String]] = [:]
     }
 
     /// Parses a `block`/`final`/`substitutionGroup`-style value: `#all` for every

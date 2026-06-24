@@ -222,6 +222,10 @@ extension PureXML.Schema {
         var nsTypeBlock: [String: Set<DerivationMethod>] = [:]
         var nsElementBlock: [String: Set<DerivationMethod>] = [:]
         var nsTypeDerivation: [String: TypeDerivation] = [:]
+        /// Each named union simple type's member type keys (`{ns}local`), so the
+        /// `xsi:type`-`block` check can follow a derivation that reaches the
+        /// declared union through one of its members (cos-st-derived-OK 2.2.4).
+        var nsUnionMembers: [String: [String]] = [:]
         /// Derivation methods each named type declares `final`, for the
         /// schema-consistency rules.
         var typeFinal: [String: Set<DerivationMethod>] = [:]

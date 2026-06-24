@@ -53,10 +53,14 @@ struct XSTSSuiteTests {
     /// a defaulted/fixed IDREF/IDREFS must resolve to a matching ID, cvc-id (idZ012).
     /// 19 -> 17: a negated character-class subtraction excludes both the
     /// negated base and the subtrahend (`[^cde-[ag]]`), RegexTest_430 and _422.
-    /// Latest (17 -> 15): the attribute-wildcard union of a type extension is
+    /// 17 -> 15: the attribute-wildcard union of a type extension is
     /// computed per Errata E1-10, so the resulting wildcard admits exactly the
     /// right attributes (wildZ013a, wildZ013d).
-    private let knownInstanceInvalidAccepted = 15
+    /// Latest (15 -> 14): an `xsi:type` that reaches a union declared type through
+    /// one of its members by a blocked derivation method is rejected (cvc-elt.4.3
+    /// / cos-st-derived-OK 2.2.4, elemT074: `block="restriction"` on the element,
+    /// the substitute restricting a union member).
+    private let knownInstanceInvalidAccepted = 14
     /// Suspect instance tests excluded from the counts: the Ethiopic-digit `\d`
     /// cases contradict `\d` = `\p{Nd}` at Unicode 3.2 and are tracked as disputed.
     private static let specDivergentInstances: Set<String> = ["reS17.v", "reS38.v", "reZ004v.v"]

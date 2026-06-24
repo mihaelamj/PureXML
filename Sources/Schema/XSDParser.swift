@@ -212,6 +212,7 @@ extension PureXML.Schema.XSDParser {
             nsTypeBlock: build.derivation.nsTypeBlock,
             nsElementBlock: build.derivation.nsElementBlock,
             nsTypeDerivation: build.derivation.nsTypeDerivation,
+            nsUnionMembers: build.derivation.nsUnionMembers,
             typeFinal: build.derivation.typeFinal,
             targetNamespace: build.context.targetNamespace,
             schemaErrors: build.context.diagnostics.deduplicated,

@@ -12,6 +12,7 @@ public extension PureXML.Validation {
         public let typeBlock: [String: Set<PureXML.Schema.DerivationMethod>]
         public let elementBlock: [String: Set<PureXML.Schema.DerivationMethod>]
         public let typeDerivation: [String: PureXML.Schema.TypeDerivation]
+        public let unionMembers: [String: [String]]
         public let globalAttributes: [String: PureXML.Schema.AttributeUse]
         public let identityFieldTypes: [String: PureXML.Schema.SimpleType]
         public let identityFieldConstraints: [String: PureXML.Schema.ValueConstraint]
@@ -26,6 +27,7 @@ public extension PureXML.Validation {
             typeBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
             elementBlock: [String: Set<PureXML.Schema.DerivationMethod>] = [:],
             typeDerivation: [String: PureXML.Schema.TypeDerivation] = [:],
+            unionMembers: [String: [String]] = [:],
             globalAttributes: [String: PureXML.Schema.AttributeUse] = [:],
             identityFieldTypes: [String: PureXML.Schema.SimpleType] = [:],
             identityFieldConstraints: [String: PureXML.Schema.ValueConstraint] = [:],
@@ -39,6 +41,7 @@ public extension PureXML.Validation {
             self.typeBlock = typeBlock
             self.elementBlock = elementBlock
             self.typeDerivation = typeDerivation
+            self.unionMembers = unionMembers
             self.globalAttributes = globalAttributes
             self.identityFieldTypes = identityFieldTypes
             self.identityFieldConstraints = identityFieldConstraints
@@ -83,6 +86,7 @@ public extension PureXML.Validation {
                         typeBlock: schema.typeBlock,
                         elementBlock: schema.elementBlock,
                         typeDerivation: schema.typeDerivation,
+                        unionMembers: schema.unionMembers,
                     )
                     var errors = validator.validate(root, as: declaration, at: [.element(root.name.description)])
                     // Document-scoped ID uniqueness and IDREF resolution, gathered
