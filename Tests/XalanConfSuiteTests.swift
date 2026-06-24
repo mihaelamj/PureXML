@@ -74,10 +74,21 @@ struct XalanConfSuiteTests {
         #expect(fixed.isEmpty, "\(fixed.count) baselined cases now pass (remove from xalan-baseline.txt): \(fixed.prefix(40))")
     }
 
+    /// Reads a file and decodes it through PureXML's own encoding detection (a
+    /// BOM or the XML declaration), falling back to UTF-8, so a non-UTF-8 source
+    /// is decoded rather than refused. nil when the file is missing.
+    private static func decodeFile(_ path: String) -> String? {
+        guard let data = FileManager.default.contents(atPath: path) else { return nil }
+        return (try? PureXML.Parsing.ByteDecoder.decode([UInt8](data))) ?? String(data: data, encoding: .utf8)
+    }
+
     private func runCase(category: String, name: String, root: String, goldPath: String) -> String? {
         let directory = root + "/conf/" + category
-        guard let stylesheet = try? String(contentsOfFile: directory + "/" + name + ".xsl", encoding: .utf8),
-              let source = try? String(contentsOfFile: directory + "/" + name + ".xml", encoding: .utf8)
+        // Decode inputs the way PureXML decodes any document, by detecting the
+        // encoding (a BOM or the XML declaration) rather than assuming UTF-8, so
+        // a UTF-16 or other non-UTF-8 source is fed to the transform, not refused.
+        guard let stylesheet = Self.decodeFile(directory + "/" + name + ".xsl"),
+              let source = Self.decodeFile(directory + "/" + name + ".xml")
         else {
             return "unreadable inputs"
         }
@@ -86,9 +97,7 @@ struct XalanConfSuiteTests {
         else {
             return "unreadable gold"
         }
-        let loader: (String) -> String? = { uri in
-            (try? String(contentsOfFile: directory + "/" + uri, encoding: .utf8))
-        }
+        let loader: (String) -> String? = { uri in Self.decodeFile(directory + "/" + uri) }
         let actual: String
         do {
             actual = try PureXML.XSLT.transform(

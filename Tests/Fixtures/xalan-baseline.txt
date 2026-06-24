@@ -2,7 +2,6 @@
 # one category/name per line, exact in both directions: a fixed case
 # must leave this list and a regression shows up as a new failure.
 attribset/attribset44
-attribvaltemplate/attribvaltemplate08
 axes/axes116
 conflictres/conflictres29
 conflictres/conflictres30
@@ -34,7 +33,6 @@ output/output70
 output/output72
 output/output73
 output/output75
-output/output80
 output/output86
 position/position106
 processorinfo/processorinfo03
