@@ -30,7 +30,6 @@ output/output26
 output/output63
 output/output70
 output/output73
-output/output75
 output/output86
 position/position106
 processorinfo/processorinfo03
