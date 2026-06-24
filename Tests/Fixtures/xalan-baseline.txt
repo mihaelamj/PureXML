@@ -7,10 +7,6 @@ extend/extend01
 extend/extend02
 extend/extend04
 idkey/idkey31
-idkey/idkey45
-idkey/idkey46
-idkey/idkey47
-idkey/idkey48
 impincl/impincl08
 impincl/impincl27
 mdocs/mdocs07

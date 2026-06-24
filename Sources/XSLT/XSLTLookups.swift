@@ -31,6 +31,39 @@ extension PureXML.XSLT.Library {
         base.isEmpty ? reference : PureXML.XInclude.URIReference.resolve(reference, against: base)
     }
 
+    /// The `xsl:key` match pattern as a path selecting every matching node: `//`
+    /// is distributed over each top-level union branch (`a | b` becomes `//a |
+    /// //b`, not `//a | b`), since the match is a pattern matched anywhere, not a
+    /// single relative path.
+    static func keyMatchPath(_ match: String) -> String {
+        splitUnion(match).map { branch in
+            let trimmed = branch.drop { $0 == " " }
+            return trimmed.hasPrefix("/") ? String(trimmed) : "//" + trimmed
+        }.joined(separator: " | ")
+    }
+
+    /// Splits a pattern on its top-level `|`, ignoring `|` inside a predicate
+    /// `[...]` or a function call `(...)`.
+    private static func splitUnion(_ pattern: String) -> [Substring] {
+        var parts: [Substring] = []
+        var depth = 0
+        var start = pattern.startIndex
+        var index = pattern.startIndex
+        while index < pattern.endIndex {
+            switch pattern[index] {
+            case "[", "(": depth += 1
+            case "]", ")": depth -= 1
+            case "|" where depth == 0:
+                parts.append(pattern[start ..< index])
+                start = pattern.index(after: index)
+            default: break
+            }
+            index = pattern.index(after: index)
+        }
+        parts.append(pattern[start...])
+        return parts
+    }
+
     /// The XPath `id()` definition exactly: only attributes the DTD
     /// declares as type ID identify elements; a document without ID
     /// declarations yields the empty set.
