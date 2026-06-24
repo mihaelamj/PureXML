@@ -27,6 +27,20 @@ extension PureXML.XPath {
             }
         }
 
+        /// Whether the axis yields disjoint node-sets from distinct context nodes,
+        /// so accumulating its results across a step's context nodes can never
+        /// produce a duplicate and needs no cross-context de-duplication. A child,
+        /// attribute, or namespace node belongs to exactly one element, and the
+        /// self axis maps each distinct context to itself; every other axis
+        /// (descendant, ancestor, the siblings, following/preceding, parent) can
+        /// reach one node from two different contexts.
+        var yieldsDisjointResults: Bool {
+            switch self {
+            case .child, .attribute, .namespace, .selfAxis: true
+            default: false
+            }
+        }
+
         /// The principal node kind of the axis: attributes for the attribute axis,
         /// namespaces for the namespace axis, elements otherwise. Governs what a
         /// name test or `*` selects.

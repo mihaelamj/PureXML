@@ -60,6 +60,7 @@ offsets throughout; libxml2's xmlReadMemory takes an int byte count).
 | 6 | byte-level markup dispatch (the single byte after `<` selects end-tag/PI/declaration/start-tag, replacing up to five literal string comparisons per element with one byte peek) | 0.147 s (9.0x) | unchanged | unchanged |
 | 7 | `sawAmpersand` short-circuit for attribute values (the byte scanner notes any `&`; an ampersand-free value skips the reference-decode pass and its full re-scan); measured against same-state baseline, every run below every baseline run | 0.143 s (~4% vs baseline) | unchanged | unchanged |
 | 8 | serialize escaping fast path (text/attribute/comment/PI return the value unchanged when no character needs escaping, instead of rebuilding it character by character; byte-level scan for the escapable bytes) | unchanged | unchanged | 0.032 s (2.7x, from 5.5x) |
+| 9 | skip cross-context node-set de-duplication on a single context or a disjoint axis (child/attribute/namespace/self); the `Set<Node>` hashing and copying was pure overhead where no duplicate can arise, same output (same-state A/B, ~28%) | unchanged | 0.097 s (10x, from 13x) | unchanged |
 
 ## Profile findings (first sample, parse path)
 

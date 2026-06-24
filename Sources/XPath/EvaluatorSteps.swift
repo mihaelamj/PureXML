@@ -15,19 +15,38 @@ extension PureXML.XPath.Evaluator {
         var current = start
         for step in steps {
             var result: [Node] = []
-            var seen: Set<Node> = []
-            for contextNode in current {
-                let matched = PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
-                    .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
-                let filtered = try applyPredicates(step.predicates, to: matched, context)
-                for node in filtered where seen.insert(node).inserted {
-                    result.append(node)
+            // Cross-context de-duplication is needed only when two distinct
+            // context nodes can reach the same node. With at most one context, or
+            // on an axis whose results are disjoint per context (child, attribute,
+            // namespace, self), no duplicate can arise, so accumulate directly:
+            // the `Set` path below produces the identical sequence (every insert
+            // succeeds) at the cost of hashing and copying every node.
+            if current.count <= 1 || step.axis.yieldsDisjointResults {
+                for contextNode in current {
+                    try result.append(contentsOf: stepNodes(step, from: contextNode, context))
+                    try context.checkBudget(result.count)
                 }
-                try context.checkBudget(result.count)
+            } else {
+                var seen: Set<Node> = []
+                for contextNode in current {
+                    for node in try stepNodes(step, from: contextNode, context) where seen.insert(node).inserted {
+                        result.append(node)
+                    }
+                    try context.checkBudget(result.count)
+                }
             }
             current = result
         }
         return current
+    }
+
+    /// The nodes a single `step` selects from one `contextNode`: the axis nodes
+    /// that pass the node test, then the step's predicates (applied per context,
+    /// as XPath proximity position requires).
+    private static func stepNodes(_ step: Step, from contextNode: Node, _ context: EvaluationContext) throws -> [Node] {
+        let matched = PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
+            .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
+        return try applyPredicates(step.predicates, to: matched, context)
     }
 
     /// Filters nodes through each predicate in turn. A numeric predicate is a
