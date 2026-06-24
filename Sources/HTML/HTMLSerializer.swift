@@ -61,9 +61,13 @@ extension PureXML.HTML {
             return " \(name)=\"\(escaped)\""
         }
 
-        /// Escapes a URI-valued attribute value (XSLT 1.0 16.2, HTML 4.01 B.2.1):
-        /// each non-ASCII or control character is percent-escaped as the uppercase
-        /// hex of its UTF-8 bytes, while `"` and `&` keep their entity form.
+        /// Escapes a URI-valued attribute value (XSLT 1.0 16.2, HTML 4.01 B.2.1,
+        /// the libxml2 HTML output model): each non-ASCII or control character, and
+        /// every space (leading ones included, where libxml2 skips them), is
+        /// percent-escaped as the uppercase hex of its UTF-8 bytes, while `"` and
+        /// `&` keep their entity form. A parse-then-serialize round-trip thus
+        /// normalizes a space or non-ASCII byte in these attributes to `%HH`; this
+        /// is idempotent, since a literal `%` is left as is.
         private static func escapeURI(_ value: String) -> String {
             var result = ""
             for scalar in value.unicodeScalars {

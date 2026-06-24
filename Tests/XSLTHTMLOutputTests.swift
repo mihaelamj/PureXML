@@ -69,6 +69,14 @@ struct XSLTHTMLOutputTests {
         #expect(out == "<q cite=\"b%C3%AB.xml\" title=\"b&euml;\" href=\"a%20b&amp;c\"></q>")
     }
 
+    @Test("URI-attribute percent-escaping is idempotent")
+    func test_uriEscapingIdempotent() throws {
+        // A space becomes %20 once; an already-escaped value is stable because a
+        // literal `%` is left as is (so a parse-serialize round-trip converges).
+        #expect(try transform(htmlStyle("<a href=\"x y\"/>"), "<x/>") == "<a href=\"x%20y\"></a>")
+        #expect(try transform(htmlStyle("<a href=\"x%20y\"/>"), "<x/>") == "<a href=\"x%20y\"></a>")
+    }
+
     @Test("the html method serializes a namespaced element as XML, not HTML")
     func test_namespacedElementAsXML() throws {
         // XSLT 1.0 16.2: an element whose expanded-name has a non-null namespace
