@@ -57,6 +57,17 @@ struct XSLTHTMLOutputTests {
         #expect(try transform(style, "<x/>") == "<a title=\"&lt;x&gt;\">t</a>")
     }
 
+    @Test("the html method serializes a namespaced element as XML, not HTML")
+    func test_namespacedElementAsXML() throws {
+        // XSLT 1.0 16.2: an element whose expanded-name has a non-null namespace
+        // URI is output as XML (empty elements self-close, the namespace is
+        // declared once), not HTML; a null-namespace element stays HTML (see
+        // test_voidElement). The html serializer otherwise left empty namespaced
+        // elements unclosed and repeated xmlns on every element.
+        let out = try transform(htmlStyle("<svg xmlns=\"urn:svg\"><rect/><g><circle/></g></svg>"), "<x/>")
+        #expect(out == "<svg xmlns=\"urn:svg\"><rect/><g><circle/></g></svg>")
+    }
+
     @Test("The XML output method still self-closes empty elements")
     func test_xmlStillSelfCloses() throws {
         let style = """

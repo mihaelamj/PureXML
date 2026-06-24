@@ -43,16 +43,7 @@ public extension PureXML.XSLT {
             // never "unescaped".
             return sheet.usesRawText ? RawText.stripped(textValue(of: result)) : textValue(of: result)
         }
-        let body: String
-        if method == "html" {
-            body = PureXML.HTML.serialize(withContentTypeMeta(result, encoding: sheet.output.encoding ?? "UTF-8"))
-        } else {
-            let fixed = XSLTNamespaceFixup.apply(result)
-            let prepared = withCDATASections(fixed, sheet.output.cdataSectionElements)
-            var emitOptions = options.applying(sheet.output)
-            if sheet.output.omitXMLDeclaration == nil { emitOptions.includeXMLDeclaration = true }
-            body = PureXML.serialize(prepared, options: emitOptions)
-        }
+        let body = serializedBody(result, sheet: sheet, options: options, method: method)
         // The XML declaration stays first; the doctype follows it.
         let resolved = sheet.usesRawText ? RawText.resolve(body) : body
         let documentType = doctype(for: result, sheet.output, method: method)
@@ -211,6 +202,40 @@ public extension PureXML.XSLT {
         case let .document(children): children.compactMap(\.element).first?.name.description
         default: nil
         }
+    }
+
+    /// Serializes the result tree by output method. 16.2 outputs a
+    /// non-null-namespace element as XML rather than HTML; this is applied at
+    /// document-element granularity, not per element: a namespaced document
+    /// element serializes the whole tree as XML (the html method still omitting
+    /// the XML declaration), so a tree mixing null- and non-null-namespace
+    /// elements follows its document element's path. The realistic result is
+    /// all-null (HTML) or all-namespaced (XML); the html null-namespace path is
+    /// unchanged.
+    private static func serializedBody(_ result: PureXML.Model.Node, sheet: Stylesheet, options: PureXML.Emitting.Options, method: String) -> String {
+        if method == "html", !documentElementIsNamespaced(result) {
+            return PureXML.HTML.serialize(withContentTypeMeta(result, encoding: sheet.output.encoding ?? "UTF-8"))
+        }
+        let fixed = XSLTNamespaceFixup.apply(result)
+        let prepared = withCDATASections(fixed, sheet.output.cdataSectionElements)
+        var emitOptions = options.applying(sheet.output)
+        if method == "html" {
+            emitOptions.includeXMLDeclaration = false
+        } else if sheet.output.omitXMLDeclaration == nil {
+            emitOptions.includeXMLDeclaration = true
+        }
+        return PureXML.serialize(prepared, options: emitOptions)
+    }
+
+    /// Whether the result's document element has a non-null namespace URI, which
+    /// the html output method serializes as XML rather than HTML (16.2).
+    private static func documentElementIsNamespaced(_ node: PureXML.Model.Node) -> Bool {
+        let element: PureXML.Model.Element? = switch node {
+        case let .element(element): element
+        case let .document(children): children.compactMap(\.element).first
+        default: nil
+        }
+        return !((element?.name.namespaceURI) ?? "").isEmpty
     }
 
     /// Transforms `source` with `stylesheet`, returning the result tree.
