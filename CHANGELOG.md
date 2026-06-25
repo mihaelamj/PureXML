@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-06-26
+
 ### Fixed
 
 - `xsl:number` levels `single` and `multiple` are no longer quadratic when numbering a wide list. Each numbered node was ranked among its siblings by rescanning the parent's child list, so numbering n siblings was O(n^2). The rank now comes from a per-parent, per-count-pattern cache built once (using the transformer's match cache, so a count test is O(1)), making the numbering linear. The numbers are unchanged. Numbering 8000 list items with the default `xsl:number` drops from about 3.5 s to about 0.04 s (~90x). Guarded by `XSLTNumberSingleTests`.
