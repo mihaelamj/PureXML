@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-25
+
 ### Changed
 
 - XPath compiles a step's node test once per query instead of re-evaluating its fixed structure on every node. The descendant and attribute walks tested each candidate through a closure that called `matchesTree`/`matchesAttribute` with the step's `NodeTest` and the evaluation `namespaces` dictionary, so the dominant traversal of a `//name`-style query passed (and reference-counted) the namespace dictionary by value on every one of tens of thousands of nodes. `compiledTreeTest`, `compiledAttributeTest`, and `compiledNodeTest` resolve the parts that do not change as the walk moves (the axis principal kind, whether eval-time bindings are in effect, the prefix-wildcard shape of the test name) exactly once, returning a tight per-node closure that captures only the local name. The selected nodes are identical to the unfused `matchesTree`/`matchesAttribute`/`matches` path. Measured `xpath` ~35% faster on the 20k-item generated corpus via a same-machine-state A/B (from ~2.0x to ~1.3x slower than libxml2). Guarded by `XPathCompiledNodeTestTests`, an exhaustive differential over every node, test, axis, and binding asserting the compiled closures equal the functions they specialize, and confirmed by an adversarial equivalence review.
