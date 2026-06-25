@@ -67,6 +67,38 @@ extension PureXML.XPath {
             }
         }
 
+        /// The descendants of `tree` that satisfy `keep`, in document order. The
+        /// whole subtree is still traversed (every node may have matching
+        /// descendants), but a node `keep` rejects is never wrapped in a ``Node``,
+        /// so it is never retained. This fuses a step's node test into the axis
+        /// walk, the common case being `descendant::name` over a wide subtree
+        /// where most nodes do not match.
+        static func descendants(of tree: PureXML.Model.TreeNode, where keep: (PureXML.Model.TreeNode) -> Bool) -> [Node] {
+            var result: [Node] = []
+            appendDescendants(of: tree, where: keep, into: &result)
+            return result
+        }
+
+        /// `descendant-or-self` with a `keep` filter: the context node itself is
+        /// tested first, then its descendants.
+        static func descendantsOrSelf(of tree: PureXML.Model.TreeNode, where keep: (PureXML.Model.TreeNode) -> Bool) -> [Node] {
+            var result: [Node] = []
+            if keep(tree) { result.append(.tree(tree)) }
+            appendDescendants(of: tree, where: keep, into: &result)
+            return result
+        }
+
+        private static func appendDescendants(
+            of tree: PureXML.Model.TreeNode,
+            where keep: (PureXML.Model.TreeNode) -> Bool,
+            into result: inout [Node],
+        ) {
+            for child in tree.children {
+                if keep(child) { result.append(.tree(child)) }
+                appendDescendants(of: child, where: keep, into: &result)
+            }
+        }
+
         static func ancestors(of node: Node) -> [Node] {
             var result: [Node] = []
             var current = node.parent

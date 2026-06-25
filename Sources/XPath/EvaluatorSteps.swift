@@ -44,9 +44,25 @@ extension PureXML.XPath.Evaluator {
     /// that pass the node test, then the step's predicates (applied per context,
     /// as XPath proximity position requires).
     private static func stepNodes(_ step: Step, from contextNode: Node, _ context: EvaluationContext) throws -> [Node] {
-        let matched = PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
-            .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
+        let matched = matchedAxisNodes(step, from: contextNode, context)
         return try applyPredicates(step.predicates, to: matched, context)
+    }
+
+    /// The axis nodes that pass the step's node test. For the descendant family
+    /// over a tree context the test is fused into the traversal so a node the
+    /// test rejects is never wrapped (and so never retained); every other axis
+    /// builds the axis node list and filters it.
+    private static func matchedAxisNodes(_ step: Step, from contextNode: Node, _ context: EvaluationContext) -> [Node] {
+        if case let .tree(tree) = contextNode {
+            let keep: (PureXML.Model.TreeNode) -> Bool = { matchesTree($0, step.test, on: step.axis, context.namespaces) }
+            switch step.axis {
+            case .descendant: return PureXML.XPath.AxisNavigation.descendants(of: tree, where: keep)
+            case .descendantOrSelf: return PureXML.XPath.AxisNavigation.descendantsOrSelf(of: tree, where: keep)
+            default: break
+            }
+        }
+        return PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
+            .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
     }
 
     /// Filters nodes through each predicate in turn. A numeric predicate is a
@@ -82,19 +98,43 @@ extension PureXML.XPath.Evaluator {
     // MARK: Node tests
 
     static func matches(_ node: Node, _ test: NodeTest, on axis: Axis, namespaces: [String: String] = [:]) -> Bool {
+        if case let .tree(tree) = node {
+            return matchesTree(tree, test, on: axis, namespaces)
+        }
+        // Attribute and namespace nodes: a name or wildcard test selects them
+        // (by the axis's principal kind), `node()` matches anything, and the
+        // kind tests (text/comment/processing-instruction) never match a node
+        // that is not a tree node.
+        switch test {
+        case let .name(name): return nameMatches(node, name, axis.principalKind, namespaces)
+        case .wildcard: return wildcardMatches(node, axis.principalKind)
+        case .node: return true
+        case .text, .comment, .processingInstruction: return false
+        }
+    }
+
+    /// The node test applied directly to a tree node, the single-node core of
+    /// ``matches`` for a `.tree` node. Taking the ``TreeNode`` rather than a
+    /// wrapped ``Node`` lets the descendant traversal test a candidate without
+    /// first wrapping (and so retaining) it, so a node the test rejects is never
+    /// retained. ``matches`` delegates here for every tree node, keeping one
+    /// source of truth.
+    static func matchesTree(_ tree: PureXML.Model.TreeNode, _ test: NodeTest, on axis: Axis, _ namespaces: [String: String]) -> Bool {
         switch test {
         case let .name(name):
-            nameMatches(node, name, axis.principalKind, namespaces)
+            guard axis.principalKind == .element, tree.kind == .element, let qualified = tree.name else { return false }
+            return qualifiedMatches(qualified, name, namespaces)
         case .wildcard:
-            wildcardMatches(node, axis.principalKind)
+            return axis.principalKind == .element && tree.kind == .element
         case .text:
-            isTreeKind(node, in: [.text, .cdata])
+            return tree.kind == .text || tree.kind == .cdata
         case .node:
-            true
+            return true
         case .comment:
-            isTreeKind(node, in: [.comment])
+            return tree.kind == .comment
         case let .processingInstruction(target):
-            processingInstructionMatches(node, target)
+            guard tree.kind == .processingInstruction else { return false }
+            return target == nil || tree.name?.description == target
         }
     }
 
