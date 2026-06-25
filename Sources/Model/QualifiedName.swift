@@ -45,6 +45,31 @@ public extension PureXML.Model {
             }
         }
 
+        /// Builds a name whose first colon is already known by byte offset (the
+        /// byte scanner found it while reading the name), so the prefix split
+        /// needs no second scan. `colonOffset` is nil for the common unprefixed
+        /// name. The split follows ``init(_:)`` exactly: a colon at the start or
+        /// end (`:local`, `prefix:`) does not split. The name is all-ASCII, so a
+        /// byte offset is a character offset.
+        init(ascii raw: String, colonOffset: Int?) {
+            namespaceURI = nil
+            guard let colonOffset else {
+                prefix = nil
+                localName = raw
+                return
+            }
+            let colon = raw.index(raw.startIndex, offsetBy: colonOffset)
+            let head = String(raw[raw.startIndex ..< colon])
+            let tail = String(raw[raw.index(after: colon)...])
+            if head.isEmpty || tail.isEmpty {
+                prefix = nil
+                localName = raw
+            } else {
+                prefix = head
+                localName = tail
+            }
+        }
+
         /// The full `prefix:local` rendering used in serialized output.
         public var description: String {
             guard let prefix else { return localName }
