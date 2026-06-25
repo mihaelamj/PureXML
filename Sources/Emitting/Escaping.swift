@@ -13,28 +13,43 @@ extension PureXML.Emitting {
             }
             var result = ""
             var runStart = value.startIndex
-            var index = value.startIndex
-            while index < value.endIndex {
-                let character = value[index]
-                let escaped: String? = switch character {
-                case "&": "&amp;"
-                case "<": "&lt;"
-                case ">": "&gt;"
-                case "\r" where escapeCarriageReturn: "&#xD;"
-                default: asciiOnly ? plainIfNonASCII(character) : nil
-                }
-                let next = value.index(after: index)
-                if let escaped {
-                    // Copy the verbatim run before this character in one append
-                    // rather than appending each unescaped character on its own.
-                    if runStart < index { result += value[runStart ..< index] }
-                    result += escaped
-                    runStart = next
-                }
-                index = next
+            // Find each character that needs escaping by scanning bytes (every
+            // trigger is an ASCII marker, or in ASCII-only mode a non-ASCII lead
+            // byte, both of which fall on a grapheme boundary), copy the verbatim
+            // run before it in one append, and rewrite only that character.
+            while let marker = value.utf8[runStart...].firstIndex(where: {
+                textEscapableByte($0, asciiOnly: asciiOnly, escapeCarriageReturn: escapeCarriageReturn)
+            }) {
+                if runStart < marker { result += value[runStart ..< marker] }
+                let character = value[marker]
+                result += textEscape(character, asciiOnly: asciiOnly, escapeCarriageReturn: escapeCarriageReturn) ?? String(character)
+                runStart = value.index(after: marker)
             }
             if runStart < value.endIndex { result += value[runStart...] }
             return result
+        }
+
+        /// Whether a byte can begin a character ``text`` must escape: an ASCII
+        /// markup byte, a carriage return when asked, or any non-ASCII lead byte
+        /// in ASCII-only mode (its character is reference-escaped whole).
+        private static func textEscapableByte(_ byte: UInt8, asciiOnly: Bool, escapeCarriageReturn: Bool) -> Bool {
+            switch byte {
+            case 0x26, 0x3C, 0x3E: true
+            case 0x0D where escapeCarriageReturn: true
+            case 0x80... where asciiOnly: true
+            default: false
+            }
+        }
+
+        /// The escaped form of one content character, or nil when it is verbatim.
+        private static func textEscape(_ character: Character, asciiOnly: Bool, escapeCarriageReturn: Bool) -> String? {
+            switch character {
+            case "&": "&amp;"
+            case "<": "&lt;"
+            case ">": "&gt;"
+            case "\r" where escapeCarriageReturn: "&#xD;"
+            default: asciiOnly ? plainIfNonASCII(character) : nil
+            }
         }
 
         /// Whether ``text`` would change `value`: it escapes `&`, `<`, `>` always,
@@ -80,19 +95,27 @@ extension PureXML.Emitting {
             }
             var result = ""
             var runStart = value.startIndex
-            var index = value.startIndex
-            while index < value.endIndex {
-                let character = value[index]
-                let next = value.index(after: index)
-                if let escaped = attributeEscape(character, quote: quote, asciiOnly: asciiOnly) {
-                    if runStart < index { result += value[runStart ..< index] }
-                    result += escaped
-                    runStart = next
-                }
-                index = next
+            while let marker = value.utf8[runStart...].firstIndex(where: {
+                attributeEscapableByte($0, quoteByte: quoteByte, asciiOnly: asciiOnly)
+            }) {
+                if runStart < marker { result += value[runStart ..< marker] }
+                let character = value[marker]
+                result += attributeEscape(character, quote: quote, asciiOnly: asciiOnly) ?? String(character)
+                runStart = value.index(after: marker)
             }
             if runStart < value.endIndex { result += value[runStart...] }
             return result
+        }
+
+        /// Whether a byte can begin a character ``attribute`` must escape: the
+        /// quote, an ASCII markup or whitespace byte, or a non-ASCII lead byte in
+        /// ASCII-only mode.
+        private static func attributeEscapableByte(_ byte: UInt8, quoteByte: UInt8, asciiOnly: Bool) -> Bool {
+            switch byte {
+            case quoteByte, 0x26, 0x3C, 0x3E, 0x09, 0x0A, 0x0D: true
+            case 0x80... where asciiOnly: true
+            default: false
+            }
         }
 
         /// The escaped form of one attribute-value character, or nil when it is

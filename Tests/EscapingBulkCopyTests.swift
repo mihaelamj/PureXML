@@ -40,6 +40,11 @@ struct EscapingBulkCopyTests {
         "&<>", "&start", "end&", "&&&",
         "café & thé", "e\u{0301} < x", "\u{1F600}&\u{1F601}",
         "tab\tnewline\ncr\r", "naïve résumé",
+        // Combining marks: in ASCII-only mode the scan's first byte >= 0x80 is the
+        // mark's lead byte, mid-grapheme; the whole cluster must still escape as a
+        // unit, not duplicate or drop the base letter.
+        "e\u{0301}", "a\u{0301}b", "e\u{0301}\u{0301}", "x\u{0301}y\u{0301}z", "a\u{0301}<b",
+        "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}", "\u{1F1FA}\u{1F1F8}",
         String(repeating: "x", count: 300) + "&" + String(repeating: "y", count: 300),
     ]
 
