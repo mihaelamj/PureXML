@@ -49,10 +49,31 @@ extension PureXML.XPath {
         }
 
         /// The index of the first occurrence of `needle` in `haystack`, or nil.
+        /// Linear-time (Knuth-Morris-Pratt): matching `needle` at every position
+        /// of `haystack` is O(n*m) and quadratic on a repetitive string (a denial
+        /// of service vector on untrusted input); KMP never rescans, so it is
+        /// O(n+m).
         private static func search(_ needle: [Character], in haystack: [Character]) -> Int? {
             guard !needle.isEmpty else { return 0 }
-            for start in haystack.indices where haystack[start...].starts(with: needle) {
-                return start
+            guard needle.count <= haystack.count else { return nil }
+            // The failure function: failure[i] is the length of the longest
+            // proper prefix of needle[0...i] that is also a suffix of it.
+            var failure = [Int](repeating: 0, count: needle.count)
+            var prefix = 0
+            for index in 1 ..< needle.count {
+                while prefix > 0, needle[index] != needle[prefix] {
+                    prefix = failure[prefix - 1]
+                }
+                if needle[index] == needle[prefix] { prefix += 1 }
+                failure[index] = prefix
+            }
+            var matched = 0
+            for index in haystack.indices {
+                while matched > 0, haystack[index] != needle[matched] {
+                    matched = failure[matched - 1]
+                }
+                if haystack[index] == needle[matched] { matched += 1 }
+                if matched == needle.count { return index - needle.count + 1 }
             }
             return nil
         }
@@ -80,14 +101,28 @@ extension PureXML.XPath {
             let source = argument(arguments, 0)
             let from = Array(argument(arguments, 1))
             let replacements = Array(argument(arguments, 2))
-            var result = ""
-            for character in source {
-                guard let index = from.firstIndex(of: character) else {
-                    result.append(character)
-                    continue
-                }
+            // Build the translation map once: a from-character maps to its
+            // replacement, or is marked for deletion when it has no positional
+            // replacement. The first occurrence in `from` wins (the XPath rule).
+            // Each source character is then translated by an O(1) lookup rather
+            // than a linear scan of `from`, which made this quadratic.
+            var replace: [Character: Character] = [:]
+            var delete: Set<Character> = []
+            for (index, character) in from.enumerated() {
+                if replace[character] != nil || delete.contains(character) { continue }
                 if index < replacements.count {
-                    result.append(replacements[index])
+                    replace[character] = replacements[index]
+                } else {
+                    delete.insert(character)
+                }
+            }
+            var result = ""
+            result.reserveCapacity(source.count)
+            for character in source {
+                if let replacement = replace[character] {
+                    result.append(replacement)
+                } else if !delete.contains(character) {
+                    result.append(character)
                 }
             }
             return result

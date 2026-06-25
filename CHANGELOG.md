@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The `translate()` and `contains()`/`substring-before()`/`substring-after()` string functions are no longer quadratic. `translate()` scanned its `from` string for every source character (O(string * from)); it now builds the from-to map once and translates each character with an O(1) lookup. The substring functions matched the needle at every position of the haystack (O(n*m), quadratic and a denial-of-service vector on a repetitive untrusted string); they now use a linear-time Knuth-Morris-Pratt search. The results are unchanged (first-occurrence-wins translation, first-occurrence substring match). A large-alphabet `translate()` and a repetitive `contains()` each drop from hundreds of milliseconds to under a millisecond at 4k-16k characters. Guarded by `TranslateFunctionTests` and `SubstringSearchTests`.
+
 ## [0.4.5] - 2026-06-25
 
 ### Fixed
