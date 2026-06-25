@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The XPath descendant and descendant-or-self axes build their node list through a single shared accumulator instead of concatenating a freshly built array at every node. `descendants(of:)` recursed on wrapped nodes and did `result.append(contentsOf: descendants(of: child))` at each level, allocating and copying an array per node (roughly O(n x depth) work over the subtree); it now recurses on the raw tree node and appends into one `inout` accumulator (O(n)). For a `//`-style query over a wide document this is the dominant cost: measured `xpath` ~46% faster on the 20k-item generated corpus via a same-machine-state A/B, with the identical node-set in the identical order (the change is purely how the array is built).
+
 ## [0.4.0] - 2026-06-25
 
 ### Fixed
