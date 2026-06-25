@@ -11,7 +11,7 @@ extension PureXML.XPath.Compiler {
         skipSpace()
         guard try isPrimaryStart() else {
             let (absolute, steps) = try parseLocationPath()
-            return .path(absolute: absolute, steps: steps)
+            return .path(absolute: absolute, steps: Self.fuseDescendantSteps(steps))
         }
         let primary = try parsePrimary()
         let predicates = try parsePredicates()
@@ -28,7 +28,7 @@ extension PureXML.XPath.Compiler {
         if predicates.isEmpty, steps.isEmpty {
             return primary
         }
-        return .filter(primary: primary, predicates: predicates, steps: steps)
+        return .filter(primary: primary, predicates: predicates, steps: Self.fuseDescendantSteps(steps))
     }
 
     private mutating func isPrimaryStart() throws -> Bool {
