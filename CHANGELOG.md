@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-06-25
+
 ### Fixed
 
 - `key()`, `id()`, and the EXSLT `set:leading`/`set:trailing` functions no longer rescan a node's siblings per comparison, which made them quadratic over a wide flat fan-out. They sorted their result with `sorted(by: Node.precedes)`, which recomputes both nodes' document-order keys on every comparison (each key a linear scan of a wide parent), and `key()` additionally deduplicated its matches with a linear membership scan. They now sort through `sortedByDocumentOrder()` (each key computed once, behind a shared sibling-index cache) and `key()` deduplicates through a set. The selected nodes, their document order, and the deduplication are unchanged. A `key()`-driven transform over a 20k-element document drops from about 1.15 s to about 0.43 s (~2.7x); the Apache Xalan gold-output corpus stays byte-identical. Guarded by `XSLTKeyIdOrderTests`.
