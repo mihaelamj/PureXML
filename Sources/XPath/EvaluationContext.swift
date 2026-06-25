@@ -7,21 +7,79 @@ extension PureXML.XPath {
     /// node, its position and size within the current node-set, the variable
     /// bindings, and the function library. Predicates and the `position()` and
     /// `last()` functions read the position and size.
+    /// The part of an evaluation that does not change as the focus moves from
+    /// node to node: the variable bindings, the function library, the namespace
+    /// bindings, and the budget. Held by reference so that re-focusing on each
+    /// node of a node-set (see ``EvaluationContext/focused(on:position:size:)``,
+    /// called once per node of a predicate's input) shares it rather than copying
+    /// (and reference-counting) three dictionaries every time.
+    final class Environment {
+        let variables: [String: Value]
+        let functions: FunctionTable
+        let namespaces: [String: String]
+        let budget: Budget?
+
+        init(variables: [String: Value], functions: FunctionTable, namespaces: [String: String], budget: Budget?) {
+            self.variables = variables
+            self.functions = functions
+            self.namespaces = namespaces
+            self.budget = budget
+        }
+    }
+
     struct EvaluationContext {
         var node: Node
         var position: Int
         var size: Int
-        var variables: [String: Value]
-        var functions: FunctionTable
+        /// The focus-independent bindings, shared across every re-focus.
+        let environment: Environment
+
+        var variables: [String: Value] {
+            environment.variables
+        }
+
+        var functions: FunctionTable {
+            environment.functions
+        }
+
         /// Prefix-to-URI bindings supplied at evaluation time, so a name test like
         /// `x:foo` resolves `x` to a URI and matches by namespace rather than by the
         /// document's own prefix. When any bindings are supplied the XPath 1.0
         /// rule applies exactly: an unprefixed name test selects only the null
         /// namespace. Empty by default, in which case matching falls back to
         /// the in-document prefix string.
-        var namespaces: [String: String] = [:]
+        var namespaces: [String: String] {
+            environment.namespaces
+        }
+
         /// The optional protective budget; nil evaluates unbounded.
-        var budget: Budget?
+        var budget: Budget? {
+            environment.budget
+        }
+
+        init(node: Node, position: Int, size: Int, environment: Environment) {
+            self.node = node
+            self.position = position
+            self.size = size
+            self.environment = environment
+        }
+
+        init(
+            node: Node,
+            position: Int,
+            size: Int,
+            variables: [String: Value],
+            functions: FunctionTable,
+            namespaces: [String: String] = [:],
+            budget: Budget? = nil,
+        ) {
+            self.init(
+                node: node,
+                position: position,
+                size: size,
+                environment: Environment(variables: variables, functions: functions, namespaces: namespaces, budget: budget),
+            )
+        }
 
         /// Throws when `count` exceeds the budget's node-set cap.
         func checkBudget(_ count: Int) throws {
@@ -31,17 +89,10 @@ extension PureXML.XPath {
         }
 
         /// A copy positioned on `node` at one-based `position` within a node-set of
-        /// `size`, keeping the same variables, functions, and namespace bindings.
+        /// `size`, sharing the same environment (variables, functions, namespaces,
+        /// budget) rather than copying it.
         func focused(on node: Node, position: Int, size: Int) -> EvaluationContext {
-            EvaluationContext(
-                node: node,
-                position: position,
-                size: size,
-                variables: variables,
-                functions: functions,
-                namespaces: namespaces,
-                budget: budget,
-            )
+            EvaluationContext(node: node, position: position, size: size, environment: environment)
         }
     }
 
