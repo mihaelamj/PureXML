@@ -12,6 +12,7 @@ enum XSLTNumbering {
         level: String,
         count: String?,
         from: String?,
+        siblingCache: SiblingPositionCache? = nil,
         matches: (Tree, String) -> Bool,
     ) -> [Int] {
         func matchesCount(_ candidate: Tree) -> Bool {
@@ -21,13 +22,21 @@ enum XSLTNumbering {
         func matchesFrom(_ candidate: Tree) -> Bool {
             from.map { matches(candidate, $0) } ?? false
         }
+        // The count test is the same for every candidate of this call, so the
+        // sibling-position cache can key by it. An explicit count is identified
+        // by its pattern; the default count by the node's kind and name (a NUL
+        // prefix keeps it out of the pattern-string space).
+        let patternKey = count ?? "\u{0}\(node.kind):\(node.name?.description ?? "")"
+        func position(of candidate: Tree) -> Int {
+            siblingPosition(of: candidate, matching: matchesCount, cache: siblingCache, patternKey: patternKey)
+        }
         switch level {
         case "multiple":
             var counts: [Int] = []
             var current: Tree? = node
             while let candidate = current, !matchesFrom(candidate) {
                 if matchesCount(candidate) {
-                    counts.append(siblingPosition(of: candidate, matching: matchesCount))
+                    counts.append(position(of: candidate))
                 }
                 current = candidate.parent
             }
@@ -46,7 +55,7 @@ enum XSLTNumbering {
                 // The count node may be the from node itself when it matches both
                 // patterns (7.7), so test count before stopping at the boundary.
                 if matchesCount(candidate) {
-                    return [siblingPosition(of: candidate, matching: matchesCount)]
+                    return [position(of: candidate)]
                 }
                 if matchesFrom(candidate) { break }
                 current = candidate.parent
@@ -55,15 +64,49 @@ enum XSLTNumbering {
         }
     }
 
-    /// 1 + the count of preceding siblings the count pattern matches.
-    private static func siblingPosition(of node: Tree, matching matchesCount: (Tree) -> Bool) -> Int {
+    /// 1 + the count of preceding siblings the count pattern matches, i.e. the
+    /// node's one-based rank among the parent's matching children. With a cache,
+    /// each parent's matching children are ranked once and reused, so numbering
+    /// a wide list is linear rather than quadratic.
+    private static func siblingPosition(
+        of node: Tree,
+        matching matchesCount: (Tree) -> Bool,
+        cache: SiblingPositionCache?,
+        patternKey: String,
+    ) -> Int {
+        guard let parent = node.parent else { return 1 }
+        if let cache {
+            return cache.rank(of: node, in: parent, patternKey: patternKey, matching: matchesCount)
+        }
         var position = 1
-        guard let parent = node.parent else { return position }
         for sibling in parent.children {
             if sibling === node { break }
             if matchesCount(sibling) { position += 1 }
         }
         return position
+    }
+
+    /// Caches, per parent and count pattern, the one-based rank of each matching
+    /// child among the parent's matching children, so `xsl:number` level single
+    /// and multiple do not rescan the child list for every numbered node.
+    final class SiblingPositionCache {
+        /// parent -> count pattern -> child -> one-based rank among matches.
+        private var ranks: [ObjectIdentifier: [String: [ObjectIdentifier: Int]]] = [:]
+
+        func rank(of node: Tree, in parent: Tree, patternKey: String, matching matchesCount: (Tree) -> Bool) -> Int {
+            let parentIdentity = ObjectIdentifier(parent)
+            if let table = ranks[parentIdentity]?[patternKey] {
+                return table[ObjectIdentifier(node)] ?? 1
+            }
+            var built: [ObjectIdentifier: Int] = [:]
+            var rank = 0
+            for child in parent.children where matchesCount(child) {
+                rank += 1
+                built[ObjectIdentifier(child)] = rank
+            }
+            ranks[parentIdentity, default: [:]][patternKey] = built
+            return built[ObjectIdentifier(node)] ?? 1
+        }
     }
 
     /// Visits `node` and everything before it in document order (ancestors

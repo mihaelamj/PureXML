@@ -18,6 +18,7 @@ extension PureXML.XSLT {
         let termination = Termination()
         private let matchCache = MatchCache()
         private let documentCache = PureXML.XSLT.DocumentCache()
+        let numberingCache = XSLTNumbering.SiblingPositionCache()
 
         /// The `xsl:message terminate="yes"` text, if one fired during `run()`.
         var terminationMessage: String? {
@@ -103,7 +104,6 @@ extension PureXML.XSLT {
         }
 
         func matches(_ node: PureXML.Model.TreeNode, _ pattern: String, _ namespaces: [String: String] = [:]) -> Bool {
-            // Patterns evaluate over the node's own document (so document()-loaded nodes match too).
             let documentRoot = Self.documentRoot(of: node)
             return matchCache.nodes(matching: pattern, over: documentRoot, functions: patternFunctions(), namespaces: namespaces).contains(ObjectIdentifier(node))
         }
