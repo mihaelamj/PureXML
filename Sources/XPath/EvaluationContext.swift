@@ -18,6 +18,10 @@ extension PureXML.XPath {
         let functions: FunctionTable
         let namespaces: [String: String]
         let budget: Budget?
+        /// Shared across the whole evaluation: the following and preceding axes
+        /// cache each document's ordered node list here instead of rebuilding it
+        /// per context node.
+        let documentNavigation = DocumentNavigationCache()
 
         init(variables: [String: Value], functions: FunctionTable, namespaces: [String: String], budget: Budget?) {
             self.variables = variables

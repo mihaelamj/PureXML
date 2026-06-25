@@ -5,8 +5,8 @@ extension PureXML.XPath {
     enum AxisNavigation {
         private static let xmlNamespaceURI = "http://www.w3.org/XML/1998/namespace"
 
-        static func nodes(on axis: Axis, from context: Node) -> [Node] {
-            verticalNodes(on: axis, from: context) ?? lateralNodes(on: axis, from: context)
+        static func nodes(on axis: Axis, from context: Node, cache: DocumentNavigationCache? = nil) -> [Node] {
+            verticalNodes(on: axis, from: context) ?? lateralNodes(on: axis, from: context, cache: cache)
         }
 
         /// The self, child, descendant, parent, and ancestor families; nil for an
@@ -25,12 +25,12 @@ extension PureXML.XPath {
         }
 
         /// The sibling, following/preceding, attribute, and namespace axes.
-        private static func lateralNodes(on axis: Axis, from context: Node) -> [Node] {
+        private static func lateralNodes(on axis: Axis, from context: Node, cache: DocumentNavigationCache?) -> [Node] {
             switch axis {
             case .followingSibling: followingSiblings(of: context)
             case .precedingSibling: precedingSiblings(of: context)
-            case .following: following(of: context)
-            case .preceding: preceding(of: context)
+            case .following: following(of: context, cache: cache)
+            case .preceding: preceding(of: context, cache: cache)
             case .attribute: attributes(of: context)
             case .namespace: namespaces(of: context)
             default: []
@@ -119,25 +119,70 @@ extension PureXML.XPath {
             return parent.children[..<index].reversed().map(Node.tree)
         }
 
-        private static func following(of node: Node) -> [Node] {
-            let all = documentNodes(of: node)
-            if let index = all.firstIndex(of: node) {
-                let excluded = Set(descendants(of: node))
-                return all[(index + 1)...].filter { !excluded.contains($0) }
+        private static func following(of node: Node, cache: DocumentNavigationCache?) -> [Node] {
+            guard let root = rootTree(of: node) else { return [] }
+            let document = orderedDocument(rootedAt: root, cache: cache)
+            if let index = document.index[node] {
+                // A node's descendants are the contiguous block right after it in
+                // document order, so the following axis begins just past the
+                // subtree. Skip it by index rather than scanning the whole tail
+                // and filtering each descendant out (which made this quadratic).
+                let start = index + 1 + descendantCount(of: node)
+                return start < document.nodes.count ? Array(document.nodes[start...]) : []
             }
             // An attribute or namespace start: document order places it after
             // its owner and before the owner's children, and it has no
             // descendants, so everything after the owner follows.
-            guard let owner = node.parent, let index = all.firstIndex(of: owner) else { return [] }
-            return Array(all[(index + 1)...])
+            guard let owner = node.parent, let index = document.index[owner] else { return [] }
+            return Array(document.nodes[(index + 1)...])
         }
 
-        private static func preceding(of node: Node) -> [Node] {
-            let all = documentNodes(of: node)
-            let anchorIndex = all.firstIndex(of: node) ?? node.parent.flatMap { all.firstIndex(of: $0) }
+        private static func preceding(of node: Node, cache: DocumentNavigationCache?) -> [Node] {
+            guard let root = rootTree(of: node) else { return [] }
+            let document = orderedDocument(rootedAt: root, cache: cache)
+            let anchorIndex = document.index[node] ?? node.parent.flatMap { document.index[$0] }
             guard let index = anchorIndex else { return [] }
+            // The excluded ancestors are few (the depth), so a membership filter
+            // over the preceding span is fine; the win here is the cached node
+            // list and the O(1) anchor lookup instead of a rebuild and scan.
             let excluded = Set(ancestors(of: node))
-            return all[..<index].filter { !excluded.contains($0) }.reversed()
+            return document.nodes[..<index].filter { !excluded.contains($0) }.reversed()
+        }
+
+        /// The number of tree-node descendants of `node`, matching what the
+        /// document node list counts after it (attribute and namespace nodes are
+        /// not in that list, so they are not counted).
+        private static func descendantCount(of node: Node) -> Int {
+            guard case let .tree(tree) = node else { return 0 }
+            return subtreeNodeCount(tree) - 1
+        }
+
+        private static func subtreeNodeCount(_ tree: PureXML.Model.TreeNode) -> Int {
+            var count = 1
+            for child in tree.children {
+                count += subtreeNodeCount(child)
+            }
+            return count
+        }
+
+        /// The document's nodes in document order plus a node-to-index map, built
+        /// once per document root and reused across the following and preceding
+        /// evaluations of one query.
+        private static func orderedDocument(
+            rootedAt root: PureXML.Model.TreeNode,
+            cache: DocumentNavigationCache?,
+        ) -> (nodes: [Node], index: [Node: Int]) {
+            if let cache, let hit = cache.byRoot[ObjectIdentifier(root)] { return hit }
+            var nodes: [Node] = []
+            appendSubtree(root, into: &nodes)
+            var index: [Node: Int] = [:]
+            index.reserveCapacity(nodes.count)
+            for (offset, node) in nodes.enumerated() {
+                index[node] = offset
+            }
+            let entry = (nodes: nodes, index: index)
+            cache?.byRoot[ObjectIdentifier(root)] = entry
+            return entry
         }
 
         private static func attributes(of node: Node) -> [Node] {
@@ -202,15 +247,6 @@ extension PureXML.XPath {
             return (parent, index)
         }
 
-        /// Every tree node of the containing document, in document order. Used to
-        /// derive the following and preceding axes by position.
-        private static func documentNodes(of node: Node) -> [Node] {
-            guard let root = rootTree(of: node) else { return [] }
-            var result: [Node] = []
-            appendSubtree(root, into: &result)
-            return result
-        }
-
         private static func appendSubtree(_ tree: PureXML.Model.TreeNode, into result: inout [Node]) {
             result.append(.tree(tree))
             for child in tree.children {
@@ -229,5 +265,16 @@ extension PureXML.XPath {
             }
             return current
         }
+    }
+
+    /// A per-query cache of each document's ordered node list and node-to-index
+    /// map, for the following and preceding axes. Without it those axes rebuild
+    /// the whole node list and linearly search it on every context node, which is
+    /// quadratic over a wide document. The document does not change during an
+    /// evaluation, so caching by root identity is safe.
+    final class DocumentNavigationCache {
+        fileprivate var byRoot: [ObjectIdentifier: (nodes: [Node], index: [Node: Int])] = [:]
+
+        init() {}
     }
 }

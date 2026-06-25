@@ -68,7 +68,11 @@ extension PureXML.XPath.Evaluator {
             }
         }
         let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
-        return PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode).filter(keep)
+        return PureXML.XPath.AxisNavigation.nodes(
+            on: step.axis,
+            from: contextNode,
+            cache: context.environment.documentNavigation,
+        ).filter(keep)
     }
 
     /// Filters nodes through each predicate in turn. A numeric predicate is a
