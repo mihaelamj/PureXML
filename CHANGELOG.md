@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.4] - 2026-06-25
+## [0.4.5] - 2026-06-25
 
 ### Fixed
 
 - The `following-sibling` and `preceding-sibling` axes no longer scan the parent's child list to locate the context node on every call, and fuse the step's node test into the walk. Locating the context among a wide parent's children was a linear scan independent of the result, so the axes were quadratic over many context siblings; the index now comes from the shared per-evaluation sibling-index cache, and a sibling the node test rejects is never wrapped. The selected siblings and their order are unchanged. Over a wide parent the gratuitous per-context scan and the non-match wrapping are removed (the per-context iteration over the siblings themselves is inherent to the axis). Guarded by `SiblingAxisTests`.
 
 - Sorting many attribute nodes from the same element into document order is no longer quadratic in the attribute count. An attribute's document-order key bands by its index among its owner's attributes, which was found by a linear scan of the attribute list on every attribute, so sorting an element's K attributes was O(K^2). The index now comes from a cached per-owner name-to-index map (built once on the second lookup, mirroring the sibling-index cache). The order is unchanged. Sorting the attributes of an 8000-attribute element drops from about 0.18 s to about 0.01 s (~16x), and the cost is now linear. Guarded by `AttributeDocumentOrderTests`.
+
+## [0.4.4] - 2026-06-25
+
+### Fixed
 
 - The `following` and `preceding` axes no longer rebuild the whole document node list and linearly search it on every context node, which made them quadratic over many context nodes. They now share a per-evaluation cache of each document's ordered node list and a node-to-index map (the document does not change during evaluation), so the list is built once and a node's position is an O(1) lookup; `following` additionally skips the context's contiguous subtree by index arithmetic rather than filtering every descendant out. The step's node test is fused into the walk, so a node the test rejects is never copied out of the shared list (only the matches are materialized). The selected nodes and their order are unchanged. A 200-context `following::` query over a 20k-element document drops from about 16 s to about 6 s. Guarded by `FollowingPrecedingAxisTests`.
 
