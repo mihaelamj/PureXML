@@ -165,7 +165,7 @@ public extension PureXML {
         limits: Parsing.Limits = .default,
         resolver: Parsing.EntityResolver = .refusing,
     ) throws -> Model.TreeNode {
-        try Model.TreeNode(parse(xml, limits: limits, resolver: resolver))
+        try Parsing.Parser().parseTree(xml, limits: limits, resolver: resolver)
     }
 
     /// Reads a possibly-invalid document without throwing, returning the maximal
