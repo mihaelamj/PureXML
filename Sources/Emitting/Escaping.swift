@@ -12,15 +12,28 @@ extension PureXML.Emitting {
                 return value
             }
             var result = ""
-            for character in value {
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case ">": result += "&gt;"
-                case "\r" where escapeCarriageReturn: result += "&#xD;"
-                default: result += plain(character, asciiOnly: asciiOnly)
+            var runStart = value.startIndex
+            var index = value.startIndex
+            while index < value.endIndex {
+                let character = value[index]
+                let escaped: String? = switch character {
+                case "&": "&amp;"
+                case "<": "&lt;"
+                case ">": "&gt;"
+                case "\r" where escapeCarriageReturn: "&#xD;"
+                default: asciiOnly ? plainIfNonASCII(character) : nil
                 }
+                let next = value.index(after: index)
+                if let escaped {
+                    // Copy the verbatim run before this character in one append
+                    // rather than appending each unescaped character on its own.
+                    if runStart < index { result += value[runStart ..< index] }
+                    result += escaped
+                    runStart = next
+                }
+                index = next
             }
+            if runStart < value.endIndex { result += value[runStart...] }
             return result
         }
 
@@ -38,6 +51,14 @@ extension PureXML.Emitting {
                 }
             }
             return false
+        }
+
+        /// In ASCII-only mode, the numeric-reference escaping of a character that
+        /// carries a non-ASCII scalar, or nil when the character is pure ASCII and
+        /// so is copied verbatim with its run.
+        private static func plainIfNonASCII(_ character: Character) -> String? {
+            guard character.unicodeScalars.contains(where: { $0.value > 0x7F }) else { return nil }
+            return plain(character, asciiOnly: true)
         }
 
         /// A character verbatim, or, in ASCII-only mode, each of its non-ASCII
@@ -58,22 +79,37 @@ extension PureXML.Emitting {
                 return value
             }
             var result = ""
-            for character in value {
-                if character == quote {
-                    result += quote == "'" ? "&apos;" : "&quot;"
-                    continue
+            var runStart = value.startIndex
+            var index = value.startIndex
+            while index < value.endIndex {
+                let character = value[index]
+                let next = value.index(after: index)
+                if let escaped = attributeEscape(character, quote: quote, asciiOnly: asciiOnly) {
+                    if runStart < index { result += value[runStart ..< index] }
+                    result += escaped
+                    runStart = next
                 }
-                switch character {
-                case "&": result += "&amp;"
-                case "<": result += "&lt;"
-                case ">": result += "&gt;"
-                case "\t": result += "&#9;"
-                case "\n": result += "&#10;"
-                case "\r": result += "&#13;"
-                default: result += plain(character, asciiOnly: asciiOnly)
-                }
+                index = next
             }
+            if runStart < value.endIndex { result += value[runStart...] }
             return result
+        }
+
+        /// The escaped form of one attribute-value character, or nil when it is
+        /// copied verbatim. Split out so ``attribute`` stays a simple run loop.
+        private static func attributeEscape(_ character: Character, quote: Character, asciiOnly: Bool) -> String? {
+            if character == quote {
+                return quote == "'" ? "&apos;" : "&quot;"
+            }
+            switch character {
+            case "&": return "&amp;"
+            case "<": return "&lt;"
+            case ">": return "&gt;"
+            case "\t": return "&#9;"
+            case "\n": return "&#10;"
+            case "\r": return "&#13;"
+            default: return asciiOnly ? plainIfNonASCII(character) : nil
+            }
         }
 
         /// Whether ``attribute`` would change `value`: it escapes the quote, the
