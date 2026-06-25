@@ -37,6 +37,17 @@ struct EntityDecodeBulkTests {
         #expect(try decode("pre &#x263A; post") == "pre \u{263A} post")
     }
 
+    @Test("multibyte literal text around references decodes correctly")
+    func test_multibyteRuns() throws {
+        // The marker scan is at the byte level; these confirm a reference byte
+        // that follows multibyte UTF-8 (precomposed, combining, and astral) is
+        // still located at a valid grapheme boundary, so the run splits cleanly.
+        #expect(try decode("café&amp;thé") == "café&thé")
+        #expect(try decode("e\u{0301}&amp;e\u{0301}") == "e\u{0301}&e\u{0301}")
+        #expect(try decode("\u{1F600}&lt;\u{1F601}") == "\u{1F600}<\u{1F601}")
+        #expect(try decode("naïve text with no references") == "naïve text with no references")
+    }
+
     @Test("declared entity replacement expands and counts against the budget")
     func test_declaredReplacement() throws {
         #expect(try decode("<&e;>", entities: ["e": "REPLACEMENT"]) == "<REPLACEMENT>")
