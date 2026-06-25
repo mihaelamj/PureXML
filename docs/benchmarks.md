@@ -63,6 +63,7 @@ offsets throughout; libxml2's xmlReadMemory takes an int byte count).
 | 9 | skip cross-context node-set de-duplication on a single context or a disjoint axis (child/attribute/namespace/self); the `Set<Node>` hashing and copying was pure overhead where no duplicate can arise, same output (same-state A/B, ~28%) | unchanged | 0.097 s (10x, from 13x) | unchanged |
 | 10 | `//` descendant fusion (`descendant-or-self::node()/child::X[P]` compiled to `descendant::X[P]` when `P` is non-positional), avoiding the whole-subtree intermediate context; guarded so positional predicates keep their per-parent meaning, adversarially reviewed for semantic transparency | unchanged | 0.063 s (~7x, from 10x) | unchanged |
 | 11 | drop the redundant `Set` de-duplication when sorting a path result: `evaluateSteps` already yields a duplicate-free node-set, so only the document-order sort is needed (each skipped insert was a copy of a node wrapping a side-table-refcounted tree node); same-state A/B, ~9% | unchanged | 0.058 s (~6x, from ~7x) | unchanged |
+| 12 | skip the document-order sort for a single forward-axis step from one context: `AxisNavigation` produces child/descendant/descendant-or-self/self/following/following-sibling already in document order with no duplicates, so the sort is redundant (adversarially reviewed for order correctness; same-state A/B, ~7%) | unchanged | 0.055 s (~6x) | unchanged |
 
 ## Profile findings (first sample, parse path)
 
