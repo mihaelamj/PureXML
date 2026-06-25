@@ -8,6 +8,31 @@ extension PureXML.XPath {
     final class SiblingIndexCache {
         private var indexes: [ObjectIdentifier: [ObjectIdentifier: Int]] = [:]
         private var scannedOnce: Set<ObjectIdentifier> = []
+        private var attributeIndexes: [ObjectIdentifier: [PureXML.Model.QualifiedName: Int]] = [:]
+        private var attributeScannedOnce: Set<ObjectIdentifier> = []
+
+        /// The index of an attribute, by name, among its owner's attributes, for
+        /// the attribute band of a document-order key. As with ``index(of:in:)``,
+        /// the per-owner table is built on the second lookup (a single lookup
+        /// scans), so sorting many attribute nodes from one element is linear
+        /// rather than quadratic in the attribute count.
+        func attributeIndex(of name: PureXML.Model.QualifiedName, in owner: PureXML.Model.TreeNode) -> Int {
+            let ownerIdentity = ObjectIdentifier(owner)
+            if let table = attributeIndexes[ownerIdentity] {
+                return table[name] ?? 0
+            }
+            guard attributeScannedOnce.contains(ownerIdentity) else {
+                attributeScannedOnce.insert(ownerIdentity)
+                return owner.attributes.firstIndex { $0.name == name } ?? 0
+            }
+            var table: [PureXML.Model.QualifiedName: Int] = [:]
+            table.reserveCapacity(owner.attributes.count)
+            for (index, attribute) in owner.attributes.enumerated() where table[attribute.name] == nil {
+                table[attribute.name] = index
+            }
+            attributeIndexes[ownerIdentity] = table
+            return table[name] ?? 0
+        }
 
         func index(of child: PureXML.Model.TreeNode, in parent: PureXML.Model.TreeNode) -> Int {
             let parentIdentity = ObjectIdentifier(parent)
