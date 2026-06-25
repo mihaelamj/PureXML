@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Extracting the string-value of a node-set no longer scans the node's siblings, which made an XSLT transform (or any repeated `string(@x)` / `value-of`) over a wide flat fan-out quadratic. `firstInDocumentOrder()` computed a document-order key even for a zero- or one-node set, and that key walks the node up to the root taking its index among each parent's children, a linear scan of a wide parent. For a single node the order is irrelevant (the node is trivially first), so it now returns directly without computing the key. A transform that reads a couple of attributes and child values per element over a 20k-element document drops from about 2.3 s to about 0.65 s (~3.5x); the produced output is unchanged (the Apache Xalan gold-output corpus stays byte-identical). Guarded by `FirstInDocumentOrderTests`.
+
 ## [0.4.2] - 2026-06-25
 
 ### Changed
