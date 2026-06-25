@@ -114,11 +114,14 @@ extension PureXML.XPath {
             guard let pivot = (arguments.count > 1 ? arguments[1].nodes ?? [] : []).firstInDocumentOrder() else {
                 return []
             }
-            // Decorate once: each node's order key is computed a single time and
-            // reused for both the pivot comparison and the final sort.
-            let pivotKey = pivot.documentOrder
+            // Decorate once through a shared sibling-index cache: each node's
+            // order key is computed a single time, and the per-parent index is
+            // built once rather than rescanned for every node (which made this
+            // quadratic over a wide fan-out).
+            let cache = PureXML.XPath.SiblingIndexCache()
+            let pivotKey = pivot.documentOrder(cache: cache)
             return first
-                .map { (node: $0, key: $0.documentOrder) }
+                .map { (node: $0, key: $0.documentOrder(cache: cache)) }
                 .filter { leading ? Node.ordered($0.key, before: pivotKey) : Node.ordered(pivotKey, before: $0.key) }
                 .sorted { Node.ordered($0.key, before: $1.key) }
                 .map(\.node)

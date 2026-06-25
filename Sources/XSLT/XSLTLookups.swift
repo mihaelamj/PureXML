@@ -102,7 +102,7 @@ extension PureXML.XSLT.Library {
         }
         let matched = index.filter { tokens.contains($0.key) }.values
             .map { PureXML.XPath.Node.tree($0) }
-            .sorted(by: PureXML.XPath.Node.precedes)
+            .sortedByDocumentOrder()
         return .nodeSet(matched)
     }
 
@@ -150,11 +150,12 @@ extension PureXML.XSLT.Library {
         }
         let index = keys(documentRoot)
         var matched: [PureXML.Model.TreeNode] = []
+        var seen: Set<ObjectIdentifier> = []
         for value in values {
-            for node in index[name]?[value] ?? [] where !matched.contains(where: { $0 === node }) {
+            for node in index[name]?[value] ?? [] where seen.insert(ObjectIdentifier(node)).inserted {
                 matched.append(node)
             }
         }
-        return .nodeSet(matched.map { PureXML.XPath.Node.tree($0) }.sorted(by: PureXML.XPath.Node.precedes))
+        return .nodeSet(matched.map { PureXML.XPath.Node.tree($0) }.sortedByDocumentOrder())
     }
 }
