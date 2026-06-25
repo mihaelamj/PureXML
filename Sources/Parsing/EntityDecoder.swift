@@ -185,8 +185,11 @@ private struct EntityExpander {
             // Copy the literal run up to the next reference or markup character
             // in bulk rather than one character at a time: only '&' (a
             // reference) and '<' (a possible CDATA section) need per-character
-            // handling, and the text between them is the bulk of any run.
-            guard let special = raw[iterator...].firstIndex(where: { $0 == "&" || $0 == "<" }) else {
+            // handling, and the text between them is the bulk of any run. The
+            // scan is at the byte level (both are ASCII, so a UTF-8 index is a
+            // valid string index), which avoids decoding every literal byte into
+            // a grapheme just to look for two markers.
+            guard let special = raw.utf8[iterator...].firstIndex(where: { $0 == 0x26 || $0 == 0x3C }) else {
                 try appendRun(raw[iterator...], counts: counts)
                 return
             }
@@ -218,7 +221,7 @@ private struct EntityExpander {
                 iterator = raw.index(after: iterator)
                 continue
             }
-            guard let semicolon = raw[iterator...].firstIndex(of: ";") else {
+            guard let semicolon = raw.utf8[iterator...].firstIndex(of: 0x3B) else {
                 throw PureXML.Parsing.ParseError.invalidReference(String(raw[iterator...]), mark)
             }
             let body = String(raw[raw.index(after: iterator) ..< semicolon])
