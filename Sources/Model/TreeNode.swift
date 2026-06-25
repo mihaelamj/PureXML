@@ -86,6 +86,31 @@ public extension PureXML.Model {
             }
         }
 
+        /// Adopts an array of freshly built, parentless children directly,
+        /// wiring each child's parent without the detach, cycle check, and
+        /// one-at-a-time array growth that ``append(_:)`` needs for children
+        /// that may already live in a tree. The caller guarantees every child
+        /// is newly constructed and unshared (as the value-`Node` conversion
+        /// does), so those guards would all be no-ops; skipping them, and
+        /// adopting the prepared array rather than rebuilding it element by
+        /// element, is the bulk of the cost of materializing a parsed tree.
+        init(
+            adopting kind: PureXML.Model.TreeNodeKind,
+            name: PureXML.Model.QualifiedName? = nil,
+            attributes: [PureXML.Model.Attribute] = [],
+            value: String = "",
+            children: [TreeNode],
+        ) {
+            self.kind = kind
+            self.name = name
+            self.attributes = attributes
+            self.value = value
+            self.children = children
+            for child in children {
+                child.parent = self
+            }
+        }
+
         // MARK: Factories
 
         /// Creates a document node holding the given top-level children.
