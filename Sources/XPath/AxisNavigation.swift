@@ -29,8 +29,8 @@ extension PureXML.XPath {
             switch axis {
             case .followingSibling: followingSiblings(of: context)
             case .precedingSibling: precedingSiblings(of: context)
-            case .following: following(of: context, cache: cache)
-            case .preceding: preceding(of: context, cache: cache)
+            case .following: following(of: context, cache: cache, where: { _ in true })
+            case .preceding: preceding(of: context, cache: cache, where: { _ in true })
             case .attribute: attributes(of: context)
             case .namespace: namespaces(of: context)
             default: []
@@ -119,7 +119,11 @@ extension PureXML.XPath {
             return parent.children[..<index].reversed().map(Node.tree)
         }
 
-        private static func following(of node: Node, cache: DocumentNavigationCache?) -> [Node] {
+        /// The following axis, fusing the step's node test into the walk: `keep`
+        /// is applied to the document-order slice directly, so a node the test
+        /// rejects is never copied out of the shared node list (only matches are
+        /// materialized). The unfused caller passes a test that keeps everything.
+        static func following(of node: Node, cache: DocumentNavigationCache?, where keep: (Node) -> Bool) -> [Node] {
             guard let root = rootTree(of: node) else { return [] }
             let document = orderedDocument(rootedAt: root, cache: cache)
             if let index = document.index[node] {
@@ -128,16 +132,19 @@ extension PureXML.XPath {
                 // subtree. Skip it by index rather than scanning the whole tail
                 // and filtering each descendant out (which made this quadratic).
                 let start = index + 1 + descendantCount(of: node)
-                return start < document.nodes.count ? Array(document.nodes[start...]) : []
+                return start < document.nodes.count ? document.nodes[start...].filter(keep) : []
             }
             // An attribute or namespace start: document order places it after
             // its owner and before the owner's children, and it has no
             // descendants, so everything after the owner follows.
             guard let owner = node.parent, let index = document.index[owner] else { return [] }
-            return Array(document.nodes[(index + 1)...])
+            return document.nodes[(index + 1)...].filter(keep)
         }
 
-        private static func preceding(of node: Node, cache: DocumentNavigationCache?) -> [Node] {
+        /// The preceding axis, fusing the step's node test into the walk: the
+        /// span before the context is filtered by `keep` (and the ancestors,
+        /// which the axis excludes) in one pass, so only matches are materialized.
+        static func preceding(of node: Node, cache: DocumentNavigationCache?, where keep: (Node) -> Bool) -> [Node] {
             guard let root = rootTree(of: node) else { return [] }
             let document = orderedDocument(rootedAt: root, cache: cache)
             let anchorIndex = document.index[node] ?? node.parent.flatMap { document.index[$0] }
@@ -146,7 +153,7 @@ extension PureXML.XPath {
             // over the preceding span is fine; the win here is the cached node
             // list and the O(1) anchor lookup instead of a rebuild and scan.
             let excluded = Set(ancestors(of: node))
-            return document.nodes[..<index].filter { !excluded.contains($0) }.reversed()
+            return document.nodes[..<index].filter { !excluded.contains($0) && keep($0) }.reversed()
         }
 
         /// The number of tree-node descendants of `node`, matching what the
