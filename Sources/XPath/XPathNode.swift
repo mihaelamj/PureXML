@@ -132,7 +132,7 @@ public extension PureXML.XPath {
             case let .tree(node):
                 return Self.treePath(node, cache: cache)
             case let .attribute(owner, attribute):
-                let index = owner.attributes.firstIndex { $0.name == attribute.name } ?? 0
+                let index = cache.attributeIndex(of: attribute.name, in: owner)
                 return Self.treePath(owner, cache: cache) + [Self.attributeBand, index]
             case let .namespace(owner, prefix, _):
                 return Self.treePath(owner, cache: cache) + [Self.namespaceBand, prefix.hashValue]
