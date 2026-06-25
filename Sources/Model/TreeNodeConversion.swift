@@ -3,10 +3,10 @@ public extension PureXML.Model.TreeNode {
     convenience init(_ node: PureXML.Model.Node) {
         switch node {
         case let .document(children):
-            self.init(kind: .document, children: children.map(PureXML.Model.TreeNode.init))
+            self.init(adopting: .document, children: children.map(PureXML.Model.TreeNode.init))
         case let .element(element):
             self.init(
-                kind: .element,
+                adopting: .element,
                 name: element.name,
                 attributes: element.attributes,
                 children: element.children.map(PureXML.Model.TreeNode.init),
