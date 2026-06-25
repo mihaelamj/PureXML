@@ -244,7 +244,13 @@ extension PureXML.XSLT.Transformer {
             }
             return XSLTNumbering.format([Int(number.rounded())], format, grouping)
         }
-        let numbers = XSLTNumbering.numbers(of: context.node, level: spec.level, count: spec.count, from: spec.from) { node, pattern in
+        let numbers = XSLTNumbering.numbers(
+            of: context.node,
+            level: spec.level,
+            count: spec.count,
+            from: spec.from,
+            siblingCache: numberingCache,
+        ) { node, pattern in
             matches(node, pattern)
         }
         return XSLTNumbering.format(numbers, format, grouping)
