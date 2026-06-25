@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- The `following` and `preceding` axes no longer rebuild the whole document node list and linearly search it on every context node, which made them quadratic over many context nodes. They now share a per-evaluation cache of each document's ordered node list and a node-to-index map (the document does not change during evaluation), so the list is built once and a node's position is an O(1) lookup; `following` additionally skips the context's contiguous subtree by index arithmetic rather than filtering every descendant out. The selected nodes and their order are unchanged. A 200-context `following::` query over a 20k-element document drops from about 16 s to about 9 s; the residual cost is the size of the produced node-set itself. Guarded by `FollowingPrecedingAxisTests`.
+- The `following` and `preceding` axes no longer rebuild the whole document node list and linearly search it on every context node, which made them quadratic over many context nodes. They now share a per-evaluation cache of each document's ordered node list and a node-to-index map (the document does not change during evaluation), so the list is built once and a node's position is an O(1) lookup; `following` additionally skips the context's contiguous subtree by index arithmetic rather than filtering every descendant out. The step's node test is fused into the walk, so a node the test rejects is never copied out of the shared list (only the matches are materialized). The selected nodes and their order are unchanged. A 200-context `following::` query over a 20k-element document drops from about 16 s to about 6 s. Guarded by `FollowingPrecedingAxisTests`.
 
 ## [0.4.3] - 2026-06-25
 

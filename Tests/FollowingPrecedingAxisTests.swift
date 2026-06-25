@@ -42,6 +42,16 @@ struct FollowingPrecedingAxisTests {
         #expect(try names("//b11/preceding::*", Self.doc) == ["a", "a1", "a2"])
     }
 
+    @Test("a name test fused into the walk selects only matching nodes")
+    func test_fusedNodeTest() throws {
+        // following::a from a1 selects only the later <a> (the one holding a3),
+        // not a2/b/b1/b11/c; preceding::a from c selects only the first <a>.
+        #expect(try names("//a1/following::a", Self.doc) == ["a"])
+        #expect(try names("//c/preceding::a", Self.doc) == ["a"])
+        #expect(try names("//a1/following::b11", Self.doc) == ["b11"])
+        #expect(try names("//a3/preceding::a1", Self.doc) == ["a1"])
+    }
+
     @Test("the axes give the same result from many context nodes (shared cache)")
     func test_manyContexts() throws {
         // Exercises the shared per-query cache across context nodes. The path is a
