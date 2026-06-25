@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The entity decoder copies the literal text between references in bulk instead of one character at a time. `EntityExpander.expand` rebuilt every reference-bearing run grapheme by grapheme (`result.append(character)` with a per-character amplification-budget charge), so a text node holding a single `&amp;` was reconstructed character by character; it now scans to the next `&` or `<` and appends the run in one operation, charging the budget by the run length. The decoded text, the CDATA-verbatim handling, and the billion-laughs budget enforcement are unchanged (the same overrun throws at the same input). The element-content reference-findings pass, which scanned each text run for `&` and rendered the enclosing element's qualified name, now returns immediately when the document has no DTD content models, which is the common case. Measured `parse` ~5% faster on the 20k-item generated corpus (whose text uses `&amp;`) via a same-machine-state A/B. Verified by the W3C XML conformance corpora, a six-case decode differential (`EntityDecodeBulkTests`: references in runs, decimal and hex character references, declared-entity replacement with budget overrun, CDATA in replacement text, an unterminated reference), and an adversarial equivalence review.
+
 ## [0.4.1] - 2026-06-25
 
 ### Changed

@@ -182,27 +182,38 @@ private struct EntityExpander {
     mutating func expand(_ raw: String, visiting: Set<String>, counts: Bool) throws {
         var iterator = raw.startIndex
         while iterator < raw.endIndex {
-            let character = raw[iterator]
-            // A CDATA section inside replacement text shields its content from
-            // reference recognition: copy it verbatim through the terminator.
-            if character == "<", raw[iterator...].hasPrefix("<![CDATA[") {
-                let openEnd = raw.index(iterator, offsetBy: 9)
-                var end = raw.endIndex
-                var cursor = openEnd
-                while cursor < raw.endIndex {
-                    if raw[cursor...].hasPrefix("]]>") {
-                        end = raw.index(cursor, offsetBy: 3)
-                        break
-                    }
-                    cursor = raw.index(after: cursor)
-                }
-                for verbatim in raw[iterator ..< end] {
-                    try append(verbatim, counts: counts)
-                }
-                iterator = end
-                continue
+            // Copy the literal run up to the next reference or markup character
+            // in bulk rather than one character at a time: only '&' (a
+            // reference) and '<' (a possible CDATA section) need per-character
+            // handling, and the text between them is the bulk of any run.
+            guard let special = raw[iterator...].firstIndex(where: { $0 == "&" || $0 == "<" }) else {
+                try appendRun(raw[iterator...], counts: counts)
+                return
             }
-            guard character == "&" else {
+            if special > iterator {
+                try appendRun(raw[iterator ..< special], counts: counts)
+                iterator = special
+            }
+            let character = raw[iterator]
+            if character == "<" {
+                // A CDATA section inside replacement text shields its content
+                // from reference recognition: copy it verbatim through the
+                // terminator. A '<' that does not open CDATA is literal content.
+                if raw[iterator...].hasPrefix("<![CDATA[") {
+                    let openEnd = raw.index(iterator, offsetBy: 9)
+                    var end = raw.endIndex
+                    var cursor = openEnd
+                    while cursor < raw.endIndex {
+                        if raw[cursor...].hasPrefix("]]>") {
+                            end = raw.index(cursor, offsetBy: 3)
+                            break
+                        }
+                        cursor = raw.index(after: cursor)
+                    }
+                    try appendRun(raw[iterator ..< end], counts: counts)
+                    iterator = end
+                    continue
+                }
                 try append(character, counts: counts)
                 iterator = raw.index(after: iterator)
                 continue
@@ -214,6 +225,22 @@ private struct EntityExpander {
             try resolve(body, visiting: visiting, counts: counts)
             iterator = raw.index(after: semicolon)
         }
+    }
+
+    /// Appends a verbatim run, charging its whole length against the
+    /// amplification budget at once when counting (the per-character
+    /// ``append(_:counts:)`` charges one at a time; for a run the effect is
+    /// identical, the budget reaching the same value and the same overrun
+    /// throwing, only without the per-character work).
+    private mutating func appendRun(_ run: Substring, counts: Bool) throws {
+        if counts {
+            let length = run.count
+            guard budget >= length else {
+                throw PureXML.Parsing.ParseError.amplificationLimitExceeded(mark)
+            }
+            budget -= length
+        }
+        result += run
     }
 
     private mutating func resolve(_ body: String, visiting: Set<String>, counts: Bool) throws {

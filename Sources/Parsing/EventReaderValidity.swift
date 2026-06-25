@@ -90,6 +90,11 @@ extension PureXML.Parsing.EventReader {
     /// (which is character data, not ignorable whitespace) inside element
     /// content.
     mutating func recordReferenceContentFindings(raw: String, decoded: String) {
+        // Element-content reference findings exist only against a declared
+        // content model. With no DTD (the common case) there is nothing to
+        // check, so return before scanning `raw` for '&' or rendering the
+        // element's qualified name.
+        guard !documentType.elementModels.isEmpty else { return }
         guard raw.contains("&"), let current = open.last,
               let model = documentType.elementModels[current.localName] ?? documentType.elementModels[current.description]
         else { return }
