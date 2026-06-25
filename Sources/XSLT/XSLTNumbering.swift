@@ -72,10 +72,16 @@ enum XSLTNumbering {
         var current: Tree? = node
         while let candidate = current {
             if !visit(candidate) { return }
-            var sibling = precedingSibling(of: candidate)
-            while let visited = sibling {
-                if !visitSubtreeReversed(visited, visit) { return }
-                sibling = precedingSibling(of: visited)
+            if let parent = candidate.parent {
+                // The preceding siblings, nearest first. Find the candidate's
+                // index in the child list once, then walk the children before it
+                // directly, rather than rescanning the whole list for each
+                // preceding sibling (which made `xsl:number level="any"` cubic
+                // over a wide fan-out).
+                let index = parent.children.firstIndex { $0 === candidate } ?? 0
+                for visited in parent.children[..<index].reversed() where !visitSubtreeReversed(visited, visit) {
+                    return
+                }
             }
             current = candidate.parent
         }
@@ -86,16 +92,6 @@ enum XSLTNumbering {
             return false
         }
         return visit(node)
-    }
-
-    private static func precedingSibling(of node: Tree) -> Tree? {
-        guard let parent = node.parent else { return nil }
-        var previous: Tree?
-        for sibling in parent.children {
-            if sibling === node { return previous }
-            previous = sibling
-        }
-        return nil
     }
 
     // MARK: Format tokens

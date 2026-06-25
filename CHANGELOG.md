@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xsl:number level="any"` is no longer cubic over a wide fan-out. Numbering a node walks the nodes that precede it in document order, and that walk found each preceding sibling by rescanning the parent's whole child list, so visiting k preceding siblings cost O(k^2), and numbering n nodes was O(n^3). It now finds the context's index once and walks the children before it directly, so the walk is linear in the number of preceding nodes and the numbering is quadratic (inherent to counting preceding nodes per numbered node). The numbers are unchanged. Numbering 1000 items drops from about 4.7 s to about 0.7 s (~6x), and the scaling improves from cubic to quadratic. Guarded by `XSLTNumberAnyTests`.
+
+### Fixed
+
 - The `translate()` and `contains()`/`substring-before()`/`substring-after()` string functions are no longer quadratic. `translate()` scanned its `from` string for every source character (O(string * from)); it now builds the from-to map once and translates each character with an O(1) lookup. The substring functions matched the needle at every position of the haystack (O(n*m), quadratic and a denial-of-service vector on a repetitive untrusted string); they now use a linear-time Knuth-Morris-Pratt search. The results are unchanged (first-occurrence-wins translation, first-occurrence substring match). A large-alphabet `translate()` and a repetitive `contains()` each drop from hundreds of milliseconds to under a millisecond at 4k-16k characters. Guarded by `TranslateFunctionTests` and `SubstringSearchTests`.
 
 ## [0.4.5] - 2026-06-25
