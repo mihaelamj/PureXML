@@ -56,16 +56,19 @@ extension PureXML.XPath.Evaluator {
         if case let .tree(tree) = contextNode {
             switch step.axis {
             case .descendant:
-                return PureXML.XPath.AxisNavigation.descendants(of: tree) { matchesTree($0, step.test, on: step.axis, context.namespaces) }
+                let keep = compiledTreeTest(step.test, on: step.axis, context.namespaces)
+                return PureXML.XPath.AxisNavigation.descendants(of: tree, where: keep)
             case .descendantOrSelf:
-                return PureXML.XPath.AxisNavigation.descendantsOrSelf(of: tree) { matchesTree($0, step.test, on: step.axis, context.namespaces) }
+                let keep = compiledTreeTest(step.test, on: step.axis, context.namespaces)
+                return PureXML.XPath.AxisNavigation.descendantsOrSelf(of: tree, where: keep)
             case .attribute:
-                return PureXML.XPath.AxisNavigation.attributes(of: tree) { matchesAttribute($0, step.test, context.namespaces) }
+                let keep = compiledAttributeTest(step.test, context.namespaces)
+                return PureXML.XPath.AxisNavigation.attributes(of: tree, where: keep)
             default: break
             }
         }
-        return PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode)
-            .filter { matches($0, step.test, on: step.axis, namespaces: context.namespaces) }
+        let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
+        return PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode).filter(keep)
     }
 
     /// Filters nodes through each predicate in turn. A numeric predicate is a
@@ -128,6 +131,103 @@ extension PureXML.XPath.Evaluator {
         case let .name(name): qualifiedMatches(attribute.name, name, namespaces)
         case .wildcard, .node: true
         case .text, .comment, .processingInstruction: false
+        }
+    }
+
+    /// Compiles a tree-node test into a per-node predicate, resolving everything
+    /// that is invariant across a traversal (the axis principal kind, whether
+    /// namespace bindings are in effect, the prefix-wildcard shape of the test
+    /// name) exactly once instead of on every node. A descendant walk over a
+    /// wide subtree applies the returned closure tens of thousands of times, so
+    /// hoisting the test's fixed structure out of the per-node path is the bulk
+    /// of the saving. The closure is equivalent to ``matchesTree`` for the same
+    /// arguments, the one source of truth it specializes.
+    static func compiledTreeTest(
+        _ test: NodeTest,
+        on axis: Axis,
+        _ namespaces: [String: String],
+    ) -> (PureXML.Model.TreeNode) -> Bool {
+        switch test {
+        case let .name(name):
+            guard axis.principalKind == .element else { return { _ in false } }
+            // No eval-time bindings and no prefix wildcard: the match is the
+            // plain in-document-string comparison, with no per-node namespace or
+            // suffix work.
+            if namespaces.isEmpty, !name.hasSuffix(":*") {
+                return { tree in
+                    tree.kind == .element && tree.name.map { $0.description == name || $0.localName == name } == true
+                }
+            }
+            return { tree in
+                tree.kind == .element && tree.name.map { qualifiedMatches($0, name, namespaces) } == true
+            }
+        case .wildcard:
+            guard axis.principalKind == .element else { return { _ in false } }
+            return { $0.kind == .element }
+        case .text:
+            return { $0.kind == .text || $0.kind == .cdata }
+        case .node:
+            return { _ in true }
+        case .comment:
+            return { $0.kind == .comment }
+        case let .processingInstruction(target):
+            return { tree in
+                tree.kind == .processingInstruction && (target == nil || tree.name?.description == target)
+            }
+        }
+    }
+
+    /// Compiles an attribute-node test into a per-attribute predicate, hoisting
+    /// the same invariants as ``compiledTreeTest`` (the binding state and the
+    /// prefix-wildcard shape) out of the per-attribute path. Equivalent to
+    /// ``matchesAttribute`` for the same arguments.
+    static func compiledAttributeTest(
+        _ test: NodeTest,
+        _ namespaces: [String: String],
+    ) -> (PureXML.Model.Attribute) -> Bool {
+        switch test {
+        case let .name(name):
+            if namespaces.isEmpty, !name.hasSuffix(":*") {
+                return { $0.name.description == name || $0.name.localName == name }
+            }
+            return { qualifiedMatches($0.name, name, namespaces) }
+        case .wildcard, .node:
+            return { _ in true }
+        case .text, .comment, .processingInstruction:
+            return { _ in false }
+        }
+    }
+
+    /// Compiles a general node test (any node kind) into a per-node predicate,
+    /// for the axes that build a node list and filter it. A tree node is tested
+    /// by the compiled tree test; an attribute or namespace node keeps the
+    /// ``matches`` behavior. Equivalent to ``matches`` for the same arguments.
+    static func compiledNodeTest(
+        _ test: NodeTest,
+        on axis: Axis,
+        _ namespaces: [String: String],
+    ) -> (Node) -> Bool {
+        let treeTest = compiledTreeTest(test, on: axis, namespaces)
+        switch test {
+        case let .name(name):
+            let kind = axis.principalKind
+            return { node in
+                if case let .tree(tree) = node { return treeTest(tree) }
+                return nameMatches(node, name, kind, namespaces)
+            }
+        case .wildcard:
+            let kind = axis.principalKind
+            return { node in
+                if case let .tree(tree) = node { return treeTest(tree) }
+                return wildcardMatches(node, kind)
+            }
+        case .node:
+            return { _ in true }
+        case .text, .comment, .processingInstruction:
+            return { node in
+                if case let .tree(tree) = node { return treeTest(tree) }
+                return false
+            }
         }
     }
 
