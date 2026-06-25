@@ -165,7 +165,12 @@ extension PureXML.XPath {
 
         private static func evalPath(absolute: Bool, steps: [Step], _ context: EvaluationContext) throws -> Value {
             let start: Node = absolute ? root(of: context.node) : context.node
-            return try .nodeSet(orderUnique(evaluateSteps(steps, from: [start], context)))
+            // `evaluateSteps` already yields a duplicate-free node-set (each step
+            // either de-duplicates across contexts or uses an axis that cannot
+            // produce a duplicate), so only the document-order sort remains; the
+            // `Set` de-duplication in `orderUnique` would copy every node for
+            // nothing.
+            return try .nodeSet(evaluateSteps(steps, from: [start], context).sortedByDocumentOrder())
         }
 
         private static func evalFilter(
@@ -177,7 +182,9 @@ extension PureXML.XPath {
             var nodes = try orderUnique(nodeSet(eval(primary, context)))
             nodes = try applyPredicates(predicates, to: nodes, context)
             if !steps.isEmpty {
-                nodes = try orderUnique(evaluateSteps(steps, from: nodes, context))
+                // As in `evalPath`, `evaluateSteps` returns a duplicate-free set,
+                // so the trailing path needs only the document-order sort.
+                nodes = try evaluateSteps(steps, from: nodes, context).sortedByDocumentOrder()
             }
             return .nodeSet(nodes)
         }
