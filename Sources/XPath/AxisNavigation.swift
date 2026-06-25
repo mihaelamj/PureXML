@@ -15,7 +15,7 @@ extension PureXML.XPath {
             switch axis {
             case .child: children(of: context)
             case .descendant: descendants(of: context)
-            case .descendantOrSelf: [context] + descendants(of: context)
+            case .descendantOrSelf: descendantsOrSelf(of: context)
             case .parent: context.parent.map { [$0] } ?? []
             case .ancestor: ancestors(of: context)
             case .ancestorOrSelf: [context] + ancestors(of: context)
@@ -43,12 +43,28 @@ extension PureXML.XPath {
         }
 
         static func descendants(of node: Node) -> [Node] {
+            guard case let .tree(tree) = node else { return [] }
             var result: [Node] = []
-            for child in children(of: node) {
-                result.append(child)
-                result.append(contentsOf: descendants(of: child))
-            }
+            appendDescendants(of: tree, into: &result)
             return result
+        }
+
+        static func descendantsOrSelf(of node: Node) -> [Node] {
+            guard case let .tree(tree) = node else { return [node] }
+            var result: [Node] = [node]
+            appendDescendants(of: tree, into: &result)
+            return result
+        }
+
+        /// Appends every descendant of `tree` in document order through a single
+        /// shared accumulator. Recursing on the raw ``TreeNode`` rather than on a
+        /// wrapped ``Node`` means the traversal builds no intermediate per-level
+        /// arrays and wraps each node exactly once, when it is appended.
+        private static func appendDescendants(of tree: PureXML.Model.TreeNode, into result: inout [Node]) {
+            for child in tree.children {
+                result.append(.tree(child))
+                appendDescendants(of: child, into: &result)
+            }
         }
 
         static func ancestors(of node: Node) -> [Node] {
