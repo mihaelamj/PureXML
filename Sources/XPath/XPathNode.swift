@@ -174,8 +174,14 @@ extension Sequence<PureXML.XPath.Node> {
 
     /// The first node in document order, computing each node's order key once.
     func firstInDocumentOrder() -> PureXML.XPath.Node? {
+        let nodes = Array(self)
+        // Zero or one node needs no ordering: the single node is trivially first.
+        // This is the common case for string-value extraction (`string(@x)`,
+        // `value-of`), where computing a document-order key would needlessly scan
+        // the node's siblings, turning a flat fan-out quadratic.
+        guard nodes.count > 1 else { return nodes.first }
         let cache = PureXML.XPath.SiblingIndexCache()
-        return map { (node: $0, key: $0.documentOrder(cache: cache)) }
+        return nodes.map { (node: $0, key: $0.documentOrder(cache: cache)) }
             .min { PureXML.XPath.Node.ordered($0.key, before: $1.key) }?
             .node
     }

@@ -104,3 +104,16 @@ patched.
   before/after recorded here.
 - The corpus generator changes only with a note here, since ratios are
   only comparable over identical corpora.
+
+## XSLT transform (quadratic fix, not in the parse/serialize/xpath series)
+
+A representative transform (select `item[@kind='even']` over the 20k-item
+corpus, emit two attributes and two child values per item) was quadratic:
+`firstInDocumentOrder()`, used to take the string-value of a single-node set
+(`string(@id)`, `value-of select="name"`), computed a document-order key for
+the one node, and that key scans the node's siblings, a linear pass over the
+wide parent. Tens of thousands of single-node extractions each rescanned the
+20k-wide parent. Returning the lone node directly (its order is irrelevant)
+makes it linear: ~2.3 s -> ~0.65 s (~3.5x), output byte-identical (Xalan
+gold-output verified). The fix is the same `count <= 1` early-out that
+`sortedByDocumentOrder()` already had.
