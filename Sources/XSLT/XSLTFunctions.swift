@@ -221,7 +221,7 @@ extension PureXML.XSLT {
                     // without a second argument, against the reference node's own
                     // base (node-set) or the stylesheet (string).
                     let secondBase: String? = arguments.count > 1
-                        ? (arguments[1].nodes?.min(by: PureXML.XPath.Node.precedes)).map { baseURI(of: $0, documents) }
+                        ? arguments[1].nodes?.firstInDocumentOrder().map { baseURI(of: $0, documents) }
                         : nil
                     func load(_ reference: String, _ base: String) -> [PureXML.XPath.Node] {
                         documentReference(resolveDocumentReference(reference, against: base), loader, documents, selfDocument)
