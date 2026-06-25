@@ -22,6 +22,10 @@ extension PureXML.XPath {
         /// cache each document's ordered node list here instead of rebuilding it
         /// per context node.
         let documentNavigation = DocumentNavigationCache()
+        /// Shared across the whole evaluation: the following-sibling and
+        /// preceding-sibling axes look up a node's index among its parent's
+        /// children here instead of scanning the sibling list per node.
+        let siblingIndex = SiblingIndexCache()
 
         init(variables: [String: Value], functions: FunctionTable, namespaces: [String: String], budget: Budget?) {
             self.variables = variables

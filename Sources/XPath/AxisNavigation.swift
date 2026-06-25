@@ -5,8 +5,14 @@ extension PureXML.XPath {
     enum AxisNavigation {
         private static let xmlNamespaceURI = "http://www.w3.org/XML/1998/namespace"
 
-        static func nodes(on axis: Axis, from context: Node, cache: DocumentNavigationCache? = nil) -> [Node] {
-            verticalNodes(on: axis, from: context) ?? lateralNodes(on: axis, from: context, cache: cache)
+        static func nodes(
+            on axis: Axis,
+            from context: Node,
+            cache: DocumentNavigationCache? = nil,
+            siblingCache: SiblingIndexCache? = nil,
+        ) -> [Node] {
+            verticalNodes(on: axis, from: context)
+                ?? lateralNodes(on: axis, from: context, cache: cache, siblingCache: siblingCache)
         }
 
         /// The self, child, descendant, parent, and ancestor families; nil for an
@@ -25,10 +31,15 @@ extension PureXML.XPath {
         }
 
         /// The sibling, following/preceding, attribute, and namespace axes.
-        private static func lateralNodes(on axis: Axis, from context: Node, cache: DocumentNavigationCache?) -> [Node] {
+        private static func lateralNodes(
+            on axis: Axis,
+            from context: Node,
+            cache: DocumentNavigationCache?,
+            siblingCache: SiblingIndexCache?,
+        ) -> [Node] {
             switch axis {
-            case .followingSibling: followingSiblings(of: context)
-            case .precedingSibling: precedingSiblings(of: context)
+            case .followingSibling: followingSiblings(of: context, siblingCache: siblingCache, where: { _ in true })
+            case .precedingSibling: precedingSiblings(of: context, siblingCache: siblingCache, where: { _ in true })
             case .following: following(of: context, cache: cache, where: { _ in true })
             case .preceding: preceding(of: context, cache: cache, where: { _ in true })
             case .attribute: attributes(of: context)
@@ -109,14 +120,20 @@ extension PureXML.XPath {
             return result
         }
 
-        private static func followingSiblings(of node: Node) -> [Node] {
-            guard let (parent, index) = siblingPosition(of: node) else { return [] }
-            return parent.children[(index + 1)...].map(Node.tree)
+        /// The following-sibling axis, fusing the step's node test into the walk:
+        /// the raw child ``TreeNode`` is tested before it is wrapped, so a sibling
+        /// the test rejects is never wrapped (and never retained). The unfused
+        /// caller passes a test that keeps everything.
+        static func followingSiblings(of node: Node, siblingCache: SiblingIndexCache?, where keep: (PureXML.Model.TreeNode) -> Bool) -> [Node] {
+            guard let (parent, index) = siblingPosition(of: node, cache: siblingCache) else { return [] }
+            return parent.children[(index + 1)...].compactMap { keep($0) ? Node.tree($0) : nil }
         }
 
-        private static func precedingSiblings(of node: Node) -> [Node] {
-            guard let (parent, index) = siblingPosition(of: node) else { return [] }
-            return parent.children[..<index].reversed().map(Node.tree)
+        /// The preceding-sibling axis (nearest first), with the same node-test
+        /// fusion as ``followingSiblings(of:siblingCache:where:)``.
+        static func precedingSiblings(of node: Node, siblingCache: SiblingIndexCache?, where keep: (PureXML.Model.TreeNode) -> Bool) -> [Node] {
+            guard let (parent, index) = siblingPosition(of: node, cache: siblingCache) else { return [] }
+            return parent.children[..<index].reversed().compactMap { keep($0) ? Node.tree($0) : nil }
         }
 
         /// The following axis, fusing the step's node test into the walk: `keep`
@@ -248,8 +265,14 @@ extension PureXML.XPath {
             return name.prefix == "xmlns" || (name.prefix == nil && name.localName == "xmlns")
         }
 
-        private static func siblingPosition(of node: Node) -> (PureXML.Model.TreeNode, Int)? {
+        private static func siblingPosition(of node: Node, cache: SiblingIndexCache?) -> (PureXML.Model.TreeNode, Int)? {
             guard case let .tree(tree) = node, let parent = tree.parent else { return nil }
+            // A node is always among its parent's children, so the cache's index
+            // is exact; without one, scanning the sibling list per node makes the
+            // sibling axes quadratic over a wide parent.
+            if let cache {
+                return (parent, cache.index(of: tree, in: parent))
+            }
             guard let index = parent.children.firstIndex(where: { $0 === tree }) else { return nil }
             return (parent, index)
         }

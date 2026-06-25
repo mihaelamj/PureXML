@@ -67,17 +67,26 @@ extension PureXML.XPath.Evaluator {
             default: break
             }
         }
-        let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
         let cache = context.environment.documentNavigation
-        // The following and preceding axes fuse the node test into the walk so a
-        // rejected node is never copied out of the cached document node list; the
-        // other axes build their list and filter it.
+        let siblingCache = context.environment.siblingIndex
+        // The following/preceding and following-sibling/preceding-sibling axes
+        // fuse the node test into the walk so a rejected node is never wrapped or
+        // copied out; the other axes build their node list and filter it.
         switch step.axis {
         case .following:
+            let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
             return PureXML.XPath.AxisNavigation.following(of: contextNode, cache: cache, where: keep)
         case .preceding:
+            let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
             return PureXML.XPath.AxisNavigation.preceding(of: contextNode, cache: cache, where: keep)
+        case .followingSibling:
+            let keep = compiledTreeTest(step.test, on: step.axis, context.namespaces)
+            return PureXML.XPath.AxisNavigation.followingSiblings(of: contextNode, siblingCache: siblingCache, where: keep)
+        case .precedingSibling:
+            let keep = compiledTreeTest(step.test, on: step.axis, context.namespaces)
+            return PureXML.XPath.AxisNavigation.precedingSiblings(of: contextNode, siblingCache: siblingCache, where: keep)
         default:
+            let keep = compiledNodeTest(step.test, on: step.axis, context.namespaces)
             return PureXML.XPath.AxisNavigation.nodes(on: step.axis, from: contextNode, cache: cache).filter(keep)
         }
     }
