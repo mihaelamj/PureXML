@@ -27,6 +27,22 @@ extension PureXML.XPath {
             }
         }
 
+        /// Whether the axis, taken from a SINGLE context node, yields its nodes
+        /// already in document order with no duplicates, so a one-step path over
+        /// it needs neither the de-duplication nor the document-order sort. True
+        /// for the structural forward axes, which `AxisNavigation` produces in
+        /// document order (child by child-array order, descendant by pre-order,
+        /// the following families by document position). The attribute axis is
+        /// excluded because its order interleaves with namespace declarations,
+        /// and the namespace axis because its nodes are produced in dictionary
+        /// (hash) order; the sort normalizes both, so they are left to it.
+        var preservesDocumentOrderFromSingleContext: Bool {
+            switch self {
+            case .child, .descendant, .descendantOrSelf, .selfAxis, .followingSibling, .following: true
+            default: false
+            }
+        }
+
         /// Whether the axis yields disjoint node-sets from distinct context nodes,
         /// so accumulating its results across a step's context nodes can never
         /// produce a duplicate and needs no cross-context de-duplication. A child,
