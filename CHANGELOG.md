@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-06-25
+
 ### Changed
 
 - Output escaping locates the characters that need escaping by scanning bytes rather than graphemes. The bulk-copy escape loop still iterated `Character`s and compared each to `&`, `<`, `>` (a grapheme comparison per character). Every escaping trigger is an ASCII marker, or in ASCII-only mode a non-ASCII lead byte, so `Escaping.text` and `Escaping.attribute` now find the next one with `value.utf8.firstIndex(where:)`, decoding no grapheme for the run between markers. The marker byte always lands on a grapheme boundary (an ASCII byte is its own scalar and forces a cluster break; the first byte at or above `0x80` after a boundary is a lead byte), so the string slice and subscript stay valid and a multi-scalar cluster escapes as a unit. The output is byte-identical. Measured `serialize` ~23% faster on the 20k-item generated corpus via a same-machine-state A/B. Verified by the oracle differential extended with combining-mark, ZWJ-sequence, and regional-indicator clusters (`EscapingBulkCopyTests`), the Apache Xalan gold-output and C14N suites, and an adversarial grapheme-alignment review.
