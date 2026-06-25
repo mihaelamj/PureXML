@@ -222,10 +222,18 @@ extension PureXML.Parsing {
         /// exceeds `maxLength`, so the caller falls back to the Character scanner
         /// (which handles the full Unicode name grammar and the length error).
         /// A name has no newlines, so position tracking is plain arithmetic.
-        mutating func takeASCIIName(maxLength: Int) -> String? {
+        /// Scans an all-ASCII name from the byte storage, also reporting the
+        /// offset of the name's first colon (or nil when it has none). The
+        /// scanner already visits every byte, so noting the colon costs one
+        /// compare per byte and lets ``Model/QualifiedName`` split the prefix
+        /// without a second pass over the name (the common unprefixed name then
+        /// splits without scanning at all).
+        mutating func takeASCIIName(maxLength: Int) -> (name: String, colon: Int?)? {
             guard buffer.isEmpty, pendingRaw == nil, let storage, byteIndex < storage.count else { return nil }
             let pointer = storage.pointer
-            guard PureXML.Parsing.XMLCharacter.isASCIINameStart(pointer[byteIndex]) else { return nil }
+            let startByte = pointer[byteIndex]
+            guard PureXML.Parsing.XMLCharacter.isASCIINameStart(startByte) else { return nil }
+            var colon: Int? = startByte == 0x3A ? 0 : nil
             var index = byteIndex + 1
             let limit = byteIndex + maxLength
             while index < storage.count {
@@ -233,6 +241,7 @@ extension PureXML.Parsing {
                 if byte >= 0x80 { return nil }
                 if !PureXML.Parsing.XMLCharacter.isASCIINameChar(byte) { break }
                 if index >= limit { return nil }
+                if colon == nil, byte == 0x3A { colon = index - byteIndex }
                 index += 1
             }
             let length = index - byteIndex
@@ -240,7 +249,7 @@ extension PureXML.Parsing {
             byteIndex = index
             offset += length
             column += length
-            return run
+            return (run, colon)
         }
 
         /// If the upcoming characters equal `literal`, consume them and return true.

@@ -289,7 +289,7 @@ public extension PureXML.Parsing {
             // no per-character buffering. The Character loop below handles a
             // non-ASCII name, the non-fast-path, and the too-long error.
             if let fast = reader.takeASCIIName(maxLength: limits.maxNameLength) {
-                return PureXML.Model.QualifiedName(fast)
+                return PureXML.Model.QualifiedName(ascii: fast.name, colonOffset: fast.colon)
             }
             guard let first = reader.peek(), first.isXMLNameStart else {
                 throw ParseError.expectedName(reader.mark)
