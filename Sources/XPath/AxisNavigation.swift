@@ -147,6 +147,21 @@ extension PureXML.XPath {
                 .map { Node.attribute(owner: tree, $0) }
         }
 
+        /// The attributes of `tree` that satisfy `keep`, in declaration order. An
+        /// attribute `keep` rejects is never wrapped in a ``Node``, so it is never
+        /// retained (each wrap retains the owner and copies the attribute's
+        /// qualified name and value). This fuses a step's node test into the
+        /// attribute walk, the common case being `@name` selecting one of several
+        /// attributes (as in a `[@x='y']` predicate).
+        static func attributes(of tree: PureXML.Model.TreeNode, where keep: (PureXML.Model.Attribute) -> Bool) -> [Node] {
+            guard tree.kind == .element else { return [] }
+            var result: [Node] = []
+            for attribute in tree.attributes where !isNamespaceDeclaration(attribute) && keep(attribute) {
+                result.append(.attribute(owner: tree, attribute))
+            }
+            return result
+        }
+
         private static func namespaces(of node: Node) -> [Node] {
             guard case let .tree(tree) = node, tree.kind == .element else { return [] }
             var bindings: [String: String] = ["xml": xmlNamespaceURI]

@@ -54,10 +54,13 @@ extension PureXML.XPath.Evaluator {
     /// builds the axis node list and filters it.
     private static func matchedAxisNodes(_ step: Step, from contextNode: Node, _ context: EvaluationContext) -> [Node] {
         if case let .tree(tree) = contextNode {
-            let keep: (PureXML.Model.TreeNode) -> Bool = { matchesTree($0, step.test, on: step.axis, context.namespaces) }
             switch step.axis {
-            case .descendant: return PureXML.XPath.AxisNavigation.descendants(of: tree, where: keep)
-            case .descendantOrSelf: return PureXML.XPath.AxisNavigation.descendantsOrSelf(of: tree, where: keep)
+            case .descendant:
+                return PureXML.XPath.AxisNavigation.descendants(of: tree) { matchesTree($0, step.test, on: step.axis, context.namespaces) }
+            case .descendantOrSelf:
+                return PureXML.XPath.AxisNavigation.descendantsOrSelf(of: tree) { matchesTree($0, step.test, on: step.axis, context.namespaces) }
+            case .attribute:
+                return PureXML.XPath.AxisNavigation.attributes(of: tree) { matchesAttribute($0, step.test, context.namespaces) }
             default: break
             }
         }
@@ -110,6 +113,21 @@ extension PureXML.XPath.Evaluator {
         case .wildcard: return wildcardMatches(node, axis.principalKind)
         case .node: return true
         case .text, .comment, .processingInstruction: return false
+        }
+    }
+
+    /// The node test applied directly to an attribute, the single-node core of
+    /// ``matches`` for an `.attribute` node on the attribute axis (whose
+    /// principal kind is always attribute). Taking the raw ``Attribute`` lets the
+    /// attribute axis test a candidate without wrapping (and so retaining) it, so
+    /// an attribute the test rejects is never materialized. A name test matches
+    /// by qualified name; a wildcard or `node()` matches any attribute; the kind
+    /// tests never match an attribute.
+    static func matchesAttribute(_ attribute: PureXML.Model.Attribute, _ test: NodeTest, _ namespaces: [String: String]) -> Bool {
+        switch test {
+        case let .name(name): qualifiedMatches(attribute.name, name, namespaces)
+        case .wildcard, .node: true
+        case .text, .comment, .processingInstruction: false
         }
     }
 
