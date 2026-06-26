@@ -53,10 +53,6 @@ extension PureXML.Schema.XSDParser {
     /// schema-for-schemas content model, the single `annotation` (where allowed
     /// once) must be first, and an identity constraint needs a selector and field.
     /// Walks the one document rooted at `schema`, skipping foreign content.
-    static func structureErrors(_ schema: XSDTree) -> [String] {
-        structureFindings(schema).map(\.reason)
-    }
-
     static func structureFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         let bindings = PureXML.Schema.XSDNode.namespaceBindings(of: schema)

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Five unused internal schema-consistency wrappers (`idAttributeErrors`, `consistencyErrors`, `postNamedTypeErrors`, `structureErrors`, `includeCompositionErrors`) that returned `[String]` reason lists, along with the now-orphaned `postCompileErrors(schema:context:containers:namedTypes:)` overload and the `SchemaCompileNamedTypes` struct it consumed. None had callers; the `XSDParser.consistencyErrors` overload was shadowed by the distinct, still-live `Validation.XSDSchema.consistencyErrors` (a different signature returning `ValidationError`), which is why a name-only search first read it as used. The located-diagnostic API (the `*Findings` functions returning `SchemaLocatedFinding`, and `Validation.XSDSchema` returning `ValidationError`) superseded all of them. Removing them deletes dead code with no behavior change; the live `*Findings` and `Validation.XSDSchema` functions are unchanged. A stale doc-comment reference to the renamed `userTypeValueConstraintErrors` (now `userTypeValueConstraintFindings`) was corrected at the same time.
+
 ### Fixed
 
 - `xpointer(string-range(...))` no longer uses a quadratic substring search. It matched the search string at every position of each node's value and re-allocated the whole needle-width window per position (O(text * needle), a denial-of-service vector on a long node value with a near-matching needle); it now uses a linear-time Knuth-Morris-Pratt search with the failure function built once. The matches are unchanged: same non-overlapping, left-to-right occurrences, same offset/length. A near-matching needle over a 16000-character node drops from about 0.18 s to about 0.002 s (~100x), and the cost is now linear. Guarded by the new non-overlapping and backtracking cases in `XPointerRangeTests`.

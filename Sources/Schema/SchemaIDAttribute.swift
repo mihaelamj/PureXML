@@ -8,10 +8,6 @@ extension PureXML.Schema.XSDParser {
     ///
     /// Walks the one document rooted at `schema`; an included or imported document
     /// keeps its own `id` scope, so cross-document collisions are not flagged here.
-    static func idAttributeErrors(_ schema: XSDTree) -> [String] {
-        idAttributeFindings(schema).map(\.reason)
-    }
-
     static func idAttributeFindings(_ schema: XSDTree) -> [PureXML.Schema.SchemaLocatedFinding] {
         var findings: [PureXML.Schema.SchemaLocatedFinding] = []
         var seen: Set<String> = []
@@ -52,31 +48,4 @@ extension PureXML.Schema.XSDParser {
     private static func unprefixedID(_ node: XSDTree) -> String? {
         node.attributes.first { $0.name.prefix == nil && $0.name.localName == "id" }?.value
     }
-
-    /// All compile-time schema-consistency findings before named types resolve.
-    static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
-        PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers).map(\.reason)
-    }
-
-    /// Consistency findings that depend on the resolved named types.
-    static func postNamedTypeErrors(
-        _ schema: XSDTree,
-        _ context: PureXML.Schema.XSDContext,
-        _ containers: [XSDTree],
-        _ derivation: DerivationTables,
-        typeMaps: (global: [String: PureXML.Schema.ElementType], named: [String: PureXML.Schema.ElementType]),
-    ) -> [String] {
-        PureXML.Validation.SchemaCompile.postCompileErrors(
-            schema: schema,
-            context: context,
-            containers: containers,
-            namedTypes: PureXML.Schema.SchemaCompileNamedTypes(
-                derivation: derivation,
-                globalElements: typeMaps.global,
-                types: typeMaps.named,
-            ),
-        ).map(\.reason)
-    }
-
-    // Legacy helpers retained for direct unit tests of individual checks.
 }

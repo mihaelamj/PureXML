@@ -304,20 +304,6 @@ extension PureXML.Schema.XSDParser {
     /// Schema-validity findings for `xs:include` when external schemas load: the
     /// included document must be chameleon (no `targetNamespace`) or declare the
     /// same target namespace as the includer (XSD Structures §4.2.3).
-    static func includeCompositionErrors(
-        _ containers: [XSDTree],
-        mainTargetNamespace: String?,
-        compositionLoaded: Bool,
-        containerLocations: [ObjectIdentifier: String?],
-    ) -> [String] {
-        includeCompositionFindings(
-            containers,
-            mainTargetNamespace: mainTargetNamespace,
-            compositionLoaded: compositionLoaded,
-            containerLocations: containerLocations,
-        ).map(\.reason)
-    }
-
     static func includeCompositionFindings(
         _ containers: [XSDTree],
         mainTargetNamespace: String?,
