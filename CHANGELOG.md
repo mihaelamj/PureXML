@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `xpointer(string-range(...))` no longer uses a quadratic substring search. It matched the search string at every position of each node's value and re-allocated the whole needle-width window per position (O(text * needle), a denial-of-service vector on a long node value with a near-matching needle); it now uses a linear-time Knuth-Morris-Pratt search with the failure function built once. The matches are unchanged: same non-overlapping, left-to-right occurrences, same offset/length. A near-matching needle over a 16000-character node drops from about 0.18 s to about 0.002 s (~100x), and the cost is now linear. Guarded by the new non-overlapping and backtracking cases in `XPointerRangeTests`.
+
 - The XSLT `id()` function no longer scans the whole document ID index on every call. It filtered the entire index by `tokens.contains(...)` (O(index) per call), so a stylesheet calling `id()` across a wide document was quadratic; it now looks each requested token up directly (O(tokens)). The result is unchanged: the same elements in document order. A stylesheet resolving 4000 `id()` references against a 4000-entry index drops from about 0.34 s to about 0.03 s (~13x), and the cost is now linear. (`key()` already used direct lookups.)
 
 ## [0.4.7] - 2026-06-26

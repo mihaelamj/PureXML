@@ -154,22 +154,60 @@ extension PureXML.XPointer.RangeForm {
     private static func stringRanges(in nodes: [PureXML.Model.TreeNode], search: String, offset: Int?, length: Int?) -> [PureXML.XPointer.Range] {
         guard !search.isEmpty else { return [] }
         let needle = Array(search)
+        // The needle is the same for every node, so its KMP failure function is
+        // built once. The former scan re-tested (and re-allocated) the whole
+        // needle window at every position, an O(text * needle) search and a
+        // denial-of-service vector on a long node value with a near-matching
+        // needle; the search is now O(text + needle).
+        let failure = kmpFailure(needle)
         return nodes.flatMap { node -> [PureXML.XPointer.Range] in
             let characters = Array(node.stringValue)
-            var ranges: [PureXML.XPointer.Range] = []
-            var index = 0
-            while index + needle.count <= characters.count {
-                guard Array(characters[index ..< index + needle.count]) == needle else { index += 1
-                    continue
-                }
+            return nonOverlappingMatches(of: needle, failure: failure, in: characters).map { index in
                 let begin = min(index + (offset ?? 1) - 1, characters.count)
                 let end = min(begin + (length ?? needle.count), characters.count)
                 let text = String(characters[max(begin, 0) ..< max(end, begin)])
-                ranges.append(PureXML.XPointer.Range(nodes: [.text(text)], text: text))
-                index += needle.count
+                return PureXML.XPointer.Range(nodes: [.text(text)], text: text)
             }
-            return ranges
         }
+    }
+
+    /// The KMP failure function (for each prefix, the length of its longest
+    /// proper prefix that is also a suffix) of `needle`.
+    private static func kmpFailure(_ needle: [Character]) -> [Int] {
+        var failure = [Int](repeating: 0, count: needle.count)
+        var matched = 0
+        for index in 1 ..< needle.count {
+            while matched > 0, needle[index] != needle[matched] {
+                matched = failure[matched - 1]
+            }
+            if needle[index] == needle[matched] { matched += 1 }
+            failure[index] = matched
+        }
+        return failure
+    }
+
+    /// The start indices of `needle` in `haystack`, left to right and
+    /// non-overlapping: each match resumes the scan past its end, matching the
+    /// former naive scan's `index += needle.count` advance, in O(text + needle).
+    private static func nonOverlappingMatches(of needle: [Character], failure: [Int], in haystack: [Character]) -> [Int] {
+        var matches: [Int] = []
+        var matched = 0
+        var index = 0
+        while index < haystack.count {
+            if haystack[index] == needle[matched] {
+                index += 1
+                matched += 1
+                if matched == needle.count {
+                    matches.append(index - needle.count)
+                    matched = 0
+                }
+            } else if matched > 0 {
+                matched = failure[matched - 1]
+            } else {
+                index += 1
+            }
+        }
+        return matches
     }
 
     /// The whole nodes spanned from `from` to `target`: the sibling run between
