@@ -70,14 +70,21 @@ public extension PureXML.Model.TreeNode {
     /// contribute nothing (XPath 1.0 sections 5.1 and 5.5). Distinct from
     /// `stringValue`, which on a comment or PI node is that node's own data.
     var textContent: String {
-        switch kind {
-        case .text, .cdata:
-            value
-        case .element, .document, .entityReference:
-            children.reduce(into: "") { $0 += $1.textContent }
-        case .namespace, .comment, .processingInstruction, .doctype:
-            ""
+        // Iterative pre-order walk so a deeply-nested subtree does not overflow
+        // the stack; children are pushed reversed to concatenate in document order.
+        var result = ""
+        var stack: [PureXML.Model.TreeNode] = [self]
+        while let node = stack.popLast() {
+            switch node.kind {
+            case .text, .cdata:
+                result += node.value
+            case .element, .document, .entityReference:
+                stack.append(contentsOf: node.children.reversed())
+            case .namespace, .comment, .processingInstruction, .doctype:
+                break
+            }
         }
+        return result
     }
 
     /// This node's position among its parent's children, or nil when it has no

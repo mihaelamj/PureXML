@@ -27,14 +27,34 @@ public extension PureXML.XPath {
 
         private static func stringValue(of node: PureXML.Model.Node) -> String {
             switch node {
-            case let .text(value), let .cdata(value), let .comment(value):
-                value
+            // A comment or processing-instruction node's own string-value is its
+            // data (XPath 1.0 5.6, 5.7), but as a descendant of an element it
+            // contributes nothing (5.1, 5.5): only text and CDATA do.
+            case let .comment(value):
+                return value
             case let .processingInstruction(_, data):
-                data
-            case let .element(element):
-                element.children.reduce(into: "") { $0 += stringValue(of: $1) }
-            case let .document(children):
-                children.reduce(into: "") { $0 += stringValue(of: $1) }
+                return data
+            case let .text(value), let .cdata(value):
+                return value
+            case .element, .document:
+                // Iterative pre-order walk so a deeply-nested node does not
+                // overflow the stack; children are pushed reversed to concatenate
+                // descendant text in document order.
+                var result = ""
+                var stack: [PureXML.Model.Node] = [node]
+                while let current = stack.popLast() {
+                    switch current {
+                    case let .text(value), let .cdata(value):
+                        result += value
+                    case let .element(element):
+                        stack.append(contentsOf: element.children.reversed())
+                    case let .document(children):
+                        stack.append(contentsOf: children.reversed())
+                    case .comment, .processingInstruction:
+                        break
+                    }
+                }
+                return result
             }
         }
     }
