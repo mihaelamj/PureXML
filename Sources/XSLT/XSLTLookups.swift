@@ -100,7 +100,13 @@ extension PureXML.XSLT.Library {
             documents.idIndexes[rootIdentity] = built
             index = built
         }
-        let matched = index.filter { tokens.contains($0.key) }.values
+        // Look each requested token up directly. Scanning the whole index and
+        // filtering by `tokens.contains` was O(index) per `id()` call, so a
+        // stylesheet calling `id()` across a wide document was quadratic; the
+        // tokens already are the keys, so the index lookup is O(tokens). The
+        // result is the same set of nodes (each ID value maps to one element),
+        // and `sortedByDocumentOrder()` gives the same order.
+        let matched = tokens.compactMap { index[$0] }
             .map { PureXML.XPath.Node.tree($0) }
             .sortedByDocumentOrder()
         return .nodeSet(matched)
