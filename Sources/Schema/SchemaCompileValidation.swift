@@ -25,13 +25,6 @@ extension PureXML.Schema {
         }
     }
 
-    /// Resolved named types and global elements produced during schema compilation.
-    struct SchemaCompileNamedTypes {
-        let derivation: PureXML.Schema.XSDParser.DerivationTables
-        let globalElements: [String: PureXML.Schema.ElementType]
-        let types: [String: PureXML.Schema.ElementType]
-    }
-
     /// A marker subject for compile-time schema checks that run once over the
     /// whole schema document rather than per node in an instance tree.
     struct SchemaCompileRoot: PureXML.Validation.Validatable {}
@@ -307,23 +300,6 @@ extension PureXML.Validation {
                 at: [.element("schema")],
                 in: document,
             )
-        }
-
-        /// Builds a post-compile context and returns every finding.
-        static func postCompileErrors(
-            schema: PureXML.Model.TreeNode,
-            context: PureXML.Schema.XSDContext,
-            containers: [PureXML.Model.TreeNode],
-            namedTypes: PureXML.Schema.SchemaCompileNamedTypes,
-        ) -> [ValidationError] {
-            postCompileErrors(in: PureXML.Schema.SchemaCompileContext(
-                schema: schema,
-                context: context,
-                containers: containers,
-                derivation: namedTypes.derivation,
-                globalElements: namedTypes.globalElements,
-                namedTypes: namedTypes.types,
-            ))
         }
 
         static func compileRule(

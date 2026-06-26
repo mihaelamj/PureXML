@@ -48,9 +48,4 @@ extension PureXML.Schema.XSDParser {
     private static func unprefixedID(_ node: XSDTree) -> String? {
         node.attributes.first { $0.name.prefix == nil && $0.name.localName == "id" }?.value
     }
-
-    /// All compile-time schema-consistency findings before named types resolve.
-    static func consistencyErrors(_ schema: XSDTree, _ context: PureXML.Schema.XSDContext, _ containers: [XSDTree]) -> [String] {
-        PureXML.Validation.SchemaCompile.preCompileErrors(schema: schema, context: context, containers: containers).map(\.reason)
-    }
 }
