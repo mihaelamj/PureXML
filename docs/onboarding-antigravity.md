@@ -88,7 +88,9 @@ environment):
   This path is the value of the `XSTS_ROOT` environment variable used by the
   conformance runner. If it is missing, the conformance runner silently does
   nothing (it is opt-in), so confirm the directory exists before relying on it:
-  `ls /private/tmp/xsts/xmlschema2006-11-06/suite.xml`.
+  `ls /private/tmp/xsts/xmlschema2006-11-06/suite.xml`. To obtain it, run
+  `bash scripts/fetch-xsts.sh`, which downloads and SHA-256-verifies the official
+  W3C archive into that path (the suite is never vendored).
 
 ---
 
