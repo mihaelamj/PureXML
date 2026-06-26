@@ -111,6 +111,35 @@ public extension PureXML.Model {
             }
         }
 
+        /// Tears the subtree down iteratively so releasing a deeply-nested tree
+        /// stays in bounded native stack. The implicit release walk would
+        /// otherwise recurse one frame per level (a chain of child releases), and
+        /// a naive `deinit` that let each child deallocate in turn would just nest
+        /// the same way. Instead, each node's children are moved into a flat heap
+        /// worklist and cleared before that node is released, so its own `deinit`
+        /// finds an empty `children` and returns at once: the teardown is flat.
+        ///
+        /// Only a node this teardown uniquely owns is drained; a node still held
+        /// elsewhere (an external reference into the tree) keeps its subtree
+        /// intact and tears down later through this same `deinit`.
+        deinit {
+            guard !children.isEmpty else { return }
+            var pending = children
+            children = []
+            while !pending.isEmpty {
+                // `removeLast` moves the node into `node` as the sole binding, so
+                // `isKnownUniquelyReferenced` sees no spurious reference (a
+                // `while let`/`popLast` binding would itself count). A node still
+                // referenced elsewhere keeps its subtree intact; only a node this
+                // teardown solely owns is flattened, so its release stays shallow.
+                var node = pending.removeLast()
+                if isKnownUniquelyReferenced(&node), !node.children.isEmpty {
+                    pending.append(contentsOf: node.children)
+                    node.children = []
+                }
+            }
+        }
+
         // MARK: Factories
 
         /// Creates a document node holding the given top-level children.

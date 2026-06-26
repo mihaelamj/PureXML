@@ -72,9 +72,15 @@ extension PureXML.XPath {
         /// wrapped ``Node`` means the traversal builds no intermediate per-level
         /// arrays and wraps each node exactly once, when it is appended.
         private static func appendDescendants(of tree: PureXML.Model.TreeNode, into result: inout [Node]) {
-            for child in tree.children {
-                result.append(.tree(child))
-                appendDescendants(of: child, into: &result)
+            // Iterative pre-order walk: a deeply-nested tree would overflow the
+            // call stack if descended recursively. Children are pushed reversed so
+            // they pop in document order.
+            var stack = Array(tree.children.reversed())
+            while let node = stack.popLast() {
+                result.append(.tree(node))
+                if !node.children.isEmpty {
+                    stack.append(contentsOf: node.children.reversed())
+                }
             }
         }
 
@@ -104,9 +110,14 @@ extension PureXML.XPath {
             where keep: (PureXML.Model.TreeNode) -> Bool,
             into result: inout [Node],
         ) {
-            for child in tree.children {
-                if keep(child) { result.append(.tree(child)) }
-                appendDescendants(of: child, where: keep, into: &result)
+            // Iterative pre-order walk (see the unfiltered overload); children are
+            // pushed reversed so they pop in document order.
+            var stack = Array(tree.children.reversed())
+            while let node = stack.popLast() {
+                if keep(node) { result.append(.tree(node)) }
+                if !node.children.isEmpty {
+                    stack.append(contentsOf: node.children.reversed())
+                }
             }
         }
 
