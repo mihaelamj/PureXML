@@ -5,6 +5,7 @@
 [![Swift Linux](https://github.com/mihaelamj/PureXML/actions/workflows/swift-linux.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-linux.yml)
 [![Swift Windows](https://github.com/mihaelamj/PureXML/actions/workflows/swift-windows.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-windows.yml)
 [![Swift WASM](https://github.com/mihaelamj/PureXML/actions/workflows/swift-wasm.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-wasm.yml)
+[![XSTS conformance](https://github.com/mihaelamj/PureXML/actions/workflows/swift-xsts.yml/badge.svg)](https://github.com/mihaelamj/PureXML/actions/workflows/swift-xsts.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 PureXML is a dependency-free XML package written entirely in Swift.

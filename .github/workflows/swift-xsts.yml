@@ -1,0 +1,27 @@
+name: XSTS conformance
+
+# Runs the W3C XML Schema Test Suite ratchet (Tests/XSTSSuiteTests.swift) on every
+# change, so a regression in the schema/instance validity baselines fails CI. The
+# corpus is extracted from the vendored archive (Tests/Fixtures/xsts), so this needs
+# no network. The gate is release-only because the debug run is far slower.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  xsts:
+    name: XSTS conformance
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v6
+      - name: Extract the vendored XSTS corpus
+        run: XSTS_DEST=/tmp/xsts bash scripts/fetch-xsts.sh
+      - name: Conformance ratchet
+        run: XSTS_ROOT=/tmp/xsts/xmlschema2006-11-06 swift test -c release --filter XSTSSuiteTests
