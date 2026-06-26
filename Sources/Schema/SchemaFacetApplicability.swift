@@ -117,7 +117,7 @@ extension PureXML.Schema.XSDParser {
         return findings
     }
 
-    /// Like ``userTypeValueConstraintErrors`` but for an element or attribute whose
+    /// Like ``userTypeValueConstraintFindings`` but for an element or attribute whose
     /// type is INLINE (no `type` attribute): an inline `simpleType`, or an inline
     /// complex type with `simpleContent`. The `default`/`fixed` value must be valid
     /// against that type's value space. Validated against the simpleContent base's
