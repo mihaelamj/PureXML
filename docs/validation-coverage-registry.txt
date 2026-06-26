@@ -11,6 +11,7 @@ SUBJECT PureXML.Schema.SchemaTypeFact xsd-schema-consistency
 SUBJECT PureXML.Schema.ResolvedElement xsd-streaming-shallow
 
 EXCLUDE PureXML.Model.QualifiedName value type; lexical invariants at construction
+EXCLUDE PureXML.Model.ElementStorage copy-on-write backing for Element children; validated via Node
 EXCLUDE PureXML.Model.TreeNode mutable editor view of Node; validated via Node
 EXCLUDE PureXML.Model.TreeNodeKind tag enum; no invariants
 EXCLUDE PureXML.LintDiagnostic editor output; not user input
