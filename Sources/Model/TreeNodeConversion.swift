@@ -182,6 +182,85 @@ public extension PureXML.Model.TreeNode {
             parent.built.append(.document(frame.built))
         }
     }
+
+    /// Like ``node`` but reuses subtrees already projected during this pass through
+    /// `memo` (keyed by tree-node identity). Projecting several result nodes that
+    /// nest within one another then shares structure (copy-on-write) instead of
+    /// rebuilding each subtree, so a result set of nested nodes is linear rather
+    /// than quadratic. The projection is identical to ``node``.
+    func node(memo: inout [ObjectIdentifier: PureXML.Model.Node]) -> PureXML.Model.Node {
+        if let cached = memo[ObjectIdentifier(self)] { return cached }
+        let result: PureXML.Model.Node = switch kind {
+        case .document:
+            .document(Self.projectedChildren(of: self, memo: &memo))
+        case .element:
+            .element(PureXML.Model.Element(
+                name: name ?? PureXML.Model.QualifiedName(""),
+                attributes: attributes,
+                children: Self.projectedChildren(of: self, memo: &memo),
+            ))
+        case .text: .text(value)
+        case .entityReference: .text(stringValue)
+        case .cdata: .cdata(value)
+        case .comment: .comment(value)
+        case .processingInstruction: .processingInstruction(target: name?.description ?? "", data: value)
+        case .doctype, .namespace: .text("")
+        }
+        memo[ObjectIdentifier(self)] = result
+        return result
+    }
+
+    /// ``projectedChildren(of:)`` that caches each element/document subtree in
+    /// `memo` and reuses an already-projected child instead of walking it again.
+    private static func projectedChildren(of root: PureXML.Model.TreeNode, memo: inout [ObjectIdentifier: PureXML.Model.Node]) -> [PureXML.Model.Node] {
+        let rootFrame = ProjectFrame(root, splice: false)
+        var stack: [ProjectFrame] = [rootFrame]
+        while let frame = stack.last {
+            guard frame.next < frame.tree.children.count else {
+                stack.removeLast()
+                guard let parent = stack.last else { break }
+                finishProjection(frame, into: parent, memo: &memo)
+                continue
+            }
+            let child = frame.tree.children[frame.next]
+            frame.next += 1
+            switch child.kind {
+            case .doctype, .namespace:
+                continue
+            case .entityReference:
+                stack.append(ProjectFrame(child, splice: true))
+            case .element, .document:
+                if let cached = memo[ObjectIdentifier(child)] {
+                    frame.built.append(cached)
+                } else {
+                    stack.append(ProjectFrame(child, splice: false))
+                }
+            default:
+                frame.built.append(projectLeaf(child))
+            }
+        }
+        return rootFrame.built
+    }
+
+    /// ``finishProjection(_:into:)`` that also records an element or document
+    /// frame's projected node in `memo` for reuse.
+    private static func finishProjection(_ frame: ProjectFrame, into parent: ProjectFrame, memo: inout [ObjectIdentifier: PureXML.Model.Node]) {
+        if frame.splice {
+            parent.built.append(contentsOf: frame.built)
+            return
+        }
+        let node: PureXML.Model.Node = if case .element = frame.tree.kind {
+            .element(PureXML.Model.Element(
+                name: frame.tree.name ?? PureXML.Model.QualifiedName(""),
+                attributes: frame.tree.attributes,
+                children: frame.built,
+            ))
+        } else {
+            .document(frame.built)
+        }
+        memo[ObjectIdentifier(frame.tree)] = node
+        parent.built.append(node)
+    }
 }
 
 /// A branch node being converted from a value ``Node`` to a ``TreeNode``: the

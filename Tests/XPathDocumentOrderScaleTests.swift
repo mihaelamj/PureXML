@@ -43,4 +43,38 @@ struct XPathDocumentOrderScaleTests {
         #expect(names == ["r", "a", "b", "c"])
         #expect(strings.count == 4)
     }
+
+    /// A value `Node` nesting `depth` `a` elements inside one another, as a document.
+    private func deepValueDocument(_ depth: Int) -> PureXML.Model.Node {
+        var node: PureXML.Model.Node = .text("leaf")
+        for _ in 0 ..< depth {
+            node = .element(.init("a", children: [node]))
+        }
+        return .document([node])
+    }
+
+    #if os(WASI)
+        @Test("the value-Node result API is linear for nested results")
+    #else
+        @Test("the value-Node result API is linear for nested results", .timeLimit(.minutes(1)))
+    #endif
+    func test_nestedValueResultsAreLinear() throws {
+        // `//a` over a deep chain selects every `a`, each containing all deeper
+        // ones. Without projection sharing, materializing them as value `Node`s is
+        // the sum of their subtree sizes, which is quadratic (#348).
+        let depth = 30000
+        let document = deepValueDocument(depth)
+        let results = try PureXML.XPath.Query("//a").evaluate(over: document)
+        #expect(results.count == depth)
+        // The outermost result still carries the full nesting, proving the shared
+        // projection did not truncate any subtree: descending the first child from
+        // the outermost `a` reaches all `depth` `a` elements.
+        var element = results.first?.element
+        var reachable = 0
+        while let current = element {
+            reachable += 1
+            element = current.children.first?.element
+        }
+        #expect(reachable == depth)
+    }
 }

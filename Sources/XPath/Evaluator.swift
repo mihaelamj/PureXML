@@ -17,7 +17,7 @@ extension PureXML.XPath {
             guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
                 return []
             }
-            return orderUnique(nodes).map(selection)
+            return selections(orderUnique(nodes))
         }
 
         /// Evaluates an expression to a typed value with optional variable bindings.
@@ -103,7 +103,7 @@ extension PureXML.XPath {
             guard let value = try? eval(expression, context), case let .nodeSet(nodes) = value else {
                 return []
             }
-            return orderUnique(nodes).map(selection)
+            return selections(orderUnique(nodes))
         }
 
         private static func rootContext(
@@ -221,10 +221,24 @@ extension PureXML.XPath {
             return current
         }
 
-        private static func selection(_ node: Node) -> Selection {
+        /// Projects an ordered node-set to selections, sharing a projection memo
+        /// so that result nodes nesting within one another reuse each other's
+        /// already-built value `Node` subtrees rather than each rebuilding the
+        /// whole subtree (which is quadratic for nested results).
+        static func selections(_ nodes: [Node]) -> [Selection] {
+            var memo: [ObjectIdentifier: PureXML.Model.Node] = [:]
+            var result: [Selection] = []
+            result.reserveCapacity(nodes.count)
+            for node in nodes {
+                result.append(selection(node, memo: &memo))
+            }
+            return result
+        }
+
+        private static func selection(_ node: Node, memo: inout [ObjectIdentifier: PureXML.Model.Node]) -> Selection {
             switch node {
             case let .tree(tree):
-                return .node(tree.node)
+                return .node(tree.node(memo: &memo))
             case let .attribute(_, attribute):
                 return .attribute(attribute)
             case let .namespace(_, prefix, uri):
