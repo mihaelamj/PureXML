@@ -100,11 +100,53 @@ struct XSTSDifferentialTests {
             process.standardError = pipe
             process.standardOutput = Pipe()
             do { try process.run() } catch { return nil }
+            // xmllint infinite-loops on a few pathological schemas (particlesZ012);
+            // an unbounded wait would block forever and leave the child as a zombie.
+            // Bound it, then skip the case (it cannot be compared against a hung
+            // reference) rather than hang the harness.
+            guard Self.boundedExit(process, seconds: 15) else { return nil }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             process.waitUntilExit()
             let output = String(decoding: data, as: UTF8.self)
             if output.contains("Schemas parser error") || output.contains("failed to compile") { return false }
             return true
+        #endif
+    }
+
+    /// Waits for `process` to exit, but no longer than `seconds`. On timeout it
+    /// terminates the child and reaps it, returning false; returns true when the
+    /// process exited on its own. Single-threaded polling, so there is no shared
+    /// mutable state to race under strict concurrency.
+    private static func boundedExit(_ process: Process, seconds: Double) -> Bool {
+        let deadline = Date().addingTimeInterval(seconds)
+        while process.isRunning, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        if process.isRunning {
+            process.terminate()
+            process.waitUntilExit()
+            return false
+        }
+        return true
+    }
+
+    @Test("a hung subprocess is bounded and reaped, not waited out")
+    func test_boundedExitTerminatesHungProcess() throws {
+        #if !os(WASI)
+            let candidates = ["/bin/sleep", "/usr/bin/sleep"]
+            guard let sleepPath = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else {
+                return // no `sleep` on this platform; skip.
+            }
+            let sleeper = Process()
+            sleeper.executableURL = URL(fileURLWithPath: sleepPath)
+            sleeper.arguments = ["30"]
+            try sleeper.run()
+            let start = Date()
+            let exitedOnOwn = Self.boundedExit(sleeper, seconds: 1)
+            let elapsed = Date().timeIntervalSince(start)
+            #expect(!exitedOnOwn) // terminated at the deadline, did not finish
+            #expect(elapsed < 10) // bounded near 1s, not the full 30s
+            #expect(!sleeper.isRunning) // reaped, no zombie
         #endif
     }
 
