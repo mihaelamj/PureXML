@@ -48,6 +48,27 @@ struct XPointerRangeTests {
         #expect(result.allSatisfy { $0.text == "ir" })
     }
 
+    @Test("string-range() matches are non-overlapping")
+    func test_stringRangeNonOverlapping() throws {
+        // "aa" in "aaaaa": the scan emits a match then resumes past it, so it
+        // finds positions 0 and 2 (not the overlapping 1 and 3). The linear KMP
+        // search must keep that advance-by-needle behavior.
+        let xml = try PureXML.parse("<d>aaaaa</d>")
+        let result = try PureXML.XPointer.evaluateRanges("xpointer(string-range(/d, \"aa\"))", over: xml)
+        #expect(result.count == 2)
+        #expect(result.allSatisfy { $0.text == "aa" })
+    }
+
+    @Test("string-range() finds a match that needs failure-function backtracking")
+    func test_stringRangeBacktrack() throws {
+        // In "abcabcabd" the needle "abcabd" matches only at index 3; reaching it
+        // requires backtracking after the partial "abcab" at index 0 mismatches.
+        let xml = try PureXML.parse("<d>abcabcabd</d>")
+        let result = try PureXML.XPointer.evaluateRanges("xpointer(string-range(/d, \"abcabd\"))", over: xml)
+        #expect(result.count == 1)
+        #expect(result.first?.text == "abcabd")
+    }
+
     @Test("string-range() honors offset and length")
     func test_stringRangeOffsetLength() throws {
         // From the "ir" match in "first", start at offset 2 (the 'r') for length 1.
