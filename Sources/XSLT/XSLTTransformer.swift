@@ -203,12 +203,8 @@ extension PureXML.XSLT {
             )
         }
 
-        fileprivate func selectNodes(_ expression: String, _ context: XSLTContext) -> [PureXML.Model.TreeNode] {
-            value(expression, context)?.nodes?.compactMap(\.treeNode) ?? []
-        }
-
-        /// Like `selectNodes` but keeping attribute and namespace nodes,
-        /// which templates apply to as well.
+        /// Selects the nodes an expression yields, keeping attribute and namespace
+        /// nodes, which templates apply to as well.
         func selectXPathNodes(_ expression: String, _ context: XSLTContext) -> [PureXML.XPath.Node] {
             value(expression, context)?.nodes ?? []
         }
