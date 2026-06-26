@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-06-26
+
 ### Fixed
 
-- XSD identity-constraint validation (`xs:unique`, `xs:key`, `xs:keyref`) is no longer quadratic over a wide list of targets. Two scans drove the cost: the duplicate check compared each new value tuple against every tuple already seen (a `keyref` likewise scanned every referenced key), and the error-location helper rescanned the parent's whole child list to position each target. The first now keys tuples in a `Set` by their raw string, which is sound because field equality reduces to a raw `string == string` comparison for whitespace-preserving lexical types (most ids); value-space types (numeric, boolean, date), whitespace-collapsing types, and QName-bearing values keep the exact pairwise comparison, so which documents pass is unchanged. The second positions each target through a per-parent, per-name index built once. Validating a 16000-item document against an `xs:unique` drops from about 4.0 s to about 0.12 s (~34x), and the cost is now linear. Guarded by `SchemaIdentityScaleDuplicateTests`.
+- XSD identity-constraint validation (`xs:unique`, `xs:key`, `xs:keyref`) is no longer quadratic over a wide list of targets. Two scans drove the cost: the duplicate check compared each new value tuple against every tuple already seen (a `keyref` likewise scanned every referenced key), and the error-location helper rescanned the parent's whole child list to position each target. The first now keys tuples in a `Set` by their raw string, which is sound because field equality reduces to a raw `string == string` comparison for whitespace-preserving lexical types (most ids); value-space types (numeric, boolean, date), whitespace-collapsing types, and QName-bearing values keep the exact pairwise comparison, so which documents pass is unchanged. The second positions each target through a per-parent, per-name index built once. Validating a 16000-item document against an `xs:unique` drops from about 4.0 s to about 0.12 s (~34x), and the cost is now linear. Guarded by `SchemaIdentityScaleDuplicateTests` (#312).
 
 ## [0.4.6] - 2026-06-26
 
