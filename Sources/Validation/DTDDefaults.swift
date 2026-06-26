@@ -5,19 +5,28 @@ public extension PureXML.Validation.DTDSchema {
     /// values are the normalized defaults from the declaration, so an editor reads
     /// the same effective attributes a validating processor would see.
     func applyingDefaults(to node: PureXML.Model.Node) -> PureXML.Model.Node {
-        switch node {
-        case let .document(children):
-            .document(children.map(applyingDefaults(to:)))
-        case let .element(element):
-            .element(applyingDefaults(to: element))
-        case .text, .cdata, .comment, .processingInstruction:
-            node
+        // Rebuilt bottom-up (iterative) so a deeply-nested document does not
+        // overflow the stack; each element gains its DTD-declared defaults once its
+        // children are rebuilt.
+        node.rebuildingBottomUp { original, rebuiltChildren in
+            switch original {
+            case let .element(element):
+                var result = element
+                result.children = rebuiltChildren
+                return .element(withDefaults(result))
+            case .document:
+                return .document(rebuiltChildren)
+            default:
+                return original
+            }
         }
     }
 
-    private func applyingDefaults(to element: PureXML.Model.Element) -> PureXML.Model.Element {
+    /// Adds the attributes `element`'s `<!ATTLIST>` declares with a default or
+    /// `#FIXED` value and that the element omits. `result.children` is assumed
+    /// already set by the caller.
+    private func withDefaults(_ element: PureXML.Model.Element) -> PureXML.Model.Element {
         var result = element
-        result.children = element.children.map { applyingDefaults(to: $0) }
         guard let declarations = attributes[element.name.description] else { return result }
         for declaration in declarations {
             guard let value = Self.defaultValue(declaration) else { continue }
