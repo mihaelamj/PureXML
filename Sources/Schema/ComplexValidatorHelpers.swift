@@ -14,32 +14,6 @@ extension PureXML.Schema.ComplexValidator {
         PureXML.Validation.PathKey.steps(forChildNames: children.map(\.name.description))
     }
 
-    /// Validates an `all` group order-independently: every child matches a
-    /// member within its occurrence bounds, and each member meets its minimum.
-    static func matchesAll(_ group: PureXML.Schema.Group, names: [PureXML.Model.QualifiedName]) -> Bool {
-        var counts = [Int](repeating: 0, count: group.particles.count)
-        for name in names {
-            guard let index = group.particles.indices.first(where: { position in
-                let member = group.particles[position]
-                let room = member.maxOccurs.map { counts[position] < $0 } ?? true
-                return room && label(of: member.term).matches(name)
-            }) else { return false }
-            counts[index] += 1
-        }
-        for (index, member) in group.particles.enumerated() where counts[index] < member.minOccurs {
-            return false
-        }
-        return true
-    }
-
-    fileprivate static func label(of term: XSDTerm) -> XSDTermLabel {
-        switch term {
-        case let .element(name, _, _, _, _, _): .name(name)
-        case let .wildcard(wildcard): .wildcard(wildcard)
-        case .group: .wildcard(XSDWildcard())
-        }
-    }
-
     /// The `processContents` of a wildcard reachable in `term`, if the content
     /// model contains one.
     static func wildcard(in term: PureXML.Schema.Term) -> PureXML.Schema.ProcessContents? {
