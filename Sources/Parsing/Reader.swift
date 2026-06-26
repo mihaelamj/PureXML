@@ -12,11 +12,22 @@ extension PureXML.Parsing {
     /// `String`.
     struct Reader {
         private var pull: () -> Character?
-        // `private(set)`/`let` rather than `private` so the bulk byte-run
-        // scanners (the same-module extension in ReaderByteRuns.swift) can READ
-        // the cursor state; all writes stay file-private, routed through
-        // `advanceByteRun` so position mutation is encapsulated here.
+        /// `private(set)`/`let` rather than `private` so the bulk byte-run
+        /// scanners (the same-module extension in ReaderByteRuns.swift) can READ
+        /// the cursor state; all writes stay file-private, routed through
+        /// `advanceByteRun` so position mutation is encapsulated here.
         private(set) var buffer: [Character] = []
+        /// Index of the first unconsumed character; the logical buffer is
+        /// `buffer[head...]`. Consuming advances this instead of shifting the
+        /// array, and re-injection reuses the freed prefix, so front-consume and
+        /// entity re-injection are amortized O(1) rather than O(buffer). The array
+        /// is reset to empty once fully consumed, so `buffer.isEmpty` stays
+        /// equivalent to "no buffered characters" for the byte fast paths.
+        private var head = 0
+        private var available: Int {
+            buffer.count - head
+        }
+
         private var exhausted = false
         private(set) var offset = 0
         private(set) var line = 1
@@ -106,7 +117,7 @@ extension PureXML.Parsing {
         /// source is exhausted). The buffer stays bounded by the largest lookahead
         /// any single scan needs, never by the document size.
         private mutating func ensure(_ count: Int) {
-            while buffer.count < count, !exhausted {
+            while available < count, !exhausted {
                 if let character = normalizedPull() {
                     buffer.append(character)
                 } else {
@@ -147,7 +158,7 @@ extension PureXML.Parsing {
 
         mutating func peek(_ ahead: Int = 0) -> Character? {
             ensure(ahead + 1)
-            return ahead < buffer.count ? buffer[ahead] : nil
+            return ahead < available ? buffer[head + ahead] : nil
         }
 
         /// The raw byte `ahead` positions past the cursor, on the byte fast path
@@ -170,8 +181,13 @@ extension PureXML.Parsing {
         @discardableResult
         mutating func advance() -> Character? {
             ensure(1)
-            guard !buffer.isEmpty else { return nil }
-            let character = buffer.removeFirst()
+            guard available > 0 else { return nil }
+            let character = buffer[head]
+            head += 1
+            if head == buffer.count {
+                buffer.removeAll(keepingCapacity: true)
+                head = 0
+            }
             offset += 1
             if character == "\n" {
                 line += 1
@@ -192,10 +208,10 @@ extension PureXML.Parsing {
             // the parse profile).
             let count = literal.count
             ensure(count)
-            guard buffer.count >= count else { return false }
+            guard available >= count else { return false }
             var index = 0
             for character in literal {
-                if buffer[index] != character { return false }
+                if buffer[head + index] != character { return false }
                 index += 1
             }
             return true
@@ -309,7 +325,19 @@ extension PureXML.Parsing {
         /// (4.4.2 Included). Position tracking keeps reporting the source
         /// document's marks, the libxml2 model for entity boundaries.
         mutating func inject(_ text: String) {
-            buffer.insert(contentsOf: text.unicodeScalars.map(Character.init), at: 0)
+            let characters = text.unicodeScalars.map(Character.init)
+            if head >= characters.count {
+                // Reuse the space the consumed prefix freed, so repeated entity
+                // re-injection is O(injected text), not O(buffer).
+                buffer.replaceSubrange(head - characters.count ..< head, with: characters)
+                head -= characters.count
+            } else {
+                if head > 0 {
+                    buffer.removeFirst(head)
+                    head = 0
+                }
+                buffer.insert(contentsOf: characters, at: 0)
+            }
         }
     }
 }
