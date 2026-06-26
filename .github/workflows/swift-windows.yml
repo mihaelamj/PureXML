@@ -1,9 +1,12 @@
 name: Swift (Windows)
 
+# Windows runs the full build and test suite but is the slowest CI job, so it
+# runs only when cutting a release (a `v*` tag push) or on demand, not on every
+# push and PR. This keeps per-PR CI fast; the badge reflects the Windows run as
+# of the last release.
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
