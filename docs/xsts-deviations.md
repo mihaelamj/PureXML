@@ -51,6 +51,35 @@ XSTS is a deliberately adversarial, exhaustive corpus; mature validators
 fix the deviations that are genuine correctness bugs affecting real documents,
 and to document the remainder as spec-justified, deliberate exclusions.
 
+## libxml2 differential triage (2026-06-26)
+
+With the corpus runnable, the open tail (10 invalid-schemas-accepted, 14
+invalid-instances-accepted) was triaged against libxml2 (`xmllint --schema`), the
+package's stated reference. A case libxml2 also accepts is one where matching the
+suite means being stricter than libxml2 (Xerces/.NET territory): a deliberate
+scope choice with false-positive risk. A case libxml2 rejects is a genuine gap
+whose fix aligns PureXML with its reference rather than exceeding it.
+
+Schema side (10 cases):
+
+| Case | libxml2 | Reading |
+|---|---|---|
+| `particlesZ030_d` | rejects | Reference-aligned bug, now fixed: a `simpleContent` restriction relaxing a base `required` attribute to `optional` (derivation-ok-restriction.2). invalid-schemas-accepted 10 -> 9. |
+| `elemZ026`, `particlesHa161`, `particlesIg004`, `particlesIk011/025/027`, `particlesM034`, `particlesV020` | accept too | Stricter-than-libxml2: NameAndTypeOK / particle-restriction edges (union membership, element-block superset) that libxml2 does not implement. Pursue only if Xerces-level strictness is wanted. |
+| `schN12` | (multi-document) | Cross-namespace composition; not triaged in isolation. |
+
+Instance side (sampled): `idZ010`, `mgO013`, `particlesZ001`, `reT17`, `reT38`
+are rejected by libxml2 (reference-aligned), but each is individually intricate:
+`particlesZ001`'s rule is marked ambiguous by the suite itself (RecurseAsIfGroup);
+`mgO013` is an `xs:all` under `redefine`; `idZ010` turns on keyref namespace
+resolution with non-absolute namespace URIs. The multi-document `sch*` / `targetns`
+cases need per-schema pairing before a verdict.
+
+Takeaway: on the schema side, libxml2 parity is reached except the one case now
+fixed; the remaining nine are a deliberate choice to exceed the reference. The
+instance tail's reference-aligned cases are real but each needs its own analysis,
+not a sweep.
+
 ## Category A: genuine correctness bugs
 
 ### Fixed (thirty-four root causes, ~2258 deviations cleared)
