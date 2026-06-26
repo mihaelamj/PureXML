@@ -203,7 +203,7 @@ extension PureXML.XPath {
         /// The document's nodes in document order plus a node-to-index map, built
         /// once per document root and reused across the following and preceding
         /// evaluations of one query.
-        private static func orderedDocument(
+        static func orderedDocument(
             rootedAt root: PureXML.Model.TreeNode,
             cache: DocumentNavigationCache?,
         ) -> (nodes: [Node], index: [Node: Int]) {
@@ -289,13 +289,17 @@ extension PureXML.XPath {
         }
 
         private static func appendSubtree(_ tree: PureXML.Model.TreeNode, into result: inout [Node]) {
-            result.append(.tree(tree))
-            for child in tree.children {
-                appendSubtree(child, into: &result)
+            // Iterative pre-order walk: a deeply-nested document would otherwise
+            // overflow the stack here. Children are pushed reversed so they pop in
+            // document order.
+            var stack: [PureXML.Model.TreeNode] = [tree]
+            while let node = stack.popLast() {
+                result.append(.tree(node))
+                stack.append(contentsOf: node.children.reversed())
             }
         }
 
-        private static func rootTree(of node: Node) -> PureXML.Model.TreeNode? {
+        static func rootTree(of node: Node) -> PureXML.Model.TreeNode? {
             let start: PureXML.Model.TreeNode? = switch node {
             case let .tree(tree): tree
             case let .attribute(owner, _), let .namespace(owner, _, _): owner
