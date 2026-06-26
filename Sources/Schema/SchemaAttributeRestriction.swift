@@ -27,7 +27,11 @@ extension PureXML.Schema.XSDParser {
         guard !skipsCrossDocumentRules(schema, compositionLoaded: context.compositionLoaded) else { return [] }
         let bindings = context.namespaceBindings
         var findings: [PureXML.Schema.SchemaLocatedFinding] = []
-        for content in descendants(schema, named: "complexContent") {
+        // The attribute-use restriction rules apply to a restriction of either
+        // content kind: a `simpleContent` restriction (a complex type with simple
+        // content plus attributes) narrows its base attributes by the same rules as
+        // a `complexContent` one, so both derivation roots are checked here.
+        for content in descendants(schema, named: "complexContent") + descendants(schema, named: "simpleContent") {
             guard let restriction = AttrRestrictNode.firstChild(content, named: "restriction"),
                   let base = AttrRestrictNode.attribute(restriction, "base"),
                   AttrRestrictNode.referenceNamespace(base, bindings) == context.targetNamespace,

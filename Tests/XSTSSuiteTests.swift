@@ -39,8 +39,12 @@ struct XSTSSuiteTests {
     /// extension that is not expressible per Errata E1-10 is rejected (wildZ013);
     /// 11 -> 10, a redefine self-reference's expansion is now seen by the UPA check
     /// and that check runs over every composition root, so a redefined group that
-    /// duplicates a particle across the redefine chain is rejected (schN10).
-    private let knownSchemaInvalidAccepted = 10
+    /// duplicates a particle across the redefine chain is rejected (schN10);
+    /// 10 -> 9, the attribute-use restriction check (derivation-ok-restriction.2:
+    /// a base `required` attribute may not become `optional`) now also runs over a
+    /// `simpleContent` restriction, not only `complexContent` (particlesZ030_d,
+    /// which libxml2 also rejects).
+    private let knownSchemaInvalidAccepted = 9
     private let knownInstanceValidRejected = 0
     /// Instance bucket (133 -> 22), per-step deltas in CHANGELOG.md: xsi:type must derive from the declared
     /// type; anyType cannot stand in for anySimpleType; an untyped substitutionGroup member inherits its head's
