@@ -34,54 +34,6 @@ enum XSLTNamespaceFixup {
         }
     }
 
-    /// A namespaced attribute needs a prefix bound to its URI, generated
-    /// fresh when absent or taken by a different binding.
-    private static func fixAttributeName(at index: Int, attributes: inout [PureXML.Model.Attribute], scope: inout [String: String], counter: inout Int) {
-        let attributeName = attributes[index].name
-        guard let uri = attributeName.namespaceURI, !uri.isEmpty,
-              attributeName.prefix != "xmlns", attributeName.prefix != "xml"
-        else { return }
-        var prefix = attributeName.prefix
-        if let candidate = prefix, scope[candidate] == uri {
-            return // Already bound correctly.
-        }
-        if prefix == nil || scope[prefix ?? ""] != nil {
-            if let existing = scope.first(where: { $0.value == uri && !$0.key.isEmpty })?.key {
-                prefix = existing
-            } else {
-                while scope["ns\(counter)"] != nil {
-                    counter += 1
-                }
-                prefix = "ns\(counter)"
-                counter += 1
-            }
-        }
-        guard let resolved = prefix else { return }
-        if scope[resolved] != uri {
-            scope[resolved] = uri
-            attributes.append(.init("xmlns:\(resolved)", uri))
-        }
-        attributes[index] = .init(
-            name: .init(prefix: resolved, localName: attributeName.localName, namespaceURI: uri),
-            value: attributes[index].value,
-        )
-    }
-
-    /// A prefix bound to `uri`: the carried one when free, an existing
-    /// binding for the same URI, or a fresh `ns<n>`.
-    private static func resolvedPrefix(for uri: String, carried: String?, scope: [String: String], counter: inout Int) -> String {
-        if let carried, scope[carried] == nil { return carried }
-        if let existing = scope.first(where: { $0.value == uri && !$0.key.isEmpty })?.key {
-            return existing
-        }
-        var fresh = counter
-        while scope["ns\(fresh)"] != nil {
-            fresh += 1
-        }
-        counter = fresh + 1
-        return "ns\(fresh)"
-    }
-
     private static func fix(_ node: PureXML.Model.Node, inScope: [String: String], counter: inout Int) -> PureXML.Model.Node {
         switch node {
         case let .document(children):
