@@ -135,12 +135,31 @@ extension PureXML.Parsing.EntityDecoder {
         visiting: Set<String>,
         at mark: PureXML.Parsing.Mark,
     ) throws {
+        var verified: Set<String> = []
+        try checkRecursion(name, entities: entities, visiting: visiting, verified: &verified, at: mark)
+    }
+
+    /// Three-colour DFS for the No-Recursion WFC. `visiting` is the grey set
+    /// (entities on the current reference chain; revisiting one is the cycle).
+    /// `verified` is the black set: an entity is added only after its whole
+    /// reachable subgraph returns acyclic, so it can never reach a chain node
+    /// that reaches it. Skipping a black entity is therefore sound and collapses
+    /// the otherwise O(references^depth) revisits of a billion-laughs graph to
+    /// one pass over the distinct edges.
+    private static func checkRecursion(
+        _ name: String,
+        entities: [String: String],
+        visiting: Set<String>,
+        verified: inout Set<String>,
+        at mark: PureXML.Parsing.Mark,
+    ) throws {
         guard let replacement = entities[name] else { return }
-        for reference in declaredReferences(in: replacement) {
+        for reference in declaredReferences(in: replacement) where !verified.contains(reference) {
             guard !visiting.contains(reference) else {
                 throw PureXML.Parsing.ParseError.recursiveEntity(name: reference, mark)
             }
-            try checkRecursion(reference, entities: entities, visiting: visiting.union([reference]), at: mark)
+            try checkRecursion(reference, entities: entities, visiting: visiting.union([reference]), verified: &verified, at: mark)
+            verified.insert(reference)
         }
     }
 
