@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Three more dead file-scoped functions found by a private-scope sweep: `selectNodes` in `XSLTTransformer` (its sibling `selectXPathNodes` is the live one; a doc comment that referenced it was reworded), `processingInstructionMatches` in `EvaluatorSteps`, and `parseExternalID` in `DoctypeScanner`. All three are `private`/`fileprivate` with zero callers, so removing them is provably behavior-neutral (the compiler confirms).
 
+- Three more dead functions found by a repo-wide reference sweep: `XSLTTransform.transformToNode` (a transform-to-tree variant nothing called; the live `transform` returning a string is independent), and `ComplexValidatorHelpers.matchesAll` together with its now-orphaned helper `label(of:)`. All had zero references; build and 1775 tests confirm behavior is unchanged.
+
 ### Fixed
 
 - A complex type with simple content that restricts a base may no longer relax a base `required` attribute to `optional` (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2`). The attribute-use restriction check ran only over `complexContent` restrictions, so a `simpleContent` restriction that relaxed a required attribute (or added a non-base attribute, or widened the attribute wildcard) was accepted; it now runs over both derivation roots. Closes XSTS `particlesZ030_d`, which libxml2 also rejects, so the fix aligns with the reference rather than exceeding it. XSTS invalid-schemas-accepted 10 -> 9 with valid-schemas-rejected held at 0 (full archive). Guarded by `SimpleContentAttrRestrictionTests`.

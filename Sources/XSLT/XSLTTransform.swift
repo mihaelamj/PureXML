@@ -238,30 +238,6 @@ public extension PureXML.XSLT {
         return !((element?.name.namespaceURI) ?? "").isEmpty
     }
 
-    /// Transforms `source` with `stylesheet`, returning the result tree.
-    static func transformToNode(
-        stylesheet: String,
-        source: String,
-        documentLoader: @escaping (String) -> String? = { _ in nil },
-        baseURI: String = "",
-    ) throws -> PureXML.Model.Node {
-        let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
-        let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
-        let root = try PureXML.parseTree(source, limits: .init(allowDoctype: true))
-        Whitespace.strip(root, stylesheet: sheet)
-        let stylesheetDocument = try? PureXML.parse(stylesheet, limits: .init(allowDoctype: true))
-        let transformer = Transformer(
-            stylesheet: sheet,
-            root: root,
-            documentLoader: documentLoader,
-            stylesheetDocument: stylesheetDocument,
-            baseURI: baseURI,
-        )
-        let result = transformer.run()
-        if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
-        return result
-    }
-
     /// The concatenated text content of a result tree, for the `text` output
     /// method: character data only, with markup, comments, and PIs dropped.
     private static func textValue(of node: PureXML.Model.Node) -> String {
