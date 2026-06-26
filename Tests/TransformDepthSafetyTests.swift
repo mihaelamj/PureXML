@@ -24,4 +24,15 @@ struct TransformDepthSafetyTests {
         }
         #expect(root.attributes.contains { $0.name.localName == "kept" && $0.value == "on" })
     }
+
+    @Test("canonicalizing a deep document does not overflow")
+    func test_deepCanonicalize() throws {
+        let depth = 50000
+        let document = try PureXML.parse(deepXML(depth), limits: .init(maxDepth: depth + 1))
+        let canonical = PureXML.Canonical.Canonicalizer(options: .inclusive).canonicalize(document)
+        // Each level contributes "<a>"; the leaf text and the closes round it out.
+        #expect(canonical.hasPrefix("<a>"))
+        #expect(canonical.hasSuffix("</a>"))
+        #expect(canonical.contains("x"))
+    }
 }

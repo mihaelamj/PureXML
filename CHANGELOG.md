@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Canonicalizing a document (`Canonicalizer`, the C14N form used for XML signatures) no longer recurses on the document's depth, so it no longer overflows the stack on a deeply-nested document (it crashed around 5000 deep). The serializer now drives a deferred-close work stack that threads each element's namespace context to its children. The canonical bytes are unchanged: the C14N 1.0/1.1 and exclusive conformance corpora pass. (#350)
+
 - Applying DTD attribute defaults to a document (`parseApplyingInternalDTDDefaults`, and the defaults pass behind DTD validation) no longer recurses on the document's depth, so it no longer overflows the stack on a deeply-nested document. The tree is rebuilt bottom-up through a new shared iterative spine (`Node.rebuildingBottomUp`), which the other tree-to-tree transforms will adopt. (#350)
 
 - The value-returning XPath result API (`PureXML.xpath`, `XPath.Query.evaluate`/`elements`/`strings`) is now linear for results that nest within one another, not quadratic. Each result was rebuilt as an independent value `Node` subtree, so selecting a deep chain of nested elements materialized the sum of their subtrees. The projection now shares a per-result-set memo keyed by tree-node identity, so a result reuses the already-built value `Node` of a deeper one by reference (copy-on-write); each tree node is projected once. `//a` over a 8000-deep chain drops from about 19 s to about 0.04 s, and the result set is unchanged. (#348)
