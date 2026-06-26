@@ -158,31 +158,19 @@ public extension PureXML.XPath {
 }
 
 extension Sequence<PureXML.XPath.Node> {
-    /// The nodes sorted into document order, computing each node's order key once
-    /// (decorate-sort-undecorate) rather than recomputing the root path on every
-    /// comparison, which turns an O(n log n x depth) sort into O(n log n).
-    func sortedByDocumentOrder() -> [PureXML.XPath.Node] {
-        // Zero- and one-node sets are already sorted: the common predicate
-        // case must not touch order keys at all.
-        let nodes = Array(self)
-        if nodes.count <= 1 { return nodes }
-        let cache = PureXML.XPath.SiblingIndexCache()
-        return nodes.map { (node: $0, key: $0.documentOrder(cache: cache)) }
-            .sorted { PureXML.XPath.Node.ordered($0.key, before: $1.key) }
-            .map(\.node)
+    /// The nodes sorted into XPath document order. Keys come from a per-root
+    /// pre-order index (see ``PureXML/XPath/AxisNavigation/sortByDocumentOrder(_:cache:)``),
+    /// so the sort is linear in the document rather than O(n log n x depth): a
+    /// per-node root path made this quadratic on a deeply-nested document.
+    /// Passing the evaluation's shared `cache` builds each document's index once
+    /// and reuses it across every sort in the query.
+    func sortedByDocumentOrder(cache: PureXML.XPath.DocumentNavigationCache? = nil) -> [PureXML.XPath.Node] {
+        PureXML.XPath.AxisNavigation.sortByDocumentOrder(Array(self), cache: cache)
     }
 
-    /// The first node in document order, computing each node's order key once.
-    func firstInDocumentOrder() -> PureXML.XPath.Node? {
-        let nodes = Array(self)
-        // Zero or one node needs no ordering: the single node is trivially first.
-        // This is the common case for string-value extraction (`string(@x)`,
-        // `value-of`), where computing a document-order key would needlessly scan
-        // the node's siblings, turning a flat fan-out quadratic.
-        guard nodes.count > 1 else { return nodes.first }
-        let cache = PureXML.XPath.SiblingIndexCache()
-        return nodes.map { (node: $0, key: $0.documentOrder(cache: cache)) }
-            .min { PureXML.XPath.Node.ordered($0.key, before: $1.key) }?
-            .node
+    /// The first node in document order, by the same keying as
+    /// ``sortedByDocumentOrder(cache:)`` but without a full sort.
+    func firstInDocumentOrder(cache: PureXML.XPath.DocumentNavigationCache? = nil) -> PureXML.XPath.Node? {
+        PureXML.XPath.AxisNavigation.firstByDocumentOrder(Array(self), cache: cache)
     }
 }
