@@ -69,11 +69,12 @@ extension PureXML.Parsing.EntityDecoder {
     /// plain decoding suffices.
     static func splitAtMarkupEntity(_ raw: String, entities: [String: String]) -> MarkupSplit? {
         guard !entities.isEmpty else { return nil }
+        var markupCache: [String: Bool] = [:]
         var index = raw.startIndex
         while index < raw.endIndex, let amp = raw[index...].firstIndex(of: "&") {
             guard let semicolon = raw[amp...].firstIndex(of: ";") else { return nil }
             let name = String(raw[raw.index(after: amp) ..< semicolon])
-            if !name.hasPrefix("#"), !predefined.contains(name), producesMarkup(name, entities: entities, visiting: []) {
+            if !name.hasPrefix("#"), !predefined.contains(name), producesMarkup(name, entities: entities, cache: &markupCache) {
                 return MarkupSplit(
                     prefix: String(raw[..<amp]),
                     name: name,
@@ -110,12 +111,22 @@ extension PureXML.Parsing.EntityDecoder {
     }
 
     /// Whether `name`'s replacement contains markup, directly or transitively.
-    private static func producesMarkup(_ name: String, entities: [String: String], visiting: Set<String>) -> Bool {
-        guard !visiting.contains(name), let replacement = entities[name] else { return false }
-        if replacement.contains("<") { return true }
-        return declaredReferences(in: replacement).contains {
-            producesMarkup($0, entities: entities, visiting: visiting.union([name]))
+    /// Memoized per entity name: the property depends only on the (fixed) entity
+    /// graph, so a deeply-nested reference chain resolves in O(entities) rather
+    /// than O(references^depth), which a billion-laughs document otherwise forces.
+    /// A tentative `false` recorded before the recursion breaks any cycle (a
+    /// cyclic entity is an error caught when the reference is expanded).
+    private static func producesMarkup(_ name: String, entities: [String: String], cache: inout [String: Bool]) -> Bool {
+        if let cached = cache[name] { return cached }
+        guard let replacement = entities[name] else {
+            cache[name] = false
+            return false
         }
+        cache[name] = false
+        let result = replacement.contains("<")
+            || declaredReferences(in: replacement).contains { producesMarkup($0, entities: entities, cache: &cache) }
+        cache[name] = result
+        return result
     }
 
     private static func checkRecursion(
