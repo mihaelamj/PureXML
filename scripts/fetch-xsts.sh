@@ -2,10 +2,11 @@
 # Fetch the W3C XML Schema Test Suite (XSTS, 2006-11-06 release) to the path the
 # conformance runner (Tests/XSTSSuiteTests.swift) expects.
 #
-# The suite is never vendored: the W3C Document License permits redistribution
-# only as the complete unmodified archive, and the corpus is about 200 MB across
-# 39,399 files. This script downloads the official archive on demand and verifies
-# its SHA-256 before extracting.
+# The extracted suite is never vendored: the W3C Document License permits
+# redistribution only as the complete unmodified archive, and the corpus is about
+# 200 MB across 39,399 files. The unmodified archive itself is vendored at
+# Tests/Fixtures/xsts; this script extracts that when present (no network), or
+# downloads the official archive otherwise, verifying its SHA-256 before extracting.
 #
 # Usage:
 #   bash scripts/fetch-xsts.sh
@@ -28,8 +29,15 @@ fi
 
 mkdir -p "$dest"
 archive="$dest/xsts-2007-06-20.tar.gz"
-echo "xsts: downloading the 2006-11-06 archive (about 4.4 MB)"
-curl -fsSL -o "$archive" "$url"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+vendored="$script_dir/../Tests/Fixtures/xsts/xsts-2007-06-20.tar.gz"
+if [ -f "$vendored" ]; then
+  echo "xsts: using the vendored archive (no download)"
+  cp "$vendored" "$archive"
+else
+  echo "xsts: downloading the 2006-11-06 archive (about 4.4 MB)"
+  curl -fsSL -o "$archive" "$url"
+fi
 
 # Verify integrity before extracting (portable across macOS and Linux).
 if command -v shasum >/dev/null 2>&1; then

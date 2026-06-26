@@ -25,6 +25,9 @@ let package = Package(
             name: "PureXMLTests",
             dependencies: ["PureXML"],
             path: "Tests",
+            // The vendored XSTS archive is consumed off-disk via XSTS_ROOT, never
+            // from the test bundle, so keep it out of the copied resources.
+            exclude: ["Fixtures/xsts"],
             resources: [
                 .copy("Fixtures"),
             ],
