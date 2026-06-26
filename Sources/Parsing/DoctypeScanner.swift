@@ -298,22 +298,6 @@ struct DTDScanner {
 }
 
 extension DTDScanner {
-    private func parseExternalID(_ reader: inout Reader) -> ExternalID? {
-        if reader.consume("SYSTEM") {
-            reader.skipSpace()
-            guard let systemID = scanLiteral(&reader) else { return nil }
-            return ExternalID(systemID: systemID)
-        }
-        if reader.consume("PUBLIC") {
-            reader.skipSpace()
-            guard let publicID = scanLiteral(&reader) else { return nil }
-            reader.skipSpace()
-            let systemID = scanLiteral(&reader) ?? ""
-            return ExternalID(publicID: publicID, systemID: systemID)
-        }
-        return nil
-    }
-
     func scanLiteral(_ reader: inout Reader) -> String? {
         guard let quote = reader.peek(), quote == "\"" || quote == "'" else { return nil }
         reader.advance()

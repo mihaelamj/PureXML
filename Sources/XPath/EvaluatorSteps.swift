@@ -330,12 +330,6 @@ extension PureXML.XPath.Evaluator {
         }
     }
 
-    private static func processingInstructionMatches(_ node: Node, _ target: String?) -> Bool {
-        guard case let .tree(tree) = node, tree.kind == .processingInstruction else { return false }
-        guard let target else { return true }
-        return tree.name?.description == target
-    }
-
     private static func isTreeKind(_ node: Node, in kinds: [PureXML.Model.TreeNodeKind]) -> Bool {
         guard case let .tree(tree) = node else { return false }
         return kinds.contains(tree.kind)

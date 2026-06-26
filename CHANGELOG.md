@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Two unused private helpers in `XSLTNamespaceFixup` (`fixAttributeName` and `resolvedPrefix`). The result-tree attribute fixup they implemented was inlined into `fix(_ element:)` and evolved past them (the inlined version additionally shadows a carried prefix through `localPrefixes`, which the helpers did not), leaving both with zero callers. Removing them deletes dead, diverged duplicate logic with no behavior change; the live inlined path is unchanged.
 
+- Three more dead file-scoped functions found by a private-scope sweep: `selectNodes` in `XSLTTransformer` (its sibling `selectXPathNodes` is the live one; a doc comment that referenced it was reworded), `processingInstructionMatches` in `EvaluatorSteps`, and `parseExternalID` in `DoctypeScanner`. All three are `private`/`fileprivate` with zero callers, so removing them is provably behavior-neutral (the compiler confirms).
+
 ### Fixed
 
 - A complex type with simple content that restricts a base may no longer relax a base `required` attribute to `optional` (XSD 1.0 `cos-ct-derived-ok` / `derivation-ok-restriction.2`). The attribute-use restriction check ran only over `complexContent` restrictions, so a `simpleContent` restriction that relaxed a required attribute (or added a non-base attribute, or widened the attribute wildcard) was accepted; it now runs over both derivation roots. Closes XSTS `particlesZ030_d`, which libxml2 also rejects, so the fix aligns with the reference rather than exceeding it. XSTS invalid-schemas-accepted 10 -> 9 with valid-schemas-rejected held at 0 (full archive). Guarded by `SimpleContentAttrRestrictionTests`.
