@@ -137,6 +137,20 @@ public extension PureXML.Schema {
             return nil
         }
 
+        /// Whether two values of this type are equal exactly when their raw
+        /// strings match: an atomic, lexically-compared type whose effective
+        /// `whiteSpace` is `preserve`, so `valueMatches` reduces `process` to the
+        /// identity and compares the strings verbatim. Identity-constraint
+        /// duplicate detection keys such fields by their raw string in a `Set`
+        /// (O(1) per value) instead of an O(n) pairwise `valueMatches` scan; the
+        /// value-space and whitespace-collapsing types return false and keep the
+        /// exact pairwise comparison.
+        var comparesRawLexically: Bool {
+            guard case .atomic = variety, base.primitive.comparesLexically else { return false }
+            if case .preserve = facets.whiteSpace ?? base.whiteSpace { return true }
+            return false
+        }
+
         /// Whether `instance` and `literal` denote the same value in this type's
         /// value space, the comparison a RELAX NG `<value>` performs. Ordered
         /// types (numeric, date/time) compare in value space, so `1` equals `01`

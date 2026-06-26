@@ -40,6 +40,18 @@ extension PureXML.Schema {
             stringValidity(value) ?? numericValidity(value)
         }
 
+        /// Whether two valid values of this primitive compare by their
+        /// whitespace-processed lexical form rather than by a value space. These
+        /// are exactly the `default` cases of `SimpleType.atomicValueMatches`:
+        /// every primitive except the numeric, date, and boolean spaces, which
+        /// compare two distinct lexical forms (`3.0`/`3`, `true`/`1`) as equal.
+        var comparesLexically: Bool {
+            switch self {
+            case .decimal, .integer, .double, .float, .boolean, .dateKind: false
+            default: true
+            }
+        }
+
         /// Validity for the string-like and boolean spaces; nil when this primitive
         /// is handled by ``numericValidity(_:)``.
         private func stringValidity(_ value: String) -> Bool? {
