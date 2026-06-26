@@ -117,3 +117,23 @@ wide parent. Tens of thousands of single-node extractions each rescanned the
 makes it linear: ~2.3 s -> ~0.65 s (~3.5x), output byte-identical (Xalan
 gold-output verified). The fix is the same `count <= 1` early-out that
 `sortedByDocumentOrder()` already had.
+
+## XSD identity constraints (quadratic fix, found by per-operation scale-testing)
+
+Validating a wide list against an `xs:unique`/`xs:key`/`xs:keyref` was
+quadratic for two independent reasons, both invisible on the default corpus
+(which has no identity constraints) and surfaced only by scale-testing the
+operation on its own at 2x/4x/8x sizes. First, the duplicate check compared
+each new value tuple against every tuple already collected (and a `keyref`
+scanned every referenced key), so n targets cost O(n^2). Field equality is
+value-space aware (`3.0` equals `3`, `true` equals `1`, a QName equals an
+equivalent prefix), so the tuples cannot be hashed directly. The fix keys only
+the tuples that provably compare as raw strings (whitespace-preserving lexical
+types with no colon, which is most ids) in a `Set`, and keeps the exact
+pairwise comparison for value-space, whitespace-collapsing, and QName-bearing
+fields, so which documents pass is unchanged. Second, the error-location helper
+rescanned the parent's whole child list to position each target (`item[3]`),
+another O(n) per target; it now uses a per-parent, per-name index built once.
+Together: a 16000-item `xs:unique` document drops from ~4.0 s to ~0.12 s
+(~34x), and the cost is now linear. The full local suite and the W3C XSTS
+datatype/identity conformance corpus are unchanged.

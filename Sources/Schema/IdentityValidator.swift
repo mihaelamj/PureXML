@@ -20,6 +20,12 @@ extension PureXML.Schema {
         let types: [String: ElementType]
         /// Selector and field XPaths compiled once per run, not per element.
         private let cache = XPathQueryCache()
+        /// Same-name sibling positions for error-location paths, indexed once per
+        /// parent and name. ``steps`` looks a target's position up here instead of
+        /// rescanning the parent's children every call, which made locating each
+        /// of a wide list's targets O(n) and the whole `unique`/`key`/`keyref`
+        /// pass quadratic.
+        let stepIndex = StepSiblingIndex()
 
         init(
             constraints: [String: [IdentityConstraint]],
@@ -115,11 +121,6 @@ extension PureXML.Schema {
             return []
         }
 
-        private func isNonRef(_ constraint: IdentityConstraint) -> Bool {
-            if case .keyref = constraint.kind { return false }
-            return true
-        }
-
         private func collect(
             _ constraint: IdentityConstraint,
             at node: PureXML.Model.TreeNode,
@@ -129,7 +130,7 @@ extension PureXML.Schema {
         ) {
             guard isNonRef(constraint) else { return }
             var tuples: [[FieldValue?]] = []
-            var seen: [[FieldValue?]] = []
+            var seen = TupleSet()
             for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
                 if let error = fieldError(constraint, at: target, path: targetPath) {
@@ -145,13 +146,13 @@ extension PureXML.Schema {
                     continue
                 }
                 if tuple.contains(where: { $0 == nil }) { continue }
-                if seen.contains(where: { $0 == tuple }) {
+                if seen.contains(tuple) {
                     issues.append(.init(
                         reason: "\(label(constraint)) '\(constraint.name)': duplicate value",
                         at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
                     ))
                 } else {
-                    seen.append(tuple)
+                    seen.insert(tuple)
                 }
                 tuples.append(tuple)
             }
@@ -167,6 +168,10 @@ extension PureXML.Schema {
         ) {
             guard case let .keyref(refer) = constraint.kind else { return }
             let keyTuples = scopes.reversed().compactMap { $0[refer] }.first ?? []
+            var keys = TupleSet()
+            for keyTuple in keyTuples {
+                keys.insert(keyTuple)
+            }
             for target in select(constraint.selector, at: node, namespaces: constraint.namespaceBindings) {
                 let targetPath = path + steps(from: node, to: target)
                 if let error = fieldError(constraint, at: target, path: targetPath) {
@@ -175,7 +180,7 @@ extension PureXML.Schema {
                 }
                 let tuple = fieldTuple(constraint.fields, at: target, constraint: constraint)
                 if tuple.contains(where: { $0 == nil }) { continue }
-                if !keyTuples.contains(where: { $0 == tuple }) {
+                if !keys.contains(tuple) {
                     issues.append(.init(
                         reason: "keyref '\(constraint.name)': no matching key '\(refer)'",
                         at: targetPath + fieldStep(constraint.fields, at: target, namespaces: constraint.namespaceBindings),
@@ -330,6 +335,13 @@ extension PureXML.Schema {
 }
 
 extension PureXML.Schema.IdentityValidator {
+    /// Whether a constraint collects tuples (`key`/`unique`) rather than
+    /// referencing them (`keyref`).
+    func isNonRef(_ constraint: PureXML.Schema.IdentityConstraint) -> Bool {
+        if case .keyref = constraint.kind { return false }
+        return true
+    }
+
     /// The coding-path steps from the constraint-bearing `container` down to a
     /// selected `target`, so an identity error locates the actual offending
     /// element rather than the element that merely declares the constraint.
@@ -346,9 +358,8 @@ extension PureXML.Schema.IdentityValidator {
         var parent = container
         for node in chain.reversed() {
             let name = node.name?.description ?? ""
-            let siblings = parent.children.filter { $0.kind == .element && ($0.name?.description ?? "") == name }
-            if siblings.count > 1, let index = siblings.firstIndex(where: { $0 === node }) {
-                steps.append(.element(name, index: index + 1))
+            if let index = stepIndex.position(of: node, under: parent, name: name) {
+                steps.append(.element(name, index: index))
             } else {
                 steps.append(.element(name))
             }
