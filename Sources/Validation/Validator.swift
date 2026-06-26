@@ -149,40 +149,43 @@ public extension PureXML.Validation {
             if !toThrow.isEmpty { throw ValidationErrorCollection(values: toThrow) }
         }
 
-        private func walk(_ node: PureXML.Model.Node, path: [PathKey], _ document: Document, _ findings: inout [ValidationError]) {
-            apply(node, at: path, in: document, into: &findings)
-            switch node {
-            case let .document(children):
-                walkChildren(children, path: path, document, &findings)
-            case let .element(element):
-                apply(element, at: path, in: document, into: &findings)
-                for attribute in element.attributes {
-                    apply(attribute, at: path + [.attribute(attribute.name.localName)], in: document, into: &findings)
-                }
-                walkChildren(element.children, path: path, document, &findings)
-            case .text, .cdata, .comment, .processingInstruction:
-                break
-            }
-        }
-
-        private func walkChildren(
-            _ children: [PureXML.Model.Node],
-            path: [PathKey],
-            _ document: Document,
-            _ findings: inout [ValidationError],
-        ) {
-            let elementNames = children.compactMap { child -> String? in
-                guard case let .element(element) = child else { return nil }
-                return element.name.description
-            }
-            var steps = PathKey.steps(forChildNames: elementNames).makeIterator()
-            for child in children {
-                guard case .element = child else {
-                    walk(child, path: path, document, &findings)
+        /// Validates `root` and its subtree in document order. The walk is
+        /// iterative, driven by an explicit `(node, path)` stack, so a deeply
+        /// nested document does not overflow the call stack; children are pushed
+        /// reversed so they pop in document order, giving the same pre-order
+        /// finding sequence a recursive descent would.
+        private func walk(_ root: PureXML.Model.Node, path rootPath: [PathKey], _ document: Document, _ findings: inout [ValidationError]) {
+            var stack: [(node: PureXML.Model.Node, path: [PathKey])] = [(root, rootPath)]
+            while let (node, path) = stack.popLast() {
+                apply(node, at: path, in: document, into: &findings)
+                let children: [PureXML.Model.Node]
+                switch node {
+                case let .document(documentChildren):
+                    children = documentChildren
+                case let .element(element):
+                    apply(element, at: path, in: document, into: &findings)
+                    for attribute in element.attributes {
+                        apply(attribute, at: path + [.attribute(attribute.name.localName)], in: document, into: &findings)
+                    }
+                    children = element.children
+                case .text, .cdata, .comment, .processingInstruction:
                     continue
                 }
-                let step = steps.next() ?? .element("")
-                walk(child, path: path + [step], document, &findings)
+                let elementNames = children.compactMap { child -> String? in
+                    guard case let .element(element) = child else { return nil }
+                    return element.name.description
+                }
+                var steps = PathKey.steps(forChildNames: elementNames).makeIterator()
+                var childItems: [(node: PureXML.Model.Node, path: [PathKey])] = []
+                childItems.reserveCapacity(children.count)
+                for child in children {
+                    if case .element = child {
+                        childItems.append((child, path + [steps.next() ?? .element("")]))
+                    } else {
+                        childItems.append((child, path))
+                    }
+                }
+                stack.append(contentsOf: childItems.reversed())
             }
         }
 
