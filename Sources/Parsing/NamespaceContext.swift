@@ -13,30 +13,42 @@ extension PureXML.Parsing {
         /// bound by a declaration.
         static let xmlnsNamespaceURI = "http://www.w3.org/2000/xmlns/"
 
-        /// A stack of scopes; each maps a prefix ("" = default namespace) to a URI.
-        private var scopes: [[String: String]] = []
+        /// The current in-scope bindings, prefix ("" = default namespace) to URI,
+        /// maintained incrementally so a lookup is O(1) rather than a walk over a
+        /// stack as deep as the document: a per-element walk would make parsing a
+        /// deeply-nested document quadratic in depth.
+        private var current: [String: String] = [:]
 
-        /// Opens an element: pushes a scope built from its `xmlns` declarations,
-        /// then resolves the element name and its attribute names against the
-        /// now-in-scope bindings.
+        /// One restore list per open element: the bindings it overwrote, so
+        /// closing the element can return `current` to its enclosing state. Each
+        /// entry is a prefix and the value it had before this element (nil when it
+        /// was unbound), applied in reverse on exit.
+        private var undo: [[(key: String, previous: String?)]] = []
+
+        /// Opens an element: applies its `xmlns` declarations to the current
+        /// bindings, then resolves the element name and its attribute names
+        /// against the now-in-scope bindings.
         mutating func enterElement(
             name: PureXML.Model.QualifiedName,
             attributes: [PureXML.Model.Attribute],
             at mark: Mark,
         ) throws -> (name: PureXML.Model.QualifiedName, attributes: [PureXML.Model.Attribute]) {
             try checkNameShape(name, at: mark)
-            var scope: [String: String] = [:]
+            var changes: [(key: String, previous: String?)] = []
             for attribute in attributes {
                 try checkNameShape(attribute.name, at: mark)
                 if attribute.name.prefix == nil, attribute.name.localName == "xmlns" {
                     try checkDefaultBinding(attribute.value, at: mark)
-                    scope[""] = attribute.value
+                    changes.append((key: "", previous: current[""]))
+                    current[""] = attribute.value
                 } else if attribute.name.prefix == "xmlns" {
                     try checkPrefixBinding(attribute.name.localName, uri: attribute.value, at: mark)
-                    scope[attribute.name.localName] = attribute.value
+                    let key = attribute.name.localName
+                    changes.append((key: key, previous: current[key]))
+                    current[key] = attribute.value
                 }
             }
-            scopes.append(scope)
+            undo.append(changes)
 
             let resolvedName = try resolveElement(name, at: mark)
             let resolvedAttributes = try attributes.map { try resolveAttribute($0, at: mark) }
@@ -44,10 +56,13 @@ extension PureXML.Parsing {
             return (resolvedName, resolvedAttributes)
         }
 
-        /// Closes an element, popping its scope.
+        /// Closes an element, restoring the bindings it overwrote.
         mutating func leaveElement() {
-            if !scopes.isEmpty {
-                scopes.removeLast()
+            guard let changes = undo.popLast() else { return }
+            // Restore in reverse so repeated bindings of one prefix on a single
+            // element unwind to the value that preceded the element.
+            for change in changes.reversed() {
+                current[change.key] = change.previous
             }
         }
 
@@ -133,12 +148,8 @@ extension PureXML.Parsing {
         }
 
         private func lookup(_ key: String) -> String? {
-            for scope in scopes.reversed() {
-                if let uri = scope[key] {
-                    return uri.isEmpty ? nil : uri
-                }
-            }
-            return nil
+            guard let uri = current[key], !uri.isEmpty else { return nil }
+            return uri
         }
     }
 }
