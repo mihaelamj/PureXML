@@ -16,6 +16,13 @@ extension PureXML.XSLT {
         let documentLoader: (String) -> String?
         private let keyIndexes = PureXML.XSLT.KeyIndexCache()
         let termination = Termination()
+        let recursionGuard = PureXML.XSLT.RecursionGuard()
+        /// The deepest template-instantiation nesting allowed before the transform
+        /// fails gracefully rather than overflowing the stack. The default clears
+        /// the parser's max source depth (so an identity transform of the deepest
+        /// permitted source still runs) while staying within an 8 MB stack; raise
+        /// it (with a correspondingly larger stack) for deeper legitimate recursion.
+        let maxTemplateDepth: Int
         private let matchCache = MatchCache()
         private let documentCache = PureXML.XSLT.DocumentCache()
         let numberingCache = XSLTNumbering.SiblingPositionCache()
@@ -23,6 +30,12 @@ extension PureXML.XSLT {
         /// The `xsl:message terminate="yes"` text, if one fired during `run()`.
         var terminationMessage: String? {
             termination.message
+        }
+
+        /// Whether template recursion hit `maxTemplateDepth` during `run()`, so the
+        /// transform was stopped before it could overflow the stack.
+        var recursionLimitExceeded: Bool {
+            recursionGuard.exceeded
         }
 
         /// Caller-supplied top-level parameter values, overriding xsl:param defaults.
@@ -41,8 +54,10 @@ extension PureXML.XSLT {
             stylesheetDocument: PureXML.Model.Node? = nil,
             unparsedEntityURIs: [String: String] = [:],
             baseURI: String = "",
+            maxTemplateDepth: Int = PureXML.XSLT.defaultMaxTemplateDepth,
         ) {
             self.parameters = parameters
+            self.maxTemplateDepth = maxTemplateDepth
             self.stylesheet = stylesheet
             self.root = root
             self.documentLoader = documentLoader
@@ -137,6 +152,7 @@ extension PureXML.XSLT {
         ) -> [ResultItem] {
             var items: [ResultItem] = []
             for (offset, xnode) in nodes.enumerated() {
+                if termination.message != nil || recursionGuard.exceeded { break }
                 guard let owner = Self.ownerNode(xnode) else { continue }
                 let nodeContext = XSLTContext(
                     node: owner,
@@ -159,7 +175,7 @@ extension PureXML.XSLT {
             var items: [ResultItem] = []
             var context = context
             for instruction in body {
-                if termination.message != nil { break }
+                if termination.message != nil || recursionGuard.exceeded { break }
                 switch instruction {
                 case let .variable(name, select, varBody):
                     context.variables[name] = variableValue(select, varBody, context)
@@ -326,21 +342,6 @@ extension PureXML.XSLT.Transformer {
         guard let template = stylesheet.templates.filter({ $0.name == name })
             .max(by: { $0.importPrecedence < $1.importPrecedence }) else { return [] }
         return instantiateTemplate(template, context, passing: parameters, from: context)
-    }
-
-    private func copyOf(_ select: String, _ context: XSLTContext) -> [ResultItem] {
-        guard let nodes = value(select, context)?.nodes else {
-            // A non-node-set result copies as its string value.
-            return value(select, context).map { [.node(.text($0.string))] } ?? []
-        }
-        return nodes.map { xnode in
-            switch xnode {
-            case let .tree(tree): .node(Self.withInScopeNamespaces(tree))
-            case let .attribute(_, attribute): .attribute(attribute)
-            case let .namespace(_, prefix, uri):
-                .attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:\(prefix)", uri))
-            }
-        }
     }
 
     // MARK: Building elements

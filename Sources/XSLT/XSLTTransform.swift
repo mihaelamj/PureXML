@@ -11,6 +11,7 @@ public extension PureXML.XSLT {
         documentLoader: @escaping (String) -> String? = { _ in nil },
         baseURI: String = "",
         parameters: [String: String] = [:],
+        maxTemplateDepth: Int = PureXML.XSLT.defaultMaxTemplateDepth,
     ) throws -> String {
         let documentLoader = resolvingLoader(documentLoader, baseURI: baseURI)
         let sheet = try XSLTParser.parse(stylesheet, loader: documentLoader)
@@ -34,8 +35,10 @@ public extension PureXML.XSLT {
             // The source DTD's unparsed entities, by name to system URI (12.4).
             unparsedEntityURIs: parsed.documentType.unparsedEntities.mapValues(\.id.resolvedSystemID),
             baseURI: baseURI,
+            maxTemplateDepth: maxTemplateDepth,
         )
         let result = transformer.run()
+        if transformer.recursionLimitExceeded { throw XSLTError.recursionLimitExceeded(maxTemplateDepth) }
         if let message = transformer.terminationMessage { throw XSLTError.terminated(message) }
         let method = sheet.output.method ?? defaultMethod(for: result)
         if method == "text" {
