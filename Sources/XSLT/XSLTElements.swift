@@ -70,82 +70,6 @@ extension PureXML.XSLT.Transformer {
         }
         return name
     }
-
-    func elementInstruction(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
-        guard case let .element(nameTemplate, namespaceTemplate, namespaces, useAttributeSets, body) = instruction else {
-            return []
-        }
-        let raw = avt(nameTemplate, context)
-        let parts = raw.split(separator: ":", omittingEmptySubsequences: false)
-        let hasExplicitNamespace = (namespaceTemplate.map { !avt($0, context).isEmpty }) ?? false
-        let prefix = parts.count == 2 ? String(parts[0]) : nil
-        // A prefix not bound to a namespace (and no explicit namespace attribute
-        // supplies one) makes the QName unusable, as does a non-NCName part.
-        let undeclaredPrefix = !hasExplicitNamespace && (prefix.map { $0 != "xml" && namespaces[$0] == nil } ?? false)
-        let unusableName = raw.isEmpty || parts.contains(where: \.isEmpty) || parts.count > 2
-            || !parts.allSatisfy { PureXML.Parsing.XMLCharacter.isValidName(String($0)) } || undeclaredPrefix
-        if unusableName {
-            // The recovery (7.1.2, element-name-not-QName) emits the content
-            // without the wrapper element.
-            return instantiate(body, context).filter { if case .attribute = $0 { false } else { true } }
-        }
-        let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: false)
-        return [buildElement(name: name, literalAttributes: [], useAttributeSets: useAttributeSets, body: body, context)]
-    }
-
-    func attributeInstruction(
-        _ nameTemplate: PureXML.XSLT.ValueTemplate,
-        _ namespaceTemplate: PureXML.XSLT.ValueTemplate?,
-        _ namespaces: [String: String],
-        _ body: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> [PureXML.XSLT.ResultItem] {
-        let name = createdName(nameTemplate, namespaceTemplate, namespaces, context, isAttribute: true)
-        // xsl:attribute content that creates a non-text node ignores it with its
-        // content (XSLT 1.0 errata E27), like xsl:comment/processing-instruction.
-        return [.attribute(.init(name: name, value: escapedTextValue(of: instantiate(body, context))))]
-    }
-
-    func copyInstruction(_ useAttributeSets: [String], _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [PureXML.XSLT.ResultItem] {
-        // A non-tree current node copies itself: an attribute node yields an
-        // attribute result, a namespace node its declaration.
-        if let current = context.current {
-            switch current {
-            case let .attribute(_, attribute):
-                return [.attribute(attribute)]
-            case let .namespace(_, prefix, uri):
-                return [.attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:" + prefix, uri))]
-            case .tree:
-                break
-            }
-        }
-        switch context.node.kind {
-        case .element:
-            let copied = buildElement(
-                name: context.node.name ?? .init(""),
-                literalAttributes: Self.namespaceDeclarations(inScopeAt: context.node),
-                useAttributeSets: useAttributeSets,
-                body: body,
-                context,
-            )
-            return [copied]
-        case .text, .cdata:
-            return [.node(.text(context.node.value))]
-        case .comment:
-            return [.node(.comment(context.node.value))]
-        case .processingInstruction:
-            return [.node(.processingInstruction(target: context.node.name?.description ?? "", data: context.node.value))]
-        case .document:
-            // Copying the root node produces no element of its own, but xsl:copy
-            // may carry use-attribute-sets (7.5); those attributes have no copied
-            // element to attach to, so they join the enclosing result element,
-            // ahead of the copied content.
-            let setAttributes = attributeSetAttributes(useAttributeSets, context, visiting: []).map(PureXML.XSLT.ResultItem.attribute)
-            return setAttributes + instantiate(body, context)
-        default:
-            return instantiate(body, context)
-        }
-    }
 }
 
 extension PureXML.XSLT.Transformer {
@@ -254,32 +178,5 @@ extension PureXML.XSLT.Transformer {
             matches(node, pattern)
         }
         return XSLTNumbering.format(numbers, format, grouping)
-    }
-}
-
-extension PureXML.XSLT.Transformer {
-    /// A literal result element: aliased name and attributes, the copied
-    /// 7.1.1 namespace declarations, then the shared element builder.
-    func literalResult(_ instruction: PureXML.XSLT.Instruction, _ context: PureXML.XSLT.XSLTContext) -> PureXML.XSLT.ResultItem {
-        guard case let .literalElement(name, attributes, namespaces, useAttributeSets, body) = instruction else {
-            return .node(.text(""))
-        }
-        let aliasedAttributes = attributes.map { PureXML.XSLT.LiteralAttribute(name: aliased($0.name), value: $0.value) }
-        // The copied namespace nodes (7.1.1) travel as xmlns attributes; the
-        // fixup pass reuses them and drops the ones already in scope. An
-        // aliased stylesheet namespace declares its result namespace instead.
-        var declarations: [PureXML.XSLT.LiteralAttribute] = []
-        for (prefix, uri) in namespaces.sorted(by: { $0.key < $1.key }) {
-            let alias = stylesheet.namespaceAliases[uri]
-            // Keep the literal prefix; an alias only remaps its namespace URI.
-            let resolvedPrefix = prefix.isEmpty ? nil : prefix
-            let resolvedURI = alias?.uri ?? uri
-            let attributeName = resolvedPrefix.map { "xmlns:" + $0 } ?? "xmlns"
-            declarations.append(PureXML.XSLT.LiteralAttribute(
-                name: PureXML.Model.QualifiedName(attributeName),
-                value: [.literal(resolvedURI)],
-            ))
-        }
-        return buildElement(name: aliased(name), literalAttributes: declarations + aliasedAttributes, useAttributeSets: useAttributeSets, body: body, context)
     }
 }

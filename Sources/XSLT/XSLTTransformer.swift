@@ -104,7 +104,7 @@ extension PureXML.XSLT {
             return .document(applyTemplates(to: [.tree(root)], mode: nil, parameters: [], context).compactMap(Self.nodeOf))
         }
 
-        fileprivate func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max, atLeast floor: Int = .min) -> Template? {
+        func bestTemplate(for node: PureXML.XPath.Node, mode: String?, below ceiling: Int = .max, atLeast floor: Int = .min) -> Template? {
             stylesheet.templates.enumerated()
                 .filter { entry in
                     entry.element.mode == mode && entry.element.importPrecedence < ceiling
@@ -142,50 +142,6 @@ extension PureXML.XSLT {
 
         private func patternFunctions() -> PureXML.XPath.FunctionTable {
             patternTable
-        }
-
-        func applyTemplates(
-            to nodes: [PureXML.XPath.Node],
-            mode: String?,
-            parameters: [Binding],
-            _ context: XSLTContext,
-        ) -> [ResultItem] {
-            var items: [ResultItem] = []
-            for (offset, xnode) in nodes.enumerated() {
-                if termination.message != nil || recursionGuard.exceeded { break }
-                guard let owner = Self.ownerNode(xnode) else { continue }
-                let nodeContext = XSLTContext(
-                    node: owner,
-                    current: xnode.treeNode == nil ? xnode : nil,
-                    position: offset + 1,
-                    size: nodes.count,
-                    variables: context.variables,
-                    mode: mode,
-                )
-                if let template = bestTemplate(for: xnode, mode: mode) {
-                    items += instantiateTemplate(template, nodeContext, passing: parameters, from: context)
-                } else {
-                    items += builtInRule(xnode, mode: mode, nodeContext)
-                }
-            }
-            return items
-        }
-
-        func instantiate(_ body: [Instruction], _ context: XSLTContext) -> [ResultItem] {
-            var items: [ResultItem] = []
-            var context = context
-            for instruction in body {
-                if termination.message != nil || recursionGuard.exceeded { break }
-                switch instruction {
-                case let .variable(name, select, varBody):
-                    context.variables[name] = variableValue(select, varBody, context)
-                case let .fallback(fallbackBody):
-                    items += instantiate(fallbackBody, context)
-                default:
-                    items += evaluate(instruction, context)
-                }
-            }
-            return items
         }
 
         func variableValue(_ select: String?, _ body: [Instruction], _ context: XSLTContext) -> PureXML.XPath.Value {
@@ -258,119 +214,28 @@ extension PureXML.XSLT {
         }
 
         private static func stringValue(_ node: PureXML.Model.Node) -> String {
-            switch node {
-            case let .text(value), let .cdata(value): value
-            case let .element(element): element.children.reduce(into: "") { $0 += stringValue($1) }
-            case let .document(children): children.reduce(into: "") { $0 += stringValue($1) }
-            default: ""
+            // Iterative pre-order walk so a deeply-nested result tree does not
+            // overflow the stack; only text and CDATA contribute.
+            var result = ""
+            var stack: [PureXML.Model.Node] = [node]
+            while let current = stack.popLast() {
+                switch current {
+                case let .text(value), let .cdata(value):
+                    result += value
+                case let .element(element):
+                    stack.append(contentsOf: element.children.reversed())
+                case let .document(children):
+                    stack.append(contentsOf: children.reversed())
+                default:
+                    break
+                }
             }
+            return result
         }
     }
 }
 
 extension PureXML.XSLT.Transformer {
-    fileprivate func evaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
-        simpleEvaluate(instruction, context) ?? structuralEvaluate(instruction, context)
-    }
-
-    private func simpleEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem]? {
-        switch instruction {
-        case let .literalText(text): [.node(.text(text))]
-        case let .valueOf(select, raw):
-            [.node(.text(raw ? PureXML.XSLT.RawText.marked(string(select, context)) : string(select, context)))]
-        case let .applyTemplates(select, mode, sorts, parameters):
-            applyTemplates(
-                to: sorted(selectXPathNodes(select ?? "node()", context), sorts, context),
-                mode: mode,
-                parameters: parameters,
-                context,
-            )
-        case let .forEach(select, sorts, body): forEach(select, sorts, body, context)
-        case let .ifInstruction(test, body): boolean(test, context) ? instantiate(body, context) : []
-        case let .choose(whens, otherwise): chooseInstruction(whens, otherwise, context)
-        case let .copyOf(select): copyOf(select, context)
-        case let .callTemplate(name, parameters): callTemplate(name, parameters, context)
-        case .variable: []
-        default: nil
-        }
-    }
-
-    // Instantiates an `xsl:message` body as its text; `terminate` records the
-    // signal so the transform aborts with it. Produces no result-tree output.
-
-    // Builds a literal result element, rewriting its name and attribute names
-    // through any `xsl:namespace-alias` in effect.
-
-    private func structuralEvaluate(_ instruction: PureXML.XSLT.Instruction, _ context: XSLTContext) -> [ResultItem] {
-        switch instruction {
-        case .literalElement:
-            [literalResult(instruction, context)]
-        case .element:
-            elementInstruction(instruction, context)
-        case let .attribute(nameTemplate, namespaceTemplate, namespaces, body):
-            attributeInstruction(nameTemplate, namespaceTemplate, namespaces, body, context)
-        case let .copy(useAttributeSets, body):
-            copyInstruction(useAttributeSets, body, context)
-        case .number:
-            [.node(.text(numberInstruction(instruction, context)))]
-        case let .comment(body):
-            [.node(.comment(escapedTextValue(of: instantiate(body, context))))]
-        case let .processingInstruction(name, body):
-            [.node(.processingInstruction(target: avt(name, context), data: escapedTextValue(of: instantiate(body, context))))]
-        case let .message(terminate, body):
-            message(terminate, body, context)
-        case .applyImports:
-            applyImports(context)
-        default:
-            []
-        }
-    }
-
-    /// Re-applies templates to the current node in the current mode, considering
-    /// only those below the current template's import precedence, falling back to
-    /// the built-in rule when none match.
-    private func applyImports(_ context: XSLTContext) -> [ResultItem] {
-        if let template = bestTemplate(for: context.focus, mode: context.mode, below: context.importPrecedence, atLeast: context.importRangeLow) {
-            return instantiateTemplate(template, context, passing: [], from: context)
-        }
-        return builtInRule(context.focus, mode: context.mode, context)
-    }
-
-    private func callTemplate(_ name: String, _ parameters: [PureXML.XSLT.Binding], _ context: XSLTContext) -> [ResultItem] {
-        // XSLT 1.0 section 6: pick the highest import-precedence definition, not the
-        // first by position, so an included template outranks a same-name import.
-        guard let template = stylesheet.templates.filter({ $0.name == name })
-            .max(by: { $0.importPrecedence < $1.importPrecedence }) else { return [] }
-        return instantiateTemplate(template, context, passing: parameters, from: context)
-    }
-
-    // MARK: Building elements
-
-    func buildElement(
-        name: PureXML.Model.QualifiedName,
-        literalAttributes: [PureXML.XSLT.LiteralAttribute],
-        useAttributeSets: [String],
-        body: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> ResultItem {
-        // Attribute sets are lowest precedence, then the element's literal
-        // attributes, then its xsl:attribute body; a later same-named attribute
-        // replaces an earlier one.
-        var attributes = attributeSetAttributes(useAttributeSets, context, visiting: [])
-        attributes += literalAttributes.map { PureXML.Model.Attribute(name: $0.name, value: avt($0.value, context)) }
-        var children: [PureXML.Model.Node] = []
-        for item in instantiate(body, context) {
-            switch item {
-            case let .attribute(attribute):
-                // Ignored once content has been added (the XSLT recovery for
-                // an attribute created after children).
-                if children.isEmpty { attributes.append(attribute) }
-            case let .node(node): children.append(node)
-            }
-        }
-        return .node(.element(.init(name: name, attributes: Self.deduplicated(attributes), children: children)))
-    }
-
     /// The attributes contributed by `names` and the attribute sets they include,
     /// lower precedence first, with a `visiting` guard against recursive includes.
     func attributeSetAttributes(_ names: [String], _ context: XSLTContext, visiting: Set<String>) -> [PureXML.Model.Attribute] {

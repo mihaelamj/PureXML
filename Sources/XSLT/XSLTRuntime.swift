@@ -1,11 +1,11 @@
 extension PureXML.XSLT {
-    /// The default ceiling on template-instantiation nesting (see
-    /// ``RecursionGuard``). Chosen to clear the parser's max source depth (256),
-    /// so an identity transform of the deepest permitted source still runs, while
-    /// staying within an 8 MB stack with margin; unbounded template recursion
-    /// (which can overflow the stack) trips it well before that. Configurable per
-    /// transform for stylesheets with deeper legitimate recursion.
-    public static let defaultMaxTemplateDepth = 300
+    /// The default ceiling on logical template-application nesting (see
+    /// ``RecursionGuard``). The evaluator is iterative, so this is no longer a
+    /// stack limit but a runaway guard: legitimate deep recursion (well into the
+    /// thousands) succeeds, while an infinite or unbounded recursion, whose result
+    /// tree would grow without bound, fails gracefully once it passes this depth.
+    /// Configurable per transform.
+    public static let defaultMaxTemplateDepth = 40000
 
     /// One produced item: a node for the result tree, or an attribute to attach to
     /// the enclosing element.
@@ -73,14 +73,15 @@ extension PureXML.XSLT {
         var message: String?
     }
 
-    /// Shared, mutable guard against unbounded template-instantiation recursion
-    /// (a recursive template whose depth is driven by source data would otherwise
-    /// overflow the native stack). `depth` tracks the current nesting of template
-    /// applications; `exceeded` latches once it passes the configured limit, so the
-    /// instantiation loops unwind and the transform fails gracefully. A reference
-    /// type so the value-semantics transformer can update it.
+    /// Shared, mutable latch for runaway template recursion. The evaluator is
+    /// iterative, so deep recursion no longer overflows the stack; this instead
+    /// caps the *logical* template-application depth (carried on each work item)
+    /// so an unbounded or infinite recursion, whose result tree would grow without
+    /// bound, fails gracefully rather than exhausting memory. `exceeded` latches
+    /// once the depth passes `maxTemplateDepth`, so the work stack drains and the
+    /// transform throws. A reference type so the value-semantics transformer can
+    /// set it.
     final class RecursionGuard {
-        var depth = 0
         var exceeded = false
     }
 }
