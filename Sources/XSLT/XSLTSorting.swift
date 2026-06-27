@@ -122,7 +122,13 @@ extension PureXML.XSLT.Transformer {
     }
 
     func builtInRule(_ xnode: PureXML.XPath.Node, mode: String?, _ context: XSLTContext) -> [ResultItem] {
-        switch xnode {
+        recursionGuard.depth += 1
+        defer { recursionGuard.depth -= 1 }
+        guard recursionGuard.depth <= maxTemplateDepth else {
+            recursionGuard.exceeded = true
+            return []
+        }
+        return switch xnode {
         case let .tree(node):
             switch node.kind {
             case .element, .document:
@@ -136,6 +142,24 @@ extension PureXML.XSLT.Transformer {
             [.node(.text(attribute.value))]
         case let .namespace(_, _, uri):
             [.node(.text(uri))]
+        }
+    }
+
+    /// Copies the nodes selected by `select` into the result tree (`xsl:copy-of`);
+    /// a non-node-set result copies as its string value. Whole subtrees are taken
+    /// as-is, so this does not recurse on their depth.
+    func copyOf(_ select: String, _ context: XSLTContext) -> [ResultItem] {
+        guard let nodes = value(select, context)?.nodes else {
+            // A non-node-set result copies as its string value.
+            return value(select, context).map { [.node(.text($0.string))] } ?? []
+        }
+        return nodes.map { xnode in
+            switch xnode {
+            case let .tree(tree): .node(Self.withInScopeNamespaces(tree))
+            case let .attribute(_, attribute): .attribute(attribute)
+            case let .namespace(_, prefix, uri):
+                .attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:\(prefix)", uri))
+            }
         }
     }
 
@@ -154,6 +178,12 @@ extension PureXML.XSLT.Transformer {
         passing parameters: [PureXML.XSLT.Binding],
         from caller: XSLTContext,
     ) -> [ResultItem] {
+        recursionGuard.depth += 1
+        defer { recursionGuard.depth -= 1 }
+        guard recursionGuard.depth <= maxTemplateDepth else {
+            recursionGuard.exceeded = true
+            return []
+        }
         var context = context
         context.importPrecedence = template.importPrecedence
         context.importRangeLow = template.importRangeLow

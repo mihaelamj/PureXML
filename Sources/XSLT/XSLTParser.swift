@@ -35,11 +35,17 @@ public extension PureXML.XSLT {
         case notAStylesheet
         /// An `xsl:message terminate="yes"` ended the transformation with this text.
         case terminated(String)
+        /// Template instantiation nested deeper than the configured limit (the
+        /// associated value), so the transform was stopped before it could
+        /// overflow the stack. Reached by unbounded template recursion, e.g. a
+        /// recursive named template whose depth is driven by source data.
+        case recursionLimitExceeded(Int)
 
         public var description: String {
             switch self {
             case .notAStylesheet: "the document is not an xsl:stylesheet"
             case let .terminated(message): "transformation terminated: \(message)"
+            case let .recursionLimitExceeded(limit): "template recursion exceeded the limit of \(limit)"
             }
         }
     }
