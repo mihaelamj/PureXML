@@ -1,3 +1,20 @@
+/// A mutable bag of rebuilt nodes a branch's children gather into, so the
+/// canonical prefix rewrite's deferred build step assembles the parent once they
+/// are done.
+private final class CanonicalRewriteAccumulator {
+    var nodes: [PureXML.Model.Node] = []
+}
+
+/// One unit of canonical prefix-rewrite work: visit a source node (appending its
+/// rebuilt result to `target`), or, after a branch's children are gathered, build
+/// the element or document. File-scoped so the work stack is not a third level of
+/// type nesting.
+private enum CanonicalRewriteWork {
+    case visit(PureXML.Model.Node, inScope: [String: String], isRoot: Bool, target: CanonicalRewriteAccumulator)
+    case buildElement(PureXML.Model.Element, childInScope: [String: String], isRoot: Bool, gathered: CanonicalRewriteAccumulator, target: CanonicalRewriteAccumulator)
+    case buildDocument(CanonicalRewriteAccumulator, CanonicalRewriteAccumulator)
+}
+
 extension PureXML.Canonical {
     /// The Canonical XML 2.0 sequential prefix rewrite. Implemented as a pre-pass
     /// that rebuilds the tree using canonical prefixes (`n0`, `n1`, ... in
@@ -16,41 +33,47 @@ extension PureXML.Canonical {
             var assignment: [String: String] = [:]
             var order = 0
             assign(node, inScope: [:], labels: labels, &assignment, &order)
-            return transform(node, inScope: [:], assignment: assignment, labels: labels, isRoot: true)
+            return transform(node, assignment: assignment, labels: labels)
         }
 
         // MARK: First pass: assign a canonical prefix per visibly-used namespace
 
         private static func assign(
-            _ node: PureXML.Model.Node,
+            _ root: PureXML.Model.Node,
             inScope: [String: String],
             labels: [QNameAwareLabel],
             _ assignment: inout [String: String],
             _ order: inout Int,
         ) {
-            switch node {
-            case let .document(children):
-                for child in children {
-                    assign(child, inScope: inScope, labels: labels, &assignment, &order)
+            // Iterative pre-order walk so a deeply-nested document does not overflow
+            // the stack; children push reversed so namespaces are recorded in
+            // document order, the order the canonical prefixes n0, n1, ... assign in.
+            var stack: [(node: PureXML.Model.Node, inScope: [String: String])] = [(root, inScope)]
+            while let (node, inScope) = stack.popLast() {
+                switch node {
+                case let .document(children):
+                    for child in children.reversed() {
+                        stack.append((child, inScope))
+                    }
+                case let .element(element):
+                    var childInScope = inScope
+                    for (prefix, uri) in declarations(element) {
+                        childInScope[prefix] = uri
+                    }
+                    record(element.name.namespaceURI, &assignment, &order)
+                    for attribute in element.attributes where attribute.name.prefix != nil {
+                        record(attribute.name.namespaceURI, &assignment, &order)
+                    }
+                    for attribute in element.attributes where isQNameAttribute(attribute.name, labels) {
+                        record(qnameNamespace(attribute.value, inScope: childInScope), &assignment, &order)
+                    }
+                    record(qnameNamespace(element.text(matching: labels), inScope: childInScope), &assignment, &order)
+                    for child in element.children.reversed() {
+                        stack.append((child, childInScope))
+                    }
+                default:
+                    break
                 }
-            case let .element(element):
-                var childInScope = inScope
-                for (prefix, uri) in declarations(element) {
-                    childInScope[prefix] = uri
-                }
-                record(element.name.namespaceURI, &assignment, &order)
-                for attribute in element.attributes where attribute.name.prefix != nil {
-                    record(attribute.name.namespaceURI, &assignment, &order)
-                }
-                for attribute in element.attributes where isQNameAttribute(attribute.name, labels) {
-                    record(qnameNamespace(attribute.value, inScope: childInScope), &assignment, &order)
-                }
-                record(qnameNamespace(element.text(matching: labels), inScope: childInScope), &assignment, &order)
-                for child in element.children {
-                    assign(child, inScope: childInScope, labels: labels, &assignment, &order)
-                }
-            default:
-                break
             }
         }
 
@@ -73,46 +96,72 @@ extension PureXML.Canonical {
 
         // MARK: Second pass: rebuild with canonical prefixes
 
+        /// Rebuilds the tree with canonical prefixes without recursing on its depth.
+        /// An explicit work stack threads the in-scope declarations and the root
+        /// flag down per element, while each branch gathers its rebuilt children
+        /// into a reference accumulator that a deferred build step assembles, so a
+        /// deeply-nested document does not overflow the stack.
         private static func transform(
-            _ node: PureXML.Model.Node,
-            inScope: [String: String],
+            _ root: PureXML.Model.Node,
             assignment: [String: String],
             labels: [QNameAwareLabel],
-            isRoot: Bool,
         ) -> PureXML.Model.Node {
-            switch node {
-            case let .document(children):
-                .document(children.map { transform($0, inScope: inScope, assignment: assignment, labels: labels, isRoot: isRoot) })
-            case let .element(element):
-                .element(transform(element, inScope: inScope, assignment: assignment, labels: labels, isRoot: isRoot))
-            default:
-                node
+            let result = CanonicalRewriteAccumulator()
+            var stack: [CanonicalRewriteWork] = [.visit(root, inScope: [:], isRoot: true, target: result)]
+            while let work = stack.popLast() {
+                switch work {
+                case let .visit(node, inScope, isRoot, target):
+                    visitForRewrite(node, inScope: inScope, isRoot: isRoot, target: target, stack: &stack)
+                case let .buildElement(element, childInScope, isRoot, gathered, target):
+                    var attributes = isRoot ? canonicalDeclarations(assignment) : []
+                    for attribute in element.attributes where declaredPrefix(of: attribute.name) == nil {
+                        attributes.append(rewrite(attribute, inScope: childInScope, assignment: assignment, labels: labels))
+                    }
+                    // A QName-labelled element's single text child is rewritten to a
+                    // canonical-prefixed QName, replacing its rebuilt children.
+                    let qualified = qname(element.text(matching: labels), inScope: childInScope, assignment: assignment)
+                    target.nodes.append(.element(PureXML.Model.Element(
+                        name: rename(element.name, assignment: assignment),
+                        attributes: attributes,
+                        children: qualified.map { [PureXML.Model.Node.text($0)] } ?? gathered.nodes,
+                    )))
+                case let .buildDocument(gathered, target):
+                    target.nodes.append(.document(gathered.nodes))
+                }
             }
+            return result.nodes.first ?? root
         }
 
-        private static func transform(
-            _ element: PureXML.Model.Element,
+        /// Pushes a node's rebuild work: a document or element schedules its build
+        /// step then its children (with the in-scope declarations extended), a leaf
+        /// is appended to `target` unchanged.
+        private static func visitForRewrite(
+            _ node: PureXML.Model.Node,
             inScope: [String: String],
-            assignment: [String: String],
-            labels: [QNameAwareLabel],
             isRoot: Bool,
-        ) -> PureXML.Model.Element {
-            var childInScope = inScope
-            for (prefix, uri) in declarations(element) {
-                childInScope[prefix] = uri
+            target: CanonicalRewriteAccumulator,
+            stack: inout [CanonicalRewriteWork],
+        ) {
+            switch node {
+            case let .document(children):
+                let gathered = CanonicalRewriteAccumulator()
+                stack.append(.buildDocument(gathered, target))
+                for child in children.reversed() {
+                    stack.append(.visit(child, inScope: inScope, isRoot: isRoot, target: gathered))
+                }
+            case let .element(element):
+                var childInScope = inScope
+                for (prefix, uri) in declarations(element) {
+                    childInScope[prefix] = uri
+                }
+                let gathered = CanonicalRewriteAccumulator()
+                stack.append(.buildElement(element, childInScope: childInScope, isRoot: isRoot, gathered: gathered, target: target))
+                for child in element.children.reversed() {
+                    stack.append(.visit(child, inScope: childInScope, isRoot: false, target: gathered))
+                }
+            default:
+                target.nodes.append(node)
             }
-
-            var attributes = isRoot ? canonicalDeclarations(assignment) : []
-            for attribute in element.attributes where declaredPrefix(of: attribute.name) == nil {
-                attributes.append(rewrite(attribute, inScope: childInScope, assignment: assignment, labels: labels))
-            }
-            let children = element.children.map { transform($0, inScope: childInScope, assignment: assignment, labels: labels, isRoot: false) }
-            let qualified = qname(element.text(matching: labels), inScope: childInScope, assignment: assignment)
-            return PureXML.Model.Element(
-                name: rename(element.name, assignment: assignment),
-                attributes: attributes,
-                children: qualified.map { [PureXML.Model.Node.text($0)] } ?? children,
-            )
         }
 
         /// One `xmlns:nK="uri"` declaration per assigned namespace, hoisted to the

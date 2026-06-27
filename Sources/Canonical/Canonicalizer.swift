@@ -252,49 +252,54 @@ public extension PureXML.Canonical.Canonicalizer {
     }
 
     private func emitSelected(
+        _ root: PureXML.Model.TreeNode,
+        inScope: [String: String],
+        rendered: [String: String],
+        including predicate: (PureXML.Model.TreeNode) -> Bool,
+        output: inout String,
+    ) {
+        // Deferred-close work stack so a deeply-nested subtree does not overflow
+        // the stack; children push reversed to emit in document order, threading
+        // each element's in-scope and already-rendered namespace context.
+        var stack: [CanonicalSelectedStep] = [.open(root, inScope: inScope, rendered: rendered)]
+        while let step = stack.popLast() {
+            switch step {
+            case let .close(name):
+                output += "</\(name)>"
+            case let .open(node, inScope, rendered):
+                switch node.kind {
+                case .document:
+                    for child in node.children.reversed() {
+                        stack.append(.open(child, inScope: inScope, rendered: rendered))
+                    }
+                case .element:
+                    stack.append(contentsOf: selectedElementSteps(node, inScope: inScope, rendered: rendered, including: predicate, into: &output))
+                default:
+                    emitSelectedLeaf(node, including: predicate, into: &output)
+                }
+            }
+        }
+    }
+
+    /// Emits a selected element's start tag and returns the steps to push for its
+    /// subtree: its children to visit, preceded by a close step (so the close pops
+    /// after them). An omitted element renders nothing and pushes no close, but its
+    /// declarations still stay in scope for descendants, so a selected descendant
+    /// re-declares them itself.
+    private func selectedElementSteps(
         _ node: PureXML.Model.TreeNode,
         inScope: [String: String],
         rendered: [String: String],
         including predicate: (PureXML.Model.TreeNode) -> Bool,
-        output: inout String,
-    ) {
-        switch node.kind {
-        case .document:
-            for child in node.children {
-                emitSelected(child, inScope: inScope, rendered: rendered, including: predicate, output: &output)
-            }
-        case .element:
-            emitSelected(element: node, inScope: inScope, rendered: rendered, including: predicate, output: &output)
-        case .text, .cdata:
-            if predicate(node) { output += Self.escapeText(options.trimTextNodes ? node.value.trimmingXMLWhitespace() : node.value) }
-        case .comment:
-            if predicate(node), options.includeComments { output += "<!--\(node.value)-->" }
-        case .processingInstruction:
-            if predicate(node) { output += node.value.isEmpty ? "<?\(node.name?.description ?? "")?>" : "<?\(node.name?.description ?? "") \(node.value)?>" }
-        case .doctype, .entityReference, .namespace:
-            break
-        }
-    }
-
-    private func emitSelected(
-        element node: PureXML.Model.TreeNode,
-        inScope: [String: String],
-        rendered: [String: String],
-        including predicate: (PureXML.Model.TreeNode) -> Bool,
-        output: inout String,
-    ) {
+        into output: inout String,
+    ) -> [CanonicalSelectedStep] {
         let element = PureXML.Model.Element(name: node.name ?? .init(""), attributes: node.attributes, children: [])
         var childInScope = inScope
         for (prefix, uri) in Self.namespaceDeclarations(element) {
             childInScope[prefix] = uri
         }
         guard predicate(node) else {
-            // Omitted element: its namespaces stay in scope for descendants, but
-            // nothing is rendered, so a selected descendant renders them itself.
-            for child in node.children {
-                emitSelected(child, inScope: childInScope, rendered: rendered, including: predicate, output: &output)
-            }
-            return
+            return node.children.reversed().map { .open($0, inScope: childInScope, rendered: rendered) }
         }
         let attributes = Self.plainAttributes(element)
         let toRender = selectedNamespaces(element, inScope: childInScope, attributes: attributes, rendered: rendered)
@@ -310,10 +315,24 @@ public extension PureXML.Canonical.Canonicalizer {
             output += " \(attribute.name.description)=\"\(Self.escapeAttribute(attribute.value))\""
         }
         output += ">"
-        for child in node.children {
-            emitSelected(child, inScope: childInScope, rendered: childRendered, including: predicate, output: &output)
+        var steps: [CanonicalSelectedStep] = [.close(element.name.description)]
+        steps.append(contentsOf: node.children.reversed().map { .open($0, inScope: childInScope, rendered: childRendered) })
+        return steps
+    }
+
+    /// Emits a selected non-element node (text, CDATA, comment, or PI).
+    private func emitSelectedLeaf(_ node: PureXML.Model.TreeNode, including predicate: (PureXML.Model.TreeNode) -> Bool, into output: inout String) {
+        guard predicate(node) else { return }
+        switch node.kind {
+        case .text, .cdata:
+            output += Self.escapeText(options.trimTextNodes ? node.value.trimmingXMLWhitespace() : node.value)
+        case .comment:
+            if options.includeComments { output += "<!--\(node.value)-->" }
+        case .processingInstruction:
+            output += node.value.isEmpty ? "<?\(node.name?.description ?? "")?>" : "<?\(node.name?.description ?? "") \(node.value)?>"
+        case .element, .document, .doctype, .entityReference, .namespace:
+            break
         }
-        output += "</\(element.name.description)>"
     }
 
     /// The namespaces a selected element renders: in inclusive mode every in-scope
