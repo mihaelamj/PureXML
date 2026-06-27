@@ -86,27 +86,31 @@ public extension PureXML.XSLT {
     /// prepended to the children of the first `head` element (16.2: the html
     /// output method should add a meta element giving the encoding).
     private static func withContentTypeMeta(_ node: PureXML.Model.Node, encoding: String) -> PureXML.Model.Node {
-        switch node {
-        case let .document(children):
-            return .document(children.map { withContentTypeMeta($0, encoding: encoding) })
-        case let .element(element):
-            var children = element.children.map { withContentTypeMeta($0, encoding: encoding) }
-            let needsMeta = element.name.localName.lowercased() == "head"
-                && !children.contains(where: { isContentTypeMeta($0) })
-            if needsMeta {
-                let meta = PureXML.Model.Element(
-                    name: .init("META"),
-                    attributes: [
-                        .init("http-equiv", "Content-Type"),
-                        .init("content", "text/html; charset=\(encoding)"),
-                    ],
-                    children: [],
-                )
-                children.insert(.element(meta), at: 0)
+        // Rebuilt bottom-up through the shared iterative spine so a deeply-nested
+        // result does not overflow the stack.
+        node.rebuildingBottomUp { node, rebuiltChildren in
+            switch node {
+            case .document:
+                return .document(rebuiltChildren)
+            case let .element(element):
+                var children = rebuiltChildren
+                let needsMeta = element.name.localName.lowercased() == "head"
+                    && !children.contains(where: { isContentTypeMeta($0) })
+                if needsMeta {
+                    let meta = PureXML.Model.Element(
+                        name: .init("META"),
+                        attributes: [
+                            .init("http-equiv", "Content-Type"),
+                            .init("content", "text/html; charset=\(encoding)"),
+                        ],
+                        children: [],
+                    )
+                    children.insert(.element(meta), at: 0)
+                }
+                return .element(.init(name: element.name, attributes: element.attributes, children: children))
+            default:
+                return node
             }
-            return .element(.init(name: element.name, attributes: element.attributes, children: children))
-        default:
-            return node
         }
     }
 
@@ -119,18 +123,24 @@ public extension PureXML.XSLT {
     /// replaced by CDATA nodes, so the serializer emits them as CDATA sections.
     private static func withCDATASections(_ node: PureXML.Model.Node, _ names: Set<String>) -> PureXML.Model.Node {
         guard !names.isEmpty else { return node }
-        switch node {
-        case let .document(children):
-            return .document(children.map { withCDATASections($0, names) })
-        case let .element(element):
-            let wrap = names.contains(element.name.localName) || names.contains(element.name.description)
-            let children = element.children.flatMap { child -> [PureXML.Model.Node] in
-                if wrap, case let .text(value) = child { return cdataNodes(value) }
-                return [withCDATASections(child, names)]
+        // Rebuilt bottom-up through the shared iterative spine; an element named in
+        // `names` has its own text children re-wrapped as CDATA.
+        return node.rebuildingBottomUp { node, rebuiltChildren in
+            switch node {
+            case .document:
+                return .document(rebuiltChildren)
+            case let .element(element):
+                let wrap = names.contains(element.name.localName) || names.contains(element.name.description)
+                let children = wrap
+                    ? rebuiltChildren.flatMap { child -> [PureXML.Model.Node] in
+                        if case let .text(value) = child { return cdataNodes(value) }
+                        return [child]
+                    }
+                    : rebuiltChildren
+                return .element(.init(name: element.name, attributes: element.attributes, children: children))
+            default:
+                return node
             }
-            return .element(.init(name: element.name, attributes: element.attributes, children: children))
-        default:
-            return node
         }
     }
 
@@ -244,11 +254,23 @@ public extension PureXML.XSLT {
     /// The concatenated text content of a result tree, for the `text` output
     /// method: character data only, with markup, comments, and PIs dropped.
     private static func textValue(of node: PureXML.Model.Node) -> String {
-        switch node {
-        case let .text(value), let .cdata(value): value
-        case let .document(children): children.map(textValue).joined()
-        case let .element(element): element.children.map(textValue).joined()
-        case .comment, .processingInstruction: ""
+        // Iterative pre-order walk so a deeply-nested result tree does not overflow
+        // the stack; children push reversed to keep document order. Only character
+        // data contributes; markup, comments, and PIs drop out.
+        var result = ""
+        var stack: [PureXML.Model.Node] = [node]
+        while let current = stack.popLast() {
+            switch current {
+            case let .text(value), let .cdata(value):
+                result += value
+            case let .document(children):
+                stack.append(contentsOf: children.reversed())
+            case let .element(element):
+                stack.append(contentsOf: element.children.reversed())
+            case .comment, .processingInstruction:
+                break
+            }
         }
+        return result
     }
 }

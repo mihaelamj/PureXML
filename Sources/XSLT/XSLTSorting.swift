@@ -87,64 +87,6 @@ extension PureXML.XSLT.Transformer {
         text.enumerated().compactMap { $1 == " " ? $0 : nil }
     }
 
-    func forEach(
-        _ select: String,
-        _ sorts: [PureXML.XSLT.Sort],
-        _ body: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> [ResultItem] {
-        let nodes = sorted(selectXPathNodes(select, context), sorts, context)
-        var items: [ResultItem] = []
-        for (offset, xnode) in nodes.enumerated() {
-            guard let owner = Self.ownerNode(xnode) else { continue }
-            var itemContext = XSLTContext(
-                node: owner,
-                current: xnode.treeNode == nil ? xnode : nil,
-                position: offset + 1,
-                size: nodes.count,
-                variables: context.variables,
-            )
-            itemContext.baseURI = context.baseURI
-            items += instantiate(body, itemContext)
-        }
-        return items
-    }
-
-    func chooseInstruction(
-        _ whens: [PureXML.XSLT.Branch],
-        _ otherwise: [PureXML.XSLT.Instruction],
-        _ context: XSLTContext,
-    ) -> [ResultItem] {
-        for branch in whens where boolean(branch.test, context) {
-            return instantiate(branch.body, context)
-        }
-        return instantiate(otherwise, context)
-    }
-
-    func builtInRule(_ xnode: PureXML.XPath.Node, mode: String?, _ context: XSLTContext) -> [ResultItem] {
-        recursionGuard.depth += 1
-        defer { recursionGuard.depth -= 1 }
-        guard recursionGuard.depth <= maxTemplateDepth else {
-            recursionGuard.exceeded = true
-            return []
-        }
-        return switch xnode {
-        case let .tree(node):
-            switch node.kind {
-            case .element, .document:
-                applyTemplates(to: node.children.map { .tree($0) }, mode: mode, parameters: [], context)
-            case .text, .cdata:
-                [.node(.text(node.value))]
-            default:
-                []
-            }
-        case let .attribute(_, attribute):
-            [.node(.text(attribute.value))]
-        case let .namespace(_, _, uri):
-            [.node(.text(uri))]
-        }
-    }
-
     /// Copies the nodes selected by `select` into the result tree (`xsl:copy-of`);
     /// a non-node-set result copies as its string value. Whole subtrees are taken
     /// as-is, so this does not recurse on their depth.
@@ -161,41 +103,5 @@ extension PureXML.XSLT.Transformer {
                 .attribute(.init(prefix.isEmpty ? "xmlns" : "xmlns:\(prefix)", uri))
             }
         }
-    }
-
-    func message(_ terminate: Bool, _ body: [PureXML.XSLT.Instruction], _ context: XSLTContext) -> [ResultItem] {
-        if terminate, termination.message == nil {
-            termination.message = Self.text(of: instantiate(body, context))
-        }
-        return []
-    }
-
-    /// Binds the template's parameters (a passed `with-param` wins over the
-    /// declared default) and instantiates its body.
-    func instantiateTemplate(
-        _ template: PureXML.XSLT.Template,
-        _ context: XSLTContext,
-        passing parameters: [PureXML.XSLT.Binding],
-        from caller: XSLTContext,
-    ) -> [ResultItem] {
-        recursionGuard.depth += 1
-        defer { recursionGuard.depth -= 1 }
-        guard recursionGuard.depth <= maxTemplateDepth else {
-            recursionGuard.exceeded = true
-            return []
-        }
-        var context = context
-        context.importPrecedence = template.importPrecedence
-        context.importRangeLow = template.importRangeLow
-        context.namespaces = template.namespaces
-        context.baseURI = template.baseURI
-        for parameter in template.parameters {
-            if let passed = parameters.first(where: { $0.name == parameter.name }) {
-                context.variables[parameter.name] = variableValue(passed.select, passed.body, caller)
-            } else {
-                context.variables[parameter.name] = variableValue(parameter.select, parameter.body, context)
-            }
-        }
-        return instantiate(template.body, context)
     }
 }
