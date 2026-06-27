@@ -5,45 +5,53 @@ extension PureXML.HTML {
     /// attribute values are escaped per HTML.
     enum Serializer {
         static func serialize(_ node: PureXML.Model.Node) -> String {
+            // Deferred-close work stack so a deeply-nested tree does not overflow
+            // the stack (the same shape as the XML serializer and Canonicalizer);
+            // children push reversed to emit in document order.
+            var output = ""
+            var stack: [HTMLSerializeStep] = [.node(node, rawTextParent: false)]
+            while let step = stack.popLast() {
+                switch step {
+                case let .close(name):
+                    output += "</\(name)>"
+                case let .node(node, rawTextParent):
+                    emit(node, rawTextParent: rawTextParent, into: &output, stack: &stack)
+                }
+            }
+            return output
+        }
+
+        private static func emit(
+            _ node: PureXML.Model.Node,
+            rawTextParent: Bool,
+            into output: inout String,
+            stack: inout [HTMLSerializeStep],
+        ) {
             switch node {
             case let .document(children):
-                children.map(serialize).joined()
+                stack.append(contentsOf: children.reversed().map { HTMLSerializeStep.node($0, rawTextParent: false) })
             case let .element(element):
-                serializeElement(element)
+                let name = element.name.description
+                output += "<" + name
+                for attribute in element.attributes {
+                    output += attributeText(attribute)
+                }
+                output += ">"
+                // A void element has no end tag and no content (the html model);
+                // anything nested is dropped, as the recursive form did.
+                if Elements.void.contains(name.lowercased()) { return }
+                stack.append(HTMLSerializeStep.close(name))
+                // A raw-text element (script, style) writes its own text children
+                // verbatim; nested elements still serialize normally by their own
+                // name, so the flag governs only this element's direct text.
+                let childRawText = Elements.rawText.contains(name.lowercased())
+                stack.append(contentsOf: element.children.reversed().map { HTMLSerializeStep.node($0, rawTextParent: childRawText) })
             case let .text(value), let .cdata(value):
-                escapeText(value)
+                output += rawTextParent ? value : escapeText(value)
             case let .comment(value):
-                "<!--\(PureXML.Emitting.Escaping.comment(value))-->"
+                output += "<!--\(PureXML.Emitting.Escaping.comment(value))-->"
             case let .processingInstruction(target, data):
-                data.isEmpty ? "<?\(target)>" : "<?\(target) \(data)>"
-            }
-        }
-
-        private static func serializeElement(_ element: PureXML.Model.Element) -> String {
-            let name = element.name.description
-            var output = "<" + name
-            for attribute in element.attributes {
-                output += attributeText(attribute)
-            }
-            output += ">"
-            if Elements.void.contains(name.lowercased()) {
-                return output
-            }
-            output += content(of: element, name: name)
-            return output + "</\(name)>"
-        }
-
-        private static func content(of element: PureXML.Model.Element, name: String) -> String {
-            if Elements.rawText.contains(name.lowercased()) {
-                return element.children.map(rawText).joined()
-            }
-            return element.children.map(serialize).joined()
-        }
-
-        private static func rawText(_ node: PureXML.Model.Node) -> String {
-            switch node {
-            case let .text(value), let .cdata(value): value
-            default: serialize(node)
+                output += data.isEmpty ? "<?\(target)>" : "<?\(target) \(data)>"
             }
         }
 
@@ -175,4 +183,13 @@ public extension PureXML.HTML {
     static func serialize(_ node: PureXML.Model.Node) -> String {
         Serializer.serialize(node)
     }
+}
+
+/// One unit of HTML serialization work: a node to emit (with whether its parent
+/// is a raw-text element, so its own text is written unescaped) or a close tag
+/// deferred until after the element's children. File-scoped so the serializer's
+/// deferred-close work stack is not a third level of type nesting.
+private enum HTMLSerializeStep {
+    case node(PureXML.Model.Node, rawTextParent: Bool)
+    case close(String)
 }
